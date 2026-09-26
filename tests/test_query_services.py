@@ -37,6 +37,7 @@ from backend.db.models import (
     PositionTotal,
 )
 from backend.services import analysis, explorer, notes, stats
+from backend.services import collections as collections_service
 from backend.services import games as games_service
 from backend.services import live as live_service
 from backend.services.games import GameFilters
@@ -1281,6 +1282,45 @@ def test_the_tree_narrows_to_speeds_and_a_start_date(
 
     rows = explorer.find_positions(session, START_EPD, speeds=[Speed.BULLET])
     assert [row["game"]["id"] for row in rows] == [library["qg000004"].id]
+
+
+def test_the_tree_narrows_to_a_collection(
+    library: Library, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A collection's tree counts its games only, off the live fold and never the book.
+
+    The book is built for the initial array, so an unnarrowed read answers from it; the
+    collection has to be what sends the read down the live path, or it would count all six.
+    """
+    session = library.session
+    monkeypatch.setattr(explorer, "BOOK_MIN_OCCURRENCES", 2)
+    while explorer.rebuild_position_books(session):
+        pass
+    assert explorer.find_position(session, START_EPD).book_state == explorer.BOOK_BUILT
+    picked = [library["qg000001"].id, library["qg000004"].id, library["qg000006"].id]
+    league = collections_service.create_collection(session, name="League", game_ids=picked)
+    assert explorer.GameScope(collection=league.id).narrows
+
+    tree = explorer.opening_explorer(session, collection=league.id)
+    assert tree["totals"]["games"] == 3
+    keyed = {node["uci"]: node["games"] for node in tree["moves"]}
+    assert keyed == {"e2e4": 2, "d2d4": 1}
+    # The unnarrowed tree still counts every game: a collection groups and hides nothing.
+    assert explorer.opening_explorer(session)["totals"]["games"] == 6
+
+    # It composes with the other lenses and with an ECO entry.
+    assert explorer.opening_explorer(
+        session, collection=league.id, speeds=[Speed.BULLET]
+    )["totals"]["games"] == 1
+    assert explorer.opening_explorer(session, collection=league.id, eco="C")["totals"][
+        "games"
+    ] == 2
+
+    rows = explorer.find_positions(session, START_EPD, collection=league.id)
+    assert sorted(row["game"]["id"] for row in rows) == sorted(picked)
+    empty = collections_service.create_collection(session, name="Empty")
+    assert explorer.opening_explorer(session, collection=empty.id)["totals"]["games"] == 0
+    assert explorer.find_positions(session, START_EPD, collection=empty.id) == []
 
 
 def test_find_positions_caps_the_newest_games_in_the_database(library: Library) -> None:

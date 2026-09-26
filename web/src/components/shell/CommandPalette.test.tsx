@@ -11,19 +11,22 @@ import { CommandPaletteProvider } from './CommandPalette'
 import { PageChromeProvider } from './PageChrome'
 import { TopBar } from './TopBar'
 
-const { useSearch, useProfile, useLogout, useChangePassword, useQueueStatus } = vi.hoisted(() => ({
-  useSearch: vi.fn(),
-  useProfile: vi.fn(),
-  useLogout: vi.fn(),
-  useChangePassword: vi.fn(),
-  useQueueStatus: vi.fn(),
-}))
+const { useSearch, useProfile, useLogout, useChangePassword, useQueueStatus, useCollections } =
+  vi.hoisted(() => ({
+    useSearch: vi.fn(),
+    useProfile: vi.fn(),
+    useLogout: vi.fn(),
+    useChangePassword: vi.fn(),
+    useQueueStatus: vi.fn(),
+    useCollections: vi.fn(),
+  }))
 vi.mock('@/lib/api/queries', () => ({
   useSearch,
   useProfile,
   useLogout,
   useChangePassword,
   useQueueStatus,
+  useCollections,
 }))
 
 // The account chip is the titlebar's, not the palette's, and it wants the tour provider
@@ -48,8 +51,9 @@ interface Answer {
 const EMPTY: Answer = { games: [], opponents: [], openings: [], notes: [] }
 
 /** The palette as it is really mounted: around the titlebar that raises it. */
-function draw(data: Answer = EMPTY) {
+function draw(data: Answer = EMPTY, collections: unknown[] = []) {
   useSearch.mockReturnValue({ data, isFetching: false })
+  useCollections.mockReturnValue({ data: { collections }, isPending: false })
   useProfile.mockReturnValue({ data: undefined, isPending: true })
   useQueueStatus.mockReturnValue({ data: undefined, isPending: true })
   useLogout.mockReturnValue({ mutate: vi.fn(), isPending: false })
@@ -152,6 +156,30 @@ describe('the ⌘K palette', () => {
 
     expect(screen.getByTestId('where')).toHaveTextContent('/games/42')
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  })
+
+  it('finds a collection by name, and every one of them by the word', async () => {
+    const user = userEvent.setup()
+    draw(EMPTY, [
+      { id: 3, name: '45-45 League', color: 'good', game_count: 8, created_at: '' },
+      { id: 7, name: 'Tough losses', color: 'blunder', game_count: 23, created_at: '' },
+    ])
+
+    await user.keyboard('{Meta>}k{/Meta}')
+    // Nothing typed: collections wait to be asked for, like the saved cuts.
+    expect(screen.queryByRole('option', { name: /League/ })).not.toBeInTheDocument()
+
+    await user.keyboard('league')
+    expect(screen.getByRole('option', { name: /45-45 League/ })).toBeInTheDocument()
+    expect(screen.queryByRole('option', { name: /Tough losses/ })).not.toBeInTheDocument()
+
+    await user.clear(screen.getByRole('textbox', { name: 'Search everything' }))
+    await user.keyboard('collection')
+    expect(screen.getByRole('option', { name: /Tough losses/ })).toBeInTheDocument()
+
+    await user.clear(screen.getByRole('textbox', { name: 'Search everything' }))
+    await user.keyboard('tough{Enter}')
+    expect(screen.getByTestId('where')).toHaveTextContent('/games?collection=7')
   })
 
   it('navigates to the page the highlight rests on', async () => {

@@ -128,6 +128,10 @@ _CACHE: dict[tuple[Any, ...], tuple[float, Any]] = {}
 # `_CACHE_LOCK` — a slot appears and disappears in the same critical section that reads and
 # writes the entry beside it, so nobody ever sees a key with neither.
 _INFLIGHT: dict[tuple[Any, ...], Future[Any]] = {}
+# Bumped by `forget_cached_payloads`, under `_CACHE_LOCK`. A computation remembers the
+# generation it started in and publishes nothing if the cache has been forgotten since:
+# it read the library as it was before the write that forgot it.
+_GENERATION = 0
 _COMPUTE_SLOTS = threading.Semaphore(STATS_CACHE_MAX_CONCURRENT_COMPUTES)
 
 # Whether every game with a primary run has a summary of that run, and when that was last
@@ -186,10 +190,69 @@ def reset_stats_cache() -> None:
     summaries are complete, which is a fact about the database rather than about the
     process, and is emphatically not a fact about the *next* one.
     """
+    global _GENERATION
     with _CACHE_LOCK:
+        _GENERATION += 1
         _CACHE.clear()
         _INFLIGHT.clear()
     reset_summaries_ready()
+
+
+def forget_cached_payloads() -> None:
+    """Drop every cached answer, for a writer that changed which games a filter matches.
+
+    The TTL is there to absorb an analysis batch's refetch storm, where ten seconds of lag
+    is the price of not scanning; a person who has just put games into a collection and
+    opens its Stats is not a storm, and should not be shown the collection as it was.
+
+    A computation already in flight read the library as it was, so it is let go rather than
+    waited on: it finishes and is handed to whoever was already waiting for it, but it is
+    not cached, and a caller arriving after this starts a computation of its own
+    (`_GENERATION`). The memo of whether the per-game summaries are complete is untouched,
+    because membership says nothing about analysis.
+    """
+    global _GENERATION
+    with _CACHE_LOCK:
+        _GENERATION += 1
+        _CACHE.clear()
+        _INFLIGHT.clear()
+
+
+def outcome_summary(session: Session, scope: GameFilters) -> dict[str, Any]:
+    """Games, score, opponents and blunders per game over one scope, from the owner's side.
+
+    The one-line summary a collection's page leads with. Built from the same game rows and
+    the same analysed counts every dimension reads, so "blunders per game" here is the
+    number Stats shows for the same filter: owner blunders in each game's primary run,
+    averaged over the games that have one. Uncached — it is one page's header, asked once
+    per change (`collections.changed` comes once per write or per import, not per game).
+
+    Only games with a side of the owner's count, as in every dimension: somebody else's game
+    has no score for the owner, and neither has one of theirs whose side is not known yet
+    (a PGN under a name that is no account). A scope that holds such games — a collection a
+    reference game was put in by hand — lists more games than this line scores.
+    """
+    rows = _game_rows(session, scope)
+    moves, blunders = _analysed_counts(session, scope, rows)
+    wins = sum(1 for row in rows if row.outcome == WIN)
+    draws = sum(1 for row in rows if row.outcome == DRAW)
+    losses = sum(1 for row in rows if row.outcome == LOSS)
+    opponents = [row.opponent_rating for row in rows if row.opponent_rating is not None]
+    analysed = [row.id for row in rows if row.id in moves]
+    played = [row.played_at for row in rows if row.played_at is not None]
+    return {
+        "games": len(rows),
+        "wins": wins,
+        "draws": draws,
+        "losses": losses,
+        "points": wins + 0.5 * draws,
+        "avg_opponent_rating": round(sum(opponents) / len(opponents)) if opponents else None,
+        "blunders_per_game": _mean(
+            sum(blunders.get(game_id, 0) for game_id in analysed), len(analysed)
+        ),
+        "first_played_at": _stamp(min(played)) if played else None,
+        "last_played_at": _stamp(max(played)) if played else None,
+    }
 
 
 def reset_summaries_ready() -> None:
@@ -878,38 +941,46 @@ def _cached(key: tuple[Any, ...], compute: Callable[[], Any]) -> Any:
         ours = ticket is None
         if ticket is None:
             ticket = _INFLIGHT[key] = Future()
+        generation = _GENERATION
     if ours:
-        return _refresh(key, compute, ticket)
+        return _refresh(key, compute, ticket, generation)
     if entry is not None:
         return entry[1]
     return ticket.result()
 
 
-def _refresh(key: tuple[Any, ...], compute: Callable[[], Any], ticket: Future[Any]) -> Any:
+def _refresh(
+    key: tuple[Any, ...], compute: Callable[[], Any], ticket: Future[Any], generation: int
+) -> Any:
     """Run the one computation for `key`, publish it and free the slot.
 
     The caller has already claimed `key` by putting `ticket` in `_INFLIGHT`; this is the
-    claim being honoured, outside the lock.
+    claim being honoured, outside the lock. A computation that `forget_cached_payloads`
+    overtook (`generation` is no longer current) answers its own waiters and nobody else:
+    its slot may already belong to a newer computation, and its payload is the old library.
     """
     try:
         with _COMPUTE_SLOTS:
             payload = compute()
     except BaseException as error:
         with _CACHE_LOCK:
-            _INFLIGHT.pop(key, None)
+            if _INFLIGHT.get(key) is ticket:
+                _INFLIGHT.pop(key)
         ticket.set_exception(error)
         raise
     with _CACHE_LOCK:
         # The entry and the slot move together, so a caller under the lock sees either a
         # computation in flight beside the payload it is replacing, or a fresh payload and
         # no computation — never a key with neither.
-        _INFLIGHT.pop(key, None)
-        # Re-inserted rather than assigned, so a refreshed entry goes to the back of the
-        # queue and the cap drops what has genuinely been idle longest.
-        _CACHE.pop(key, None)
-        _CACHE[key] = (_clock() + STATS_CACHE_TTL_SECONDS, payload)
-        while len(_CACHE) > STATS_CACHE_MAX_ENTRIES:
-            _CACHE.pop(next(iter(_CACHE)))
+        if _INFLIGHT.get(key) is ticket:
+            _INFLIGHT.pop(key)
+        if generation == _GENERATION:
+            # Re-inserted rather than assigned, so a refreshed entry goes to the back of the
+            # queue and the cap drops what has genuinely been idle longest.
+            _CACHE.pop(key, None)
+            _CACHE[key] = (_clock() + STATS_CACHE_TTL_SECONDS, payload)
+            while len(_CACHE) > STATS_CACHE_MAX_ENTRIES:
+                _CACHE.pop(next(iter(_CACHE)))
     ticket.set_result(payload)
     return payload
 

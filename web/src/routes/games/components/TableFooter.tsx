@@ -21,11 +21,20 @@
  * Below `md` the 46px line becomes as many lines as it needs. Nothing here shortens on a
  * phone: "Queue analysis" is what the button does, and a second line costs less than
  * guessing which word the owner would still recognise it by.
+ *
+ * "Add to…" comes first among the actions because it is the one a selection is most often
+ * made for, and it opens the shared collection checklist (`CollectionChecklist`) above
+ * itself — the footer is pinned to the bottom, so a panel below it would open off screen.
+ * On a collection's page the footer also offers "Remove from collection": the checklist can
+ * do the same, but on that page taking games out is the everyday act and deserves a button.
+ * Both make the one line wider, so the words the pager implies leave earlier than they did.
  */
 import { Trans, useLingui } from '@lingui/react/macro'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import type * as React from 'react'
+import { useEffect, useRef, useState } from 'react'
 
+import { CollectionChecklist, type ChecklistGame } from '@/components/collections/CollectionChecklist'
 import { Button } from '@/components/ui/button'
 
 import { formatCount } from '../format'
@@ -33,6 +42,17 @@ import { pageRange, PAGE_SIZE_OPTIONS, type PageSizeChoice } from '../paging'
 
 export interface TableFooterProps {
   selectedCount: number
+  /**
+   * The selected rows with the collections each is in, for Add to…'s ticks. The same rows
+   * `selectedCount` counts.
+   */
+  selectedGames?: readonly ChecklistGame[]
+  /** "+ New collection from these N…" — the page opens `CollectionDialog` with them. */
+  onNewCollection?: () => void
+  /** The page is one collection's: offer to take the selection out of it. */
+  inCollection?: boolean
+  removing?: boolean
+  onRemoveFromCollection?: () => void
   /** Rows on this page. */
   loadedCount: number
   total: number
@@ -57,6 +77,11 @@ export interface TableFooterProps {
 
 export function TableFooter({
   selectedCount,
+  selectedGames = [],
+  onNewCollection,
+  inCollection = false,
+  removing = false,
+  onRemoveFromCollection,
   loadedCount,
   total,
   queueing,
@@ -89,6 +114,26 @@ export function TableFooter({
             <Trans>{selected} selected</Trans>
           </span>
           <span className="h-4 w-px bg-line" />
+          <AddTo games={selectedGames} onNew={onNewCollection} />
+          {inCollection && onRemoveFromCollection ? (
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              disabled={removing}
+              onClick={onRemoveFromCollection}
+              aria-label={t`Remove from collection`}
+            >
+              {/* The long form where there is room; "Remove" beside the collection's own
+                  header says the same thing where there is not. */}
+              <span className="md:@max-[60rem]:hidden">
+                <Trans>Remove from collection</Trans>
+              </span>
+              <span aria-hidden className="hidden md:@max-[60rem]:inline">
+                <Trans context="button">Remove</Trans>
+              </span>
+            </Button>
+          ) : null}
           <Button
             type="button"
             size="sm"
@@ -113,8 +158,16 @@ export function TableFooter({
           </Button>
         </>
       ) : (
-        <span className="text-label text-dim">
-          <Trans>Select rows to queue analysis over them, or to delete them.</Trans>
+        <span className="min-w-0 truncate text-label text-dim">
+          {inCollection ? (
+            <Trans>
+              Select rows to remove them from this collection, queue analysis, or delete them.
+            </Trans>
+          ) : (
+            <Trans>
+              Select rows to queue analysis over them, add them to a collection, or delete them.
+            </Trans>
+          )}
         </span>
       )}
 
@@ -137,7 +190,7 @@ export function TableFooter({
         text first, then the "Rows" caption. The phone wraps (`max-md:`) and keeps both.
       */}
       <label className="flex flex-none items-center gap-1.5 text-label text-dim">
-        <span className="md:@max-[50rem]:sr-only">
+        <span className="md:@max-[56rem]:sr-only">
           <Trans>Rows</Trans>
         </span>
         <select
@@ -177,11 +230,73 @@ export function TableFooter({
         </PageStep>
       </div>
 
-      <span className="flex-none font-mono text-label tabular text-dim md:@max-[56rem]:hidden">
+      <span className="flex-none font-mono text-label tabular text-dim md:@max-[64rem]:hidden">
         <Trans>
           {firstRow}–{lastRow} of {games}
         </Trans>
       </span>
+    </div>
+  )
+}
+
+/**
+ * "Add to…" and the checklist it opens. The checklist does the writing and keeps its own
+ * ticks honest (`CollectionChecklist`); this is only the button and the panel around it,
+ * which closes on Escape, on a click outside and when "+ New collection…" hands over to the
+ * dialog.
+ */
+function AddTo({ games, onNew }: { games: readonly ChecklistGame[]; onNew?: () => void }) {
+  const { t } = useLingui()
+  const [open, setOpen] = useState(false)
+  const host = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!open) return
+    const onPointerDown = (event: MouseEvent) => {
+      if (host.current && !host.current.contains(event.target as Node)) setOpen(false)
+    }
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setOpen(false)
+    }
+    document.addEventListener('mousedown', onPointerDown)
+    document.addEventListener('keydown', onKeyDown)
+    return () => {
+      document.removeEventListener('mousedown', onPointerDown)
+      document.removeEventListener('keydown', onKeyDown)
+    }
+  }, [open])
+
+  return (
+    <div ref={host} className="relative flex-none">
+      <Button
+        type="button"
+        size="sm"
+        variant="secondary"
+        aria-haspopup="dialog"
+        aria-expanded={open}
+        onClick={() => setOpen((current) => !current)}
+      >
+        <Trans>Add to…</Trans>
+      </Button>
+      {open ? (
+        <div
+          role="dialog"
+          aria-label={t`Add to a collection`}
+          className="bb-pop-in absolute bottom-[calc(100%+0.375rem)] left-0 z-30 rounded-lg border border-edge bg-elevated p-1 shadow-[0_1.125rem_2.5rem_-1.125rem_var(--bb-shadow)]"
+        >
+          <CollectionChecklist
+            games={games}
+            onNew={
+              onNew
+                ? () => {
+                    setOpen(false)
+                    onNew()
+                  }
+                : undefined
+            }
+          />
+        </div>
+      ) : null}
     </div>
   )
 }

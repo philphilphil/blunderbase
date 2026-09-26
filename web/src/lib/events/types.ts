@@ -46,6 +46,7 @@ export const EVENT_NAMES = [
   'correspondence.search',
   'correspondence.snapshot',
   'lichess.connection',
+  'collections.changed',
 ] as const
 
 export type EventName = (typeof EVENT_NAMES)[number]
@@ -224,6 +225,16 @@ export type LineEvent = LineCreatedEvent | LineDeletedEvent
 export type LiveUpdatedEvent = { event: 'live.updated' } & LiveState
 
 /**
+ * A collection made, changed or deleted, or games put in or taken out — by hand, by an
+ * MCP client, or by a rule while an import stored them. `collection_id` is null when the
+ * change was about more than one (an import matching several rules).
+ */
+export interface CollectionsChangedEvent {
+  event: 'collections.changed'
+  collection_id: number | null
+}
+
+/**
  * The Lichess connection changed. With `stream`, it is only the live import reporting its
  * own state; without, somebody connected or disconnected.
  */
@@ -393,6 +404,7 @@ export type BlunderbaseEvent =
   | CorrespondenceUpdatedEvent
   | CorrespondenceSearchEvent
   | CorrespondenceSnapshotEvent
+  | CollectionsChangedEvent
 
 /** A frame carrying an event name we do not model yet. */
 export interface UnknownEvent {

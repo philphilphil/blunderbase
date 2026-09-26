@@ -1,7 +1,10 @@
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { MemoryRouter } from 'react-router-dom'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
+import { queryKeys } from '@/lib/api/keys'
 import type { GameCard } from '@/lib/api/types'
 import { setEngineHidden } from '@/lib/ui/engineVisibility'
 
@@ -184,6 +187,22 @@ describe('GamesTable rows', () => {
     expect(document.activeElement).toBe(document.body)
   })
 
+  it('leaves the arrows to a popover or a dialog over the table', async () => {
+    const user = userEvent.setup()
+    setup()
+    render(
+      <div role="dialog" aria-label="Add to">
+        <button type="button">45-45 League</button>
+      </div>,
+    )
+
+    screen.getByRole('button', { name: '45-45 League' }).focus()
+    await user.keyboard('{ArrowDown}')
+    expect(document.activeElement).toBe(screen.getByRole('button', { name: '45-45 League' }))
+    await user.keyboard('{End}')
+    expect(document.activeElement).toBe(screen.getByRole('button', { name: '45-45 League' }))
+  })
+
   it('deletes one game from its own row', async () => {
     const props = setup()
     await userEvent.click(screen.getByRole('button', { name: 'Delete game 12' }))
@@ -236,6 +255,67 @@ describe('GamesTable selection', () => {
     const cell = screen.getByText('Analysed')
     expect(cell).toHaveClass('text-deep')
     expect(cell).not.toHaveClass('text-soft')
+  })
+})
+
+describe('GamesTable collection chips', () => {
+  function withCollections(games: GameCard[]) {
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    client.setQueryData(queryKeys.collectionList(), {
+      collections: [
+        { id: 3, name: '45-45 League', color: 'accent', description: null, rule: null, game_count: 8, created_at: '2026-09-01T00:00:00Z' },
+        { id: 4, name: 'Tough losses', color: 'way-back', description: null, rule: null, game_count: 2, created_at: '2026-09-01T00:00:00Z' },
+      ],
+    })
+    const onOpen = vi.fn()
+    render(
+      <QueryClientProvider client={client}>
+        <MemoryRouter>
+          <GamesTable
+            games={games}
+            sort={DEFAULT_SORT}
+            onSortChange={vi.fn()}
+            selected={new Set()}
+            onToggle={vi.fn()}
+            onToggleAll={vi.fn()}
+            onOpen={onOpen}
+            onAnalyse={vi.fn()}
+            analysing={new Set()}
+            onDelete={vi.fn()}
+            status="success"
+            error={null}
+            onRetry={vi.fn()}
+            empty={null}
+          />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    )
+    return { onOpen }
+  }
+
+  it('shows the collections a game is in, as links that do not open the row', async () => {
+    const { onOpen } = withCollections([{ ...GAME, collections: [4, 3] } as GameCard])
+    // One copy per breakpoint (the Flags cell and the phone card's date line); jsdom has
+    // no media queries, so both are in the tree.
+    const league = screen.getAllByRole('link', { name: /45-45 League/ })
+    expect(league).toHaveLength(2)
+    expect(league[0]).toHaveAttribute('href', '/games?collection=3')
+    expect(screen.getAllByRole('link', { name: /Tough losses/ })).toHaveLength(2)
+    await userEvent.click(league[0]!)
+    expect(onOpen).not.toHaveBeenCalled()
+  })
+
+  it('leaves Enter on a chip to the chip rather than opening the game', async () => {
+    const { onOpen } = withCollections([{ ...GAME, collections: [3] } as GameCard])
+    const chip = screen.getAllByRole('link', { name: /45-45 League/ })[0]!
+    chip.focus()
+    await userEvent.keyboard('{Enter}')
+    expect(onOpen).not.toHaveBeenCalled()
+  })
+
+  it('draws nothing for a game in none', () => {
+    withCollections([{ ...GAME, collections: [] } as GameCard])
+    expect(screen.queryByRole('link', { name: /League/ })).not.toBeInTheDocument()
   })
 })
 

@@ -244,6 +244,39 @@ def ratings(value: Sequence[int] | int | None, field: str = "elos") -> list[int]
     return levels or None
 
 
+def collection(value: str | int | None) -> str | int | None:
+    """A collection as the model named it — its id or its name — or None for "any".
+
+    Only tidied here: which collection a name means is a lookup against the database, and
+    that is `collections.resolve_collection`'s, called inside the tool's session.
+    """
+    if value is None or isinstance(value, bool):
+        return None
+    if isinstance(value, int):
+        return value
+    text = str(value).strip()
+    return text or None
+
+
+def game_ids(value: Sequence[int] | None, maximum: int) -> list[int]:
+    """Game ids to add or remove, at least one and at most `maximum`.
+
+    Refused rather than clamped past the ceiling: quietly adding the first few hundred of a
+    longer list would leave the coach telling the owner a collection holds games it does not.
+    """
+    wanted: list[int] = []
+    for entry in value or ():
+        try:
+            wanted.append(int(entry))
+        except (TypeError, ValueError):
+            raise CoachError(BAD_ARGUMENT, f"game_ids takes ids, not {entry!r}") from None
+    if not wanted:
+        raise CoachError(BAD_ARGUMENT, "name at least one game id")
+    if len(wanted) > maximum:
+        raise CoachError(BAD_ARGUMENT, f"at most {maximum} games at a time, not {len(wanted)}")
+    return wanted
+
+
 def tags(value: Sequence[str] | None) -> list[str]:
     return [str(tag).strip() for tag in (value or ()) if str(tag).strip()]
 

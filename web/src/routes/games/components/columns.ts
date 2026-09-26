@@ -118,9 +118,9 @@ export const COLUMNS: Column[] = [
  * will not tell you. The header, the rows and the loading skeleton all lay themselves out
  * from this one list, so they cannot disagree about how many cells a row has.
  *
- * `Flags` stays in the list because the cell is not only flags: it also carries the
- * "analyse" affordance and the row's delete button. `GameRow` empties what is engine about
- * it and keeps the rest.
+ * `Flags` stays in the list because the cell is not only flags: it also carries the game's
+ * collection chips, the "analyse" affordance and the row's delete button. `GameRow` empties
+ * what is engine about it and keeps the rest.
  */
 export function columnsFor(engineHidden: boolean): Column[] {
   return engineHidden ? COLUMNS.filter((column) => column.id !== 'worst') : COLUMNS

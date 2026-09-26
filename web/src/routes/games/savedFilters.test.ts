@@ -148,3 +148,16 @@ describe('suggestLabel', () => {
     expect(suggestLabel({})).toBe('')
   })
 })
+
+describe('saved cuts over collections', () => {
+  it('keeps a cut inside a collection, rated flag and all', () => {
+    saveFilter('League losses', { collection: 7, rated: true, outcome: 'loss' })
+    resetSavedFilters()
+    expect(readSavedFilters()[0]?.filters).toEqual({ collection: 7, rated: true, outcome: 'loss' })
+  })
+
+  it('suggests the collection by name when the lookup knows it', () => {
+    const names = (id: number) => (id === 7 ? '45-45 League' : undefined)
+    expect(suggestLabel({ collection: 7, outcome: 'loss' }, names)).toBe('loss · 45-45 League')
+  })
+})

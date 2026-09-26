@@ -5,7 +5,7 @@
  * and a pinned footer with the engine roster above it.
  *
  * An entry with more inside it unfolds when you are in it, and only then — Saved filters
- * under Games, Your lines under Openings, Reports under Stats, the configuration pages
+ * and Collections under Games, Your lines under Openings, Reports under Stats, the configuration pages
  * under Analysis. They used to be one section at the bottom of the rail that swapped
  * contents with the screen, which meant the list of cuts of the library sat under a
  * heading of its own three entries away from Games, and nothing said whose they were.
@@ -21,7 +21,7 @@
 import type { MessageDescriptor } from '@lingui/core'
 import { msg } from '@lingui/core/macro'
 import { Trans, useLingui } from '@lingui/react/macro'
-import { BookOpen, PanelLeftClose, PanelLeftOpen, X } from 'lucide-react'
+import { BookOpen, PanelLeftClose, PanelLeftOpen, Plus, X } from 'lucide-react'
 import {
   createContext,
   Fragment,
@@ -33,10 +33,12 @@ import {
   type ComponentType,
   type ReactNode,
 } from 'react'
-import { NavLink, useLocation } from 'react-router-dom'
+import { createPortal } from 'react-dom'
+import { NavLink, useLocation, useNavigate } from 'react-router-dom'
 
 import { preloadRoute } from '@/app/lazyRoutes'
 import { StatusDot } from '@/components/badges/StatusDot'
+import { CollectionSwatch } from '@/components/collections/CollectionChip'
 import {
   AnalysisIcon,
   ComputeIcon,
@@ -52,6 +54,7 @@ import {
 import { SETTING_DEFAULTS } from '@/lib/api/appSettings'
 import {
   useAppSettings,
+  useCollections,
   useCorrespondenceGames,
   useCorrespondenceStatus,
   useEngines,
@@ -59,10 +62,12 @@ import {
   useLiveState,
 } from '@/lib/api/queries'
 import type { Color } from '@/lib/api/types'
+import { collectionPath } from '@/lib/collections'
 import { useEvents } from '@/lib/events/EventsProvider'
 import { useLocale } from '@/lib/i18n/I18nProvider'
 import { REPO_URL } from '@/lib/links'
 import { manualUrl } from '@/lib/manual'
+import { CollectionDialog } from '@/routes/games/components/CollectionDialog'
 import { paramsFromFilters, toGameQuery } from '@/routes/games/filters'
 import {
   filterLabel,
@@ -70,7 +75,7 @@ import {
   useSavedFilters,
   type SavedFilter,
 } from '@/routes/games/savedFilters'
-import { REPORTS, reportFrom } from '@/routes/stats/reports'
+import { REPORTS, reportFrom, reportPath } from '@/routes/stats/reports'
 import { cn } from '@/lib/utils'
 import { VERSION_LABEL } from '@/lib/version'
 
@@ -187,9 +192,27 @@ function SectionLabel({ children }: { children: ReactNode }) {
   )
 }
 
-/** The quiet label over a fold's contents — "Filters", "Your lines · black", "Reports". */
-function FoldLabel({ children }: { children: ReactNode }) {
-  return <div className="px-1.5 py-1 text-meta text-dim-2">{children}</div>
+/**
+ * The quiet label over a fold's contents — "Filters", "Collections", "Your lines · black",
+ * "Reports" — with room at its right end for the one action that belongs to the list.
+ */
+function FoldLabel({
+  children,
+  action,
+  className,
+}: {
+  children: ReactNode
+  action?: ReactNode
+  className?: string
+}) {
+  return (
+    <div
+      className={cn('flex items-center gap-1.5 px-1.5 py-1 text-meta text-dim-2', className)}
+    >
+      {children}
+      {action ? <span className="ml-auto flex items-center">{action}</span> : null}
+    </div>
+  )
 }
 
 function Item({
@@ -477,6 +500,77 @@ function SavedFilters({ search }: { search: string }) {
   )
 }
 
+/**
+ * The owner's collections, under the saved filters: a colour square, the name and how many
+ * games are in it, each one a link to the library scoped to it (`/games?collection=ID`).
+ *
+ * Under the filters rather than beside Games as rows of their own, because a collection's
+ * page *is* the library, filtered — the same table, the same footer — and the fold is
+ * where the rail already keeps the ways into that one list. A square rather than the
+ * filters' dot: the square is the collection's mark everywhere it appears (the chips, the
+ * checklist, the page header), so it is recognisable here before the name is read.
+ *
+ * The "+" is the one place a collection can be started with nothing in hand. It opens the
+ * same dialog as "Make a collection", portalled out of the rail: the rail clips, never
+ * wraps and selects nothing, and a form inside it would inherit all three. A new
+ * collection opens on its own (empty) page, which is where filling it starts.
+ */
+function Collections({ search }: { search: string }) {
+  const { t } = useLingui()
+  const navigate = useNavigate()
+  const collections = useCollections()
+  const [creating, setCreating] = useState(false)
+  const current = new URLSearchParams(search).get('collection')
+  const rows = collections.data?.collections ?? []
+
+  return (
+    <>
+      <FoldLabel
+        className="mt-1"
+        action={
+          <button
+            type="button"
+            aria-label={t`New collection`}
+            title={t`New collection`}
+            onClick={() => setCreating(true)}
+            className="rounded-sm p-0.5 text-faint transition-colors hover:bg-raised hover:text-ink"
+          >
+            <Plus className="size-3" aria-hidden />
+          </button>
+        }
+      >
+        <Trans>Collections</Trans>
+      </FoldLabel>
+      {rows.map((collection) => (
+        <DotRow
+          key={collection.id}
+          to={collectionPath(collection.id)}
+          active={current === String(collection.id)}
+          leading={<CollectionSwatch color={collection.color} />}
+          trailing={collection.game_count.toLocaleString()}
+          title={collection.description ?? undefined}
+        >
+          {collection.name}
+        </DotRow>
+      ))}
+      {collections.isPending || rows.length > 0 ? null : (
+        <div className="px-2 py-[0.4375rem] text-[0.75rem] text-faint">
+          <Trans>No collections yet</Trans>
+        </div>
+      )}
+      {creating
+        ? createPortal(
+            <CollectionDialog
+              onClose={() => setCreating(false)}
+              onSaved={(saved) => navigate(collectionPath(saved.id))}
+            />,
+            document.body,
+          )
+        : null}
+    </>
+  )
+}
+
 /** Design 2c's "Your lines · black": the ECO codes the scoped games keep reaching. */
 function YourLines({ search }: { search: string }) {
   const scope = (new URLSearchParams(search).get('color') as Color | null) ?? undefined
@@ -520,7 +614,7 @@ function Reports({ search }: { search: string }) {
       {REPORTS.map((report) => (
         <DotRow
           key={report.key}
-          to={`/stats?report=${report.key}`}
+          to={reportPath(report.key, search)}
           active={report.key === current}
           title={i18n._(report.hint)}
         >
@@ -709,7 +803,12 @@ function Folded({ to, pathname, search }: { to: string; pathname: string; search
   const body = pages ? (
     <SubPages pages={pages} />
   ) : to === '/games' ? (
-    pathname === '/games' ? <SavedFilters search={search} /> : null
+    pathname === '/games' ? (
+      <>
+        <SavedFilters search={search} />
+        <Collections search={search} />
+      </>
+    ) : null
   ) : to === '/explorer' ? (
     <YourLines search={search} />
   ) : to === '/stats' ? (

@@ -8,6 +8,7 @@ from typing import Any
 from mcp.types import CallToolResult, TextContent
 
 from backend.services import analysis as analysis_service
+from backend.services import collections as collections_service
 from backend.services import engines as engines_service
 from backend.services import live as live_service
 from backend.services import maia_live as maia_live_service
@@ -24,6 +25,9 @@ UNKNOWN_GAME = "unknown_game"
 UNKNOWN_RUN = "unknown_run"
 UNKNOWN_NOTE = "unknown_note"
 UNKNOWN_DIMENSION = "unknown_dimension"
+# A collection is named by the owner's own word for it, so a miss is usually a misremembered
+# name: its own code tells the coach to read list_collections rather than to give up.
+UNKNOWN_COLLECTION = "unknown_collection"
 NOT_FOUND = "not_found"
 ENGINE_UNAVAILABLE = "engine_unavailable"
 ENGINE_FAILED = "engine_failed"
@@ -82,6 +86,7 @@ TRANSLATIONS: tuple[tuple[type[Exception], str], ...] = (
     (notes_service.NoteNotFoundError, UNKNOWN_NOTE),
     (notes_service.LineNotFoundError, NOT_FOUND),
     (notes_service.UnknownGameError, UNKNOWN_GAME),
+    (collections_service.UnknownCollectionError, UNKNOWN_COLLECTION),
     (live_service.UnknownLiveGameError, UNKNOWN_GAME),
     (live_service.IllegalMoveError, ILLEGAL_MOVE),
     (live_service.NoLivePositionError, NO_LIVE_POSITION),

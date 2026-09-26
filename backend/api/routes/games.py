@@ -71,7 +71,7 @@ def list_games(
     rows = (
         games_service.game_cards(session, found)
         if cards
-        else [games_service.game_summary(game) for game in found]
+        else games_service.game_summaries(session, found)
     )
     return GameList(
         games=rows,
@@ -163,4 +163,4 @@ def put_game_engine(session: SessionDep, game_id: int, body: GameEngineUpdate) -
     game = games_service.set_engine_hidden(session, game_id, body.hidden)
     if game is None:
         raise not_found("unknown_game", f"no game with id {game_id}")
-    return GameSummary.model_validate(games_service.game_summary(game))
+    return GameSummary.model_validate(games_service.game_summaries(session, [game])[0])

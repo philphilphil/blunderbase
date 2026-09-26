@@ -123,13 +123,18 @@ export function GamesTable({
    * On `document` rather than on the body element, because the first press has to work
    * before anything in the table has focus — the reader arrives on the screen and presses
    * ↓. A field takes its own arrows, and a modifier makes them the browser's (⌘↑ is the top
-   * of the document), so both are left alone.
+   * of the document), so both are left alone. So is anything over the table — a popover
+   * like Add to… or a modal like the collection dialog (`role="dialog"`, the convention
+   * `useBoardKeys` stands down for): their rows and swatches are walked with the same keys,
+   * and an arrow there that moved focus to a game behind them would have Enter open it.
    */
   useEffect(() => {
     function walk(event: KeyboardEvent) {
       if (!STEP_KEYS.includes(event.key)) return
       if (event.metaKey || event.ctrlKey || event.altKey || event.shiftKey) return
       if (isTyping(event.target)) return
+      if (event.target instanceof Element && event.target.closest('[role="dialog"]')) return
+      if (document.querySelector('[aria-modal="true"]')) return
       const node = body.current
       if (!node) return
       const rows = Array.from(node.querySelectorAll<HTMLElement>('[data-games-row]'))

@@ -271,6 +271,12 @@ export interface GameSummary extends Extra {
   opening?: string | null
   termination?: string | null
   ply_count?: number | null
+  /**
+   * The ids of every collection this game is in, `[]` when none. The backend always sends
+   * it on `/games` rows and on a game's detail; optional here only so a fixture or a
+   * payload from before collections still type-checks — read it as `game.collections ?? []`.
+   */
+  collections?: number[]
 }
 
 /** One point of a game's eval curve: `win` is the win percentage, 0..100. */
@@ -648,9 +654,109 @@ export interface GameFilters {
    * reference books (`others`), or both (`all`).
    */
   whose?: Whose
+  /** Only the games in this collection (its id). */
+  collection?: number
+  /** Rated games only (`true`), casual only (`false`), or both when absent. */
+  rated?: boolean
 }
 
 export type Whose = 'mine' | 'others' | 'all'
+
+// --- collections ------------------------------------------------------------
+
+/**
+ * The seven colours a collection can wear — keys, not hex, because the palette is the
+ * theme's (`lib/collections.ts` maps each onto its token classes). The backend validates
+ * against the same list.
+ */
+export type CollectionColor =
+  | 'accent'
+  | 'good'
+  | 'otb'
+  | 'way-back'
+  | 'mistake'
+  | 'info'
+  | 'blunder'
+
+/**
+ * A collection's rule: a subset of the library's own filter vocabulary, matched against
+ * each game as an import stores it. Every key is optional; a rule with none is no rule and
+ * travels as `null`.
+ */
+export interface CollectionRule {
+  source?: Source
+  speed?: Speed[]
+  /** The stored clock, seconds + increment: `"2700+45"`. */
+  time_control?: string
+  rated?: boolean
+  color?: Color
+  /** A prefix: `C6` is C60–C69. */
+  eco?: string
+  /** Part of a name. */
+  opponent?: string
+  variant?: string
+}
+
+/** `GET /collections` rows, and what every write answers with. */
+export interface Collection extends Extra {
+  id: number
+  name: string
+  color: CollectionColor
+  description: string | null
+  rule: CollectionRule | null
+  game_count: number
+  created_at: string
+}
+
+/** The score line on a collection's page, always from the owner's side of the board. */
+export interface CollectionSummary extends Extra {
+  games: number
+  wins: number
+  draws: number
+  losses: number
+  points: number
+  avg_opponent_rating: number | null
+  blunders_per_game: number | null
+  first_played_at: string | null
+  last_played_at: string | null
+}
+
+export interface CollectionDetail extends Collection {
+  summary: CollectionSummary
+}
+
+export interface CollectionList {
+  collections: Collection[]
+}
+
+export interface CollectionCreate {
+  name: string
+  color?: CollectionColor
+  description?: string | null
+  rule?: CollectionRule | null
+  /** Run the rule over the games already in the library, once. */
+  apply_to_existing?: boolean
+  /** Games to put in by hand as it is made — "New collection from these N". */
+  game_ids?: number[]
+}
+
+/** A key left out is unchanged; `rule: null` clears the rule. */
+export interface CollectionUpdate {
+  name?: string
+  color?: CollectionColor
+  description?: string | null
+  rule?: CollectionRule | null
+}
+
+export interface CollectionGamesAdded {
+  added: number
+  collection: Collection
+}
+
+export interface CollectionGamesRemoved {
+  removed: number
+  collection: Collection
+}
 
 // --- import ---------------------------------------------------------------
 

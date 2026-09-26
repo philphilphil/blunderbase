@@ -41,6 +41,19 @@ export const REPORTS: Report[] = [
 
 export const DEFAULT_REPORT: ReportKey = 'overview'
 
+/**
+ * Where a report lives, keeping the collection the page is scoped to. The collection is the
+ * one scope Stats keeps in its URL (`StatsPage`), so a link that rebuilt the query from the
+ * report alone would quietly widen every card back to the whole library. `from` is the
+ * query string of the Stats page being left, or nothing from anywhere else.
+ */
+export function reportPath(report: ReportKey, from?: string): string {
+  const params = new URLSearchParams({ report })
+  const collection = from ? new URLSearchParams(from).get('collection') : null
+  if (collection) params.set('collection', collection)
+  return `/stats?${params.toString()}`
+}
+
 /** The report a query string names, or the default for anything unrecognised. */
 export function reportFrom(params: URLSearchParams | string | null | undefined): ReportKey {
   const value =

@@ -10,9 +10,9 @@
  * Which of them is a button and which is a line in the ⋯ menu is decided by how often it is
  * pressed. **Add to library** is the one affirmative act on a model game's screen and exists
  * only while the game is one, so it is a button in the row with its word in the accent. The
- * way back to the explorer and the tree behind a finished correspondence game are pressed once a session at most, and
- * they are what `useStudioMenu` hands to `RowMenu` — a row that carried them as buttons was
- * a row that wrapped.
+ * way back to the explorer, the tree behind a finished correspondence game and the game's
+ * collections are pressed once a session at most, and they are what `useStudioMenu` hands
+ * to `RowMenu` — a row that carried them as buttons was a row that wrapped.
  *
  * A component and a hook rather than nodes built inside `GamePage` because both hold
  * react-query state: the studio re-renders on every engine tick, and the pending and error
@@ -33,6 +33,7 @@ import { CorrespondenceTreeDialog } from '@/routes/correspondence/components/Cor
 import { cn } from '@/lib/utils'
 
 import type { StudioGame } from '../GamePage'
+import { GameCollectionsDialog } from './GameCollectionsDialog'
 import type { RowMenuItem } from './RowMenu'
 
 /**
@@ -57,28 +58,41 @@ export function StudioActions({
 }
 
 /**
- * The studio's rare doors, as rows of the control row's ⋯ — and the tree dialog one of them
- * opens, which the page renders wherever it renders dialogs.
+ * The studio's rare doors, as rows of the control row's ⋯ — and the dialogs they open,
+ * which the page renders wherever it renders dialogs.
  *
  * A hook rather than a component because the menu is one list: the page folds these into
  * whatever else belongs behind that ⋯, and a second ⋯ of the studio's own would be two
  * menus in one row holding one item each.
+ *
+ * Collections… is here for every library game. Filing a game is done once, after reading
+ * it, which is what the ⋯ is for; the header's chips already say where it is filed, so the
+ * row needs no button that says it again.
  */
 export function useStudioMenu(
   game: StudioGame,
   backTo: string | null,
+  /** The game's collection ids (`GameSummary.collections`), for the checklist's ticks. */
+  collections?: readonly number[] | null,
 ): { items: RowMenuItem[]; dialog: ReactNode } {
   const navigate = useNavigate()
-  const [tree, setTree] = useState(false)
+  const [open, setOpen] = useState<'tree' | 'collections' | null>(null)
   const gameId = game.kind === 'library' ? game.id : null
   const correspondence = useCorrespondenceTree(gameId)
 
   const items: RowMenuItem[] = []
+  if (gameId !== null) {
+    items.push({
+      id: 'collections',
+      label: <Trans>Collections…</Trans>,
+      onSelect: () => setOpen('collections'),
+    })
+  }
   if (correspondence.has && gameId !== null) {
     items.push({
       id: 'correspondence-tree',
       label: <Trans>Correspondence tree</Trans>,
-      onSelect: () => setTree(true),
+      onSelect: () => setOpen('tree'),
     })
   }
   if (backTo) {
@@ -89,11 +103,14 @@ export function useStudioMenu(
     })
   }
 
+  const close = () => setOpen(null)
   return {
     items,
     dialog:
-      tree && gameId !== null ? (
-        <CorrespondenceTreeDialog gameId={gameId} onClose={() => setTree(false)} />
+      gameId === null ? null : open === 'tree' ? (
+        <CorrespondenceTreeDialog gameId={gameId} onClose={close} />
+      ) : open === 'collections' ? (
+        <GameCollectionsDialog gameId={gameId} collections={collections} onClose={close} />
       ) : null,
   }
 }

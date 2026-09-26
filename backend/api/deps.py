@@ -77,6 +77,10 @@ def game_filters(
             "added from the reference books; all: both"
         ),
     ] = "mine",
+    collection: Annotated[
+        int | None, Query(description="only the games in this collection (its id)")
+    ] = None,
+    rated: Annotated[bool | None, Query(description="true: rated games; false: casual")] = None,
 ) -> GameFilters:
     """The one filter vocabulary, shared by `/games` and every `/stats` dimension.
 
@@ -102,6 +106,8 @@ def game_filters(
         analyzed=analyzed,
         text=text,
         mine=WHOSE[whose],
+        collection=collection,
+        rated=rated,
     )
 
 

@@ -20,6 +20,7 @@ from sqlalchemy.orm import Session
 
 from backend.db.enums import Color, Platform, Source
 from backend.db.models import Account, Game
+from backend.services import collections as collections_service
 from backend.services import explorer as explorer_service
 from backend.services import games as games_service
 from backend.services import stats as stats_service
@@ -192,6 +193,9 @@ def reconcile_games(session: Session, account: Account | None = None) -> Reconci
 
     filled = Reconciled()
     recolored_games: list[int] = []
+    # Of those, the ones that were somebody else's until now: no collection rule has ever
+    # looked at them, where the rest were only unanswerable to a rule that names a colour.
+    newly_owned: list[int] = []
     for target in targets:
         folded = fold(target.username)
         sources = claimable_sources(target, accounts)
@@ -210,7 +214,11 @@ def reconcile_games(session: Session, account: Account | None = None) -> Reconci
                 # Read before the update, because after it these games no longer match:
                 # which positions have to be refolded is a question about the rows as they
                 # are now. Usually empty, which is one indexed lookup and nothing else.
-                recolored = list(session.scalars(select(Game.id).where(claimed)))
+                found = session.execute(
+                    select(Game.id, Game.is_owner_game).where(claimed)
+                ).all()
+                recolored = [game_id for game_id, _owned in found]
+                newly_owned.extend(game_id for game_id, owned in found if not owned)
                 filled.colored += _fill(
                     session,
                     claimed,
@@ -242,6 +250,15 @@ def reconcile_games(session: Session, account: Account | None = None) -> Reconci
         # is why the colour has to be expired first — the fold reads the row as it is now.
         session.expire_all()
         games_service.refresh_cards(session, recolored_games)
+    # A collection rule looked at each game as it was stored, and could not answer for one
+    # whose side was unknown then if the rule names a colour — nor at all for a game that
+    # was somebody else's. Those are asked now, in the same commit, the way the import
+    # would have asked had it known; every other rule already had its say and keeps it,
+    # so a game a hand took out of a collection stays out.
+    joined = collections_service.assign_on_import(
+        session, sorted(set(recolored_games) - set(newly_owned)), colour_rules_only=True
+    )
+    joined += collections_service.assign_on_import(session, newly_owned)
     session.commit()
     # The rows went out as bulk statements, so whatever this Session had already loaded
     # still remembers the values from before; the next read of one comes off the database.
@@ -250,6 +267,9 @@ def reconcile_games(session: Session, account: Account | None = None) -> Reconci
         # Games this just coloured have no fold any more, so the aggregations have to go
         # back to reading the evals until the sweep has folded them again.
         stats_service.reset_summaries_ready()
+    touched = sorted(set(joined))
+    if touched:
+        collections_service.notify_changed(touched[0] if len(touched) == 1 else None)
     return filled
 
 

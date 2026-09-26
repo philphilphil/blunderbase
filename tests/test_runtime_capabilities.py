@@ -132,7 +132,7 @@ def test_demo_needs_no_password_and_says_it_is_read_only(demo: TestClient) -> No
 
 
 def test_demo_answers_every_read_to_a_stranger(demo: TestClient) -> None:
-    for path in ("/games", "/stats/dimensions", "/explorer", "/notes", "/settings"):
+    for path in ("/games", "/collections", "/stats/dimensions", "/explorer", "/notes", "/settings"):
         assert demo.get(path).status_code == 200, path
     assert demo.get("/api/games").status_code == 200
     with demo.websocket_connect("/events") as socket:
@@ -149,6 +149,10 @@ def test_demo_answers_every_read_to_a_stranger(demo: TestClient) -> None:
         ("DELETE", "/engines/1", None),
         ("PATCH", "/notes/1", {"text": "x"}),
         ("POST", "/api/notes", {"text": "under the prefix too"}),
+        ("POST", "/collections", {"name": "a stranger's league"}),
+        ("PATCH", "/collections/1", {"name": "renamed"}),
+        ("POST", "/collections/1/games", {"game_ids": [1]}),
+        ("DELETE", "/collections/1", None),
     ],
 )
 def test_demo_refuses_every_write_before_a_handler_sees_it(

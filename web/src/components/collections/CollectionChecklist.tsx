@@ -1,0 +1,200 @@
+/**
+ * The body of "Add to…" — the games footer's popover and the game page's ⋯ → Collections…
+ * — as one component, so the two cannot drift.
+ *
+ * A checklist rather than a list to pick one from, because membership is not exclusive: a
+ * lost league round is in "45-45 League" and in "Tough losses". Each row's box says where
+ * the games in hand stand — ticked when all of them are in, half-ticked when only some
+ * are, empty when none — and a click settles it for all of them: a ticked row takes them
+ * out, anything else puts them all in. The half state is the one a plain checkbox cannot
+ * draw, which is why the box is drawn here rather than native.
+ *
+ * What the rows show comes from the games' own `collections` ids, which only change when
+ * the games query comes back after a write. So the answer of a click is held locally until
+ * the ids the caller passes in move, and the box does not flicker back to its old state in
+ * between.
+ */
+import { Plural, Trans, useLingui } from '@lingui/react/macro'
+import { Check, Loader2, Minus, Plus } from 'lucide-react'
+import { useState } from 'react'
+
+import { useAddToCollection, useCollections, useRemoveFromCollection } from '@/lib/api/queries'
+import type { Collection } from '@/lib/api/types'
+import { membershipOf, type MembershipState } from '@/lib/collections'
+import { toast } from '@/lib/toast'
+import { cn } from '@/lib/utils'
+
+import { CollectionSwatch } from './CollectionChip'
+
+export interface ChecklistGame {
+  id: number
+  /** The game's collection ids, as `GameSummary.collections` carries them. */
+  collections?: readonly number[] | null
+}
+
+export function CollectionChecklist({
+  games,
+  onNew,
+  newLabel,
+  className,
+}: {
+  /** The games in hand — the selected rows, or the one game on its page. */
+  games: readonly ChecklistGame[]
+  /** "+ New collection…": the caller opens `CollectionDialog` with these games. */
+  onNew?: () => void
+  /** Overrides the new row's wording; the default counts the games in hand. */
+  newLabel?: string
+  className?: string
+}) {
+  const { t } = useLingui()
+  const collections = useCollections()
+  const add = useAddToCollection()
+  const remove = useRemoveFromCollection()
+  const [settled, setSettled] = useState<Map<number, MembershipState>>(() => new Map())
+  const [busy, setBusy] = useState<number | null>(null)
+
+  // Drop what a click settled as soon as the games' own ids say something new — they are
+  // the truth, and the local answer only covers the gap until they arrive.
+  const signature = games
+    .map((game) => `${game.id}:${[...(game.collections ?? [])].sort((a, b) => a - b).join(',')}`)
+    .join('|')
+  const [seen, setSeen] = useState(signature)
+  if (seen !== signature) {
+    setSeen(signature)
+    setSettled(new Map())
+  }
+
+  const ids = games.map((game) => game.id)
+  const count = games.length
+
+  async function toggle(collection: Collection, state: MembershipState) {
+    if (busy !== null || count === 0) return
+    setBusy(collection.id)
+    const leaving = state === 'all'
+    try {
+      if (leaving) {
+        await remove.mutateAsync({ collectionId: collection.id, gameIds: ids })
+      } else {
+        await add.mutateAsync({ collectionId: collection.id, gameIds: ids })
+      }
+      setSettled((current) => new Map(current).set(collection.id, leaving ? 'none' : 'all'))
+    } catch {
+      // A toast rather than a line in the list: the popover is a menu, and it has nowhere to
+      // keep a red sentence without pushing the rows the owner is aiming at.
+      const name = collection.name
+      toast.error(
+        leaving ? t`Could not take the games out of ${name}.` : t`Could not add the games to ${name}.`,
+      )
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  const rows = collections.data?.collections ?? []
+  const states = rows.map((collection) => {
+    const measured = membershipOf(games, collection.id)
+    const state = settled.get(collection.id) ?? measured.state
+    return { collection, state, inCount: state === measured.state ? measured.count : null }
+  })
+  const anyPartial = states.some((row) => row.state === 'some')
+
+  return (
+    <div className={cn('flex min-w-[13.75rem] flex-col text-[0.75rem] text-soft', className)}>
+      <span className="px-[0.4375rem] pt-[0.3125rem] pb-1 text-[0.625rem] tracking-[.1em] text-faint uppercase">
+        <Plural value={count} one="This game is in" other="# games in" />
+      </span>
+
+      {collections.isPending ? (
+        <span className="flex items-center gap-2 px-[0.4375rem] py-[0.3125rem] text-dim">
+          <Loader2 className="size-3 animate-spin" aria-hidden />
+          <Trans>Loading collections…</Trans>
+        </span>
+      ) : collections.isError ? (
+        <span className="px-[0.4375rem] py-[0.3125rem] text-blunder">
+          <Trans>Could not load the collections.</Trans>
+        </span>
+      ) : rows.length === 0 ? (
+        <span className="px-[0.4375rem] py-[0.3125rem] text-dim">
+          <Trans>No collections yet.</Trans>
+        </span>
+      ) : (
+        <ul role="list" className="flex flex-col">
+          {states.map(({ collection, state, inCount }) => (
+            <li key={collection.id}>
+              <button
+                type="button"
+                role="checkbox"
+                aria-checked={state === 'all' ? true : state === 'some' ? 'mixed' : false}
+                disabled={busy !== null || count === 0}
+                onClick={() => void toggle(collection, state)}
+                className="flex w-full items-center gap-2 rounded-sm px-[0.4375rem] py-[0.3125rem] text-left whitespace-nowrap transition-colors hover:bg-raised hover:text-ink disabled:cursor-wait"
+              >
+                <TickBox state={state} busy={busy === collection.id} />
+                <CollectionSwatch color={collection.color} />
+                <span className="min-w-0 truncate">{collection.name}</span>
+                <span className="ml-auto pl-3.5 font-mono text-[0.65625rem] text-faint">
+                  {state === 'some' && inCount !== null ? (
+                    <Trans>
+                      {inCount} of {count}
+                    </Trans>
+                  ) : null}
+                </span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {onNew ? (
+        <>
+          <div className="mx-0.5 my-1 h-px bg-hairline" />
+          <button
+            type="button"
+            onClick={onNew}
+            className="flex items-center gap-2 rounded-sm px-[0.4375rem] py-[0.3125rem] text-left text-dim transition-colors hover:bg-raised hover:text-ink"
+          >
+            <Plus className="size-3" aria-hidden />
+            {newLabel ?? (
+              <Plural
+                value={count}
+                one="New collection from this game…"
+                other="New collection from these # games…"
+              />
+            )}
+          </button>
+        </>
+      ) : null}
+
+      <p className="px-[0.4375rem] pt-[0.1875rem] pb-1 text-[0.6875rem] leading-snug whitespace-normal text-faint">
+        {anyPartial ? (
+          <Plural
+            value={count}
+            one="A game can be in several."
+            other="A game can be in several. Click a half-ticked one to put all # in."
+          />
+        ) : (
+          <Trans>A game can be in several.</Trans>
+        )}
+      </p>
+    </div>
+  )
+}
+
+/** The design's 13px box in its three states, with a spinner while its write is out. */
+function TickBox({ state, busy }: { state: MembershipState; busy: boolean }) {
+  if (busy) return <Loader2 className="size-[0.8125rem] flex-none animate-spin text-dim" aria-hidden />
+  return (
+    <span
+      aria-hidden
+      className={cn(
+        'flex size-[0.8125rem] flex-none items-center justify-center rounded-[0.1875rem] border',
+        state === 'none'
+          ? 'border-edge-strong'
+          : 'border-accent-teal bg-accent-teal text-accent-ink',
+      )}
+    >
+      {state === 'all' ? <Check className="size-2.5" strokeWidth={3} /> : null}
+      {state === 'some' ? <Minus className="size-2.5" strokeWidth={3} /> : null}
+    </span>
+  )
+}

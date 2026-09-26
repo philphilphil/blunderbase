@@ -177,6 +177,7 @@ msgstr "Von {moveName} bis zum Ende der Partie."
 #: src/routes/engines/EngineDetail.tsx
 #: src/routes/engines/RunnerCard.tsx
 #: src/routes/game/components/PracticeDialog.tsx
+#: src/routes/games/components/CollectionDialog.tsx
 #: src/routes/games/components/DeleteGamesDialog.tsx
 #: src/routes/import/DeleteAllGamesDialog.tsx
 #: src/routes/live/SaveMoment.tsx
@@ -437,6 +438,7 @@ msgstr "Läuft"
 #: src/components/badges/RunBadge.tsx
 #: src/components/tour/TourCoachmark.tsx
 #: src/routes/engines/CreateRunnerForm.tsx
+#: src/routes/game/components/GameCollectionsDialog.tsx
 #: src/routes/import/SyncHistory.tsx
 #: src/routes/mcp/McpKeys.tsx
 msgid "Done"
@@ -452,6 +454,7 @@ msgstr "Fehlgeschlagen"
 #: src/routes/game/components/EvalGraph.tsx
 #: src/routes/game/components/MoveTimeGraph.tsx
 #: src/routes/game/components/PracticeDialog.tsx
+#: src/routes/games/components/CollectionDialog.tsx
 #: src/routes/games/components/FilterBar.tsx
 #: src/routes/games/components/columns.ts
 #: src/routes/live/LivePage.tsx
@@ -463,6 +466,7 @@ msgstr "Weiß"
 #: src/routes/game/components/EvalGraph.tsx
 #: src/routes/game/components/MoveTimeGraph.tsx
 #: src/routes/game/components/PracticeDialog.tsx
+#: src/routes/games/components/CollectionDialog.tsx
 #: src/routes/games/components/FilterBar.tsx
 #: src/routes/games/components/columns.ts
 #: src/routes/live/LivePage.tsx
@@ -606,6 +610,78 @@ msgstr "Was mit dem Brett passiert, wenn du auf eine Engine-Variante zeigst."
 msgid "Chess position"
 msgstr "Schachstellung"
 
+#: src/components/collections/CollectionChecklist.tsx
+msgid "Could not take the games out of {name}."
+msgstr "Die Partien ließen sich nicht aus {name} herausnehmen."
+
+#: src/components/collections/CollectionChecklist.tsx
+msgid "Could not add the games to {name}."
+msgstr "Die Partien ließen sich nicht zu {name} hinzufügen."
+
+#: src/components/collections/CollectionChecklist.tsx
+msgid "{count, plural, one {This game is in} other {# games in}}"
+msgstr "{count, plural, one {Diese Partie steckt in} other {# Partien in}}"
+
+#: src/components/collections/CollectionChecklist.tsx
+#: src/routes/games/components/FilterBar.tsx
+msgid "Loading collections…"
+msgstr "Sammlungen werden geladen …"
+
+#: src/components/collections/CollectionChecklist.tsx
+#: src/routes/games/components/FilterBar.tsx
+msgid "Could not load the collections."
+msgstr "Die Sammlungen ließen sich nicht laden."
+
+#: src/components/collections/CollectionChecklist.tsx
+msgid "No collections yet."
+msgstr "Noch keine Sammlungen."
+
+#: src/components/collections/CollectionChecklist.tsx
+msgid "{inCount} of {count}"
+msgstr "{inCount} von {count}"
+
+#: src/components/collections/CollectionChecklist.tsx
+msgid "{count, plural, one {New collection from this game…} other {New collection from these # games…}}"
+msgstr "{count, plural, one {Neue Sammlung aus dieser Partie …} other {Neue Sammlung aus diesen # Partien …}}"
+
+#: src/components/collections/CollectionChecklist.tsx
+msgid "{count, plural, one {A game can be in several.} other {A game can be in several. Click a half-ticked one to put all # in.}}"
+msgstr "{count, plural, one {Eine Partie kann in mehreren stecken.} other {Eine Partie kann in mehreren stecken. Ein Klick auf eine halb abgehakte legt alle # hinein.}}"
+
+#: src/components/collections/CollectionChecklist.tsx
+msgid "A game can be in several."
+msgstr "Eine Partie kann in mehreren stecken."
+
+#. placeholder {0}: collection.name
+#: src/components/collections/CollectionChip.tsx
+msgid "Open the collection {0}"
+msgstr "Sammlung {0} öffnen"
+
+#: src/components/collections/ruleParts.ts
+msgctxt "collection rule"
+msgid "rated"
+msgstr "gewertet"
+
+#: src/components/collections/ruleParts.ts
+msgctxt "collection rule"
+msgid "casual"
+msgstr "ungewertet"
+
+#: src/components/collections/ruleParts.ts
+msgctxt "collection rule"
+msgid "as white"
+msgstr "mit Weiß"
+
+#: src/components/collections/ruleParts.ts
+msgctxt "collection rule"
+msgid "as black"
+msgstr "mit Schwarz"
+
+#: src/components/collections/ruleParts.ts
+msgctxt "collection rule"
+msgid "vs {opponent}"
+msgstr "gegen {opponent}"
+
 #: src/components/engine-dialog/EnginePicker.tsx
 msgid "No engine is switched on that speaks UCI. Add one under Analysis → Engines."
 msgstr "Keine eingeschaltete Engine spricht UCI. Leg eine unter Analyse → Engines an."
@@ -694,6 +770,7 @@ msgstr "Verwerfen"
 
 #: src/components/settings/SettingField.tsx
 #: src/routes/engines/RunnerCard.tsx
+#: src/routes/games/components/CollectionDialog.tsx
 #: src/routes/notes/components/NoteEditor.tsx
 msgid "Save"
 msgstr "Speichern"
@@ -851,6 +928,7 @@ msgstr "deine Partien, die Referenzdatenbanken und Musterpartien"
 #: src/components/shell/CommandPalette.tsx
 #: src/components/shell/SideNav.tsx
 #: src/lib/ui/shortcuts.ts
+#: src/routes/games/GamesPage.tsx
 #: src/routes/stats/StatsPage.tsx
 msgid "Stats"
 msgstr "Statistiken"
@@ -973,6 +1051,10 @@ msgstr "Statistik-Bericht"
 #: src/components/shell/CommandPalette.tsx
 msgid "saved filter"
 msgstr "gespeicherter Filter"
+
+#: src/components/shell/CommandPalette.tsx
+msgid "collection"
+msgstr "Sammlung"
 
 #: src/components/shell/CommandPalette.tsx
 msgid "report · {hint}"
@@ -1195,6 +1277,20 @@ msgstr "Filter"
 #: src/components/shell/SideNav.tsx
 msgid "No saved filters yet"
 msgstr "Noch keine gespeicherten Filter"
+
+#: src/components/shell/SideNav.tsx
+#: src/routes/games/components/CollectionDialog.tsx
+msgid "New collection"
+msgstr "Neue Sammlung"
+
+#: src/components/shell/SideNav.tsx
+#: src/routes/game/components/GameCollectionsDialog.tsx
+msgid "Collections"
+msgstr "Sammlungen"
+
+#: src/components/shell/SideNav.tsx
+msgid "No collections yet"
+msgstr "Noch keine Sammlungen"
 
 #: src/components/shell/SideNav.tsx
 #: src/routes/explorer/ExplorerPage.tsx
@@ -1459,6 +1555,34 @@ msgstr "Analysiert"
 #: src/lib/chess/classification.ts
 msgid "{count, plural, one {# line} other {# lines}}"
 msgstr "{count, plural, one {# Variante} other {# Varianten}}"
+
+#: src/lib/collections.ts
+msgid "Blue"
+msgstr "Blau"
+
+#: src/lib/collections.ts
+msgid "Green"
+msgstr "Grün"
+
+#: src/lib/collections.ts
+msgid "Sand"
+msgstr "Sand"
+
+#: src/lib/collections.ts
+msgid "Orange"
+msgstr "Orange"
+
+#: src/lib/collections.ts
+msgid "Amber"
+msgstr "Bernstein"
+
+#: src/lib/collections.ts
+msgid "Slate"
+msgstr "Schiefer"
+
+#: src/lib/collections.ts
+msgid "Red"
+msgstr "Rot"
 
 #: src/lib/desktop/NativeFeedback.tsx
 msgid "Analysis finished with errors"
@@ -3042,6 +3166,7 @@ msgstr "Die Partie wird sofort gespeichert, ohne Züge und ohne Analysedurchlauf
 #: src/routes/engines/AddEngineForm.tsx
 #: src/routes/engines/CreateRunnerForm.tsx
 #: src/routes/engines/EngineDetail.tsx
+#: src/routes/games/components/CollectionDialog.tsx
 msgid "Name"
 msgstr "Name"
 
@@ -3066,6 +3191,7 @@ msgid "Link to the game"
 msgstr "Link zur Partie"
 
 #: src/routes/correspondence/components/NewGameDialog.tsx
+#: src/routes/games/components/CollectionDialog.tsx
 #: src/routes/games/components/FilterBar.tsx
 #: src/routes/games/filters.ts
 msgid "Time control"
@@ -3655,6 +3781,8 @@ msgid "Recent games"
 msgstr "Neueste Partien"
 
 #: src/routes/dashboard/RecentGamesList.tsx
+#: src/routes/explorer/components/OwnFilters.tsx
+#: src/routes/stats/StatsPage.tsx
 msgid "All games"
 msgstr "Alle Partien"
 
@@ -4215,6 +4343,7 @@ msgid "Remove {engineName}? Analysis already stored keeps its runs."
 msgstr "{engineName} entfernen? Bereits gespeicherte Analysen behalten ihre Durchläufe."
 
 #: src/routes/engines/EngineDetail.tsx
+#: src/routes/games/components/TableFooter.tsx
 msgctxt "button"
 msgid "Remove"
 msgstr "Entfernen"
@@ -4973,6 +5102,17 @@ msgstr "gespielt"
 msgid "Played within"
 msgstr "Gespielt im Zeitraum"
 
+#: src/routes/explorer/components/OwnFilters.tsx
+msgid "in"
+msgstr "in"
+
+#: src/routes/explorer/components/OwnFilters.tsx
+#: src/routes/games/GamesPage.tsx
+#: src/routes/games/filters.ts
+#: src/routes/stats/StatsPage.tsx
+msgid "Collection"
+msgstr "Sammlung"
+
 #: src/routes/explorer/components/PositionNotes.tsx
 msgid "Your notes on this position"
 msgstr "Deine Notizen zu dieser Stellung"
@@ -5305,6 +5445,14 @@ msgstr "ACPL"
 #: src/routes/game/components/MoveList.tsx
 msgid "Nothing flagged in this game."
 msgstr "In dieser Partie ist nichts markiert."
+
+#: src/routes/game/components/GameCollectionsDialog.tsx
+msgid "Tick a collection to put this game in it, untick it to take the game out. Taking it out by hand sticks."
+msgstr "Hake eine Sammlung an, um die Partie hineinzulegen, und entferne den Haken, um sie herauszunehmen. Was du von Hand herausnimmst, bleibt draußen."
+
+#: src/routes/game/components/GameCollectionsDialog.tsx
+msgid "New collection…"
+msgstr "Neue Sammlung …"
 
 #: src/routes/game/components/GameHeaderBar.tsx
 msgid "Next game"
@@ -5787,6 +5935,10 @@ msgid "More for this game"
 msgstr "Mehr zu dieser Partie"
 
 #: src/routes/game/components/StudioActions.tsx
+msgid "Collections…"
+msgstr "Sammlungen …"
+
+#: src/routes/game/components/StudioActions.tsx
 msgid "← Back to explorer"
 msgstr "← Zurück zum Explorer"
 
@@ -5859,6 +6011,36 @@ msgid "{deleted, plural, one {# game} other {# games}} deleted"
 msgstr "{deleted, plural, one {# Partie} other {# Partien}} gelöscht"
 
 #: src/routes/games/GamesPage.tsx
+msgid "{removed, plural, one {# game} other {# games}} taken out of {name}"
+msgstr "{removed, plural, one {# Partie} other {# Partien}} aus {name} herausgenommen"
+
+#. placeholder {0}: refusalReason(error, t`the request never landed`)
+#: src/routes/games/GamesPage.tsx
+msgid "Could not take the games out — {0}"
+msgstr "Die Partien ließen sich nicht herausnehmen – {0}"
+
+#: src/routes/games/GamesPage.tsx
+msgid "Collection not found"
+msgstr "Sammlung nicht gefunden"
+
+#: src/routes/games/GamesPage.tsx
+msgctxt "button"
+msgid "Edit"
+msgstr "Bearbeiten"
+
+#: src/routes/games/GamesPage.tsx
+msgid "Stats over this collection's games"
+msgstr "Statistiken über die Partien dieser Sammlung"
+
+#: src/routes/games/GamesPage.tsx
+msgid "This collection is not there any more. <0>Show the whole library</0>"
+msgstr "Diese Sammlung gibt es nicht mehr. <0>Die ganze Bibliothek zeigen</0>"
+
+#: src/routes/games/GamesPage.tsx
+msgid "Could not load the collection."
+msgstr "Die Sammlung ließ sich nicht laden."
+
+#: src/routes/games/GamesPage.tsx
 #: src/routes/notes/components/NoteFilterBar.tsx
 msgid "Clear {active}"
 msgstr "{active} zurücksetzen"
@@ -5870,6 +6052,59 @@ msgstr "Partien durchsuchen"
 #: src/routes/games/GamesPage.tsx
 msgid "Opponent, ECO, PGN text…"
 msgstr "Gegner, ECO, PGN-Text …"
+
+#: src/routes/games/GamesPage.tsx
+msgid "Made {name}"
+msgstr "{name} angelegt"
+
+#: src/routes/games/GamesPage.tsx
+msgid "{unscored, plural, one {# game in it is not scored: a reference game, or one of yours whose side is not known yet} other {# games in it are not scored: reference games, or yours whose side is not known yet}}"
+msgstr "{unscored, plural, one {# Partie darin zählt nicht mit: eine fremde, oder eine eigene, deren Seite noch niemand kennt} other {# Partien darin zählen nicht mit: fremde, oder eigene, deren Seite noch niemand kennt}}"
+
+#: src/routes/games/GamesPage.tsx
+msgid "Your games: score <0>{points} / {games}</0>"
+msgstr "Deine Partien: Bilanz <0>{points} / {games}</0>"
+
+#: src/routes/games/GamesPage.tsx
+msgid "{wins} won, {draws} drawn, {losses} lost"
+msgstr "{wins} gewonnen, {draws} remis, {losses} verloren"
+
+#: src/routes/games/GamesPage.tsx
+msgid "avg opponent <0>{opponent}</0>"
+msgstr "Ø Gegner <0>{opponent}</0>"
+
+#: src/routes/games/GamesPage.tsx
+msgid "blunders <0>{blunders}</0> / game"
+msgstr "grobe Patzer <0>{blunders}</0> / Partie"
+
+#: src/routes/games/GamesPage.tsx
+msgid "No score: none of its games is one of yours with a known side."
+msgstr "Keine Bilanz: Keine ihrer Partien ist eine eigene mit bekannter Seite."
+
+#: src/routes/games/GamesPage.tsx
+msgid "No games in it yet."
+msgstr "Noch keine Partien darin."
+
+#: src/routes/games/GamesPage.tsx
+#: src/routes/games/components/CollectionDialog.tsx
+msgid "Rule"
+msgstr "Regel"
+
+#: src/routes/games/GamesPage.tsx
+msgid "· adds new imports"
+msgstr "· nimmt neue Importe auf"
+
+#: src/routes/games/GamesPage.tsx
+msgid "Nothing in this collection yet"
+msgstr "Noch nichts in dieser Sammlung"
+
+#: src/routes/games/GamesPage.tsx
+msgid "Select games in the library and use Add to…, or give the collection a rule under Edit and it fills as new games arrive."
+msgstr "Wähle Partien in der Bibliothek aus und nimm „Hinzufügen zu…“, oder gib der Sammlung unter „Bearbeiten“ eine Regel, dann füllt sie sich, sobald neue Partien ankommen."
+
+#: src/routes/games/GamesPage.tsx
+msgid "Go to all games"
+msgstr "Zu allen Partien"
 
 #: src/routes/games/GamesPage.tsx
 msgid "Nothing matches these filters"
@@ -5894,6 +6129,172 @@ msgstr "Filter zurücksetzen"
 #: src/routes/games/GamesPage.tsx
 msgid "Go to import"
 msgstr "Zum Import"
+
+#: src/routes/games/components/CollectionDialog.tsx
+msgid "There is already a collection with that name."
+msgstr "Es gibt schon eine Sammlung mit diesem Namen."
+
+#: src/routes/games/components/CollectionDialog.tsx
+msgid "Could not save the collection."
+msgstr "Die Sammlung ließ sich nicht speichern."
+
+#: src/routes/games/components/CollectionDialog.tsx
+msgid "Give it a name."
+msgstr "Gib ihr einen Namen."
+
+#: src/routes/games/components/CollectionDialog.tsx
+msgid "Could not delete the collection."
+msgstr "Die Sammlung ließ sich nicht löschen."
+
+#: src/routes/games/components/CollectionDialog.tsx
+msgid "Edit {collectionName}"
+msgstr "{collectionName} bearbeiten"
+
+#: src/routes/games/components/CollectionDialog.tsx
+msgid "A collection is a set of games. Changing its rule moves none of them."
+msgstr "Eine Sammlung ist eine Menge von Partien. Eine geänderte Regel bewegt keine davon."
+
+#: src/routes/games/components/CollectionDialog.tsx
+msgid "{handIn, plural, one {With the game you picked.} other {With the # games you picked.}}"
+msgstr "{handIn, plural, one {Mit der Partie, die du ausgewählt hast.} other {Mit den # Partien, die du ausgewählt hast.}}"
+
+#: src/routes/games/components/CollectionDialog.tsx
+msgid "From the filter you had open:"
+msgstr "Aus dem Filter, den du offen hattest:"
+
+#: src/routes/games/components/CollectionDialog.tsx
+msgid "A named set of games. They still count everywhere; the collection is a way to find them."
+msgstr "Eine Menge von Partien mit einem Namen. Sie zählen weiter überall; die Sammlung ist ein Weg, sie wiederzufinden."
+
+#: src/routes/games/components/CollectionDialog.tsx
+msgid "45-45 League"
+msgstr "45-45-Liga"
+
+#: src/routes/games/components/CollectionDialog.tsx
+#: src/routes/games/filters.ts
+#: src/routes/stats/StatsPage.tsx
+msgid "Colour"
+msgstr "Farbe"
+
+#: src/routes/games/components/CollectionDialog.tsx
+msgid "Description (optional)"
+msgstr "Beschreibung (optional)"
+
+#: src/routes/games/components/CollectionDialog.tsx
+msgid "What these games have in common"
+msgstr "Was diese Partien gemeinsam haben"
+
+#: src/routes/games/components/CollectionDialog.tsx
+msgid "Add new games that match"
+msgstr "Neue passende Partien aufnehmen"
+
+#: src/routes/games/components/CollectionDialog.tsx
+msgid "Pick at least one thing a game must match, or switch the rule off."
+msgstr "Wähle mindestens eine Bedingung, die eine Partie erfüllen muss, oder schalte die Regel aus."
+
+#: src/routes/games/components/CollectionDialog.tsx
+msgid "Counting the games you already have…"
+msgstr "Deine vorhandenen Partien werden gezählt …"
+
+#: src/routes/games/components/CollectionDialog.tsx
+msgid "Every game you already have that matches is in it."
+msgstr "Jede vorhandene Partie, die passt, ist schon darin."
+
+#: src/routes/games/components/CollectionDialog.tsx
+msgid "None of the games you already have match."
+msgstr "Keine deiner vorhandenen Partien passt."
+
+#: src/routes/games/components/CollectionDialog.tsx
+msgid "{matchCount, plural, one {Also add the # game that matches and is not in it yet} other {Also add the # games that match and are not in it yet}}"
+msgstr "{matchCount, plural, one {Auch die # passende Partie aufnehmen, die noch nicht darin ist} other {Auch die # passenden Partien aufnehmen, die noch nicht darin sind}}"
+
+#: src/routes/games/components/CollectionDialog.tsx
+msgid "{matchCount, plural, one {Also add the # game you already have that matches} other {Also add the # games you already have that match}}"
+msgstr "{matchCount, plural, one {Auch die # vorhandene Partie aufnehmen, die passt} other {Auch die # vorhandenen Partien aufnehmen, die passen}}"
+
+#: src/routes/games/components/CollectionDialog.tsx
+msgid "A rule only looks at games as they arrive (sync, the live stream, PGN). Taking a game out by hand sticks."
+msgstr "Eine Regel sieht sich Partien nur an, wenn sie ankommen (Synchronisierung, Livestream, PGN). Nimmst du eine Partie von Hand heraus, bleibt sie draußen."
+
+#: src/routes/games/components/CollectionDialog.tsx
+msgid "Delete {collectionName}? Its games stay in your library, in every other collection and in Stats."
+msgstr "{collectionName} löschen? Ihre Partien bleiben in deiner Bibliothek, in jeder anderen Sammlung und in den Statistiken."
+
+#: src/routes/games/components/CollectionDialog.tsx
+#: src/routes/notes/components/NoteEditor.tsx
+msgid "Keep it"
+msgstr "Behalten"
+
+#: src/routes/games/components/CollectionDialog.tsx
+msgid "Delete collection"
+msgstr "Sammlung löschen"
+
+#: src/routes/games/components/CollectionDialog.tsx
+msgid "Delete…"
+msgstr "Löschen …"
+
+#: src/routes/games/components/CollectionDialog.tsx
+msgid "Create collection"
+msgstr "Sammlung anlegen"
+
+#: src/routes/games/components/CollectionDialog.tsx
+#: src/routes/games/components/columns.ts
+#: src/routes/games/filters.ts
+#: src/routes/import/SyncHistory.tsx
+#: src/routes/live/SessionMeta.tsx
+msgid "Source"
+msgstr "Quelle"
+
+#: src/routes/games/components/CollectionDialog.tsx
+msgid "Any source"
+msgstr "Jede Quelle"
+
+#: src/routes/games/components/CollectionDialog.tsx
+msgid "Seconds, then the increment: 2700+45 is 45 minutes plus 45 seconds a move"
+msgstr "Sekunden, dann das Inkrement: 2700+45 sind 45 Minuten plus 45 Sekunden pro Zug"
+
+#: src/routes/games/components/CollectionDialog.tsx
+msgctxt "collection rule field"
+msgid "Speed"
+msgstr "Kategorie"
+
+#: src/routes/games/components/CollectionDialog.tsx
+#: src/routes/games/components/FilterBar.tsx
+msgid "Rated"
+msgstr "Gewertet"
+
+#: src/routes/games/components/CollectionDialog.tsx
+#: src/routes/games/components/FilterBar.tsx
+msgid "Either"
+msgstr "Beides"
+
+#: src/routes/games/components/CollectionDialog.tsx
+msgid "Casual"
+msgstr "Ungewertet"
+
+#: src/routes/games/components/CollectionDialog.tsx
+#: src/routes/games/components/FilterBar.tsx
+#: src/routes/games/filters.ts
+#: src/routes/notes/components/NoteFilterBar.tsx
+#: src/routes/notes/components/NoteRow.tsx
+#: src/routes/notes/filters.ts
+msgid "Opponent"
+msgstr "Gegner"
+
+#: src/routes/games/components/CollectionDialog.tsx
+#: src/routes/games/components/FilterBar.tsx
+#: src/routes/notes/components/NoteFilterBar.tsx
+msgid "Part of a name"
+msgstr "Teil eines Namens"
+
+#: src/routes/games/components/CollectionDialog.tsx
+msgid "Opening (ECO)"
+msgstr "Eröffnung (ECO)"
+
+#: src/routes/games/components/CollectionDialog.tsx
+#: src/routes/games/components/FilterBar.tsx
+msgid "B22, or just C6"
+msgstr "B22, oder auch nur C6"
 
 #: src/routes/games/components/DeleteGamesDialog.tsx
 msgid "{count, plural, one {Delete 1 game} other {Delete # games}}"
@@ -5929,6 +6330,22 @@ msgstr "90T"
 #: src/routes/games/components/FilterBar.tsx
 msgid "12m"
 msgstr "12M"
+
+#: src/routes/games/components/FilterBar.tsx
+msgid "In the collection"
+msgstr "In der Sammlung"
+
+#: src/routes/games/components/FilterBar.tsx
+msgid "No collections yet. Select games and use Add to… under the table, or press + beside Collections in the sidebar."
+msgstr "Noch keine Sammlungen. Wähle Partien aus und nimm „Hinzufügen zu…“ unter der Tabelle, oder drück + neben „Sammlungen“ in der Seitenleiste."
+
+#: src/routes/games/components/FilterBar.tsx
+msgid "Keep the games this filter finds as a collection, and add new ones as they arrive"
+msgstr "Die Partien, die dieser Filter findet, als Sammlung behalten und neue aufnehmen, sobald sie ankommen"
+
+#: src/routes/games/components/FilterBar.tsx
+msgid "Make a collection"
+msgstr "Sammlung anlegen"
 
 #: src/routes/games/components/FilterBar.tsx
 msgid "Your own games — the ones every statistic counts"
@@ -6017,10 +6434,6 @@ msgid "ECO code"
 msgstr "ECO-Code"
 
 #: src/routes/games/components/FilterBar.tsx
-msgid "B22, or just C6"
-msgstr "B22, oder auch nur C6"
-
-#: src/routes/games/components/FilterBar.tsx
 msgid "A prefix matches the whole family — <0>C6</0> is every Caro-Kann from C60 to C69."
 msgstr "Ein Präfix trifft die ganze Familie – <0>C6</0> ist jede Caro-Kann von C60 bis C69."
 
@@ -6032,19 +6445,6 @@ msgstr "Bedenkzeit"
 #: src/routes/games/components/FilterBar.tsx
 msgid "Exact clock"
 msgstr "Genaue Bedenkzeit"
-
-#: src/routes/games/components/FilterBar.tsx
-#: src/routes/games/filters.ts
-#: src/routes/notes/components/NoteFilterBar.tsx
-#: src/routes/notes/components/NoteRow.tsx
-#: src/routes/notes/filters.ts
-msgid "Opponent"
-msgstr "Gegner"
-
-#: src/routes/games/components/FilterBar.tsx
-#: src/routes/notes/components/NoteFilterBar.tsx
-msgid "Part of a name"
-msgstr "Teil eines Namens"
 
 #: src/routes/games/components/FilterBar.tsx
 msgid "Contains a blunder"
@@ -6103,6 +6503,10 @@ msgid "{selected} selected"
 msgstr "{selected} ausgewählt"
 
 #: src/routes/games/components/TableFooter.tsx
+msgid "Remove from collection"
+msgstr "Aus der Sammlung nehmen"
+
+#: src/routes/games/components/TableFooter.tsx
 msgid "Queue analysis"
 msgstr "Analyse einreihen"
 
@@ -6116,8 +6520,12 @@ msgid "Clear selection"
 msgstr "Auswahl aufheben"
 
 #: src/routes/games/components/TableFooter.tsx
-msgid "Select rows to queue analysis over them, or to delete them."
-msgstr "Wähle Zeilen aus, um eine Analyse über sie einzureihen oder sie zu löschen."
+msgid "Select rows to remove them from this collection, queue analysis, or delete them."
+msgstr "Wähle Zeilen aus, um sie aus dieser Sammlung zu nehmen, ihre Analyse einzureihen oder sie zu löschen."
+
+#: src/routes/games/components/TableFooter.tsx
+msgid "Select rows to queue analysis over them, add them to a collection, or delete them."
+msgstr "Wähle Zeilen aus, um ihre Analyse einzureihen, sie einer Sammlung hinzuzufügen oder sie zu löschen."
 
 #: src/routes/games/components/TableFooter.tsx
 msgid "Rows"
@@ -6144,6 +6552,14 @@ msgstr "Nächste Seite"
 #: src/routes/games/components/TableFooter.tsx
 msgid "{firstRow}–{lastRow} of {games}"
 msgstr "{firstRow}–{lastRow} von {games}"
+
+#: src/routes/games/components/TableFooter.tsx
+msgid "Add to…"
+msgstr "Hinzufügen zu…"
+
+#: src/routes/games/components/TableFooter.tsx
+msgid "Add to a collection"
+msgstr "Zu einer Sammlung hinzufügen"
 
 #. The rating, named after Arpad Elo — left as it is in most languages
 #: src/routes/games/components/columns.ts
@@ -6175,20 +6591,8 @@ msgid "Worst"
 msgstr "Verlust"
 
 #: src/routes/games/components/columns.ts
-#: src/routes/games/filters.ts
-#: src/routes/import/SyncHistory.tsx
-#: src/routes/live/SessionMeta.tsx
-msgid "Source"
-msgstr "Quelle"
-
-#: src/routes/games/components/columns.ts
 msgid "Flags"
 msgstr "Symbole"
-
-#: src/routes/games/filters.ts
-#: src/routes/stats/StatsPage.tsx
-msgid "Colour"
-msgstr "Farbe"
 
 #: src/routes/games/filters.ts
 msgctxt "filter chip"
@@ -6239,6 +6643,16 @@ msgstr "Klassisch"
 msgctxt "filter chip"
 msgid "correspondence"
 msgstr "Fernschach"
+
+#: src/routes/games/filters.ts
+msgctxt "filter chip"
+msgid "rated"
+msgstr "gewertet"
+
+#: src/routes/games/filters.ts
+msgctxt "filter chip"
+msgid "casual"
+msgstr "ungewertet"
 
 #: src/routes/games/filters.ts
 #: src/routes/notes/filters.ts
@@ -7092,10 +7506,6 @@ msgstr "Diese Notiz endgültig vergessen?"
 #: src/routes/notes/components/NoteEditor.tsx
 msgid "Forget it"
 msgstr "Vergessen"
-
-#: src/routes/notes/components/NoteEditor.tsx
-msgid "Keep it"
-msgstr "Behalten"
 
 #: src/routes/notes/components/NoteFilterBar.tsx
 msgid "Search the notes"

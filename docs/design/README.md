@@ -6,6 +6,24 @@ directory are local snapshots pulled 2026-08-25.
 
 ## Decisions
 
+- **Game collections: named, coloured groups of games** (issue #37,
+  `prototypes/organize-collections.html`, chosen 2026-09-26 over
+  `prototypes/organize-tags.html` and `prototypes/organize-folders.html`). A collection holds
+  games rather than a query, a game can be in several, and it lives on the server, so it
+  reaches the phone and MCP where a saved filter never did. It gets a fold in the rail under
+  the saved filters, a tinted chip on the rows and in the game header (colour keys from the
+  token palette: `accent`, `good`, `otb`, `way-back`, `mistake`, `info`, `blunder`), an
+  **Add to…** checklist in the library's footer and behind the game page's ⋯ (half-ticked when
+  only part of the selection is in), and a page of its own that is just `/games?collection=…`
+  with a score line and the rule above the table. Games get in by hand or by a rule, and a
+  rule is a subset of the library's own filter vocabulary (plus `rated`, which the library
+  gained for it) matched against new imports only, so taking a game out by hand sticks.
+  **Set apart was deliberately not built.** The prototype's per-collection switch that hid a
+  collection's games from the library, the dashboard and Stats, and the Stats strip that
+  announced it, are left out: a collection never hides games, and it is a filter dimension
+  everywhere instead — the library, Stats and the explorer can each be narrowed to one. The
+  switch may come back together with a rework of the reference-games (`whose`) feature,
+  which is the library's existing answer to "games that should not count".
 - **Compute: Engines and Machines as two pages**
   (`prototypes/compute-pages.html`, built 2026-09-12; plan and what differs from the
   prototype in `docs/compute.md`). The Engines page's inventory and its capacity grid become two rail

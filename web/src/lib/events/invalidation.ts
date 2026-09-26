@@ -53,7 +53,9 @@ export function invalidationsFor(event: AnyEvent): QueryKey[] {
     case 'analysis.paused':
       return [queryKeys.queue()]
 
-    // New evals: classifications, eval curves, worst moments, explorer eval drops.
+    // New evals: classifications, eval curves, worst moments, explorer eval drops — and a
+    // collection page's "blunders / game", which is the one number in its header an
+    // analysis moves. Only the details: the rail's counts are membership, not analysis.
     case 'analysis.done':
     case 'analysis.failed':
       return [
@@ -61,6 +63,7 @@ export function invalidationsFor(event: AnyEvent): QueryKey[] {
         queryKeys.games(),
         queryKeys.stats(),
         queryKeys.explorer(),
+        queryKeys.collectionDetails(),
       ]
 
     // A note the coach wrote over MCP, or one written in another tab. Notes ride along in
@@ -142,6 +145,15 @@ export function invalidationsFor(event: AnyEvent): QueryKey[] {
       return 'stream' in event && event.stream
         ? [queryKeys.lichess()]
         : [queryKeys.lichess(), queryKeys.reference()]
+
+    // A collection made, renamed or deleted, or games put in or taken out. The rail's
+    // counts and the collection page's score line are `['collections']`; every games row
+    // carries its memberships and a list can be filtered to one collection; Stats and the
+    // explorer can be scoped to one too. A rename moves nothing but the first of these, but
+    // the frame does not say which kind of change it was, and it is rare — a click, or an
+    // import whose games a rule matched.
+    case 'collections.changed':
+      return [queryKeys.collections(), queryKeys.games(), queryKeys.stats(), queryKeys.explorer()]
 
     // Carried whole on the socket, and a keepalive is not news. `stream.snapshot` arrives
     // twice a second per open board — refetching on it would be a refetch loop, and

@@ -198,3 +198,14 @@ export const OUTCOME_LABELS: Record<Outcome, MessageDescriptor> = {
 export function formatCount(value: number): string {
   return value.toLocaleString('en-US')
 }
+
+/**
+ * A match score the way a crosstable writes it: `5`, `5½`, `½`. A half point is the only
+ * fraction chess scores have, and `5.5 / 8` reads as a statistic rather than a result.
+ */
+export function formatPoints(points: number): string {
+  const halves = Math.round(points * 2)
+  const whole = Math.floor(halves / 2)
+  if (halves % 2 === 0) return formatCount(whole)
+  return whole === 0 ? '½' : `${formatCount(whole)}½`
+}

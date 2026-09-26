@@ -120,17 +120,19 @@ export function parsePeriod(value: string | null): WindowKey {
 }
 
 /**
- * What the owner's tree sends for its two lenses, and what it leaves out. Every speed on
+ * What the owner's tree sends for its lenses, and what it leaves out. Every speed on
  * is no speed filter, so a game whose speed was never parsed still counts until somebody
- * names the speeds they want — the rule the Stats page keeps.
+ * names the speeds they want — the rule the Stats page keeps. No collection is every game.
  */
 export function ownFilterQuery(
   speeds: readonly GameSpeed[],
   period: WindowKey,
-): { speed?: GameSpeed[]; days?: number } {
+  collection: number | null = null,
+): { speed?: GameSpeed[]; days?: number; collection?: number } {
   return {
     ...(speeds.length < GAME_SPEEDS.length ? { speed: [...speeds] } : {}),
     ...(period === 'all' ? {} : { days: WINDOW_DAYS[period] }),
+    ...(collection === null ? {} : { collection }),
   }
 }
 

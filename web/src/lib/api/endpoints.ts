@@ -19,6 +19,13 @@ import type {
   BackupPrepared,
   BatchAnalysisRequest,
   BatchAnalysisResponse,
+  Collection,
+  CollectionCreate,
+  CollectionDetail,
+  CollectionGamesAdded,
+  CollectionGamesRemoved,
+  CollectionList,
+  CollectionUpdate,
   Color,
   ComparisonResponse,
   CorrespondenceExpand,
@@ -271,6 +278,41 @@ export const forgetDeletions = (ids?: number[]) =>
 export const preparedBackupUrl = (token: string) =>
   apiUrl(`/library/backup/prepared/${encodeURIComponent(token)}`)
 
+// --- collections ------------------------------------------------------------
+
+/** Every collection, by name (case-insensitive), each with its game count. */
+export const listCollections = () => http.get<CollectionList>('/collections')
+
+/** One collection with the owner's score over its games — the collection page's header. */
+export const getCollection = (id: number) => http.get<CollectionDetail>(`/collections/${id}`)
+
+/**
+ * A 409 `name_taken` for a name another collection already has, whatever its case; a 422
+ * for a colour or a rule the backend does not know.
+ */
+export const createCollection = (body: CollectionCreate) =>
+  http.post<Collection>('/collections', { body })
+
+export const updateCollection = (id: number, body: CollectionUpdate) =>
+  http.patch<Collection>(`/collections/${id}`, { body })
+
+/** The collection goes; its games stay in the library, untouched. */
+export const deleteCollection = (id: number) => http.delete<void>(`/collections/${id}`)
+
+/** Put games in by hand. A game already in is a no-op, an unknown id is ignored. */
+export const addToCollection = (id: number, gameIds: number[]) =>
+  http.post<CollectionGamesAdded>(`/collections/${id}/games`, { body: { game_ids: gameIds } })
+
+/** Take games out. The rule never puts them back on its own — only a new import can match. */
+export const removeFromCollection = (id: number, gameIds: number[]) =>
+  http.post<CollectionGamesRemoved>(`/collections/${id}/games/remove`, {
+    body: { game_ids: gameIds },
+  })
+
+/** Run the collection's rule over the games already in the library, once. */
+export const applyCollectionRule = (id: number) =>
+  http.post<CollectionGamesAdded>(`/collections/${id}/apply-rule`)
+
 // --- import ---------------------------------------------------------------
 
 export const listImportJobs = (
@@ -438,6 +480,8 @@ export interface ExplorerQuery {
   speed?: Speed[]
   /** Only games played in the last this many days. */
   days?: number
+  /** Only the games in this collection (its id). */
+  collection?: number
 }
 
 export const explore = (query: ExplorerQuery = {}) =>
@@ -448,6 +492,8 @@ export interface PositionsQuery {
   limit?: number
   speed?: Speed[]
   days?: number
+  /** The same collection lens as `ExplorerQuery`, so the games under a scoped tree match it. */
+  collection?: number
 }
 
 export const findPositions = (fen: string, query: PositionsQuery = {}) =>

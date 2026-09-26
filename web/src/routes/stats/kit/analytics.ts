@@ -113,6 +113,16 @@ export function windowProse(
 
 export const DEFAULT_WINDOWS: WindowKey[] = ['all', '1y', '90d', '30d']
 
+/**
+ * `?collection=7` as a collection id, or null for anything that is not one — the scope
+ * Stats and the explorer both take from the URL, read the same way on both.
+ */
+export function parseCollectionParam(value: string | null): number | null {
+  if (value === null || !/^\d+$/.test(value)) return null
+  const id = Number(value)
+  return Number.isSafeInteger(id) && id > 0 ? id : null
+}
+
 // --- comparison -----------------------------------------------------------
 
 /**

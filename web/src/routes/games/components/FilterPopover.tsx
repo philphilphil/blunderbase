@@ -204,25 +204,33 @@ export function OptionRow<T extends string>({
   )
 }
 
-/** A yes / no / either tri-state, for the two boolean filters. */
+/**
+ * A yes / no / either tri-state, for the boolean filters. "Either" is clicking the chosen
+ * one again; `either` also draws it as a button of its own, for a filter whose unset state
+ * is the one most people mean and should be seen to be chosen (rated / casual / either).
+ */
 export function TriState({
   value,
   onChange,
   yes,
   no,
+  either,
 }: {
   value: boolean | undefined
   onChange: (next: boolean | undefined) => void
   yes?: string
   no?: string
+  either?: string
 }) {
   const { t } = useLingui()
+  const options: { label: string; next: boolean | undefined }[] = [
+    { label: yes ?? t`Yes`, next: true },
+    { label: no ?? t`No`, next: false },
+  ]
+  if (either) options.unshift({ label: either, next: undefined })
   return (
     <div className="flex gap-1">
-      {[
-        { label: yes ?? t`Yes`, next: true },
-        { label: no ?? t`No`, next: false },
-      ].map(({ label, next }) => {
+      {options.map(({ label, next }) => {
         const selected = value === next
         return (
           <OptionButton

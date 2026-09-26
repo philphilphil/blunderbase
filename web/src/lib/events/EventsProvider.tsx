@@ -70,6 +70,9 @@ const FLUSH_MS = 200
  * `analysis.progress` fires once per analysed ply — many times a second during a batch — so it
  * gets its own entry rather than joining `['analysis']`, which would need to cool every key
  * under it (`runs()`, `run()`, …) to avoid dragging a single game's own analysis along.
+ * `collectionDetails()` is the other: a batch's `analysis.done` burst refreshes an open
+ * collection page's score line, which the server computes uncached. `['collections']`
+ * itself cools like the other roots, for an import whose rules fill several collections.
  */
 const COOLDOWN_MS: Record<string, number> = {
   games: 3_000,
@@ -77,10 +80,14 @@ const COOLDOWN_MS: Record<string, number> = {
   explorer: 3_000,
   import: 3_000,
   analysis: 1_000,
+  collections: 3_000,
 }
 
 /** Cooldowns for specific keys that are not a whole-prefix root — see `queue()` above. */
-const EXACT_COOLDOWN_MS = new Map<string, number>([[JSON.stringify(queryKeys.queue()), 1_000]])
+const EXACT_COOLDOWN_MS = new Map<string, number>([
+  [JSON.stringify(queryKeys.queue()), 1_000],
+  [JSON.stringify(queryKeys.collectionDetails()), 3_000],
+])
 
 function cooldownFor(key: QueryKey): number {
   const exact = EXACT_COOLDOWN_MS.get(JSON.stringify(key))

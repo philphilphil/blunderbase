@@ -26,6 +26,7 @@ import { memo } from 'react'
 
 import { preloadRoute } from '@/app/lazyRoutes'
 import { ClassificationBadge } from '@/components/badges/ClassificationBadge'
+import { CollectionChips } from '@/components/collections/CollectionChip'
 import { SourceBadge } from '@/components/badges/SourceBadge'
 import { RunBadge, UnanalysedBadge } from '@/components/badges/RunBadge'
 import type { GameCard } from '@/lib/api/types'
@@ -90,6 +91,8 @@ export const GameRow = memo(function GameRow({
   // imported with it held back (`engine_hidden`, cleared on the game itself). The second
   // keeps the column and marks the cell instead, so the row says *why* it is quiet.
   const quiet = engineHidden || game.engine_hidden === true
+  // Most rows are in no collection; those never subscribe to the collections list at all.
+  const inCollections = (game.collections?.length ?? 0) > 0
   // The owner's side, or null: a game added from the reference books has none, and a
   // game of theirs whose side is not yet known has none either. Their name is set bold
   // under its column, which is how the row says which side was theirs — the same fact
@@ -153,9 +156,17 @@ export const GameRow = memo(function GameRow({
       </span>
 
       <span
-        {...cell('date', cn('font-mono tabular text-body', selected ? 'max-md:text-soft' : 'max-md:text-dim'))}
+        {...cell(
+          'date',
+          cn(
+            'font-mono tabular text-body max-md:flex max-md:min-w-0 max-md:items-center max-md:gap-2',
+            selected ? 'max-md:text-soft' : 'max-md:text-dim',
+          ),
+        )}
       >
         {formatGameDate(game.played_at)}
+        {/* The phone card's copy of the chips (see the Flags cell for why there are two). */}
+        {inCollections ? <CollectionChips ids={game.collections} className="md:hidden" /> : null}
       </span>
 
       <span {...cell('white', nameClass('white'))} title={game.white ?? undefined}>
@@ -233,6 +244,15 @@ export const GameRow = memo(function GameRow({
       </span>
 
       <span {...cell('flags', 'flex items-center gap-1 overflow-hidden')}>
+        {/* A game's collections, ahead of its flags. The chips shrink and clip, the flags
+            do not: a row with three long collection names still shows its `??2`. This is
+            the desktop copy; the phone card's flags cell is one narrow grid column that
+            also carries the result above it, so on a phone the chips ride on the date's
+            line instead, which spans most of the card. Two copies, one per breakpoint,
+            rather than one that would widen the result column on every card. */}
+        {inCollections ? (
+          <CollectionChips ids={game.collections} className="max-w-[60%] max-md:hidden" />
+        ) : null}
         {analysis && quiet ? null : analysis ? (
           flags.map((flag) => (
             <ClassificationBadge

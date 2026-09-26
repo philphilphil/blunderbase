@@ -28,6 +28,7 @@ from backend.db.enums import (
     Result,
     RunStatus,
     Source,
+    Speed,
 )
 from backend.runtime import RuntimeCapabilities
 
@@ -295,6 +296,10 @@ class GameSummary(Payload):
     opening: str | None = None
     termination: str | None = None
     ply_count: int | None = None
+    # The ids of the collections the game is in (`services.collections`), [] for none.
+    # Looked up for the games list and the game detail; an embedding that did not look
+    # them up reads [] too, so a client never has to ask whether the key is there.
+    collections: list[int] = Field(default_factory=list)
 
 
 class GameEngineUpdate(Input):
@@ -2529,3 +2534,101 @@ class SearchResponse(BaseModel):
     opponents: list[OpponentHit] = Field(default_factory=list)
     openings: list[OpeningHit] = Field(default_factory=list)
     notes: list[NoteResponse] = Field(default_factory=list)
+
+
+# --- collections -------------------------------------------------------------
+
+
+class CollectionRule(Input):
+    """What a collection's rule may narrow by: a subset of the `/games` query vocabulary.
+
+    Each key means what the same query parameter means on `/games`; `time_control` is the
+    stored form (`"2700+45"`), `speed` a set. Every key is optional and absent means "any".
+    """
+
+    source: Source | None = None
+    speed: list[Speed] | None = None
+    time_control: str | None = Field(default=None, max_length=32)
+    rated: bool | None = None
+    color: Color | None = None
+    eco: str | None = Field(default=None, max_length=8)
+    opponent: str | None = Field(default=None, max_length=128)
+    variant: str | None = Field(default=None, max_length=32)
+
+
+class CollectionResponse(Payload):
+    """`services.collections.collection_payload`: one collection and how many games it has.
+
+    `rule` carries only the keys it narrows by — `{"source": "lichess", "rated": true}` —
+    and is null for a collection filled by hand alone.
+    """
+
+    id: int
+    name: str
+    color: str
+    description: str | None = None
+    rule: dict[str, Any] | None = None
+    game_count: int = 0
+    created_at: datetime
+
+
+class CollectionList(BaseModel):
+    collections: list[CollectionResponse]
+
+
+class CollectionSummary(BaseModel):
+    """The score line a collection's page leads with, from the owner's side.
+
+    The same definitions Stats uses: `points` counts a draw as half, `blunders_per_game` is
+    over the games with a finished analysis and null when none has one.
+    """
+
+    games: int = 0
+    wins: int = 0
+    draws: int = 0
+    losses: int = 0
+    points: float = 0.0
+    avg_opponent_rating: int | None = None
+    blunders_per_game: float | None = None
+    first_played_at: datetime | None = None
+    last_played_at: datetime | None = None
+
+
+class CollectionDetail(CollectionResponse):
+    summary: CollectionSummary
+
+
+class CollectionCreate(Input):
+    """`POST /collections`. `game_ids` go in by hand; `apply_to_existing` runs the rule once."""
+
+    name: str = Field(max_length=200)
+    color: str = "accent"
+    description: str | None = None
+    rule: CollectionRule | None = None
+    apply_to_existing: bool = False
+    game_ids: list[int] = Field(default_factory=list, max_length=MAX_BATCH_GAMES)
+
+
+class CollectionUpdate(Input):
+    """`PATCH /collections/{id}`: a key that is absent is left alone; `rule: null` clears it."""
+
+    name: str | None = Field(default=None, max_length=200)
+    color: str | None = None
+    description: str | None = None
+    rule: CollectionRule | None = None
+
+
+class CollectionGames(Input):
+    """The games one membership change is about. Unknown ids are ignored, not refused."""
+
+    game_ids: list[int] = Field(min_length=1, max_length=MAX_BATCH_GAMES)
+
+
+class CollectionGamesAdded(BaseModel):
+    added: int
+    collection: CollectionResponse
+
+
+class CollectionGamesRemoved(BaseModel):
+    removed: int
+    collection: CollectionResponse

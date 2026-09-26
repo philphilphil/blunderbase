@@ -783,6 +783,65 @@ class Note(Base):
     line: Mapped[Line | None] = relationship(back_populates="notes")
 
 
+class Collection(Base):
+    """A named, coloured group of games: a league, a club season, the games against a rival.
+
+    A grouping and a filter, never a hiding place. A game in a collection is still one of
+    the owner's games everywhere — the library, Stats, the dashboard and the explorer count
+    it exactly as before — and the collection is one more thing any of them can be narrowed
+    to. A game may sit in any number of them.
+
+    `rule` is an optional library filter over *new* imports, a subset of the `/games` query
+    vocabulary (`services.collections.RULE_KEYS`): every game an import stores that matches
+    it joins the collection as it arrives. A rule never re-runs over old games on its own;
+    that is the explicit "apply to existing", so a game taken out by hand stays out. NULL is
+    no rule, and an empty rule is stored as NULL rather than as a filter that matches all.
+
+    `color` is a key into the app's palette rather than a colour (`services.collections
+    .COLORS`), so a theme change recolours every collection with it. `name` is unique
+    case-insensitively, which the service enforces; the constraint here is the exact-case
+    backstop.
+    """
+
+    __tablename__ = "collections"
+    __table_args__ = (UniqueConstraint("name", name="uq_collections_name"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    name: Mapped[str] = mapped_column(String(40), nullable=False)
+    color: Mapped[str] = mapped_column(
+        String(16), nullable=False, default="accent", server_default="accent"
+    )
+    description: Mapped[str | None] = mapped_column(Text)
+    rule: Mapped[dict[str, Any] | None] = mapped_column(JSON(none_as_null=True))
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False, default=utcnow)
+
+
+class GameCollection(Base):
+    """One game in one collection, and how it got there.
+
+    `added_by` is `manual` for a game the owner put there and `rule` for one the
+    collection's rule took in as it was imported (or by an explicit "apply to existing").
+    The two are kept apart because they answer different questions later — which games a
+    rule is responsible for — and because a rule never takes back what a hand put in.
+
+    Both keys cascade: deleting a game or a collection takes the membership with it, and
+    `services.games.delete_games` deletes these rows first anyway, child-first, for a
+    database whose foreign keys are not enforced.
+    """
+
+    __tablename__ = "game_collections"
+    __table_args__ = (Index("ix_game_collections_collection_id", "collection_id"),)
+
+    game_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("games.id", ondelete="CASCADE"), primary_key=True
+    )
+    collection_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("collections.id", ondelete="CASCADE"), primary_key=True
+    )
+    added_by: Mapped[str] = mapped_column(String(16), nullable=False)
+    added_at: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False, default=utcnow)
+
+
 class RepertoireMove(Base):
     """One move in one of the owner's two opening repertoires: what they intend to play.
 

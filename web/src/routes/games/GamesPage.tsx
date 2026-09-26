@@ -9,6 +9,16 @@
  * link — the opening explorer and the dashboard both point into it that way. The page and
  * its size do not: which slice you are reading is not what a link to a filtered library is
  * about, and the size is a preference the reader keeps (`./paging`).
+ *
+ * A collection's page is this page under `?collection=ID` rather than a screen of its own:
+ * the filters, the selection, the paging and the footer all work on it unchanged, and a
+ * filter inside a collection is a link like any other. What it adds is the header — the
+ * collection's colour and name as the title, its description, the score line and the rule —
+ * which is the part a filter alone could not give. On that page the collection is the
+ * page's scope rather than one of its filters: "Clear" keeps it, and the count says "of its
+ * games" rather than "of your games". It also opens on every game in the collection rather
+ * than the owner's alone (`defaultWhose`), because the rail's count is every game in it and
+ * a reference game put in by hand should be on the page that count links to.
  */
 import { plural } from '@lingui/core/macro'
 import { Trans, useLingui } from '@lingui/react/macro'
@@ -16,18 +26,29 @@ import type * as React from 'react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 
+import { CollectionSwatch } from '@/components/collections/CollectionChip'
+import { RuleChips } from '@/components/collections/RuleChips'
 import { SetPageChrome } from '@/components/shell/PageChrome'
 import { Button } from '@/components/ui/button'
 import { ApiError } from '@/lib/api/client'
-import { useDeleteGames, useRequestAnalysisBatch } from '@/lib/api/queries'
+import {
+  useCollection,
+  useDeleteGames,
+  useRemoveFromCollection,
+  useRequestAnalysisBatch,
+} from '@/lib/api/queries'
+import type { CollectionDetail } from '@/lib/api/types'
+import { collectionStatsPath, isRuleEmpty } from '@/lib/collections'
 import { useEngineHidden } from '@/lib/ui/engineVisibility'
 import { isTyping } from '@/lib/ui/shortcuts'
 
+import { CollectionDialog } from './components/CollectionDialog'
 import { DeleteGamesDialog } from './components/DeleteGamesDialog'
 import { DebouncedInput, FilterBar } from './components/FilterBar'
 import { GamesTable } from './components/GamesTable'
 import { TableFooter } from './components/TableFooter'
 import {
+  clearGroup,
   filterCount,
   filtersFromParams,
   paramsFromFilters,
@@ -35,6 +56,7 @@ import {
   toGameQuery,
   type LibraryFilters,
 } from './filters'
+import { formatCount, formatPoints } from './format'
 import { rememberTrail } from './gameTrail'
 import {
   FALLBACK_FIT_ROWS,
@@ -44,6 +66,7 @@ import {
   type PageSizeChoice,
 } from './paging'
 import { DEFAULT_SORT, type Sort } from './sorting'
+import { useCollectionNames } from './useCollectionNames'
 import { useGameLibrary } from './useGameLibrary'
 
 /**
@@ -95,6 +118,26 @@ export function GamesPage() {
   // one path here is one receipt and one set of spinning rows. Deleting works the same way.
   const analysis = useRequestAnalysisBatch()
   const deletion = useDeleteGames()
+  const removal = useRemoveFromCollection()
+
+  // The collection this page is, when it is one. The name comes from the list the rail
+  // already holds, so the title is there at once; the detail (score line, description) is
+  // its own request and fills in when it lands.
+  const scope = filters.collection
+  const collectionName = useCollectionNames()
+  const detail = useCollection(scope)
+  // Deleted elsewhere, or a link to one that never was: say so and offer the way out,
+  // rather than an empty table under a title that is only a number. Asked before anything
+  // reads the detail, because a refetch that 404s keeps the last good answer as `data`:
+  // a collection deleted in another tab would otherwise go on showing its name, its score
+  // and an Edit that can only fail.
+  const gone = detail.error instanceof ApiError && detail.error.status === 404
+  const current = gone ? undefined : detail.data
+  const scopeName =
+    scope === undefined || gone ? undefined : (current?.name ?? collectionName(scope))
+  /** Games handed to "+ New collection from these N…", while its dialog is open. */
+  const [newFrom, setNewFrom] = useState<number[] | null>(null)
+  const [editing, setEditing] = useState(false)
 
   /**
    * Open a game, and hand the run it was opened from over with it.
@@ -269,6 +312,41 @@ export function GamesPage() {
     deletion.reset()
   }, [deletion])
 
+  // What Add to… ticks from: the selected rows, each with the collections it is in.
+  const selectedGames = useMemo(
+    () =>
+      rows
+        .filter((game) => selectedVisible.has(game.id))
+        .map((game) => ({ id: game.id, collections: game.collections ?? [] })),
+    [rows, selectedVisible],
+  )
+
+  // Taking games out of the collection this page is. No confirmation: nothing is deleted,
+  // the games are one Add to… away from coming back, and a rule never re-adds them.
+  const removeFromCollection = useCallback(async () => {
+    const ids = [...selectedVisible]
+    if (scope === undefined || ids.length === 0) return
+    const name = scopeName ?? ''
+    try {
+      const receipt = await removal.mutateAsync({ collectionId: scope, gameIds: ids })
+      setSelected((current) => {
+        const next = new Set(current)
+        for (const id of ids) next.delete(id)
+        return next
+      })
+      const removed = receipt.removed
+      setMessage(t`${plural(removed, { one: '# game', other: '# games' })} taken out of ${name}`)
+    } catch (error) {
+      setMessage(t`Could not take the games out — ${refusalReason(error, t`the request never landed`)}`)
+    }
+  }, [removal, scope, scopeName, selectedVisible, t])
+
+  /** Leave a collection's page for the library with the same filters, minus the collection. */
+  const leaveCollection = useCallback(
+    () => setFilters(clearGroup(filters, 'collection')),
+    [filters, setFilters],
+  )
+
   // The message is a receipt, not a state — it goes away on its own.
   useEffect(() => {
     if (!message) return
@@ -276,34 +354,101 @@ export function GamesPage() {
     return () => clearTimeout(timer)
   }, [message])
 
-  const active = filterCount(filters)
+  // On a collection's page the collection is the page, not one of its filters.
+  const active = filterCount(filters) - (scope === undefined ? 0 : 1)
+  const clearFilters = () => setFilters(scope === undefined ? {} : { collection: scope })
   const loaded = rows.length
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      {/* No heading of its own: the titlebar's crumb names the page and carries Import, and
-          the count is the footer's ("1–50 of 312") and the rail's. What is left is the one
-          toolbar — whose games, the filters, then Clear and the search at its right end. */}
+      {/* No heading of its own: the titlebar's crumb names the page — a collection's colour
+          and name when it is one — and carries its buttons, and the count is the footer's
+          ("1–50 of 312") and the rail's. A collection's Edit and Stats take Import's place:
+          they act on the collection, and importing is not what its page is for. */}
       <SetPageChrome
-        breadcrumb={[{ label: t`Games`, to: '/games' }]}
+        breadcrumb={
+          scope === undefined
+            ? [{ label: t`Games`, to: '/games' }]
+            : [
+                { label: t`Games`, to: '/games' },
+                {
+                  label: (
+                    <span className="flex min-w-0 items-center gap-1.5">
+                      <CollectionSwatch color={current?.color ?? 'accent'} />
+                      <span className="truncate">
+                        {scopeName ?? (gone ? t`Collection not found` : t`Collection`)}
+                      </span>
+                    </span>
+                  ),
+                },
+              ]
+        }
         manual="guide/games"
         actions={
-          <Button asChild size="sm" variant="secondary">
-            <Link to="/library/import">
-              <Trans>Import</Trans>
-            </Link>
-          </Button>
+          scope !== undefined ? (
+            <>
+              <Button
+                type="button"
+                size="sm"
+                variant="secondary"
+                disabled={!current}
+                onClick={() => setEditing(true)}
+              >
+                <Trans context="button">Edit</Trans>
+              </Button>
+              <Button asChild size="sm" variant="secondary">
+                <Link to={collectionStatsPath(scope)} title={t`Stats over this collection's games`}>
+                  <Trans>Stats</Trans>
+                </Link>
+              </Button>
+            </>
+          ) : (
+            <Button asChild size="sm" variant="secondary">
+              <Link to="/library/import">
+                <Trans>Import</Trans>
+              </Link>
+            </Button>
+          )
         }
       />
 
-      <div className="flex-none border-b border-hairline px-5 py-3 max-md:px-3">
+      <div className="flex flex-none flex-col gap-3 border-b border-hairline px-5 py-3 max-md:px-3">
+        {scope !== undefined ? (
+          gone ? (
+            <p className="text-[0.75rem] text-dim">
+              <Trans>
+                This collection is not there any more.{' '}
+                <button
+                  type="button"
+                  onClick={leaveCollection}
+                  className="text-accent-teal hover:text-accent-link"
+                >
+                  Show the whole library
+                </button>
+              </Trans>
+            </p>
+          ) : current ? (
+            <>
+              {current.description ? (
+                <p className="text-[0.78125rem] text-soft">{current.description}</p>
+              ) : null}
+              <CollectionScore collection={current} />
+            </>
+          ) : detail.isError ? (
+            <p className="text-[0.75rem] text-blunder">
+              {refusalReason(detail.error, t`Could not load the collection.`)}
+            </p>
+          ) : null
+        ) : null}
+
+
         <FilterBar
           filters={filters}
           onChange={setFilters}
           trailing={
             <>
               {active > 0 ? (
-                <Button type="button" size="sm" variant="outline" onClick={() => setFilters({})}>
+                <Button type="button" size="sm" variant="outline" onClick={clearFilters}>
                   <Trans>Clear {active}</Trans>
                 </Button>
               ) : null}
@@ -343,11 +488,18 @@ export function GamesPage() {
         onRetry={() => void library.refetch()}
         busy={library.isPaging}
         onCapacityChange={setFitRows}
-        empty={<EmptyState active={active} onClear={() => setFilters({})} />}
+        empty={
+          <EmptyState active={active} inCollection={scope !== undefined} onClear={clearFilters} />
+        }
       />
 
       <TableFooter
         selectedCount={selectedVisible.size}
+        selectedGames={selectedGames}
+        onNewCollection={() => setNewFrom([...selectedVisible])}
+        inCollection={scope !== undefined}
+        removing={removal.isPending}
+        onRemoveFromCollection={() => void removeFromCollection()}
         loadedCount={loaded}
         total={library.total}
         queueing={analysis.isPending}
@@ -377,6 +529,114 @@ export function GamesPage() {
           onClose={closeDelete}
         />
       ) : null}
+
+      {newFrom ? (
+        <CollectionDialog
+          gameIds={newFrom}
+          onClose={() => setNewFrom(null)}
+          onSaved={(collection) => {
+            const name = collection.name
+            setMessage(t`Made ${name}`)
+          }}
+        />
+      ) : null}
+
+      {editing && current ? (
+        <CollectionDialog
+          collection={current}
+          onClose={() => setEditing(false)}
+          onDeleted={leaveCollection}
+        />
+      ) : null}
+    </div>
+  )
+}
+
+/**
+ * The line under a collection's title that a filter could not give: how the games in it
+ * went, from the owner's side, and the rule that keeps adding to it.
+ *
+ * The score is over the collection whatever the filter bar says — it is the collection's
+ * record, the thing a league season is looked at for — while the count above it follows
+ * the filters like it does everywhere. It is the owner's record, so it scores only the
+ * games they have a side in: the page lists every game in the collection, and a reference
+ * game (or one of theirs whose side is unknown) is in the list and not in the score. The
+ * line says "Your games" so the two numbers are not read as one. A number that is not there
+ * yet (no rated opponents, nothing analysed) is left out rather than shown as a dash.
+ */
+function CollectionScore({ collection }: { collection: CollectionDetail }) {
+  const { t } = useLingui()
+  const summary = collection.summary
+  const unscored = collection.game_count - summary.games
+  const rule = collection.rule ?? null
+  const points = formatPoints(summary.points)
+  const games = formatCount(summary.games)
+  const wins = formatCount(summary.wins)
+  const draws = formatCount(summary.draws)
+  const losses = formatCount(summary.losses)
+  const opponent = summary.avg_opponent_rating
+  const blunders = summary.blunders_per_game?.toFixed(2)
+  return (
+    <div className="flex flex-wrap items-center gap-x-5 gap-y-1.5 rounded-md border border-hairline bg-panel px-3 py-1.5 text-[0.75rem] text-dim">
+      {summary.games > 0 ? (
+        <>
+          <span
+            title={
+              unscored > 0
+                ? t`${plural(unscored, {
+                    one: '# game in it is not scored: a reference game, or one of yours whose side is not known yet',
+                    other: '# games in it are not scored: reference games, or yours whose side is not known yet',
+                  })}`
+                : undefined
+            }
+          >
+            <Trans>
+              Your games: score{' '}
+              <b className="font-mono font-medium text-ink">
+                {points} / {games}
+              </b>
+            </Trans>
+          </span>
+          <span className="font-mono tabular" title={t`${wins} won, ${draws} drawn, ${losses} lost`}>
+            <span className="text-good">+{wins}</span> <span>={draws}</span>{' '}
+            <span className="text-blunder">−{losses}</span>
+          </span>
+          {opponent !== null && opponent !== undefined ? (
+            <span>
+              <Trans>
+                avg opponent <b className="font-mono font-medium text-body">{opponent}</b>
+              </Trans>
+            </span>
+          ) : null}
+          {blunders !== undefined ? (
+            <span>
+              <Trans>
+                blunders <b className="font-mono font-medium text-body">{blunders}</b> / game
+              </Trans>
+            </span>
+          ) : null}
+        </>
+      ) : collection.game_count > 0 ? (
+        <span>
+          <Trans>No score: none of its games is one of yours with a known side.</Trans>
+        </span>
+      ) : (
+        <span>
+          <Trans>No games in it yet.</Trans>
+        </span>
+      )}
+      {!isRuleEmpty(rule) ? (
+        <>
+          <span className="flex-1 max-md:hidden" />
+          <span className="flex flex-wrap items-center gap-1.5">
+            <Trans>Rule</Trans>
+            <RuleChips rule={rule} />
+            <span className="text-faint">
+              <Trans>· adds new imports</Trans>
+            </span>
+          </span>
+        </>
+      ) : null}
     </div>
   )
 }
@@ -399,7 +659,37 @@ function refusalReason(error: unknown, fallback: string): string {
  * so importing is the filled primary; a filter that matched nothing is routine and gets
  * the quieter outline.
  */
-function EmptyState({ active, onClear }: { active: number; onClear: () => void }) {
+function EmptyState({
+  active,
+  inCollection,
+  onClear,
+}: {
+  active: number
+  inCollection: boolean
+  onClear: () => void
+}) {
+  // An empty collection is not an empty library: the way to fill it is from the library,
+  // not from an import.
+  if (inCollection && active === 0) {
+    return (
+      <div className="mx-auto flex max-w-[28rem] flex-col items-center gap-2.5 py-10 text-center max-md:py-6">
+        <span className="text-heading font-semibold text-ink">
+          <Trans>Nothing in this collection yet</Trans>
+        </span>
+        <p className="text-data leading-relaxed text-dim">
+          <Trans>
+            Select games in the library and use Add to…, or give the collection a rule under
+            Edit and it fills as new games arrive.
+          </Trans>
+        </p>
+        <Button asChild size="sm" variant="outline">
+          <Link to="/games">
+            <Trans>Go to all games</Trans>
+          </Link>
+        </Button>
+      </div>
+    )
+  }
   return (
     <div className="mx-auto flex max-w-[28rem] flex-col items-center gap-2.5 py-10 text-center max-md:py-6">
       <span className="text-heading font-semibold text-ink">

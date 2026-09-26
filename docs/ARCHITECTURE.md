@@ -357,6 +357,25 @@ delete takes the node's whole subtree, collected in Python rather than left to a
 The tree is read in one SELECT and assembled in memory; a repertoire is hundreds of rows,
 and the caller wants all of it.
 
+**Collections** are a filter dimension and nothing more. `collections` holds the name, a
+palette key and an optional `rule`; `game_collections` is the membership, keyed by the pair,
+with `added_by` saying whether a hand or the rule put the game there. Nothing hides a game:
+`GameFilters.collection` is one more condition in `game_conditions` (an uncorrelated `IN`
+over the members), so the games list, Stats, search and the explorer's scope all narrow by
+a collection without knowing what one is. A rule is a subset of the same vocabulary
+(`collections.RULE_KEYS`) turned into `GameFilters(mine=True, …)`;
+`import_service.ingest_game` — the one function every route in stores through — matches a
+new game against every rule inside the game's own transaction. The import announces
+`collections.changed` once, after its last commit (`announce_collections`: once per sync
+stream or per single game, never per game of a stream), and `accounts.reconcile_games` asks
+the colour rules again about games whose side it has just learned. Every announcement —
+a hand edit, `apply_rule`, an import — drops the Stats cache first, and a Stats computation
+that was already running when it did publishes nothing (`stats._GENERATION`), so a
+collection's Stats is never answered from its old membership. Rules never re-run on their
+own, so a game taken out by hand stays out; `apply_rule` is the explicit catch-up. A page
+of games reads its memberships in one query (`collections.collections_of`), never one per
+row.
+
 ## Testing
 
 `tests/conftest.py` gives every later test the same two starting points: `session`, an

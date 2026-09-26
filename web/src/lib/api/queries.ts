@@ -24,6 +24,11 @@ import type {
   AppSettingsUpdate,
   AuthStatus,
   BatchAnalysisRequest,
+  Collection,
+  CollectionCreate,
+  CollectionGamesAdded,
+  CollectionGamesRemoved,
+  CollectionUpdate,
   Color,
   CorrespondenceExpand,
   CorrespondenceFinishRequest,
@@ -339,6 +344,8 @@ export function useDeleteAllGames(
         queryKeys.imports(),
         queryKeys.explorer(),
         queryKeys.notes(),
+        // The collections themselves survive an empty library, with nothing in them.
+        queryKeys.collections(),
       ]) {
         void client.invalidateQueries({ queryKey })
       }
@@ -399,9 +406,157 @@ export function useDeleteGames(
         queryKeys.lines(),
         // Every deleted game is written into the record the Manage screen lists.
         queryKeys.library(),
+        // And leaves every collection it was in, whose counts are on the rail.
+        queryKeys.collections(),
       ]) {
         void client.invalidateQueries({ queryKey })
       }
+      options?.onSuccess?.(...args)
+    },
+  })
+}
+
+// --- collections ----------------------------------------------------------
+
+/**
+ * Every collection, by name. The rail, the filter bar, the chips on every row and the
+ * checklists all read this one query, so a chip is drawn from an id without a request of
+ * its own.
+ */
+export function useCollections(options?: Options<Awaited<ReturnType<typeof api.listCollections>>>) {
+  return useQuery({
+    queryKey: queryKeys.collectionList(),
+    queryFn: api.listCollections,
+    ...options,
+  })
+}
+
+/** One collection with its score line. `null` asks for nothing — no collection in view. */
+export function useCollection(
+  id: number | null | undefined,
+  options?: Options<Awaited<ReturnType<typeof api.getCollection>>>,
+) {
+  return useQuery({
+    queryKey: queryKeys.collection(id ?? -1),
+    queryFn: () => api.getCollection(id as number),
+    enabled: typeof id === 'number',
+    ...options,
+  })
+}
+
+/**
+ * What a change to which games are in a collection makes stale: the collections (counts,
+ * score lines), every games query (each row carries its memberships, and a page filtered to
+ * the collection lists different games), and Stats and the explorer, which can be scoped
+ * to one. The socket says the same with `collections.changed`; doing it here as well means
+ * the tab that made the change does not wait for the frame.
+ */
+function membershipMoved(client: ReturnType<typeof useQueryClient>) {
+  for (const queryKey of [
+    queryKeys.collections(),
+    queryKeys.games(),
+    queryKeys.stats(),
+    queryKeys.explorer(),
+  ]) {
+    void client.invalidateQueries({ queryKey })
+  }
+}
+
+/** Make one, with its first games — by hand (`game_ids`) or by its rule (`apply_to_existing`). */
+export function useCreateCollection(
+  options?: UseMutationOptions<Collection, Error, CollectionCreate>,
+) {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: (body: CollectionCreate) => api.createCollection(body),
+    ...options,
+    onSuccess: (...args) => {
+      membershipMoved(client)
+      options?.onSuccess?.(...args)
+    },
+  })
+}
+
+/**
+ * Rename, recolour, redescribe or re-rule one. No game moves — a new rule only looks at
+ * games still to come — so only the collections go back to the server.
+ */
+export function useUpdateCollection(
+  options?: UseMutationOptions<Collection, Error, { id: number; body: CollectionUpdate }>,
+) {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, body }: { id: number; body: CollectionUpdate }) =>
+      api.updateCollection(id, body),
+    ...options,
+    onSuccess: (...args) => {
+      void client.invalidateQueries({ queryKey: queryKeys.collections() })
+      options?.onSuccess?.(...args)
+    },
+  })
+}
+
+/** The games stay; every row that carried its chip, and every scope that named it, moves. */
+export function useDeleteCollection(options?: UseMutationOptions<void, Error, number>) {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: (id: number) => api.deleteCollection(id),
+    ...options,
+    onSuccess: (...args) => {
+      membershipMoved(client)
+      options?.onSuccess?.(...args)
+    },
+  })
+}
+
+export function useAddToCollection(
+  options?: UseMutationOptions<
+    CollectionGamesAdded,
+    Error,
+    { collectionId: number; gameIds: number[] }
+  >,
+) {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: ({ collectionId, gameIds }: { collectionId: number; gameIds: number[] }) =>
+      api.addToCollection(collectionId, gameIds),
+    ...options,
+    onSuccess: (...args) => {
+      membershipMoved(client)
+      options?.onSuccess?.(...args)
+    },
+  })
+}
+
+export function useRemoveFromCollection(
+  options?: UseMutationOptions<
+    CollectionGamesRemoved,
+    Error,
+    { collectionId: number; gameIds: number[] }
+  >,
+) {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: ({ collectionId, gameIds }: { collectionId: number; gameIds: number[] }) =>
+      api.removeFromCollection(collectionId, gameIds),
+    ...options,
+    onSuccess: (...args) => {
+      membershipMoved(client)
+      options?.onSuccess?.(...args)
+    },
+  })
+}
+
+/** Run a collection's rule over the library once — the only way a rule reaches old games. */
+export function useApplyCollectionRule(
+  options?: UseMutationOptions<CollectionGamesAdded, Error, number>,
+) {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: (id: number) => api.applyCollectionRule(id),
+    ...options,
+    onSuccess: (...args) => {
+      membershipMoved(client)
       options?.onSuccess?.(...args)
     },
   })

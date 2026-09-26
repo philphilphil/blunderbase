@@ -35,6 +35,7 @@ from backend.db.session import database_backpressure
 from backend.db.types import utcnow
 from backend.services import accounts as accounts_service
 from backend.services import analysis, app_settings, engines
+from backend.services import collections as collections_service
 from backend.services import explorer as explorer_service
 from backend.services import games as games_service
 from backend.services.accounts import AccountIndex, fold
@@ -151,6 +152,9 @@ class IngestOutcome:
     game: Game | None
     created: bool
     blocked: bool = False
+    # The collections whose rule took the new game in, in the same transaction. The caller
+    # announces them once the game is committed (`announce_collections`).
+    collections: tuple[int, ...] = ()
 
 
 # A progress subscriber: the WebSocket layer, a CLI printer, a test recorder. It is called
@@ -399,6 +403,47 @@ def ingest_games(
     hide_engine_from = app_settings.get_hide_engine_new_games(session)
 
     result = ImportResult()
+    # The collections a rule filled during this stream. Announced once, when the stream
+    # ends however it ends, rather than once per game: a first sync of a few hundred league
+    # games would otherwise be a few hundred `collections.changed` frames, each one a
+    # refetch of the rail and of any open collection's score line in every tab.
+    joined: set[int] = set()
+    try:
+        _ingest_stream(
+            session,
+            job,
+            games,
+            result,
+            joined,
+            progress=progress,
+            accounts=accounts,
+            analyze=analyze,
+            presume_owner=presume_owner,
+            hide_engine_from=hide_engine_from,
+            settled=settled,
+            sleep=sleep,
+        )
+    finally:
+        announce_collections(joined)
+    return result
+
+
+def _ingest_stream(
+    session: Session,
+    job: ImportJob,
+    games: Iterable[ParsedGame | ImportFailure],
+    result: ImportResult,
+    joined: set[int],
+    *,
+    progress: ProgressHook | None,
+    accounts: AccountIndex,
+    analyze: bool,
+    presume_owner: bool,
+    hide_engine_from: int,
+    settled: SettledHook | None,
+    sleep: Callable[[float], None],
+) -> None:
+    """`ingest_games`' loop: every game its own commit, the rule memberships into `joined`."""
     # Whether the stream is still settling: it stops at the first game the database could
     # not take, and never starts again, because every later game in the stream sits after
     # that one and resuming from any of them would step over it.
@@ -411,6 +456,7 @@ def ingest_games(
             result.cancelled = True
             break
         result.seen += 1
+        stored: IngestOutcome | None = None
         if isinstance(item, ImportFailure):
             _record_failure(result, item.ref, item.error)
             event = _game_event(job, item.ref, GAME_FAILED, result, error=item.error)
@@ -433,6 +479,7 @@ def ingest_games(
                 _record_failure(result, item.reference, error)
                 event = _game_event(job, item.reference, GAME_FAILED, result, error=error)
             else:
+                stored = outcome
                 if outcome.blocked:
                     result.blocked += 1
                     status = GAME_BLOCKED
@@ -451,10 +498,11 @@ def ingest_games(
                 )
         _apply(job, result)
         session.commit()
+        if stored is not None:
+            joined.update(stored.collections)
         if settled is not None and settling:
             settled(item)
         _emit(progress, event)
-    return result
 
 
 def _ingest_with_retries(
@@ -511,6 +559,7 @@ def ingest_game(
     analyze: bool = True,
     presume_owner: bool = True,
     hide_engine_from: int | None = None,
+    owner_side: Color | None = None,
 ) -> IngestOutcome:
     """Store one parsed game, or report the one that is already there.
 
@@ -530,6 +579,11 @@ def ingest_game(
     setting, which is what every import route means; a stream reads it once and passes the
     answer down. A game that is not the owner's is never hidden — there is nothing of theirs
     to review first.
+
+    `owner_side` is a side the caller knows is the owner's whatever the names say — a
+    correspondence game, whose handle need not be an account here at all. It outranks the
+    account match and makes the game the owner's, and it is set before the collection rules
+    look at the game, so a rule that names a colour sees the side the game really has.
     """
     if accounts is None:
         accounts = AccountIndex.load(session)
@@ -563,6 +617,8 @@ def ingest_game(
         owner_color = Color.WHITE
     elif black_is_owner:
         owner_color = Color.BLACK
+    if owner_side is not None:
+        owner_color = owner_side
     is_owner_game = presume_owner or owner_color is not None
 
     game = Game(
@@ -602,7 +658,27 @@ def ingest_game(
     store_positions(session, game, rows)
     if analyze:
         enqueue_import_analysis(session, game)
-    return IngestOutcome(game=game, created=True)
+    # Here rather than in each route in, for the reason the dedup lookup is: a sync, the
+    # live stream, a PGN and a single game added by hand all store through this function,
+    # so a collection's rule sees every one of them. In the game's own transaction, so a
+    # game never exists without the memberships its rules gave it. A rule only ever takes
+    # the owner's own games, so somebody else's is not worth the query.
+    joined = collections_service.assign_on_import(session, [game.id]) if is_owner_game else []
+    return IngestOutcome(game=game, created=True, collections=tuple(joined))
+
+
+def announce_collections(collection_ids: Iterable[int]) -> None:
+    """Tell the screens that committed games joined these collections by rule, if any did.
+
+    One call per import — a whole sync's stream, or one game added by name — and so one
+    `collections.changed` and one drop of the stats cache however many games the rules took
+    in: a collection's Stats is right the moment the import is over, and the import never
+    turns into a refetch per game.
+    """
+    touched = sorted(set(collection_ids))
+    if not touched:
+        return
+    collections_service.notify_changed(touched[0] if len(touched) == 1 else None)
 
 
 def dedup_hash(parsed: ParsedGame) -> str:
@@ -731,6 +807,7 @@ def import_one(
     presume_owner: bool = True,
     analyze: bool = True,
     hide_engine_from: int | None = None,
+    owner_side: Color | None = None,
 ) -> IngestOutcome:
     """Store one game the owner asked for by name, under a job of its own.
 
@@ -750,7 +827,8 @@ def import_one(
     while it is played, and a pass over it would be redone after every move.
     `hide_engine_from` is `ingest_game`'s: None asks the setting, and a correspondence game
     passes `HIDE_ENGINE_NEVER`, because a game played *with* the engine is not one to be
-    read before it speaks.
+    read before it speaks. `owner_side` is `ingest_game`'s too: the side a correspondence
+    game says is the owner's.
     """
     known = games_service.identify(session, parsed.source, parsed.source_id, dedup_hash(parsed))
     if known.deleted is not None:
@@ -770,6 +848,7 @@ def import_one(
             presume_owner=presume_owner,
             analyze=analyze,
             hide_engine_from=hide_engine_from,
+            owner_side=owner_side,
         )
     except Exception as exc:
         session.rollback()
@@ -794,6 +873,7 @@ def import_one(
     job.status = JobStatus.DONE
     job.finished_at = utcnow()
     session.commit()
+    announce_collections(outcome.collections)
     _emit(
         progress,
         _game_event(

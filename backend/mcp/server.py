@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Iterator
 from contextlib import contextmanager
+from dataclasses import replace
 from typing import Any
 
 from mcp.server import MCPServer
@@ -23,6 +24,7 @@ from backend.mcp.errors import (
 )
 from backend.services import accounts as accounts_service
 from backend.services import analysis as analysis_service
+from backend.services import collections as collections_service
 from backend.services import explorer as explorer_service
 from backend.services import games as games_service
 from backend.services import live as live_service
@@ -58,6 +60,9 @@ MAX_NOTES = 100
 MAX_EXPORT_NOTES = 200
 DEFAULT_RATING_POINTS = 24
 MAX_RATING_POINTS = 200
+# Games one add_to_collection / remove_from_collection call moves: the ceiling the web
+# app's own request has, so the two surfaces refuse the same list.
+MAX_COLLECTION_GAMES = 500
 
 # Points kept from a game's eval curve. Enough to see the shape of the game; the moves
 # themselves are what `get_game` is for.
@@ -88,6 +93,9 @@ A requested analysis is queued, not immediate: request_analysis returns a run id
 Write what you learn down with save_note, and open a session with search_notes; a note can
 be pinned to a variation as well as to a move (save_line, get_lines), and export_notes
 hands the memory back as one document.
+The owner groups games into named collections (a league, a training block): read
+list_collections, then pass `collection` — its name or id — to search_games,
+get_last_games, get_stats or opening_explorer to ask about just those games.
 The owner keeps two opening repertoires, one per colour — what they mean to play, not what
 they have played: read get_repertoire before recommending an opening move, and say when a
 position is outside it.
@@ -105,7 +113,9 @@ one out. Those moves are an analysis board — they never change a stored game."
 STATS_DESCRIPTION = (
     "One aggregation over the owner's games. `dimension` is one of: "
     + ", ".join(stats_service.DIMENSIONS)
-    + ". Windows accept an ISO date or a relative window like '90d'. Each answer carries "
+    + ". Windows accept an ISO date or a relative window like '90d'; `rated` keeps to rated "
+    "(true) or casual (false) games; `collection` (a name or id from list_collections) "
+    "keeps to the owner's games in that collection. Each answer carries "
     "its buckets and their totals: counts, scores and average win% given away."
 )
 
@@ -160,6 +170,7 @@ def build_server(
     _register_insight(server, coach)
     _register_analysis(server, coach)
     _register_memory(server, coach)
+    _register_collections(server, coach)
     _register_runners(server, coach)
     _register_live(server, coach)
     return server
@@ -176,18 +187,28 @@ def _register_convenience(server: MCPServer, coach: Coach) -> None:
         platform: str | None = None,
         time_control: str | None = None,
         worst_moments: int = DEFAULT_WORST_MOMENTS,
+        collection: str | int | None = None,
+        rated: bool | None = None,
     ) -> TextContent:
         """The owner's newest games as compact cards: result, colour, opponent and
         rating, opening, the eval curve as [ply, win%] pairs, and the worst moments with
         their classifications. `platform` is lichess, chesscom, fics, pgn, manual or otb;
-        `time_control` is either a speed (blitz) or a literal clock (300+3)."""
+        `time_control` is either a speed (blitz) or a literal clock (300+3); `rated` keeps
+        to rated (true) or casual (false) games; `collection` (a name or id from
+        list_collections) keeps to the owner's games in that collection — search_games
+        lists every game in it."""
         count = args.capped(amount, DEFAULT_GAMES, MAX_GAMES)
         speeds, literal = args.time_control(time_control)
         filters = GameFilters(
-            source=args.platform(platform), speeds=speeds, time_control=literal
+            source=args.platform(platform),
+            speeds=speeds,
+            time_control=literal,
+            rated=args.flag(rated, "rated"),
         )
         worst = max(0, min(int(worst_moments), MAX_WORST_MOMENTS))
+        ref = args.collection(collection)
         with coach.session() as session:
+            filters = _in_collection(session, filters, ref)
             found = games_service.search_games(session, filters, limit=count)
             cards = games_service.game_cards(session, found, worst=worst)
         return payloads.result(
@@ -263,15 +284,21 @@ def _register_query(server: MCPServer, coach: Coach) -> None:
         text: str | None = None,
         limit: int = DEFAULT_SEARCH,
         offset: int = 0,
-        whose: str = "mine",
+        whose: str | None = None,
+        collection: str | int | None = None,
+        rated: bool | None = None,
     ) -> TextContent:
         """Games matching any combination of filters, newest first, as compact rows.
         `outcome` is win/loss/draw from the owner's side; `result` is the PGN result
         (1-0, 0-1, 1/2-1/2). `eco` matches a code or a prefix (C6 for all of C60-C69),
-        `text` searches names, openings and terminations. Dates accept an ISO date or a
-        relative window like '30d'. `whose` is "mine" (the owner's games, the default),
-        "others" (games added from the reference books) or "all". Follow up with get_game
-        for the moves."""
+        `text` searches names, openings and terminations, `rated` keeps to rated (true) or
+        casual (false) games. Dates accept an ISO date or a relative window like '30d'.
+        `whose` is "mine" (the owner's games), "others" (games added from the reference
+        books) or "all"; it defaults to "mine", and to "all" when `collection` is given,
+        because a collection's games are every game in it. `collection` is a name or id
+        from list_collections; a row's `collections` lists the ids it is in. Follow up with
+        get_game for the moves."""
+        ref = args.collection(collection)
         speeds, literal = args.time_control(time_control)
         filters = GameFilters(
             since=args.when(since, "since"),
@@ -288,13 +315,19 @@ def _register_query(server: MCPServer, coach: Coach) -> None:
             has_blunders=has_blunders,
             analyzed=analyzed,
             text=text,
-            mine=args.whose(whose),
+            rated=args.flag(rated, "rated"),
+            # The web app's collection page opens on every game in it too (`filters.ts`).
+            mine=args.whose(whose or ("all" if ref is not None else "mine")),
         )
         count = args.capped(limit, DEFAULT_SEARCH, MAX_SEARCH)
         start = args.offset(offset)
         with coach.session() as session:
+            filters = _in_collection(session, filters, ref)
             found = games_service.search_games(session, filters, limit=count, offset=start)
-            rows = [payloads.game_row(games_service.game_summary(game)) for game in found]
+            rows = [
+                payloads.game_row(summary)
+                for summary in games_service.game_summaries(session, found)
+            ]
             total = games_service.count_games(session, filters)
         return payloads.result(
             {"games": rows, "count": len(rows), "total": total, "offset": start}
@@ -422,17 +455,20 @@ def _register_insight(server: MCPServer, coach: Coach) -> None:
         min_games: int = 1,
         speeds: list[str] | None = None,
         since: str | None = None,
+        collection: str | int | None = None,
     ) -> TextContent:
         """The owner's personal opening tree from a position: how often they played each
         continuation, how they scored, the average win% they gave away playing it, and
         where they leave their own book. Enter by FEN, by ECO code, or by neither for the
         starting position. There is no reference database here — this is their games only.
-        `speeds` (like ["blitz","rapid"]) and `since` (an ISO date or a relative window like
-        '90d') narrow which of their games count.
+        `speeds` (like ["blitz","rapid"]), `since` (an ISO date or a relative window like
+        '90d') and `collection` (a name or id from list_collections) narrow which of their
+        games count.
         The accuracy numbers (`blunders`, `avg_win_loss`) count the owner's own moves, so
         they are zero and null on a continuation only the opponent ever played there."""
         start = args.fen(fen, required=False)
         chosen = [args.member(Speed, speed, "speed") for speed in args.tags(speeds)]
+        ref = args.collection(collection)
         with coach.session() as session:
             tree = explorer_service.opening_explorer(
                 session,
@@ -443,6 +479,7 @@ def _register_insight(server: MCPServer, coach: Coach) -> None:
                 min_games=max(1, int(min_games)),
                 speeds=[speed for speed in chosen if speed is not None],
                 since=args.when(since, "since"),
+                collection=_collection_id(session, ref),
             )
         return payloads.result(tree)
 
@@ -534,13 +571,17 @@ def _register_insight(server: MCPServer, coach: Coach) -> None:
         platform: str | None = None,
         color: str | None = None,
         time_control: str | None = None,
+        collection: str | int | None = None,
+        rated: bool | None = None,
     ) -> TextContent:
         speeds, literal = args.time_control(time_control)
         filters = GameFilters(
             source=args.platform(platform), color=args.color(color), speeds=speeds,
-            time_control=literal,
+            time_control=literal, rated=args.flag(rated, "rated"),
         )
+        ref = args.collection(collection)
         with coach.session() as session:
+            filters = _in_collection(session, filters, ref)
             payload = stats_service.get_stats(
                 session,
                 dimension.strip(),
@@ -999,6 +1040,81 @@ def _register_memory(server: MCPServer, coach: Coach) -> None:
             if not any(filtered):
                 payload["tags"] = notes_service.list_tags(session)
         return payloads.result(payload)
+
+
+# --- collections -----------------------------------------------------------
+
+
+def _register_collections(server: MCPServer, coach: Coach) -> None:
+    @server.tool()
+    @guarded
+    def list_collections() -> TextContent:
+        """The owner's collections — named groups of their games, like a league or a
+        training block — each with its id, colour, game count (every game in it, the
+        owner's and any reference game put in by hand) and, where it has one, the rule that
+        files the owner's new imports into it. A rule's keys are the library's: `source`
+        is search_games' `platform`, `speed` and `time_control` both go to its
+        `time_control`, and `rated`, `color`, `eco`, `opponent` and `variant` are its own.
+        Pass a name or id as `collection` to search_games (every game in it by default),
+        or to get_last_games, get_stats or opening_explorer (the owner's games in it) to ask
+        about just those games. A collection only groups: its games still count everywhere
+        else. Making or renaming one is done in the web app."""
+        with coach.session() as session:
+            rows = collections_service.list_payloads(session)
+        return payloads.result({"collections": rows, "count": len(rows)})
+
+    @server.tool()
+    @guarded
+    def add_to_collection(collection: str | int, game_ids: list[int]) -> TextContent:
+        """Put games in one of the owner's collections, by its name (any case) or id and
+        the game ids search_games lists. A game already in it and an id no game has are
+        both skipped; `added` is how many actually went in. Answers with the collection
+        as it now reads."""
+        ref = args.collection(collection)
+        wanted = args.game_ids(game_ids, MAX_COLLECTION_GAMES)
+        with coach.session() as session:
+            found = _resolve_collection(session, ref)
+            added = collections_service.add_games(session, found.id, wanted)
+            payload = {"added": added, "collection": collections_service.payload(session, found)}
+        return payloads.result(payload)
+
+    @server.tool()
+    @guarded
+    def remove_from_collection(collection: str | int, game_ids: list[int]) -> TextContent:
+        """Take games out of one of the owner's collections, by its name (any case) or id.
+        The games themselves stay in the library. Taking one out sticks: a collection's
+        rule only looks at games as they are imported, so the next sync does not put it
+        back. `removed` is how many were in it; answers with the collection as it now
+        reads."""
+        ref = args.collection(collection)
+        wanted = args.game_ids(game_ids, MAX_COLLECTION_GAMES)
+        with coach.session() as session:
+            found = _resolve_collection(session, ref)
+            removed = collections_service.remove_games(session, found.id, wanted)
+            payload = {
+                "removed": removed,
+                "collection": collections_service.payload(session, found),
+            }
+        return payloads.result(payload)
+
+
+def _resolve_collection(session: Session, ref: str | int | None) -> Any:
+    """The collection `ref` names — the service's row, handed straight back to the service."""
+    if ref is None:
+        raise CoachError(BAD_ARGUMENT, "a collection is required: its name or its id")
+    return collections_service.resolve_collection(session, ref)
+
+
+def _collection_id(session: Session, ref: str | int | None) -> int | None:
+    """The id a tool's `collection` argument names, or None where it named none."""
+    return None if ref is None else _resolve_collection(session, ref).id
+
+
+def _in_collection(session: Session, filters: GameFilters, ref: str | int | None) -> GameFilters:
+    """`filters` narrowed to the collection `ref` names, once a session can look it up."""
+    if ref is None:
+        return filters
+    return replace(filters, collection=_collection_id(session, ref))
 
 
 # --- runners ---------------------------------------------------------------

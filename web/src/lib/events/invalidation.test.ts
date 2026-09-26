@@ -69,6 +69,9 @@ describe('invalidationsFor — analysis lifecycle', () => {
       expect(has(keys, queryKeys.games())).toBe(true)
       expect(has(keys, queryKeys.stats())).toBe(true)
       expect(has(keys, queryKeys.explorer())).toBe(true)
+      // A collection page's blunders per game is read from analysis; its counts are not.
+      expect(has(keys, queryKeys.collectionDetails())).toBe(true)
+      expect(has(keys, queryKeys.collections())).toBe(false)
     }
   })
 
@@ -308,6 +311,31 @@ describe('invalidationsFor — lichess connection', () => {
   it('refreshes only the status when the live import reports its state', () => {
     const keys = invalidationsFor({ event: 'lichess.connection', stream: 'live' })
     expect(names(keys)).toEqual(names([queryKeys.lichess()]))
+  })
+})
+
+describe('invalidationsFor — collections', () => {
+  it('refreshes the collections, the games rows and every scope that can name one', () => {
+    const keys = invalidationsFor({ event: 'collections.changed', collection_id: 3 })
+    expect(has(keys, queryKeys.collections())).toBe(true)
+    expect(has(keys, queryKeys.games())).toBe(true)
+    expect(has(keys, queryKeys.stats())).toBe(true)
+    expect(has(keys, queryKeys.explorer())).toBe(true)
+  })
+
+  it('treats a change about several collections the same way', () => {
+    const one = invalidationsFor({ event: 'collections.changed', collection_id: 3 })
+    const many = invalidationsFor({ event: 'collections.changed', collection_id: null })
+    expect(names(many)).toEqual(names(one))
+  })
+
+  it('leaves the collections out of an import frame, which the rule news arrives beside', () => {
+    const keys = invalidationsFor({
+      event: 'import.game',
+      job_id: 1,
+      source: 'lichess',
+    } as AnyEvent)
+    expect(has(keys, queryKeys.collections())).toBe(false)
   })
 })
 

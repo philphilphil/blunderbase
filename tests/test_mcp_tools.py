@@ -26,6 +26,7 @@ from backend.mcp import payloads
 from backend.mcp import server as mcp_server
 from backend.mcp.server import build_server
 from backend.services import analysis as analysis_service
+from backend.services import collections as collections_service
 from backend.services import engines as engines_service
 from backend.services import live as live_service
 from backend.services import runners as runners_service
@@ -624,6 +625,201 @@ async def test_an_unknown_dimension_is_a_structured_error(coach: MCPServer) -> N
     payload = await failure(coach, "get_stats", dimension="blunders_by_vibe")
     assert payload["error"] == "unknown_dimension"
     assert "blunders_by_phase" in payload["message"]
+
+
+# --- collections -----------------------------------------------------------
+
+
+@pytest.fixture()
+def league(analysed: dict[str, Game], session: Session) -> int:
+    """A collection of three of the owner's games — two blitz, one bullet — with a rule."""
+    collection = collections_service.create_collection(
+        session,
+        name="Blitz League",
+        color="good",
+        rule={"source": "lichess", "time_control": "300+3", "rated": True},
+        game_ids=[
+            analysed["qg000001"].id,
+            analysed["qg000002"].id,
+            analysed["qg000004"].id,
+        ],
+    )
+    return collection.id
+
+
+async def test_the_collection_tools_need_only_what_they_act_on(coach: MCPServer) -> None:
+    listing = await tools_of(coach)
+    required = {tool.name: set(tool.input_schema.get("required", ())) for tool in listing}
+    assert required["list_collections"] == set()
+    assert required["add_to_collection"] == {"collection", "game_ids"}
+    assert required["remove_from_collection"] == {"collection", "game_ids"}
+    for name in ("search_games", "get_last_games", "get_stats", "opening_explorer"):
+        assert required[name] <= {"dimension"}, name
+
+
+async def test_list_collections_names_each_with_its_count_and_rule(
+    coach: MCPServer, league: int, session: Session
+) -> None:
+    collections_service.create_collection(session, name="archive")
+    payload = await call(coach, "list_collections")
+    assert payload["count"] == 2
+    # By name, whatever its case.
+    assert [row["name"] for row in payload["collections"]] == ["archive", "Blitz League"]
+    blitz = payload["collections"][1]
+    assert blitz["id"] == league
+    assert blitz["game_count"] == 3
+    assert blitz["color"] == "good"
+    assert blitz["rule"] == {"source": "lichess", "time_control": "300+3", "rated": True}
+    # Nulls are dropped like everywhere else in a coach payload.
+    assert "description" not in blitz
+
+
+async def test_add_to_collection_takes_a_name_in_any_case(
+    coach: MCPServer, analysed: dict[str, Game], league: int
+) -> None:
+    game = analysed["qg000005"].id
+    payload = await call(
+        coach, "add_to_collection", collection="blitz league", game_ids=[game, 999_999]
+    )
+    assert payload["added"] == 1
+    assert payload["collection"]["id"] == league
+    assert payload["collection"]["game_count"] == 4
+    # Already in it is a no-op, not a second membership.
+    again = await call(coach, "add_to_collection", collection=str(league), game_ids=[game])
+    assert again["added"] == 0
+    assert again["collection"]["game_count"] == 4
+
+
+async def test_remove_from_collection_takes_its_id_and_leaves_the_game(
+    coach: MCPServer, analysed: dict[str, Game], league: int
+) -> None:
+    game = analysed["qg000004"].id
+    payload = await call(coach, "remove_from_collection", collection=league, game_ids=[game])
+    assert payload["removed"] == 1
+    assert payload["collection"]["game_count"] == 2
+    assert (await call(coach, "search_games"))["total"] == 6
+    again = await call(coach, "remove_from_collection", collection=league, game_ids=[game])
+    assert again["removed"] == 0
+
+
+async def test_an_unknown_collection_is_a_structured_error(
+    coach: MCPServer, league: int
+) -> None:
+    for name, arguments in (
+        ("add_to_collection", {"collection": "Rapid League", "game_ids": [1]}),
+        ("remove_from_collection", {"collection": league + 50, "game_ids": [1]}),
+        ("search_games", {"collection": "Rapid League"}),
+        ("get_last_games", {"collection": "Rapid League"}),
+        ("get_stats", {"dimension": "rating_trend", "collection": "Rapid League"}),
+        ("opening_explorer", {"collection": "Rapid League"}),
+    ):
+        payload = await failure(coach, name, **arguments)
+        assert payload["error"] == "unknown_collection", name
+
+
+async def test_moving_games_needs_a_collection_and_some_games(
+    coach: MCPServer, league: int
+) -> None:
+    blank = await failure(coach, "add_to_collection", collection="  ", game_ids=[1])
+    assert blank["error"] == "bad_argument"
+    empty = await failure(coach, "remove_from_collection", collection=league, game_ids=[])
+    assert empty["error"] == "bad_argument"
+    greedy = await failure(
+        coach,
+        "add_to_collection",
+        collection=league,
+        game_ids=list(range(1, mcp_server.MAX_COLLECTION_GAMES + 2)),
+    )
+    assert greedy["error"] == "bad_argument"
+
+
+async def test_search_games_narrows_to_a_collection_and_says_which_a_game_is_in(
+    coach: MCPServer, analysed: dict[str, Game], league: int
+) -> None:
+    payload = await call(coach, "search_games", collection="Blitz League")
+    assert payload["total"] == 3
+    assert {game["id"] for game in payload["games"]} == {
+        analysed["qg000001"].id,
+        analysed["qg000002"].id,
+        analysed["qg000004"].id,
+    }
+    assert all(game["collections"] == [league] for game in payload["games"])
+    # Composes with the other filters, and a row outside every collection carries no key.
+    blitz = await call(coach, "search_games", collection=league, time_control="bullet")
+    assert blitz["total"] == 1
+    everyone = await call(coach, "search_games", eco="C50")
+    assert all("collections" not in game for game in everyone["games"])
+
+
+async def test_search_games_lists_every_game_in_a_collection_by_default(
+    coach: MCPServer, analysed: dict[str, Game], league: int, session: Session
+) -> None:
+    # A reference game put in by hand: counted by list_collections, so listed here too.
+    stranger = analysed["qg000006"]
+    stranger.is_owner_game = False
+    session.commit()
+    collections_service.add_games(session, league, [stranger.id])
+
+    listed = await call(coach, "search_games", collection=league)
+    mine = await call(coach, "search_games", collection=league, whose="mine")
+    counted = await call(coach, "list_collections")
+
+    assert listed["total"] == 4 == counted["collections"][0]["game_count"]
+    assert stranger.id in {game["id"] for game in listed["games"]}
+    assert mine["total"] == 3
+    # Without a collection the default is still the owner's own games.
+    assert (await call(coach, "search_games"))["total"] == 5
+
+
+async def test_the_game_tools_filter_by_rated(
+    coach: MCPServer, analysed: dict[str, Game], session: Session
+) -> None:
+    casual = analysed["qg000001"]
+    for game in analysed.values():
+        game.rated = game.id != casual.id
+    session.commit()
+
+    searched = await call(coach, "search_games", rated=False)
+    last = await call(coach, "get_last_games", rated="false")
+    stats = await call(coach, "get_stats", dimension="performance_by_speed", rated=True)
+
+    assert [game["id"] for game in searched["games"]] == [casual.id]
+    assert [game["id"] for game in last["games"]] == [casual.id]
+    assert stats["total"]["games"] == 5
+
+
+async def test_get_last_games_narrows_to_a_collection(
+    coach: MCPServer, analysed: dict[str, Game], league: int
+) -> None:
+    payload = await call(coach, "get_last_games", amount=10, collection="BLITZ LEAGUE")
+    assert [game["id"] for game in payload["games"]] == [
+        analysed["qg000004"].id,
+        analysed["qg000002"].id,
+        analysed["qg000001"].id,
+    ]
+    assert payload["games"][0]["collections"] == [league]
+
+
+async def test_get_stats_narrows_to_a_collection(
+    coach: MCPServer, analysed: dict[str, Game], league: int
+) -> None:
+    everything = await call(coach, "get_stats", dimension="performance_by_speed")
+    narrowed = await call(
+        coach, "get_stats", dimension="performance_by_speed", collection="Blitz League"
+    )
+    assert everything["total"]["games"] == 6
+    assert narrowed["total"]["games"] == 3
+    speeds = {bucket["key"]: bucket["games"] for bucket in narrowed["buckets"]}
+    assert speeds == {"blitz": 2, "bullet": 1}
+
+
+async def test_opening_explorer_narrows_to_a_collection(
+    coach: MCPServer, analysed: dict[str, Game], league: int
+) -> None:
+    payload = await call(coach, "opening_explorer", collection=league)
+    assert payload["totals"]["games"] == 3
+    played = {move["san"]: move["games"] for move in payload["moves"]}
+    assert played == {"e4": 2, "d4": 1}
 
 
 # --- analysis --------------------------------------------------------------

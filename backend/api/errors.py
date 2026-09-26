@@ -19,6 +19,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from backend.services import analysis as analysis_service
 from backend.services import app_settings as app_settings_service
 from backend.services import auth as auth_service
+from backend.services import collections as collections_service
 from backend.services import correspondence as correspondence_service
 from backend.services import engines as engines_service
 from backend.services import games as games_service
@@ -161,6 +162,14 @@ MAPPINGS: tuple[tuple[type[Exception], int, str], ...] = (
     (games_service.GameFinishedError, 409, "correspondence_finished"),
     (games_service.IllegalMoveError, 422, "illegal_move"),
     (games_service.GameMutationError, 422, "invalid_request"),
+    # Collections. A name another collection has in any case is a conflict the form shows
+    # against the name field; a rule or a colour the vocabulary does not have is the
+    # request being wrong, and so is asking a collection with no rule to apply one.
+    (collections_service.UnknownCollectionError, 404, "unknown_collection"),
+    (collections_service.CollectionNameTakenError, 409, "name_taken"),
+    (collections_service.NoRuleError, 422, "no_rule"),
+    (collections_service.CollectionRuleError, 422, "invalid_rule"),
+    (collections_service.CollectionError, 422, "invalid_collection"),
     (notes_service.NoteNotFoundError, 404, "unknown_note"),
     (notes_service.LineNotFoundError, 404, "unknown_line"),
     (notes_service.UnknownGameError, 404, "unknown_game"),

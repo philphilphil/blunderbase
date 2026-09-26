@@ -2328,9 +2328,17 @@ def _store(session: Session, parsed: import_service.ParsedGame, color: Color) ->
     Never with its engine hidden, whatever `hide_engine_new_games` says: a correspondence
     game is played *with* the engine, and the tree is its analysis from the first move.
     """
+    # The owner said which side is theirs, and that outranks whatever the account index
+    # made of the names: a correspondence handle need not be an account here at all. Handed
+    # to the import rather than written afterwards, so the game is stored with its side and
+    # a collection rule that names a colour sees it.
     try:
         outcome = import_service.import_one(
-            session, parsed, analyze=False, hide_engine_from=app_settings_service.HIDE_ENGINE_NEVER
+            session,
+            parsed,
+            analyze=False,
+            hide_engine_from=app_settings_service.HIDE_ENGINE_NEVER,
+            owner_side=color,
         )
     except Exception as exc:
         raise CorrespondenceError(f"that game could not be stored: {exc}") from None
@@ -2338,13 +2346,7 @@ def _store(session: Session, parsed: import_service.ParsedGame, color: Color) ->
         raise GameAlreadyStoredError(
             "the library already holds that game; open it rather than adding it again"
         )
-    game = outcome.game
-    # The owner said which side is theirs, and that outranks whatever the account index
-    # made of the names: a correspondence handle need not be an account here at all.
-    game.owner_color = color
-    game.is_owner_game = True
-    session.flush()
-    return game
+    return outcome.game
 
 
 def _new_row(

@@ -10,3 +10,15 @@ export function ChromeActions() {
   const { actions } = usePageChrome()
   return <div data-testid="titlebar">{actions}</div>
 }
+
+/** The page's breadcrumb, drawn the same way: its labels in order, for a test to read. */
+export function ChromeCrumbs() {
+  const { breadcrumb } = usePageChrome()
+  return (
+    <div data-testid="crumbs">
+      {breadcrumb.map((crumb, index) => (
+        <span key={index}>{crumb.label}</span>
+      ))}
+    </div>
+  )
+}

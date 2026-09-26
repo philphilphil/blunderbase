@@ -1,7 +1,7 @@
 /**
  * Design 2d — the aggregation dashboards.
  *
- * One filter set (window · colour · speed) drives every card: the same `GameFilters`
+ * One filter set (window · colour · speed · collection) drives every card: the same `GameFilters`
  * vocabulary `/games` takes, forwarded to each `/stats/{dimension}`. The "vs previous"
  * control turns the KPI row into a comparison with the equally long window before it, over
  * `/stats/compare`.
@@ -20,11 +20,12 @@ import { Trans, useLingui } from '@lingui/react/macro'
 import { useMemo, useState, type ReactNode } from 'react'
 import { useSearchParams } from 'react-router-dom'
 
+import { CollectionSwatch } from '@/components/collections/CollectionChip'
 import { SetPageChrome } from '@/components/shell/PageChrome'
 import { PageBody } from '@/components/shell/PageHeader'
 import { Button } from '@/components/ui/button'
 import { FilterChip } from '@/components/ui/chip'
-import { useStatsDashboard } from '@/lib/api/queries'
+import { useCollections, useStatsDashboard } from '@/lib/api/queries'
 import { SPEEDS } from '@/lib/api/types'
 import type { Color, GameFilters, Speed, StatsBucket, StatsResponse } from '@/lib/api/types'
 import { toggleFilter } from '@/lib/filters'
@@ -45,13 +46,14 @@ import {
   formatDelta,
   num,
   numOr,
+  parseCollectionParam,
   precedingWindow,
   total,
   useCompare,
   type WindowKey,
 } from './kit/analytics'
 import { downloadCsv, exportRows, toCsv } from './kit/csv'
-import { REPORTS, reportFrom } from './reports'
+import { DEFAULT_REPORT, REPORTS, reportFrom, reportPath } from './reports'
 import { DeltaText, Segmented, StatTile, type StatsQuery } from './kit/states'
 
 type ColorChoice = 'both' | Color
@@ -105,8 +107,25 @@ function dimensionQuery(
 }
 
 export function StatsPage() {
-  const [params] = useSearchParams()
+  const [params, setParams] = useSearchParams()
   const report = reportFrom(params)
+  // The one scope in the URL rather than in state: a collection's page links here with it
+  // (`collectionStatsPath`), and "Stats for the league" is worth a bookmark where "the
+  // last 90 days, blitz" is not. Every card and the comparison read it through `filters`.
+  const collections = useCollections()
+  const collectionList = collections.data?.collections
+  const requested = parseCollectionParam(params.get('collection'))
+  const inCollection = collectionList?.find((entry) => entry.id === requested) ?? null
+  // Asked for straight from the URL while the list is loading, so the page does not count
+  // everything first and then again; a collection the list no longer has (deleted since
+  // the link was made) is no scope at all rather than a page of zeros.
+  const collection = collectionList === undefined || inCollection ? requested : null
+  const setCollection = (next: number | null) => {
+    const updated = new URLSearchParams(params)
+    if (next === null) updated.delete('collection')
+    else updated.set('collection', String(next))
+    setParams(updated, { replace: true })
+  }
   const { i18n, t } = useLingui()
   const reportLabel = i18n._(REPORTS.find((entry) => entry.key === report)!.label)
   const [windowKey, setWindowKey] = useState<WindowKey>('90d')
@@ -122,6 +141,7 @@ export function StatsPage() {
     ...(WINDOW_DAYS[windowKey] === undefined ? {} : { days: WINDOW_DAYS[windowKey] }),
     ...(color === 'both' ? {} : { color }),
     ...(allSpeeds ? {} : { speed: speeds }),
+    ...(collection === null ? {} : { collection }),
   })
 
   // `speeds` is a fresh array on every toggle, so the memo keys off its content rather than
@@ -134,8 +154,9 @@ export function StatsPage() {
       ...(dashboard.data?.until ? { until: dashboard.data.until } : {}),
       ...(color === 'both' ? {} : { color }),
       ...(speedKey ? { speed: speedKey.split(',') as Speed[] } : {}),
+      ...(collection === null ? {} : { collection }),
     }),
-    [dashboard.data?.since, dashboard.data?.until, color, speedKey],
+    [dashboard.data?.since, dashboard.data?.until, color, speedKey, collection],
   )
 
   const speed = dimensionQuery(dashboard, 'performance_by_speed')
@@ -183,7 +204,7 @@ export function StatsPage() {
     downloadCsv(
       `blunderbase-stats-${windowKey}${color === 'both' ? '' : `-${color}`}${
         allSpeeds ? '' : `-${speeds.join('-')}`
-      }.csv`,
+      }${collection === null ? '' : `-collection-${collection}`}.csv`,
       csv,
     )
   }
@@ -212,6 +233,10 @@ export function StatsPage() {
    * Three filters, two shapes. Window and colour are one-of-N, so they are segmented
    * controls; speed is a set — "everything except bullet" is the ordinary question — so it
    * is a row of chips, which is the same distinction the explorer draws.
+   *
+   * The fourth, the collection, is one-of-N as well but of a list the owner writes, which
+   * can run to any length and any name — a native select rather than a segmented control
+   * that would wrap the bar. It is only there once there is a collection to pick.
    */
   const scope = (
     <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
@@ -253,6 +278,31 @@ export function StatsPage() {
           )
         })}
       </Field>
+      {collectionList?.length ? (
+        <Field label={t`Collection`}>
+          {inCollection ? <CollectionSwatch color={inCollection.color} /> : null}
+          <select
+            aria-label={t`Collection`}
+            value={inCollection ? String(inCollection.id) : ''}
+            onChange={(event) =>
+              setCollection(event.target.value === '' ? null : Number(event.target.value))
+            }
+            className={cn(
+              'h-[1.625rem] max-w-[14rem] rounded-md border bg-elevated px-1.5 text-[0.6875rem] outline-none transition-colors focus-visible:border-accent-teal/50',
+              inCollection
+                ? 'border-accent-teal/30 text-ink'
+                : 'border-edge text-dim hover:text-ink',
+            )}
+          >
+            <option value="">{t`All games`}</option>
+            {collectionList.map((entry) => (
+              <option key={entry.id} value={String(entry.id)}>
+                {entry.name}
+              </option>
+            ))}
+          </select>
+        </Field>
+      ) : null}
     </div>
   )
 
@@ -262,7 +312,14 @@ export function StatsPage() {
         breadcrumb={
           report === 'overview'
             ? [{ label: t`Stats` }]
-            : [{ label: t`Stats`, to: '/stats' }, { label: reportLabel }]
+            : [
+                {
+                  label: t`Stats`,
+                  // Back to the overview of the same scope, not of the whole library.
+                  to: collection === null ? '/stats' : reportPath(DEFAULT_REPORT, params.toString()),
+                },
+                { label: reportLabel },
+              ]
         }
         manual="guide/stats"
         actions={

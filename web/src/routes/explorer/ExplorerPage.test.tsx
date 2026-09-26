@@ -467,3 +467,65 @@ describe('ExplorerPage way back to a game', () => {
     vi.unstubAllGlobals()
   })
 })
+
+describe('ExplorerPage collection lens', () => {
+  const COLLECTIONS = {
+    collections: [
+      { id: 3, name: '45-45 League', color: 'good', game_count: 8, created_at: '' },
+      { id: 7, name: 'Tough losses', color: 'blunder', game_count: 23, created_at: '' },
+    ],
+  }
+
+  /** The owner's tree, the collections list, and every URL the page asked for. */
+  function stubWithCollections(collections: unknown = COLLECTIONS): string[] {
+    const seen: string[] = []
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url = String(input)
+        seen.push(url)
+        if (url.includes('/collections')) return json(collections)
+        if (url.includes('/explorer/positions')) return json([])
+        if (url.includes('/explorer')) return json(TREE)
+        return json({ error: 'not_found', detail: url }, 404)
+      }),
+    )
+    return seen
+  }
+
+  const trees = (seen: string[]) => seen.filter((url) => /\/explorer\?/.test(url))
+
+  it('scopes the tree to the collection the URL names', async () => {
+    const seen = stubWithCollections()
+    renderPage('/explorer?collection=3')
+
+    await screen.findByText('1.e4')
+    expect(await screen.findByRole('combobox', { name: 'Collection' })).toHaveValue('3')
+    expect(trees(seen).every((url) => url.includes('collection=3'))).toBe(true)
+
+    vi.unstubAllGlobals()
+  })
+
+  it('asks again without it once "All games" is picked', async () => {
+    const seen = stubWithCollections()
+    renderPage('/explorer?collection=3')
+
+    const select = await screen.findByRole('combobox', { name: 'Collection' })
+    await userEvent.selectOptions(select, 'All games')
+
+    await waitFor(() => expect(trees(seen).at(-1)).not.toContain('collection='))
+    expect(select).toHaveValue('')
+
+    vi.unstubAllGlobals()
+  })
+
+  it('draws no collection row for an owner who has none', async () => {
+    stubWithCollections({ collections: [] })
+    renderPage()
+
+    await screen.findByText('1.e4')
+    expect(screen.queryByRole('combobox', { name: 'Collection' })).not.toBeInTheDocument()
+
+    vi.unstubAllGlobals()
+  })
+})

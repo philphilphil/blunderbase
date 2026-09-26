@@ -7,6 +7,7 @@ import {
   flagCounts,
   formatDrop,
   formatGameDate,
+  formatPoints,
   formatResult,
   formatTimeControl,
   moveCount,
@@ -145,5 +146,15 @@ describe('the small cells', () => {
     expect(outcomeTone('loss')).toBe('text-blunder')
     expect(outcomeTone('draw')).toBe('text-soft')
     expect(outcomeTone(null)).toBe('text-dim')
+  })
+})
+
+describe('formatPoints', () => {
+  it('writes a score the way a crosstable does', () => {
+    expect(formatPoints(5)).toBe('5')
+    expect(formatPoints(5.5)).toBe('5½')
+    expect(formatPoints(0.5)).toBe('½')
+    expect(formatPoints(0)).toBe('0')
+    expect(formatPoints(1234.5)).toBe('1,234½')
   })
 })

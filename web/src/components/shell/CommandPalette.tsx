@@ -2,8 +2,8 @@
  * ⌘K: the one box over the whole app.
  *
  * Two halves that never mix. The "Pages" group is client-side and answers instantly —
- * the workspace routes, the stats reports and the owner's saved filters are all things
- * this build already knows, so asking the backend where the Stats page is would only add
+ * the workspace routes, the stats reports, the owner's saved filters and their collections
+ * are all things this build (or the rail's own cache) already knows, so asking the backend where the Stats page is would only add
  * a frame of nothing. The other four groups are `GET /search`, which the backend holds
  * back until the query is two characters long.
  *
@@ -25,7 +25,7 @@ import {
   type ComponentType,
   type ReactNode,
 } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 
 // The rail's own glyphs for the rail's own destinations, so a page reads the same here as
 // it does in the sidebar (`NavIcons`).
@@ -40,16 +40,24 @@ import {
   NotesIcon,
   StatsIcon,
 } from '@/components/icons/NavIcons'
-import { useSearch } from '@/lib/api/queries'
-import type { GameSummary, NoteResponse, OpeningHit, OpponentHit } from '@/lib/api/types'
+import { CollectionSwatch } from '@/components/collections/CollectionChip'
+import { useCollections, useSearch } from '@/lib/api/queries'
+import type {
+  Collection,
+  GameSummary,
+  NoteResponse,
+  OpeningHit,
+  OpponentHit,
+} from '@/lib/api/types'
 import type { RuntimeCapabilities } from '@/lib/api/types'
+import { collectionPath } from '@/lib/collections'
 import { useRuntimeCapabilities } from '@/lib/runtime/capabilities'
 import { cn } from '@/lib/utils'
 import { paramsFromFilters } from '@/routes/games/filters'
 import { formatGameDate, formatResult, outcomeTone } from '@/routes/games/format'
 import { filterLabel, useSavedFilters } from '@/routes/games/savedFilters'
 import { noteHref, oneLine } from '@/routes/notes/presentation'
-import { REPORTS } from '@/routes/stats/reports'
+import { REPORTS, reportPath } from '@/routes/stats/reports'
 
 /** Under this the backend answers four empty groups, so the box says so itself. */
 const MIN_QUERY = 2
@@ -82,6 +90,11 @@ interface PaletteItem {
   trailing?: string
   trailingClass?: string
   icon: ComponentType<{ className?: string }>
+  /**
+   * A collection's colour key: the row leads with its square instead of the icon, the mark
+   * the collection wears in the rail and on every chip.
+   */
+  swatch?: string
   to: string
 }
 
@@ -175,6 +188,7 @@ const PAGES: PageRoute[] = [
  */
 const REPORT_KEYWORD = msg`stats report`
 const SAVED_FILTER = msg`saved filter`
+const COLLECTION = msg`collection`
 
 function matches(query: string, ...fields: (string | undefined)[]): boolean {
   if (!query) return true
@@ -197,6 +211,9 @@ function pageItems(
   query: string,
   saved: ReturnType<typeof useSavedFilters>,
   capabilities: RuntimeCapabilities,
+  collections: readonly Collection[] = [],
+  /** The query string of the Stats page the palette was opened over, if it was. */
+  statsSearch?: string,
 ): PaletteItem[] {
   const items: PaletteItem[] = []
 
@@ -226,7 +243,8 @@ function pageItems(
       label,
       hint: i18n._(msg`report · ${hint}`),
       icon: StatsIcon,
-      to: `/stats?report=${report.key}`,
+      // Keeps the collection a Stats page is scoped to, as the rail's report rows do.
+      to: reportPath(report.key, statsSearch),
     })
   }
 
@@ -243,6 +261,23 @@ function pageItems(
       hint: savedLabel,
       icon: Signpost,
       to: `/games?${paramsFromFilters(filter.filters).toString()}`,
+    })
+  }
+
+  // After the saved cuts, as in the rail's fold, and found by what they are as well as by
+  // name — "collection" lists them all.
+  const collectionLabel = i18n._(COLLECTION)
+  for (const collection of collections) {
+    if (!matches(query, collection.name, collectionLabel)) continue
+    items.push({
+      id: `collection:${collection.id}`,
+      group: 'Pages',
+      label: collection.name,
+      hint: collectionLabel,
+      trailing: collection.game_count.toLocaleString(),
+      icon: Signpost,
+      swatch: collection.color,
+      to: collectionPath(collection.id),
     })
   }
   return items
@@ -361,7 +396,13 @@ function Row({
         active ? 'bg-raised text-ink' : 'text-soft hover:bg-raised/60',
       )}
     >
-      <Icon className={cn('size-3.5 flex-none', active ? 'text-accent-teal' : 'text-faint')} aria-hidden />
+      {item.swatch ? (
+        <span className="flex size-3.5 flex-none items-center justify-center">
+          <CollectionSwatch color={item.swatch} />
+        </span>
+      ) : (
+        <Icon className={cn('size-3.5 flex-none', active ? 'text-accent-teal' : 'text-faint')} aria-hidden />
+      )}
       <span className="min-w-0 flex-1 truncate text-[0.71875rem]">{item.label}</span>
       {item.hint ? (
         <span className="max-w-[42%] flex-none truncate text-[0.625rem] text-dim">{item.hint}</span>
@@ -379,22 +420,25 @@ function Dialog({ onClose }: { onClose: () => void }) {
   const [query, setQuery] = useState('')
   const [active, setActive] = useState(0)
   const navigate = useNavigate()
+  const location = useLocation()
+  const statsSearch = location.pathname === '/stats' ? location.search : undefined
   const saved = useSavedFilters()
   const search = useSearch(query, PER_GROUP)
   const capabilities = useRuntimeCapabilities()
+  const collections = useCollections().data?.collections
   const { t, i18n } = useLingui()
 
   const needle = query.trim().toLowerCase()
   const answered = search.data
 
   const items = useMemo(() => {
-    const pages = pageItems(i18n, needle, saved, capabilities)
+    const pages = pageItems(i18n, needle, saved, capabilities, collections, statsSearch)
     if (needle.length < MIN_QUERY || !answered) return pages
     return [
       ...pages,
       ...searchItems(i18n, answered.games, answered.opponents, answered.openings, answered.notes),
     ]
-  }, [i18n, needle, saved, answered, capabilities])
+  }, [i18n, needle, saved, answered, capabilities, collections, statsSearch])
 
   // A new set of rows starts at the top: the highlight belongs to the list, not to a
   // position that happened to survive a keystroke. Adjusted during the render that

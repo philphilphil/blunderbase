@@ -35,6 +35,11 @@ SpeedQuery = Annotated[
 DaysQuery = Annotated[
     int | None, Query(ge=1, description="only games played in the last this many days")
 ]
+# The third lens, spelled the way `/games?collection=` spells it. An id no collection has
+# is an empty tree rather than a 404, the same answer the library gives it.
+CollectionQuery = Annotated[
+    int | None, Query(description="only the games in this collection (its id)")
+]
 
 
 @router.get("", response_model=ExplorerResponse, summary="The personal tree from a position")
@@ -51,6 +56,7 @@ def explore(
     ] = None,
     speed: SpeedQuery = None,
     days: DaysQuery = None,
+    collection: CollectionQuery = None,
 ) -> Any:
     """Per continuation: frequency, score, average eval drop, and where book runs out."""
     return explorer_service.opening_explorer(
@@ -63,6 +69,7 @@ def explore(
         line=_line(line),
         speeds=speed,
         since=_since(days),
+        collection=collection,
     )
 
 
@@ -111,7 +118,14 @@ def find_positions(
     limit: Annotated[int, Query(ge=1, le=MAX_MOVES)] = 20,
     speed: SpeedQuery = None,
     days: DaysQuery = None,
+    collection: CollectionQuery = None,
 ) -> list[Any]:
     return explorer_service.find_positions(
-        session, fen, color=color, limit=limit, speeds=speed, since=_since(days)
+        session,
+        fen,
+        color=color,
+        limit=limit,
+        speeds=speed,
+        since=_since(days),
+        collection=collection,
     )

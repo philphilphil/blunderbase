@@ -1246,6 +1246,27 @@ def test_the_explorer_and_its_games_narrow_by_speed_and_days(api: TestClient) ->
     assert api.get("/explorer", params={"days": 0}).status_code == 422
 
 
+def test_the_explorer_and_its_games_narrow_to_a_collection(api: TestClient) -> None:
+    start = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq -"
+    rapid = [game["id"] for game in api.get("/games", params={"speed": "rapid"}).json()["games"]]
+    assert len(rapid) == 2
+    created = api.post("/collections", json={"name": "Rapid club", "game_ids": rapid})
+    assert created.status_code == 201
+    collection = created.json()["id"]
+
+    tree = api.get("/explorer", params={"collection": collection}).json()
+    rows = api.get("/explorer/positions", params={"fen": start, "collection": collection}).json()
+
+    assert tree["totals"]["games"] == 2
+    assert sorted(row["game"]["id"] for row in rows) == sorted(rapid)
+    # The explorer still counts every game without the parameter: a collection hides none.
+    assert api.get("/explorer").json()["totals"]["games"] == 6
+    # An id no collection has is an empty tree, the answer `/games?collection=` gives it.
+    assert api.get("/explorer", params={"collection": collection + 99}).json()["totals"][
+        "games"
+    ] == 0
+
+
 def test_the_explorer_names_the_line_it_was_reached_by(api: TestClient) -> None:
     line = "d2d4,g8f6,c2c4,e7e6,g1f3,d7d5,b1c3,f8b4,c1g5,h7h6"
     body = api.get("/explorer", params={"line": line}).json()

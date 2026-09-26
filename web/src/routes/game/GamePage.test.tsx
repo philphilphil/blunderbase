@@ -1846,13 +1846,16 @@ describe('the board’s controls', () => {
     expect(controlRow()).toContainElement(box)
   })
 
-  it('puts the rare doors behind ⋯, and nothing there on an ordinary game', async () => {
+  it('puts the rare doors behind ⋯, and only its collections there on an ordinary game', async () => {
     const user = userEvent.setup()
     renderPage()
     await screen.findByText('Scandinavian Defense')
     // A library game opened from the library has neither a way back to the explorer nor a
-    // correspondence tree, so the row grows no menu at all.
-    expect(screen.queryByRole('button', { name: 'More for this game' })).not.toBeInTheDocument()
+    // correspondence tree: the one thing behind its ⋯ is where it is filed.
+    await user.click(await screen.findByRole('button', { name: 'More for this game' }))
+    expect(screen.getAllByRole('menuitem').map((item) => item.textContent)).toEqual([
+      'Collections…',
+    ])
 
     cleanup()
     // The way back rides in router state, the way `ModelGames` puts it there.
@@ -1864,6 +1867,67 @@ describe('the board’s controls', () => {
     expect(screen.queryByRole('menuitem')).not.toBeInTheDocument()
     await user.click(more)
     expect(screen.getByRole('menuitem', { name: '← Back to explorer' })).toBeInTheDocument()
+  })
+
+  it('files the game from ⋯ → Collections…, and shows where it is filed in the header', async () => {
+    const user = userEvent.setup()
+    const COLLECTIONS = {
+      collections: [
+        { id: 3, name: '45-45 League', color: 'good', game_count: 8, created_at: '' },
+        { id: 7, name: 'Tough losses', color: 'blunder', game_count: 23, created_at: '' },
+      ],
+    }
+    vi.stubGlobal(
+      'fetch',
+      stubFetch({
+        '/collections': COLLECTIONS,
+        '/games/14': { ...DETAIL, game: { ...DETAIL.game, collections: [3] } },
+      }),
+    )
+    renderPage()
+    await screen.findByText('Scandinavian Defense')
+
+    // The chip is a link to the collection's page, in the header's facts.
+    const chip = await within(screen.getByTestId('game-header')).findByRole('link', {
+      name: /45-45 League/,
+    })
+    expect(chip).toHaveAttribute('href', '/games?collection=3')
+    expect(
+      within(screen.getByTestId('game-header')).queryByRole('link', { name: /Tough losses/ }),
+    ).not.toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'More for this game' }))
+    await user.click(screen.getByRole('menuitem', { name: 'Collections…' }))
+
+    const dialog = screen.getByRole('dialog', { name: 'Collections' })
+    expect(within(dialog).getByRole('checkbox', { name: /45-45 League/ })).toHaveAttribute(
+      'aria-checked',
+      'true',
+    )
+    const tough = within(dialog).getByRole('checkbox', { name: /Tough losses/ })
+    expect(tough).toHaveAttribute('aria-checked', 'false')
+
+    await user.click(tough)
+    await waitFor(() =>
+      expect(posted).toContainEqual({
+        url: expect.stringContaining('/collections/7/games'),
+        body: { game_ids: [14] },
+      }),
+    )
+  })
+
+  it('opens the new-collection form with this game in hand from the checklist', async () => {
+    const user = userEvent.setup()
+    vi.stubGlobal('fetch', stubFetch({ '/collections': { collections: [] } }))
+    renderPage()
+    await screen.findByText('Scandinavian Defense')
+
+    await user.click(await screen.findByRole('button', { name: 'More for this game' }))
+    await user.click(screen.getByRole('menuitem', { name: 'Collections…' }))
+    await user.click(screen.getByRole('button', { name: 'New collection…' }))
+
+    expect(screen.queryByRole('dialog', { name: 'Collections' })).not.toBeInTheDocument()
+    expect(screen.getByRole('textbox', { name: 'Name' })).toBeInTheDocument()
   })
 
   it('offers the way back to a game it was reached from, to the position left there', async () => {

@@ -15,6 +15,11 @@ import type { Color } from '@/lib/api/types'
 import { SOURCE_LABELS } from './format'
 
 export interface LibraryFilters {
+  /**
+   * One collection's games (its id). First in the object so it is first in the URL, which
+   * is how a collection's page is spelled: `/games?collection=7&…`.
+   */
+  collection?: number
   /** `YYYY-MM-DD`, inclusive. */
   since?: string
   /** `YYYY-MM-DD`, inclusive — widened to 23:59:59 for the API. */
@@ -26,6 +31,8 @@ export interface LibraryFilters {
   outcome?: Outcome
   speed?: Speed
   time_control?: string
+  /** Rated games only, casual only, or both when absent. */
+  rated?: boolean
   opponent?: string
   has_blunders?: boolean
   analyzed?: boolean
@@ -34,14 +41,26 @@ export interface LibraryFilters {
   // not know), never refused.
   text?: string
   /**
-   * Whose games: `others` is the ones added from the reference books, `all` is both.
-   * Absent is the default cut, the owner's own — never spelled as `mine`, because a URL
-   * should not spell the default.
+   * Whose games: `mine` the owner's own, `others` the ones added from the reference books,
+   * `all` both. Absent is the default cut (`defaultWhose`), which is never spelled, because a
+   * URL should not spell the default: the owner's own in the library, and every game in it
+   * on a collection's page — a reference game put in a collection by hand is counted on the
+   * rail, so the page it links to lists it too.
    */
-  whose?: Exclude<Whose, 'mine'>
+  whose?: Whose
 }
 
-const WHOSE: readonly Exclude<Whose, 'mine'>[] = ['others', 'all']
+const WHOSE: readonly Whose[] = ['mine', 'others', 'all']
+
+/** What an absent `whose` means for these filters; see `LibraryFilters.whose`. */
+export function defaultWhose(filters: LibraryFilters): Whose {
+  return filters.collection === undefined ? 'mine' : 'all'
+}
+
+/** Whose games these filters are over, spelled or not. */
+export function effectiveWhose(filters: LibraryFilters): Whose {
+  return filters.whose ?? defaultWhose(filters)
+}
 
 const SOURCES: readonly Source[] = [
   'lichess',
@@ -77,6 +96,13 @@ function bool(value: string | null): boolean | undefined {
   return undefined
 }
 
+/** A database id: a positive whole number, nothing else. */
+function id(value: string | null): number | undefined {
+  if (value === null || !/^\d+$/.test(value)) return undefined
+  const parsed = Number(value)
+  return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : undefined
+}
+
 function text(value: string | null): string | undefined {
   const trimmed = value?.trim()
   return trimmed ? trimmed : undefined
@@ -89,6 +115,7 @@ function date(value: string | null): string | undefined {
 /** Read the filters out of a query string, dropping anything that is not a valid value. */
 export function filtersFromParams(params: URLSearchParams): LibraryFilters {
   return prune({
+    collection: id(params.get('collection')),
     since: date(params.get('since')),
     until: date(params.get('until')),
     source: oneOf(params.get('source'), SOURCES),
@@ -98,6 +125,7 @@ export function filtersFromParams(params: URLSearchParams): LibraryFilters {
     outcome: oneOf(params.get('outcome'), OUTCOMES),
     speed: oneOf(params.get('speed'), SPEEDS),
     time_control: text(params.get('time_control')),
+    rated: bool(params.get('rated')),
     opponent: text(params.get('opponent')),
     has_blunders: bool(params.get('has_blunders')),
     analyzed: bool(params.get('analyzed')),
@@ -118,14 +146,20 @@ export function paramsFromFilters(filters: LibraryFilters): URLSearchParams {
   return params
 }
 
-/** Drop the keys that carry no value, so an empty filter set is `{}` and compares equal. */
+/**
+ * Drop the keys that carry no value, so an empty filter set is `{}` and compares equal — and
+ * a `whose` that says what its absence would, so the default is never spelled whichever way
+ * the collection came or went.
+ */
 export function prune(filters: LibraryFilters): LibraryFilters {
   const cleaned: Record<string, unknown> = {}
   for (const [key, value] of Object.entries(filters)) {
     if (value === undefined || value === '') continue
     cleaned[key] = value
   }
-  return cleaned as LibraryFilters
+  const pruned = cleaned as LibraryFilters
+  if (pruned.whose !== undefined && pruned.whose === defaultWhose(pruned)) delete pruned.whose
+  return pruned
 }
 
 /** How many filters are set — the "N active" the clear-all control needs. */
@@ -134,20 +168,32 @@ export function filterCount(filters: LibraryFilters): number {
 }
 
 /**
- * The filters as the API takes them: `until` widened to the end of its day, everything
- * else passed straight through.
+ * The filters as the API takes them: `until` widened to the end of its day, and `whose`
+ * spelled out when its default is not the API's (`mine`) — a collection's page asks for every
+ * game in it. Everything else is passed straight through.
  */
 export function toGameQuery(filters: LibraryFilters): GameFilters {
   const { until, ...rest } = prune(filters)
   const query: GameFilters = { ...rest }
   if (until) query.until = `${until}T23:59:59`
+  const whose = effectiveWhose(rest)
+  if (whose !== 'mine') query.whose = whose
   return query
 }
 
 // --- the chips over the table --------------------------------------------
 
 /** Which popover a chip belongs to; several filters share one. */
-export type FilterGroup = 'date' | 'source' | 'color' | 'result' | 'opening' | 'time' | 'opponent' | 'analysis'
+export type FilterGroup =
+  | 'date'
+  | 'source'
+  | 'color'
+  | 'result'
+  | 'opening'
+  | 'time'
+  | 'opponent'
+  | 'analysis'
+  | 'collection'
 
 export const GROUP_LABELS: Record<FilterGroup, MessageDescriptor> = {
   date: msg`Date`,
@@ -158,20 +204,26 @@ export const GROUP_LABELS: Record<FilterGroup, MessageDescriptor> = {
   time: msg`Time control`,
   opponent: msg`Opponent`,
   analysis: msg`Analysis`,
+  collection: msg`Collection`,
 }
 
-/** Which filter keys each popover owns, so "clear this chip" clears the whole group. */
+/**
+ * Which filter keys each popover owns, so "clear this chip" clears the whole group.
+ * `rated` sits with the clock: "rated 45+45" is how a league describes its games.
+ */
 export const GROUP_KEYS: Record<FilterGroup, (keyof LibraryFilters)[]> = {
   date: ['since', 'until'],
   source: ['source'],
   color: ['color'],
   result: ['outcome', 'result'],
   opening: ['eco'],
-  time: ['speed', 'time_control'],
+  time: ['speed', 'time_control', 'rated'],
   opponent: ['opponent'],
   analysis: ['has_blunders', 'analyzed'],
+  collection: ['collection'],
 }
 
+/** The design puts Collection last, after the groups that describe a game itself. */
 export const FILTER_GROUPS: FilterGroup[] = [
   'date',
   'source',
@@ -181,7 +233,15 @@ export const FILTER_GROUPS: FilterGroup[] = [
   'time',
   'opponent',
   'analysis',
+  'collection',
 ]
+
+/**
+ * A collection's name by id — what the Collection chip reads. The names live on the server
+ * (`useCollections`), so whoever draws the chip hands the lookup in; without one, or for an
+ * id the list does not know, the chip reads `#7` rather than nothing.
+ */
+export type CollectionNames = (id: number) => string | undefined
 
 /**
  * A chip reads `Colour: black`, in lower case and in the middle of a line — so the words a
@@ -209,8 +269,21 @@ export const SPEED_WORDS: Record<Speed, MessageDescriptor> = {
   correspondence: msg({ message: 'correspondence', context: 'filter chip' }),
 }
 
-/** `Colour: black` — what an active chip reads, or null when the group is unset. */
-export function groupSummary(group: FilterGroup, filters: LibraryFilters): string | null {
+/** Also the Time control popover's own labels for the rated row. */
+export const RATED_WORDS = {
+  rated: msg({ message: 'rated', context: 'filter chip' }),
+  casual: msg({ message: 'casual', context: 'filter chip' }),
+} as const
+
+/**
+ * `Colour: black` — what an active chip reads, or null when the group is unset. The
+ * Collection chip needs the collection's name, which only the caller has (`CollectionNames`).
+ */
+export function groupSummary(
+  group: FilterGroup,
+  filters: LibraryFilters,
+  collectionName?: CollectionNames,
+): string | null {
   switch (group) {
     case 'date': {
       const since = filters.since
@@ -237,8 +310,16 @@ export function groupSummary(group: FilterGroup, filters: LibraryFilters): strin
       const parts = [
         filters.speed ? i18n._(SPEED_WORDS[filters.speed]) : null,
         filters.time_control ?? null,
+        filters.rated === undefined
+          ? null
+          : i18n._(filters.rated ? RATED_WORDS.rated : RATED_WORDS.casual),
       ].filter(Boolean)
       return parts.length ? parts.join(' · ') : null
+    }
+    case 'collection': {
+      const id = filters.collection
+      if (id === undefined) return null
+      return collectionName?.(id) ?? `#${id}`
     }
     case 'opponent':
       return filters.opponent ?? null

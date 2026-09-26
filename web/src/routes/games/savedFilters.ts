@@ -28,6 +28,7 @@ import {
   groupSummary,
   paramsFromFilters,
   prune,
+  type CollectionNames,
   type LibraryFilters,
 } from './filters'
 
@@ -243,10 +244,11 @@ export function useSavedFilters(): SavedFilter[] {
 
 /**
  * The name the save box starts with: what the chips over the table already say, so the
- * common case is one click. `Colour: black` and `Result: loss` become `black · loss`.
+ * common case is one click. `Colour: black` and `Result: loss` become `black · loss`. A cut
+ * inside a collection names it, so the lookup the Collection chip uses is passed on.
  */
-export function suggestLabel(filters: LibraryFilters): string {
-  const parts = FILTER_GROUPS.map((group) => groupSummary(group, filters)).filter(
+export function suggestLabel(filters: LibraryFilters, collectionName?: CollectionNames): string {
+  const parts = FILTER_GROUPS.map((group) => groupSummary(group, filters, collectionName)).filter(
     (part): part is string => part !== null,
   )
   const suggestion = parts.join(' · ')

@@ -4,6 +4,7 @@ import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { SourceBadge } from '@/components/badges/SourceBadge'
 import { RunStatusBadge, UnanalysedBadge } from '@/components/badges/RunBadge'
 import { buttonVariants } from '@/components/ui/button'
+import { CollectionChips } from '@/components/collections/CollectionChip'
 import type { GameRunSummary, GameSummary, RunResponse } from '@/lib/api/types'
 import { relative } from '@/lib/mcp/status'
 import { cn } from '@/lib/utils'
@@ -29,6 +30,12 @@ import { formatResult, formatTimeControl } from '../gameModel'
  *
  * The date is not here: `AppShell`'s breadcrumb already carries it (`GamePage` passes it),
  * and the one thing this line cannot afford is a second copy of something.
+ *
+ * The game's collections close the facts, as the same tinted chips the library's rows
+ * carry, each a link to its collection's page. They are the owner's filing rather than a
+ * fact of the game, so they come after everything the game says about itself, and they are
+ * the first of those facts to leave a narrow bar; a long list clips at a fixed width rather
+ * than pushing the opening's name out.
  *
  * When the game was opened from the library, two arrows and a counter lead the line: the
  * run the table was showing, steppable without going back to it (`gameTrail`). They are
@@ -140,6 +147,10 @@ export function GameHeaderBar({
           <Trans>not your game</Trans>
         </span>
       ) : null}
+      <CollectionChips
+        ids={game.collections}
+        className="max-w-[18rem] flex-none @max-[44rem]:hidden"
+      />
 
       {/* The spacer is what makes the analysis state right-aligned rather than a sixth fact
           about the game: it is about the app's work, not about the game. */}

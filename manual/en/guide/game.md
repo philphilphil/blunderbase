@@ -22,6 +22,9 @@ The bar across the top names the opening, where the game came from, its time con
 how it ended. On a Lichess or Chess.com game the source there is a link that opens the
 game on that site in a new tab, and a small arrow shows when you point at it; on a phone
 the same link is the arrow beside the PGN button.
+A game that is in a [collection](games.md#collections) carries that collection's chip there
+too, and the chip opens the collection's page. Like the bar's other items, the chips give
+way when the window is too narrow for them.
 
 ## What the badges mean
 
@@ -190,6 +193,14 @@ Hubert2001** — and both return to exactly the position you were on.
 The **Book** tab beside **Notes** shows how your own games went on from here; `B` opens it.
 It is headed with the name of the opening the game is in, and a move that enters a named
 opening shows that name in its **Opening** column.
+
+## Collections
+
+**Collections…**, behind the **⋯** under the board, puts this game in a
+[collection](games.md#collections) or takes it out. It is the same checklist as **Add to…**
+in the games list, for this one game: tick a collection to add the game, untick it to take
+the game out. **+ New collection…** makes one that starts with this game. A game you take
+out by hand stays out, even if it was the collection's rule that put it in when it arrived.
 
 ## The correspondence tree
 

@@ -8,8 +8,9 @@
  * control the hand goes to without looking, and the whole point of the row is that the hand
  * can.
  *
- * The button draws nothing at all when there is nothing rare to hold, which is the ordinary
- * library game — so the row does not grow a permanent ⋯ to hold an empty list.
+ * The button draws nothing at all when there is nothing rare to hold — a model game opened
+ * from nowhere in particular — so the row does not grow a permanent ⋯ to hold an empty
+ * list. Every library game has at least its collections in here.
  *
  * The ⋯ is the row's tool button as an `icon-sm` square, the row's `h-7` (below `md` the
  * phone's taller `max-md:py-1.5`, like the rest of the row). While the menu is

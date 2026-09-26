@@ -2,7 +2,7 @@ import { QueryClient } from '@tanstack/react-query'
 import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { UseQueryResult } from '@tanstack/react-query'
-import { MemoryRouter } from 'react-router-dom'
+import { MemoryRouter, useLocation } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { Providers } from '@/app/Providers'
@@ -17,7 +17,8 @@ import { exportRows, toCsv } from './kit/csv'
 const useStats = vi.hoisted(() => vi.fn())
 const useProfile = vi.hoisted(() => vi.fn())
 const useStatsDashboard = vi.hoisted(() => vi.fn())
-vi.mock('@/lib/api/queries', () => ({ useStats, useProfile, useStatsDashboard }))
+const useCollections = vi.hoisted(() => vi.fn())
+vi.mock('@/lib/api/queries', () => ({ useStats, useProfile, useStatsDashboard, useCollections }))
 
 /** Just the fields the cards read off a query result. */
 function result(state: Partial<UseQueryResult<StatsResponse, Error>>) {
@@ -183,12 +184,19 @@ describe('StatsPage — the filter bar', () => {
     )
   }
 
-  function draw() {
+  /** Prints the query string, so what the page wrote to the URL can be asserted. */
+  function Where() {
+    const location = useLocation()
+    return <span data-testid="where">{location.search}</span>
+  }
+
+  function draw(path = '/stats') {
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
     render(
       <Providers client={client}>
-        <MemoryRouter>
+        <MemoryRouter initialEntries={[path]}>
           <Titlebar />
+          <Where />
           <StatsPage />
         </MemoryRouter>
       </Providers>,
@@ -201,6 +209,7 @@ describe('StatsPage — the filter bar', () => {
     useStats.mockReturnValue(result({ isPending: true }))
     useProfile.mockReturnValue(result({ isPending: true }))
     useStatsDashboard.mockReturnValue(result({ isPending: true }))
+    useCollections.mockReturnValue({ data: undefined, isPending: true })
     vi.stubGlobal('WebSocket', FakeSocket)
   })
 
@@ -264,5 +273,68 @@ describe('StatsPage — the filter bar', () => {
     // The last chip cannot be switched off: an empty set counts no games, and a page
     // answering "nothing here" because of it reads as broken rather than as filtered.
     expect(useStatsDashboard).toHaveBeenLastCalledWith({ days: 90, speed: ['correspondence'] })
+  })
+
+  const COLLECTIONS = {
+    collections: [
+      { id: 3, name: '45-45 League', color: 'good', game_count: 8, created_at: '' },
+      { id: 7, name: 'Tough losses', color: 'blunder', game_count: 23, created_at: '' },
+    ],
+  }
+
+  it('offers no collection field until there is a collection to pick', () => {
+    stubViewport(false)
+    useCollections.mockReturnValue({ data: { collections: [] }, isPending: false })
+    draw()
+
+    expect(screen.queryByRole('combobox', { name: 'Collection' })).not.toBeInTheDocument()
+  })
+
+  it('scopes every number to the collection the URL names', () => {
+    stubViewport(false)
+    useCollections.mockReturnValue({ data: COLLECTIONS, isPending: false })
+    draw('/stats?collection=3')
+
+    expect(useStatsDashboard).toHaveBeenLastCalledWith({ days: 90, collection: 3 })
+    expect(screen.getByRole('combobox', { name: 'Collection' })).toHaveValue('3')
+  })
+
+  it('asks for the collection straight away, before the list has loaded', () => {
+    stubViewport(false)
+    useStatsDashboard.mockClear()
+    draw('/stats?collection=3')
+
+    // Not a first request for everything and a second one for the league: every render
+    // asks the one question.
+    expect(useStatsDashboard).toHaveBeenCalled()
+    for (const [query] of useStatsDashboard.mock.calls) {
+      expect(query).toEqual({ days: 90, collection: 3 })
+    }
+  })
+
+  it('writes the chosen collection to the URL, and takes it out for all games', async () => {
+    stubViewport(false)
+    useCollections.mockReturnValue({ data: COLLECTIONS, isPending: false })
+    draw('/stats?report=blunders')
+
+    const select = screen.getByRole('combobox', { name: 'Collection' })
+    expect(select).toHaveValue('')
+
+    await userEvent.selectOptions(select, 'Tough losses')
+    expect(screen.getByTestId('where')).toHaveTextContent('?report=blunders&collection=7')
+    expect(useStatsDashboard).toHaveBeenLastCalledWith({ days: 90, collection: 7 })
+
+    await userEvent.selectOptions(select, 'All games')
+    expect(screen.getByTestId('where')).toHaveTextContent(/^\?report=blunders$/)
+    expect(useStatsDashboard).toHaveBeenLastCalledWith({ days: 90 })
+  })
+
+  it('reads a collection that no longer exists as no scope at all', () => {
+    stubViewport(false)
+    useCollections.mockReturnValue({ data: COLLECTIONS, isPending: false })
+    draw('/stats?collection=99')
+
+    expect(useStatsDashboard).toHaveBeenLastCalledWith({ days: 90 })
+    expect(screen.getByRole('combobox', { name: 'Collection' })).toHaveValue('')
   })
 })

@@ -112,6 +112,11 @@ def game_row(summary: Mapping[str, Any]) -> dict[str, Any]:
         # names are the only way to say who did.
         row["white"] = summary.get("white")
         row["black"] = summary.get("black")
+    # The ids of the collections the game is in, which list_collections names. Only when
+    # there are some: an empty list on every row of a library without collections is bytes
+    # saying nothing.
+    if summary.get("collections"):
+        row["collections"] = list(summary["collections"])
     return row
 
 

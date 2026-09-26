@@ -23,8 +23,8 @@ One chapter per entry in the app's sidebar, in the sidebar's order.
   analyse.
 - [Dashboard](guide/dashboard.md) — ratings, worst recent moments, recent games, the
   analysis queue, the trends.
-- [Games](guide/games.md) — the filter bar, saved cuts, sorting and paging, acting on
-  several games, deleting.
+- [Games](guide/games.md) — the filter bar, saved cuts, collections, sorting and paging,
+  acting on several games, deleting.
 - [Analysing a game](guide/game.md) — the board, the evaluation graph, engine lines,
   variations and move classifications.
 - [Explorer and repertoire](guide/explorer.md) — your own opening tree, the Lichess

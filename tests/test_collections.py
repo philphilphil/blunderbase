@@ -1,0 +1,817 @@
+"""Collections: named groups of games, filled by hand or by a rule over new imports.
+
+The service tests drive `services.collections` and the import pipeline over an in-memory
+library; the API tests drive the real app over a migrated file. Games arrive through the
+same `ingest_games` a Lichess sync uses, because "a rule sees every import" is the claim.
+"""
+
+from __future__ import annotations
+
+from collections.abc import Iterator
+from datetime import UTC, datetime, timedelta
+from typing import Any
+
+import pytest
+from alembic import command
+from fastapi.testclient import TestClient
+from sqlalchemy import func, inspect, select
+from sqlalchemy.orm import Session
+
+from backend.api.app import create_app
+from backend.config import Settings
+from backend.db.enums import Color, JobStatus, Platform, Result, Source, Speed
+from backend.db.migrate import alembic_config, upgrade_to_head
+from backend.db.models import Account, Collection, Game, GameCollection, ImportJob
+from backend.db.session import get_engine, get_sessionmaker
+from backend.services import accounts as accounts_service
+from backend.services import collections as collections_service
+from backend.services import events as events_service
+from backend.services import games as games_service
+from backend.services import import_service, stats
+from backend.services.games import GameFilters
+from backend.services.import_service import ParsedGame
+from tests.conftest import running_app, socket_headers
+
+OWNER = "blunderbase"
+LEAGUE_RULE = {"source": "lichess", "time_control": "2700+45", "rated": True}
+# Four plies of a Ruy Lopez: legal, short, and the same for every game here — the source
+# ID is what keeps them apart.
+MOVES = ["e2e4", "e7e5", "g1f3", "b8c6"]
+SANS = ["e4", "e5", "Nf3", "Nc6"]
+START = datetime(2026, 9, 1, 19, 0, tzinfo=UTC)
+
+
+def _game(
+    source_id: str,
+    *,
+    rated: bool | None = True,
+    time_control: str = "2700+45",
+    speed: Speed = Speed.CLASSICAL,
+    white: str = OWNER,
+    black: str = "leaguemate",
+    result: Result = Result.WHITE_WIN,
+    days: int = 0,
+    black_rating: int | None = 1800,
+) -> ParsedGame:
+    return ParsedGame(
+        source=Source.LICHESS,
+        source_id=source_id,
+        white_name=white,
+        black_name=black,
+        result=result,
+        pgn="from the API",
+        moves_uci=list(MOVES),
+        moves_san=list(SANS),
+        rated=rated,
+        speed=speed,
+        time_control=time_control,
+        played_at=START + timedelta(days=days),
+        white_rating=1700,
+        black_rating=black_rating,
+    )
+
+
+def _sync(session: Session, *games: ParsedGame) -> list[int]:
+    """Store games the way a Lichess sync does; the ids of the games it created."""
+    job = ImportJob(source=Source.LICHESS, status=JobStatus.RUNNING)
+    before = set(session.scalars(select(Game.id)))
+    import_service.ingest_games(session, job, list(games), analyze=False)
+    return sorted(set(session.scalars(select(Game.id))) - before)
+
+
+def _members(session: Session, collection_id: int) -> dict[int, str]:
+    rows = session.execute(
+        select(GameCollection.game_id, GameCollection.added_by).where(
+            GameCollection.collection_id == collection_id
+        )
+    )
+    return {game_id: added_by for game_id, added_by in rows}
+
+
+@pytest.fixture()
+def owner(session: Session) -> Account:
+    account = Account(platform=Platform.LICHESS, username=OWNER, is_owner=True)
+    session.add(account)
+    session.commit()
+    return account
+
+
+@pytest.fixture()
+def heard() -> Iterator[list[dict[str, Any]]]:
+    """Every event the service hub publishes while the test runs."""
+    events: list[dict[str, Any]] = []
+    cancel = events_service.subscribe(events.append)
+    yield events
+    cancel()
+
+
+def _changed(events: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    return [event for event in events if event["event"] == collections_service.EVENT_CHANGED]
+
+
+# --- making, naming, listing -------------------------------------------------
+
+
+def test_a_collection_is_made_and_listed_by_name_regardless_of_case(session: Session) -> None:
+    collections_service.create_collection(session, name="zugzwang club", color="good")
+    league = collections_service.create_collection(
+        session, name="  45-45   League ", description=" Tuesdays ", rule=LEAGUE_RULE
+    )
+
+    listed = collections_service.list_payloads(session)
+
+    assert [row["name"] for row in listed] == ["45-45 League", "zugzwang club"]
+    assert listed[0] == {
+        "id": league.id,
+        "name": "45-45 League",
+        "color": "accent",
+        "description": "Tuesdays",
+        "rule": LEAGUE_RULE,
+        "game_count": 0,
+        "created_at": league.created_at.isoformat(),
+    }
+
+
+def test_a_name_is_taken_whatever_its_case(session: Session) -> None:
+    league = collections_service.create_collection(session, name="45-45 League")
+    other = collections_service.create_collection(session, name="Club")
+
+    with pytest.raises(collections_service.CollectionNameTakenError):
+        collections_service.create_collection(session, name="45-45 league")
+    with pytest.raises(collections_service.CollectionNameTakenError):
+        collections_service.update_collection(session, other.id, name="45-45 LEAGUE")
+    # Renaming a collection to its own name in another case is not a clash with itself.
+    renamed = collections_service.update_collection(session, league.id, name="45-45 LEAGUE")
+    assert renamed.name == "45-45 LEAGUE"
+
+
+@pytest.mark.parametrize(
+    "changes",
+    [
+        {"name": ""},
+        {"name": "x" * 41},
+        {"name": "ok", "color": "hotpink"},
+        {"name": "ok", "rule": {"since": "2026-01-01"}},
+        {"name": "ok", "rule": {"source": "nowhere"}},
+        {"name": "ok", "rule": {"speed": ["glacial"]}},
+        {"name": "ok", "rule": {"rated": "yes"}},
+    ],
+)
+def test_a_bad_name_colour_or_rule_is_refused(session: Session, changes: dict[str, Any]) -> None:
+    with pytest.raises(collections_service.CollectionError):
+        collections_service.create_collection(session, **changes)
+    assert session.scalar(select(func.count(Collection.id))) == 0
+
+
+def test_an_empty_rule_is_no_rule(session: Session) -> None:
+    made = collections_service.create_collection(
+        session, name="By hand", rule={"source": None, "speed": [], "opponent": ""}
+    )
+    assert made.rule is None
+    with pytest.raises(collections_service.NoRuleError):
+        collections_service.apply_rule(session, made.id)
+
+
+def test_a_collection_is_found_by_id_or_by_name(session: Session) -> None:
+    league = collections_service.create_collection(session, name="45-45 League")
+
+    assert collections_service.resolve_collection(session, league.id) is league
+    assert collections_service.resolve_collection(session, str(league.id)) is league
+    assert collections_service.resolve_collection(session, " 45-45 league ") is league
+    with pytest.raises(collections_service.UnknownCollectionError):
+        collections_service.resolve_collection(session, "nope")
+
+
+# --- by hand -------------------------------------------------------------------
+
+
+def test_games_go_in_and_come_out_by_hand(session: Session, owner: Account) -> None:
+    first, second = _sync(session, _game("aaaa0001"), _game("aaaa0002"))
+    club = collections_service.create_collection(session, name="Club")
+
+    assert collections_service.add_games(session, club.id, [first, second, first, 999]) == 2
+    assert collections_service.add_games(session, club.id, [first]) == 0
+    assert _members(session, club.id) == {first: "manual", second: "manual"}
+
+    assert collections_service.remove_games(session, club.id, [first, 999]) == 1
+    assert _members(session, club.id) == {second: "manual"}
+    assert collections_service.payload(session, club)["game_count"] == 1
+
+
+def test_a_new_collection_can_start_with_the_selected_games(
+    session: Session, owner: Account
+) -> None:
+    ids = _sync(session, _game("aaaa0001"), _game("aaaa0002"))
+
+    made = collections_service.create_collection(session, name="From these", game_ids=ids)
+
+    assert _members(session, made.id) == {game_id: "manual" for game_id in ids}
+
+
+def test_deleting_a_collection_leaves_its_games(session: Session, owner: Account) -> None:
+    ids = _sync(session, _game("aaaa0001"))
+    club = collections_service.create_collection(session, name="Club", game_ids=ids)
+
+    collections_service.delete_collection(session, club.id)
+
+    assert session.scalar(select(func.count()).select_from(GameCollection)) == 0
+    assert session.scalar(select(func.count(Game.id))) == 1
+    with pytest.raises(collections_service.UnknownCollectionError):
+        collections_service.get_collection(session, club.id)
+
+
+# --- by rule -------------------------------------------------------------------
+
+
+def test_a_rule_takes_the_rated_league_game_and_nothing_else(
+    session: Session, owner: Account
+) -> None:
+    league = collections_service.create_collection(session, name="45-45 League", rule=LEAGUE_RULE)
+
+    rated, casual, blitz = _sync(
+        session,
+        _game("league01"),
+        _game("casual01", rated=False),
+        _game("blitz001", time_control="180+2", speed=Speed.BLITZ),
+    )
+
+    assert _members(session, league.id) == {rated: "rule"}
+    assert casual and blitz
+
+
+def test_a_rule_never_takes_somebody_elses_game(session: Session, owner: Account) -> None:
+    league = collections_service.create_collection(session, name="League", rule=LEAGUE_RULE)
+    job = ImportJob(source=Source.LICHESS, status=JobStatus.RUNNING)
+
+    import_service.ingest_games(
+        session,
+        job,
+        [_game("strange1", white="carlsen", black="caruana")],
+        analyze=False,
+        presume_owner=False,
+    )
+
+    assert _members(session, league.id) == {}
+
+
+def test_a_game_added_by_name_is_matched_too(
+    session: Session, owner: Account, heard: list[dict[str, Any]]
+) -> None:
+    league = collections_service.create_collection(session, name="League", rule=LEAGUE_RULE)
+    heard.clear()
+
+    outcome = import_service.import_one(session, _game("single01"), analyze=False)
+
+    assert outcome.game is not None
+    assert _members(session, league.id) == {outcome.game.id: "rule"}
+    assert _changed(heard) == [{"event": "collections.changed", "collection_id": league.id}]
+
+
+def test_a_rule_does_not_reach_back_until_asked(session: Session, owner: Account) -> None:
+    older = _sync(session, _game("league01"), _game("league02"), _game("casual01", rated=False))
+    league = collections_service.create_collection(session, name="League", rule=LEAGUE_RULE)
+
+    assert _members(session, league.id) == {}
+    assert collections_service.apply_rule(session, league.id) == 2
+    assert _members(session, league.id) == {older[0]: "rule", older[1]: "rule"}
+    assert collections_service.apply_rule(session, league.id) == 0
+
+
+def test_apply_to_existing_fills_a_new_collection_at_once(session: Session, owner: Account) -> None:
+    first, second, casual = _sync(
+        session, _game("league01"), _game("league02"), _game("casual01", rated=False)
+    )
+
+    league = collections_service.create_collection(
+        session, name="League", rule=LEAGUE_RULE, apply_to_existing=True, game_ids=[casual]
+    )
+
+    assert _members(session, league.id) == {first: "rule", second: "rule", casual: "manual"}
+
+
+def test_taking_a_game_out_by_hand_survives_the_next_import(
+    session: Session, owner: Account
+) -> None:
+    league = collections_service.create_collection(session, name="League", rule=LEAGUE_RULE)
+    kept, dropped = _sync(session, _game("league01"), _game("league02"))
+    collections_service.remove_games(session, league.id, [dropped])
+
+    (later,) = _sync(session, _game("league03"), _game("league01"))
+
+    assert _members(session, league.id) == {kept: "rule", later: "rule"}
+
+
+def test_changing_a_rule_leaves_the_games_already_in(session: Session, owner: Account) -> None:
+    league = collections_service.create_collection(session, name="League", rule=LEAGUE_RULE)
+    (first,) = _sync(session, _game("league01"))
+
+    collections_service.update_collection(session, league.id, rule=None)
+    _sync(session, _game("league02"))
+
+    assert _members(session, league.id) == {first: "rule"}
+
+
+# --- deleting games ---------------------------------------------------------------
+
+
+def test_deleting_games_takes_their_memberships(session: Session, owner: Account) -> None:
+    first, second = _sync(session, _game("aaaa0001"), _game("aaaa0002"))
+    club = collections_service.create_collection(session, name="Club", game_ids=[first, second])
+
+    games_service.delete_games(session, [first])
+
+    assert _members(session, club.id) == {second: "manual"}
+
+
+def test_emptying_the_library_empties_every_collection_but_keeps_them(
+    session: Session, owner: Account
+) -> None:
+    ids = _sync(session, _game("aaaa0001"), _game("aaaa0002"))
+    club = collections_service.create_collection(
+        session, name="Club", game_ids=ids, rule=LEAGUE_RULE
+    )
+
+    games_service.delete_all_games(session)
+
+    assert session.scalar(select(func.count()).select_from(GameCollection)) == 0
+    assert collections_service.get_collection(session, club.id).rule == LEAGUE_RULE
+
+
+# --- filtering ---------------------------------------------------------------------
+
+
+def test_the_library_filters_by_collection_and_by_rated(session: Session, owner: Account) -> None:
+    rated, casual, unknown = _sync(
+        session, _game("rated001"), _game("casual01", rated=False), _game("nosay001", rated=None)
+    )
+    club = collections_service.create_collection(session, name="Club", game_ids=[rated, casual])
+
+    def ids(filters: GameFilters) -> list[int]:
+        return sorted(game.id for game in games_service.search_games(session, filters))
+
+    assert ids(GameFilters(collection=club.id)) == [rated, casual]
+    assert games_service.count_games(session, GameFilters(collection=club.id)) == 2
+    assert ids(GameFilters(rated=True)) == [rated]
+    assert ids(GameFilters(rated=False)) == [casual]
+    assert ids(GameFilters(collection=club.id, rated=False)) == [casual]
+    assert unknown not in ids(GameFilters(rated=True)) + ids(GameFilters(rated=False))
+
+
+def test_stats_narrow_to_a_collection_and_follow_its_membership(
+    session: Session, owner: Account
+) -> None:
+    first, second, _other = _sync(session, _game("aaaa0001"), _game("aaaa0002"), _game("aaaa0003"))
+    club = collections_service.create_collection(session, name="Club", game_ids=[first])
+
+    def games_in_club() -> int:
+        payload = stats.get_stats(
+            session, "performance_by_speed", filters=GameFilters(collection=club.id)
+        )
+        return payload["total"]["games"]
+
+    assert games_in_club() == 1
+    # Inside the cache's window: the membership change is what has to invalidate it.
+    collections_service.add_games(session, club.id, [second])
+    assert games_in_club() == 2
+
+
+def test_a_collection_counts_in_the_whole_library_too(session: Session, owner: Account) -> None:
+    ids = _sync(session, _game("aaaa0001"), _game("aaaa0002"))
+    collections_service.create_collection(session, name="Club", game_ids=ids[:1])
+
+    payload = stats.get_stats(session, "performance_by_speed")
+
+    assert payload["total"]["games"] == 2
+
+
+def test_a_game_knows_its_collections(session: Session, owner: Account) -> None:
+    first, second = _sync(session, _game("aaaa0001"), _game("aaaa0002"))
+    club = collections_service.create_collection(session, name="Club", game_ids=[first])
+    league = collections_service.create_collection(session, name="League", game_ids=[first])
+
+    rows = games_service.game_summaries(session, games_service.search_games(session, GameFilters()))
+    by_id = {row["id"]: row["collections"] for row in rows}
+    cards = games_service.game_cards(session, games_service.search_games(session, GameFilters()))
+    detail = games_service.get_game_detail(session, first)
+
+    assert by_id == {first: [club.id, league.id], second: []}
+    assert {card["id"]: card["collections"] for card in cards} == by_id
+    assert detail is not None and detail["game"]["collections"] == [club.id, league.id]
+
+
+# --- the summary ----------------------------------------------------------------------
+
+
+def test_the_summary_is_the_score_line_of_the_collection(session: Session, owner: Account) -> None:
+    win, loss, draw, _outside = _sync(
+        session,
+        _game("win00001", days=0, black_rating=1800),
+        _game("loss0001", result=Result.BLACK_WIN, days=3, black_rating=1900),
+        _game("draw0001", result=Result.DRAW, days=7, black_rating=None),
+        _game("outside1"),
+    )
+    club = collections_service.create_collection(session, name="Club", game_ids=[win, loss, draw])
+
+    detail = collections_service.detail_payload(session, club.id)
+
+    assert detail["game_count"] == 3
+    assert detail["summary"] == {
+        "games": 3,
+        "wins": 1,
+        "draws": 1,
+        "losses": 1,
+        "points": 1.5,
+        "avg_opponent_rating": 1850,
+        # Nothing is analysed here, so there is no rate to give rather than a zero.
+        "blunders_per_game": None,
+        "first_played_at": START.isoformat(),
+        "last_played_at": (START + timedelta(days=7)).isoformat(),
+    }
+
+
+# --- events -----------------------------------------------------------------------------
+
+
+def test_every_change_is_announced(
+    session: Session, owner: Account, heard: list[dict[str, Any]]
+) -> None:
+    (game_id,) = _sync(session, _game("aaaa0001"))
+    club = collections_service.create_collection(session, name="Club")
+    collections_service.update_collection(session, club.id, color="good")
+    collections_service.add_games(session, club.id, [game_id])
+    collections_service.remove_games(session, club.id, [game_id])
+    collections_service.delete_collection(session, club.id)
+
+    assert _changed(heard) == [
+        {"event": "collections.changed", "collection_id": club.id} for _ in range(5)
+    ]
+
+
+def test_a_sync_announces_the_games_its_rules_took(
+    session: Session, owner: Account, heard: list[dict[str, Any]]
+) -> None:
+    league = collections_service.create_collection(session, name="League", rule=LEAGUE_RULE)
+    heard.clear()
+
+    _sync(session, _game("league01"), _game("casual01", rated=False))
+
+    assert _changed(heard) == [{"event": "collections.changed", "collection_id": league.id}]
+
+
+def test_a_sync_whose_rule_takes_many_games_announces_once_and_forgets_the_stats(
+    session: Session, owner: Account, heard: list[dict[str, Any]]
+) -> None:
+    league = collections_service.create_collection(session, name="League", rule=LEAGUE_RULE)
+
+    def games_in_league() -> int:
+        payload = stats.get_stats(
+            session, "performance_by_speed", filters=GameFilters(collection=league.id)
+        )
+        return payload["total"].get("games", 0)
+
+    # Cached empty, inside the TTL: only the import's announcement can make it right.
+    assert games_in_league() == 0
+    heard.clear()
+
+    _sync(session, *(_game(f"league{index:02}") for index in range(12)))
+
+    assert len(_members(session, league.id)) == 12
+    assert _changed(heard) == [{"event": "collections.changed", "collection_id": league.id}]
+    assert games_in_league() == 12
+
+
+def test_a_sync_filling_two_collections_announces_once_for_both(
+    session: Session, owner: Account, heard: list[dict[str, Any]]
+) -> None:
+    collections_service.create_collection(session, name="League", rule=LEAGUE_RULE)
+    collections_service.create_collection(session, name="Classical", rule={"speed": ["classical"]})
+    heard.clear()
+
+    _sync(session, _game("league01"), _game("league02"))
+
+    assert _changed(heard) == [{"event": "collections.changed", "collection_id": None}]
+
+
+def test_a_sync_that_fails_part_way_still_announces_what_it_filed(
+    session: Session, owner: Account, heard: list[dict[str, Any]]
+) -> None:
+    league = collections_service.create_collection(session, name="League", rule=LEAGUE_RULE)
+    heard.clear()
+
+    def stream() -> Iterator[ParsedGame]:
+        yield _game("league01")
+        raise RuntimeError("the connection dropped")
+
+    job = ImportJob(source=Source.LICHESS, status=JobStatus.RUNNING)
+    with pytest.raises(RuntimeError):
+        import_service.ingest_games(session, job, stream(), analyze=False)
+
+    assert len(_members(session, league.id)) == 1
+    assert _changed(heard) == [{"event": "collections.changed", "collection_id": league.id}]
+
+
+def test_a_game_stored_with_a_side_the_caller_knows_meets_the_colour_rules(
+    session: Session, heard: list[dict[str, Any]]
+) -> None:
+    # No account at all: a correspondence handle, whose side the owner said.
+    as_white = collections_service.create_collection(
+        session, name="As white", rule={"color": "white"}
+    )
+    heard.clear()
+
+    outcome = import_service.import_one(
+        session, _game("iccf0001", white="myiccfname"), analyze=False, owner_side=Color.WHITE
+    )
+
+    assert outcome.game is not None
+    assert outcome.game.owner_color == Color.WHITE and outcome.game.is_owner_game
+    assert _members(session, as_white.id) == {outcome.game.id: "rule"}
+    assert _changed(heard) == [{"event": "collections.changed", "collection_id": as_white.id}]
+
+
+def test_learning_a_games_side_asks_the_colour_rules_and_no_others(
+    session: Session, owner: Account, heard: list[dict[str, Any]]
+) -> None:
+    as_white = collections_service.create_collection(
+        session, name="As white", rule={"color": "white"}
+    )
+    league = collections_service.create_collection(session, name="League", rule=LEAGUE_RULE)
+    # A sync under a name that is no account yet: the owner's game, side unknown.
+    (game_id,) = _sync(session, _game("otbname1", white="otbname"))
+    assert session.get(Game, game_id).owner_color is None
+    assert _members(session, as_white.id) == {}
+    # The league rule could answer, and did; the owner then took the game out by hand.
+    assert _members(session, league.id) == {game_id: "rule"}
+    collections_service.remove_games(session, league.id, [game_id])
+    heard.clear()
+
+    accounts_service.register_account(session, Platform.LICHESS, "otbname")
+
+    assert session.get(Game, game_id).owner_color == Color.WHITE
+    assert _members(session, as_white.id) == {game_id: "rule"}
+    assert _members(session, league.id) == {}
+    assert _changed(heard) == [{"event": "collections.changed", "collection_id": as_white.id}]
+
+
+def test_a_reference_game_that_turns_out_to_be_the_owners_meets_every_rule(
+    session: Session, owner: Account
+) -> None:
+    league = collections_service.create_collection(session, name="League", rule=LEAGUE_RULE)
+    job = ImportJob(source=Source.LICHESS, status=JobStatus.RUNNING)
+    import_service.ingest_games(
+        session,
+        job,
+        [_game("stranger", white="secondhandle")],
+        analyze=False,
+        presume_owner=False,
+    )
+    game_id = session.scalars(select(Game.id).where(Game.source_id == "stranger")).one()
+    assert _members(session, league.id) == {}
+
+    accounts_service.register_account(session, Platform.LICHESS, "secondhandle")
+
+    assert session.get(Game, game_id).is_owner_game
+    assert _members(session, league.id) == {game_id: "rule"}
+
+
+# --- writes that overlap -----------------------------------------------------------------
+
+
+def test_adding_a_game_twice_at_once_adds_it_once(session: Session, owner: Account) -> None:
+    (game_id,) = _sync(session, _game("aaaa0001"))
+    club = collections_service.create_collection(session, name="Club")
+
+    # What the loser of two overlapping adds meets: the membership its read did not see.
+    assert collections_service._insert_members(session, club.id, [game_id], "manual") == 1
+    assert collections_service._insert_members(session, club.id, [game_id], "rule") == 0
+    session.commit()
+
+    assert _members(session, club.id) == {game_id: "manual"}
+
+
+def test_a_name_taken_between_the_check_and_the_write_is_still_name_taken(
+    session: Session, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    collections_service.create_collection(session, name="League")
+    # The other request's check ran before this one's write: it saw the name free.
+    monkeypatch.setattr(collections_service, "_valid_name", lambda _session, name, keep=None: name)
+
+    with pytest.raises(collections_service.CollectionNameTakenError):
+        collections_service.create_collection(session, name="League")
+    assert session.scalar(select(func.count()).select_from(Collection)) == 1
+
+
+def test_a_stats_answer_computed_across_a_membership_change_is_not_kept() -> None:
+    computed: list[int] = []
+
+    def overtaken() -> int:
+        # The membership write lands while this computation is reading the old library.
+        stats.forget_cached_payloads()
+        computed.append(1)
+        return len(computed)
+
+    key = ("test-overtaken",)
+    assert stats._cached(key, overtaken) == 1
+    # Not served from the cache: the next caller computes against the new library.
+    assert stats._cached(key, lambda: 2) == 2
+    assert stats._cached(key, lambda: 3) == 2
+
+
+def test_the_summary_scores_only_games_with_a_side_of_the_owners(
+    session: Session, owner: Account
+) -> None:
+    (mine,) = _sync(session, _game("mine0001"))
+    job = ImportJob(source=Source.LICHESS, status=JobStatus.RUNNING)
+    import_service.ingest_games(
+        session,
+        job,
+        [_game("model001", white="carlsen", black="caruana")],
+        analyze=False,
+        presume_owner=False,
+    )
+    reference = session.scalars(select(Game.id).where(Game.source_id == "model001")).one()
+    club = collections_service.create_collection(session, name="Club", game_ids=[mine, reference])
+
+    detail = collections_service.detail_payload(session, club.id)
+
+    # Every game in it is what the page lists (whose=all); the score is the owner's.
+    assert detail["game_count"] == 2
+    assert games_service.count_games(session, GameFilters(collection=club.id, mine=None)) == 2
+    assert detail["summary"]["games"] == 1
+
+
+# --- the migration -----------------------------------------------------------------------
+
+
+def test_the_migration_goes_down_and_up_again(settings: Settings) -> None:
+    upgrade_to_head(settings)
+    config = alembic_config(settings)
+
+    command.downgrade(config, "0029_engine_declared_options")
+    tables = set(inspect(get_engine(settings)).get_table_names())
+    assert "collections" not in tables and "game_collections" not in tables
+
+    command.upgrade(config, "head")
+    inspector = inspect(get_engine(settings))
+    assert {"collections", "game_collections"} <= set(inspector.get_table_names())
+    assert ("collection_id",) in {
+        tuple(index["column_names"]) for index in inspector.get_indexes("game_collections")
+    }
+
+
+# --- the HTTP surface ----------------------------------------------------------------------
+
+
+@pytest.fixture()
+def api(settings: Settings) -> Iterator[tuple[TestClient, list[int]]]:
+    """The app over a migrated library of three games: two league games and a casual one."""
+    upgrade_to_head(settings)
+    with get_sessionmaker(settings)() as session:
+        session.add(Account(platform=Platform.LICHESS, username=OWNER, is_owner=True))
+        session.commit()
+        ids = _sync(
+            session,
+            _game("league01", days=0),
+            _game("league02", days=1, result=Result.DRAW),
+            _game("casual01", days=2, rated=False),
+        )
+    settings.analysis_workers = False
+    with running_app(create_app(settings)) as client:
+        yield client, ids
+
+
+def test_the_api_makes_lists_and_describes_a_collection(
+    api: tuple[TestClient, list[int]],
+) -> None:
+    client, (first, second, casual) = api
+
+    made = client.post(
+        "/collections",
+        json={
+            "name": "45-45 League",
+            "color": "way-back",
+            "rule": {"source": "lichess", "time_control": "2700+45", "rated": True},
+            "apply_to_existing": True,
+        },
+    )
+    assert made.status_code == 201, made.text
+    body = made.json()
+    assert body["game_count"] == 2
+    assert body["rule"] == LEAGUE_RULE
+    assert body["description"] is None
+
+    assert client.post("/collections", json={"name": "45-45 LEAGUE"}).json()["error"] == (
+        "name_taken"
+    )
+    assert client.post("/collections", json={"name": "x", "color": "pink"}).status_code == 422
+    assert (
+        client.post("/collections", json={"name": "x", "rule": {"since": "2026-01-01"}}).status_code
+        == 422
+    )
+
+    listed = client.get("/collections").json()["collections"]
+    assert [row["name"] for row in listed] == ["45-45 League"]
+
+    detail = client.get(f"/collections/{body['id']}").json()
+    assert detail["summary"]["games"] == 2
+    assert detail["summary"]["wins"] == 1
+    assert detail["summary"]["draws"] == 1
+    assert detail["summary"]["points"] == 1.5
+    assert client.get("/collections/999").json()["error"] == "unknown_collection"
+    assert casual not in (first, second)
+
+
+def test_the_api_patches_only_what_it_is_sent(api: tuple[TestClient, list[int]]) -> None:
+    client, _ids = api
+    made = client.post(
+        "/collections", json={"name": "League", "description": "Tuesdays", "rule": LEAGUE_RULE}
+    ).json()
+
+    renamed = client.patch(f"/collections/{made['id']}", json={"name": "Liga"}).json()
+    assert renamed["name"] == "Liga"
+    assert renamed["description"] == "Tuesdays"
+    assert renamed["rule"] == LEAGUE_RULE
+
+    cleared = client.patch(f"/collections/{made['id']}", json={"rule": None}).json()
+    assert cleared["rule"] is None
+    assert client.post(f"/collections/{made['id']}/apply-rule").json()["error"] == "no_rule"
+
+    assert client.delete(f"/collections/{made['id']}").status_code == 204
+    assert client.get("/collections").json()["collections"] == []
+
+
+def test_the_api_moves_games_in_and_out(api: tuple[TestClient, list[int]]) -> None:
+    client, (first, second, casual) = api
+    club = client.post("/collections", json={"name": "Club"}).json()
+
+    added = client.post(f"/collections/{club['id']}/games", json={"game_ids": [first, casual, 9]})
+    assert added.json()["added"] == 2
+    assert added.json()["collection"]["game_count"] == 2
+
+    removed = client.post(f"/collections/{club['id']}/games/remove", json={"game_ids": [first]})
+    assert removed.json()["removed"] == 1
+    assert removed.json()["collection"]["game_count"] == 1
+
+    ruled = client.patch(f"/collections/{club['id']}", json={"rule": LEAGUE_RULE})
+    assert ruled.status_code == 200
+    applied = client.post(f"/collections/{club['id']}/apply-rule").json()
+    # Asking for it brings back the game a hand took out: that is what "apply" means.
+    assert applied["added"] == 2
+    assert applied["collection"]["game_count"] == 3
+
+
+def test_the_games_list_carries_and_filters_by_collections(
+    api: tuple[TestClient, list[int]],
+) -> None:
+    client, (first, second, casual) = api
+    club = client.post("/collections", json={"name": "Club", "game_ids": [first, casual]}).json()
+
+    rows = {row["id"]: row["collections"] for row in client.get("/games").json()["games"]}
+    assert rows == {first: [club["id"]], second: [], casual: [club["id"]]}
+    cards = client.get("/games", params={"cards": True}).json()["games"]
+    assert {row["id"]: row["collections"] for row in cards} == rows
+    assert client.get(f"/games/{first}").json()["game"]["collections"] == [club["id"]]
+    engine = client.put(f"/games/{first}/engine", json={"hidden": False}).json()
+    assert engine["collections"] == [club["id"]]
+
+    in_club = client.get("/games", params={"collection": club["id"]}).json()
+    assert {row["id"] for row in in_club["games"]} == {first, casual}
+    assert in_club["total"] == 2
+    rated = client.get("/games", params={"collection": club["id"], "rated": True}).json()
+    assert [row["id"] for row in rated["games"]] == [first]
+
+    speed = client.get(
+        "/stats/performance_by_speed", params={"collection": club["id"], "rated": False}
+    )
+    assert speed.status_code == 200, speed.text
+    assert speed.json()["total"]["games"] == 1
+
+
+def test_a_membership_change_reaches_the_event_socket(
+    api: tuple[TestClient, list[int]],
+) -> None:
+    client, (first, _second, _casual) = api
+    club = client.post("/collections", json={"name": "Club"}).json()
+
+    with client.websocket_connect("/events", headers=socket_headers(client)) as socket:
+        client.post(f"/collections/{club['id']}/games", json={"game_ids": [first]})
+        for _ in range(20):
+            event = socket.receive_json()
+            if event.get("event") == "collections.changed":
+                break
+        assert event == {"event": "collections.changed", "collection_id": club["id"]}
+
+
+def test_a_rule_naming_a_colour_takes_only_the_games_played_with_it(
+    session: Session, owner: Account
+) -> None:
+    rule = {**LEAGUE_RULE, "color": "black"}
+    league = collections_service.create_collection(session, name="As black", rule=rule)
+
+    (as_white, as_black) = _sync(
+        session, _game("white001"), _game("black001", white="leaguemate", black=OWNER)
+    )
+
+    assert _members(session, league.id) == {as_black: "rule"}
+    assert session.get(Game, as_black).owner_color == Color.BLACK
+    assert as_white

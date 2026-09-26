@@ -37,6 +37,7 @@ from backend.db.models import (
     CorrespondenceSearch,
     DeletedGame,
     Game,
+    GameCollection,
     GamePosition,
     ImportJob,
     Line,
@@ -130,6 +131,12 @@ class GameFilters:
     # game added from the reference books out of every statistic without each one having
     # to remember), False is only those, None is both.
     mine: bool | None = True
+    # One collection's games (`services.collections`). A filter like any other: nothing
+    # about a game changes by being in one, so every screen built on these filters can be
+    # narrowed to a collection without knowing collections exist.
+    collection: int | None = None
+    # Rated or casual. A game whose source never said is neither, and falls outside both.
+    rated: bool | None = None
 
 
 def search_games(
@@ -307,6 +314,9 @@ def delete_games(session: Session, game_ids: Sequence[int]) -> Deleted:
         deleted.runs += _deleted(session, delete(AnalysisRun).where(AnalysisRun.id.in_(of_these)))
         deleted.notes += _deleted(session, delete(Note).where(Note.game_id.in_(present)))
         deleted.lines += _deleted(session, delete(Line).where(Line.game_id.in_(present)))
+        _deleted(
+            session, delete(GameCollection).where(GameCollection.game_id.in_(present))
+        )
         _deleted(session, delete(GamePosition).where(GamePosition.game_id.in_(present)))
         deleted.games += _deleted(session, delete(Game).where(Game.id.in_(present)))
     session.commit()
@@ -535,6 +545,10 @@ def delete_all_games(session: Session) -> Wiped:
     _deleted(session, delete(MoveEval).where(MoveEval.run_id.in_(of_a_game)))
     wiped.runs = _deleted(session, delete(AnalysisRun).where(AnalysisRun.id.in_(of_a_game)))
     wiped.notes = _deleted(session, delete(Note).where(Note.game_id.is_not(None)))
+    # Every membership names a game too. The collections themselves stay, rules and all:
+    # they are the owner's configuration, and a rule is exactly what refills one when the
+    # library is imported again.
+    _deleted(session, delete(GameCollection))
     # Every `game_positions` row names a game, and every game is going.
     _deleted(session, delete(GamePosition))
     wiped.games = _deleted(session, delete(Game))
@@ -588,7 +602,26 @@ def game_conditions(filters: GameFilters) -> list[ColumnElement[bool]]:
         conditions.append(_text_condition(filters.text))
     if filters.mine is not None:
         conditions.append(Game.is_owner_game.is_(filters.mine))
+    if filters.collection is not None:
+        conditions.append(in_collection_condition(filters.collection))
+    if filters.rated is not None:
+        conditions.append(Game.rated.is_(filters.rated))
     return conditions
+
+
+def in_collection_condition(collection_id: int) -> ColumnElement[bool]:
+    """The game is in this collection.
+
+    An uncorrelated `IN` over the collection's memberships rather than a correlated EXISTS:
+    SQLite reads the member list once, off the collection index, and tests each row against
+    it with a bloom filter, where the EXISTS probed the membership key once per row. On the
+    explorer's live fold, whose rows are every occurrence of a position, that halved a
+    collection-scoped step at the root.
+    """
+    members = select(GameCollection.game_id).where(
+        GameCollection.collection_id == int(collection_id)
+    )
+    return Game.id.in_(members)
 
 
 def outcome_condition(outcome: str) -> ColumnElement[bool]:
@@ -952,8 +985,11 @@ def get_game_detail(
         for ply in range(start, min(end, game.ply_count - 1) + 1)
     ]
 
+    from backend.services import collections as collections_service
+
+    memberships = collections_service.collections_of(session, [game.id])
     detail: dict[str, Any] = {
-        "game": game_summary(game),
+        "game": game_summary(game, collections=memberships[game.id]),
         "ply_range": [start, end] if ply_range is not None else None,
         "moves": moves,
         "runs": [_run_summary(run) for run in runs],
@@ -1201,7 +1237,13 @@ def get_last_games(
     )
 
 
-def game_card(session: Session, game: Game, *, worst: int = 3) -> dict[str, Any]:
+def game_card(
+    session: Session,
+    game: Game,
+    *,
+    worst: int = 3,
+    collections: Sequence[int] | None = None,
+) -> dict[str, Any]:
     """A game as a compact card: the summary, the eval curve and its worst moments.
 
     The expensive half is read off `Game.card`, written whenever the game's finished runs
@@ -1214,7 +1256,7 @@ def game_card(session: Session, game: Game, *, worst: int = 3) -> dict[str, Any]
     stored = _stored_card(game, worst)
     card = stored if stored is not None else build_card(session, game, worst=max(worst, 0))
     return {
-        **game_summary(game),
+        **game_summary(game, collections=collections),
         "analyzed": card["analyzed"],
         # A card folded before there was one pass says `deep` instead; a deep run then was
         # exactly what a requested run is now, and refolding every card to rename the key
@@ -1226,8 +1268,18 @@ def game_card(session: Session, game: Game, *, worst: int = 3) -> dict[str, Any]
 
 
 def game_cards(session: Session, games: Iterable[Game], *, worst: int = 3) -> list[dict[str, Any]]:
-    """`game_card` over a list, which is what `get_last_games` is usually followed by."""
-    return [game_card(session, game, worst=worst) for game in games]
+    """`game_card` over a list, which is what `get_last_games` is usually followed by.
+
+    Each card carries the collections its game is in, looked up once for the whole list.
+    """
+    from backend.services import collections as collections_service
+
+    rows = list(games)
+    memberships = collections_service.collections_of(session, [game.id for game in rows])
+    return [
+        game_card(session, game, worst=worst, collections=memberships.get(game.id, []))
+        for game in rows
+    ]
 
 
 def build_card(session: Session, game: Game, *, worst: int = CARD_WORST_MOMENTS) -> dict[str, Any]:
@@ -1363,9 +1415,27 @@ def game_url(game: Game) -> str | None:
     return match.group(1) if match else None
 
 
-def game_summary(game: Game) -> dict[str, Any]:
-    """The compact form of a game every payload in the service layer embeds."""
-    return _compact(
+def game_summaries(session: Session, games: Iterable[Game]) -> list[dict[str, Any]]:
+    """`game_summary` over a page of games, each with the collections it is in.
+
+    The memberships are one query for the whole page rather than one per row, which is the
+    difference between a list of fifty games and fifty-one queries.
+    """
+    from backend.services import collections as collections_service
+
+    rows = list(games)
+    memberships = collections_service.collections_of(session, [game.id for game in rows])
+    return [game_summary(game, collections=memberships.get(game.id, [])) for game in rows]
+
+
+def game_summary(game: Game, *, collections: Sequence[int] | None = None) -> dict[str, Any]:
+    """The compact form of a game every payload in the service layer embeds.
+
+    `collections` is the ids of the collections the game is in, for the callers that have
+    looked them up (`game_summaries`, `game_cards`, `get_game_detail`); left out, the key
+    is absent rather than a list that would claim the game is in none.
+    """
+    summary = _compact(
         {
             "id": game.id,
             "source": str(game.source),
@@ -1396,6 +1466,9 @@ def game_summary(game: Game) -> dict[str, Any]:
             "ply_count": game.ply_count,
         }
     )
+    if collections is not None:
+        summary["collections"] = list(collections)
+    return summary
 
 
 def outcome_of(game: Game) -> str | None:

@@ -1,32 +1,45 @@
 /**
  * Design 2b's filter bar: the free-text box and one chip per filter group. Every chip writes
  * straight into the page's `LibraryFilters`, which the page mirrors into the URL.
+ *
+ * Collection is one more chip rather than a control of its own: a collection's page is the
+ * library under `?collection=`, so picking one here and clicking it in the rail land on the
+ * same page, and every other chip narrows inside it the way it narrows the whole library.
  */
 import type { I18n, MessageDescriptor } from '@lingui/core'
 import { msg } from '@lingui/core/macro'
 import { Trans, useLingui } from '@lingui/react/macro'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { useNavigate } from 'react-router-dom'
 
 import { Button } from '@/components/ui/button'
+import { CollectionSwatch } from '@/components/collections/CollectionChip'
 import { Input } from '@/components/ui/input'
-import type { Color, Whose } from '@/lib/api/types'
+import { useCollections } from '@/lib/api/queries'
+import type { Collection, Color, Whose } from '@/lib/api/types'
+import { collectionPath, ruleFromFilters } from '@/lib/collections'
 import { cn } from '@/lib/utils'
 import { Segmented } from '@/routes/stats/kit/states'
 
 import {
   clearGroup,
+  effectiveWhose,
   FILTER_GROUPS,
   FILTER_OPTIONS,
   filterCount,
   GROUP_LABELS,
   groupSummary,
   prune,
+  RATED_WORDS,
   SPEED_WORDS,
+  type CollectionNames,
   type FilterGroup,
   type LibraryFilters,
 } from '../filters'
-import { OUTCOME_LABELS, SOURCE_LABELS } from '../format'
+import { formatCount, OUTCOME_LABELS, SOURCE_LABELS } from '../format'
 import { MAX_LABEL_LENGTH, saveFilter, suggestLabel } from '../savedFilters'
+import { useCollectionNames } from '../useCollectionNames'
+import { CollectionDialog } from './CollectionDialog'
 import { FilterPopover, OptionButton, OptionRow, PopoverLabel, TriState } from './FilterPopover'
 
 export interface FilterBarProps {
@@ -59,6 +72,7 @@ function isoDay(offsetDays: number): string {
 export function FilterBar({ filters, onChange, trailing }: FilterBarProps) {
   const { i18n } = useLingui()
   const patch = (next: Partial<LibraryFilters>) => onChange(prune({ ...filters, ...next }))
+  const collectionName = useCollectionNames()
 
   return (
     // `max-md:relative` is what a `FilterPopover` anchors its panel to on a phone; see the
@@ -68,30 +82,149 @@ export function FilterBar({ filters, onChange, trailing }: FilterBarProps) {
           narrows one cut of the library: it decides which library — the owner's own games
           (the default, and the only ones any statistic counts), the games added from the
           reference books, or both together. The same segmented control the explorer uses
-          for its source, since it answers the same kind of question. */}
-      <WhoseToggle
-        value={filters.whose ?? 'mine'}
-        onChange={(whose) => patch({ whose: whose === 'mine' ? undefined : whose })}
-      />
+          for its source, since it answers the same kind of question. On a collection's page
+          it starts on All (`defaultWhose`); `prune` drops whichever value is the default. */}
+      <WhoseToggle value={effectiveWhose(filters)} onChange={(whose) => patch({ whose })} />
 
       {FILTER_GROUPS.map((group) => (
         <FilterPopover
           key={group}
           label={i18n._(GROUP_LABELS[group])}
-          value={groupSummary(group, filters)}
+          value={groupSummary(group, filters, collectionName)}
           onClear={() => onChange(clearGroup(filters, group))}
-          width={group === 'date' ? '15.625rem' : '14.5rem'}
+          width={group === 'date' ? '15.625rem' : group === 'collection' ? '15rem' : '14.5rem'}
         >
-          {() => <GroupPanel group={group} filters={filters} patch={patch} />}
+          {(close) =>
+            group === 'collection' ? (
+              <CollectionPanel
+                value={filters.collection}
+                onChange={(collection) => {
+                  patch({ collection })
+                  close()
+                }}
+              />
+            ) : (
+              <GroupPanel group={group} filters={filters} patch={patch} />
+            )
+          }
         </FilterPopover>
       ))}
 
-      <SaveFilter filters={filters} />
+      <SaveFilter filters={filters} collectionName={collectionName} />
+      <MakeCollection filters={filters} />
 
       {trailing ? (
         <div className="ml-auto flex items-center gap-[0.4375rem] max-md:w-full">{trailing}</div>
       ) : null}
     </div>
+  )
+}
+
+/**
+ * The Collection chip's panel: one row per collection with its colour and its size, and a
+ * click picks it — one at a time, since a game in two collections is found under either,
+ * and "in this one and that one" is a cut nobody has asked for. Picking closes the panel,
+ * because the page it lands on is a different page (the collection's own header comes up).
+ */
+function CollectionPanel({
+  value,
+  onChange,
+}: {
+  value: number | undefined
+  onChange: (next: number | undefined) => void
+}) {
+  const collections = useCollections()
+  const rows: Collection[] = collections.data?.collections ?? []
+  return (
+    <>
+      <PopoverLabel>
+        <Trans>In the collection</Trans>
+      </PopoverLabel>
+      {collections.isPending ? (
+        <span className="text-[0.71875rem] text-dim">
+          <Trans>Loading collections…</Trans>
+        </span>
+      ) : collections.isError ? (
+        <span className="text-[0.71875rem] text-blunder">
+          <Trans>Could not load the collections.</Trans>
+        </span>
+      ) : rows.length === 0 ? (
+        <span className="text-[0.6875rem] leading-snug text-dim">
+          <Trans>
+            No collections yet. Select games and use Add to… under the table, or press + beside
+            Collections in the sidebar.
+          </Trans>
+        </span>
+      ) : (
+        <div className="-mx-1 flex max-h-[16rem] flex-col overflow-y-auto">
+          {rows.map((collection) => {
+            const selected = value === collection.id
+            return (
+              <button
+                key={collection.id}
+                type="button"
+                aria-pressed={selected}
+                onClick={() => onChange(selected ? undefined : collection.id)}
+                className={cn(
+                  'flex items-center gap-2 rounded-sm px-1.5 py-1 text-left text-[0.71875rem] transition-colors',
+                  selected ? 'bg-accent-teal/10 text-accent-teal' : 'text-soft hover:bg-raised hover:text-ink',
+                )}
+              >
+                <CollectionSwatch color={collection.color} />
+                <span className="min-w-0 truncate">{collection.name}</span>
+                <span className="ml-auto pl-3 font-mono text-[0.65625rem] text-faint">
+                  {formatCount(collection.game_count)}
+                </span>
+              </button>
+            )
+          })}
+        </div>
+      )}
+    </>
+  )
+}
+
+/**
+ * Design 5's "Make a collection", beside Save filter: the same cut, kept as a set of games
+ * on the server rather than a query in this browser. The dialog opens with the rule taken
+ * from the filter that is open — only the keys that describe a game as it arrives, so a date
+ * range or "has blunders" is left behind — and with "Also add the games you already have"
+ * ticked, since someone who filtered the library down to the league wants the league's
+ * games in it now, not only the next ones.
+ *
+ * Only there when the filter has something a rule can hold. With nothing rule-able set the
+ * sidebar's + and a selection's Add to… are the doors, and a link that opened an empty form
+ * here would read as "these games" when it meant none of them. Saving goes to the new
+ * collection's page, which is where its games and its score line are.
+ */
+function MakeCollection({ filters }: { filters: LibraryFilters }) {
+  const { t } = useLingui()
+  const navigate = useNavigate()
+  const [open, setOpen] = useState(false)
+  const rule = ruleFromFilters(filters)
+  if (!rule && !open) return null
+  return (
+    <>
+      <button
+        type="button"
+        title={t`Keep the games this filter finds as a collection, and add new ones as they arrive`}
+        onClick={() => setOpen(true)}
+        className="px-1 text-label text-accent-teal transition-colors hover:text-accent-link"
+      >
+        <Trans>Make a collection</Trans>
+      </button>
+      {open ? (
+        <CollectionDialog
+          initialRule={rule}
+          addExistingByDefault
+          onClose={() => setOpen(false)}
+          onSaved={(collection) => {
+            setOpen(false)
+            navigate(collectionPath(collection.id))
+          }}
+        />
+      ) : null}
+    </>
   )
 }
 
@@ -132,7 +265,13 @@ function WhoseToggle({ value, onChange }: { value: Whose; onChange: (whose: Whos
  * (`../savedFilters`). Nothing to save is not an error — with no filter set there is no
  * cut, so the link says so rather than pretending.
  */
-function SaveFilter({ filters }: { filters: LibraryFilters }) {
+function SaveFilter({
+  filters,
+  collectionName,
+}: {
+  filters: LibraryFilters
+  collectionName: CollectionNames
+}) {
   const { t } = useLingui()
   const [open, setOpen] = useState(false)
   const [label, setLabel] = useState('')
@@ -171,7 +310,7 @@ function SaveFilter({ filters }: { filters: LibraryFilters }) {
             : t`Set a filter first — there is nothing to save yet`
         }
         onClick={() => {
-          setLabel(suggestLabel(filters))
+          setLabel(suggestLabel(filters, collectionName))
           setOpen((current) => !current)
         }}
         className="px-1 text-label text-accent-teal transition-colors hover:text-accent-link disabled:cursor-not-allowed disabled:text-dim-2"
@@ -352,6 +491,18 @@ function GroupPanel({
             onChange={(event) => patch({ time_control: event.target.value || undefined })}
             className="h-7 font-mono text-data"
           />
+          {/* With the clock because that is how a league names its games — "rated 45+45" —
+              and a casual 45+45 with a friend is exactly what it wants kept out. */}
+          <PopoverLabel>
+            <Trans>Rated</Trans>
+          </PopoverLabel>
+          <TriState
+            value={filters.rated}
+            onChange={(rated) => patch({ rated })}
+            either={t`Either`}
+            yes={i18n._(RATED_WORDS.rated)}
+            no={i18n._(RATED_WORDS.casual)}
+          />
         </>
       )
 
@@ -391,6 +542,10 @@ function GroupPanel({
           />
         </>
       )
+
+    case 'collection':
+      // Drawn by `CollectionPanel`, which needs the collections list and closes on a pick.
+      return null
   }
 }
 

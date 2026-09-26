@@ -6,6 +6,7 @@ from backend.api.routes import (
     accounts,
     analysis,
     auth,
+    collections,
     correspondence,
     engines,
     events,
@@ -33,6 +34,7 @@ from backend.api.routes import (
 CORE_ROUTERS: tuple[APIRouter, ...] = (
     auth.router,
     games.router,
+    collections.router,
     accounts.router,
     imports.router,
     library.router,

@@ -11,6 +11,7 @@ import {
   lossCounts,
   num,
   numOr,
+  parseCollectionParam,
   periodLabel,
   precedingWindow,
   shortDate,
@@ -20,6 +21,18 @@ import {
 
 const NOW = new Date('2026-08-26T12:00:00.000Z')
 const DAY = 86_400_000
+
+describe('parseCollectionParam', () => {
+  it('reads a positive id and nothing else', () => {
+    expect(parseCollectionParam('7')).toBe(7)
+    expect(parseCollectionParam(null)).toBeNull()
+    expect(parseCollectionParam('')).toBeNull()
+    expect(parseCollectionParam('0')).toBeNull()
+    expect(parseCollectionParam('-3')).toBeNull()
+    expect(parseCollectionParam('2.5')).toBeNull()
+    expect(parseCollectionParam('league')).toBeNull()
+  })
+})
 
 describe('windowRange', () => {
   it('is unbounded for "all", so the filters carry nothing', () => {

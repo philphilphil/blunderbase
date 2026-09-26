@@ -45,7 +45,13 @@ import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-do
 import { Board } from '@/components/board/Board'
 import { LichessConnectCard } from '@/components/lichess/ConnectLichess'
 import { SetPageChrome } from '@/components/shell/PageChrome'
-import { useExplorer, usePositionOccurrences, useReferenceExplorer } from '@/lib/api/queries'
+import {
+  useCollections,
+  useExplorer,
+  usePositionOccurrences,
+  useReferenceExplorer,
+} from '@/lib/api/queries'
+import { parseCollectionParam } from '@/routes/stats/kit/analytics'
 import { SPEEDS } from '@/lib/api/types'
 import type { Color, ExplorerMove } from '@/lib/api/types'
 import { isTyping } from '@/lib/ui/shortcuts'
@@ -137,7 +143,20 @@ export function ExplorerPage() {
   // The owner's own two lenses, in params of their own (`parseOwnSpeeds` says why).
   const ownSpeeds = useMemo(() => parseOwnSpeeds(params.get('tc')), [params])
   const period = parsePeriod(params.get('period'))
-  const ownFilter = useMemo(() => ownFilterQuery(ownSpeeds, period), [ownSpeeds, period])
+  // The third lens, `?collection=`. A collection the list no longer has (deleted since the
+  // link was made) is read as none once the list is in, rather than as an empty tree.
+  const collections = useCollections()
+  const collectionList = collections.data?.collections
+  const requestedCollection = parseCollectionParam(params.get('collection'))
+  const collection =
+    collectionList === undefined ||
+    collectionList.some((entry) => entry.id === requestedCollection)
+      ? requestedCollection
+      : null
+  const ownFilter = useMemo(
+    () => ownFilterQuery(ownSpeeds, period, collection),
+    [ownSpeeds, period, collection],
+  )
   // `?fen=` roots the tree at a position whose move order nobody recorded — how a note
   // written about a position links back here, and how the coach can hand over a board.
   // `?line=` still walks from it, so the two compose and the breadcrumb stays honest: it
@@ -334,6 +353,8 @@ export function ExplorerPage() {
         const since = new Date(Date.now() - ownFilter.days * 86_400_000)
         query.set('since', since.toISOString().slice(0, 10))
       }
+      // The library is scoped by collection the same way, so the lens carries over whole.
+      if (ownFilter.collection) query.set('collection', String(ownFilter.collection))
       navigate(`/games?${query.toString()}`)
     }
   }, [tagged?.eco, scope, ownFilter, navigate])
@@ -489,6 +510,9 @@ export function ExplorerPage() {
                   setLens('tc', next.length === SPEEDS.length ? null : formatCsv(next))
                 }
                 onPeriod={(next) => setLens('period', next === 'all' ? null : next)}
+                collections={collectionList}
+                collection={collection}
+                onCollection={(next) => setLens('collection', next === null ? null : String(next))}
               />
             ) : null}
             {source === 'lichess' ? (

@@ -1198,9 +1198,9 @@ export function GameStudio({ game: from }: { game: StudioGame }) {
     typeof cameFrom === 'string' && cameFrom.startsWith('/games/') ? cameFrom : null
   const cameFromLabel = (location.state as { label?: unknown } | null)?.label
   const backToGameLabel = typeof cameFromLabel === 'string' ? cameFromLabel : null
-  // What this game rarely needs, for the control row's ⋯ — the way back to the explorer, the
-  // tree behind a correspondence game — and the dialog one of them opens.
-  const studioMenu = useStudioMenu(from, backToExplorer)
+  // What this game rarely needs, for the control row's ⋯ — its collections, the way back to
+  // the explorer, the tree behind a correspondence game — and the dialogs they open.
+  const studioMenu = useStudioMenu(from, backToExplorer, detail?.game.collections)
   const [requested] = useState(() => ({
     ply: intParam(params.get('ply')),
     line: intParam(params.get('line')),

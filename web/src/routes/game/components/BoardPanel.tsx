@@ -198,8 +198,8 @@ export interface BoardPanelProps {
    */
   actions?: ReactNode
   /**
-   * What this game rarely needs, behind the row's ⋯ (`RowMenu`): the way back to the
-   * explorer, the tree behind a correspondence game. Empty draws no button at all.
+   * What this game rarely needs, behind the row's ⋯ (`RowMenu`): its collections, the way
+   * back to the explorer, the tree behind a correspondence game. Empty draws no button.
    */
   menu?: RowMenuItem[]
   /**
