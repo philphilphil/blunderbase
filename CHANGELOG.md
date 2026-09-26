@@ -4,6 +4,10 @@ One line per change, newest first. Written by hand when a release is cut — see
 
 ## Unreleased
 
+## v1.8.2 — 2026-09-26
+
+- Fixed the board's buttons falling off screen on iPad
+
 ## v1.8.1 — 2026-09-25
 
 - Changed game notes to a row in the Notes tab
