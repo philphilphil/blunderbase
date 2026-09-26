@@ -8,7 +8,7 @@
 # The compose files beside this one set that context, and `Dockerfile.dockerignore` is the
 # allowlist BuildKit applies to it.
 
-FROM node:22-bookworm-slim AS web-build
+FROM node:25-bookworm-slim AS web-build
 ENV COREPACK_ENABLE_DOWNLOAD_PROMPT=0 \
     CI=1
 WORKDIR /app/web
