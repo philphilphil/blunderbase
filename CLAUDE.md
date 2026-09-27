@@ -66,6 +66,18 @@ Full reasoning in `docs/ARCHITECTURE.md`. The short version:
 - **Colours come from `web/src/index.css` only.** Every colour is a `--bb-*` token with a
   semantic alias (`bg-elevated`, `text-dim`, `border-edge-strong`, …); no component names a
   hex. Dark is the default theme, `:root.light` overrides. Design source: `docs/design/`.
+- **The control and type standard** (full rules: `docs/design/README.md`, "Polish pass").
+  Read it before adding UI; the parts that get missed:
+  - Buttons are `components/ui/button.tsx`, never a hand-built `<button>` with classes.
+    `secondary` is the tool button, `sm` the size for toolbars, control rows and footers
+    (a card's footer too); `xs` only in pane-title strips; one filled `default` per region;
+    `ghost` only where a border would be noise (icon actions inside table rows).
+  - Text sizes are the named scale — `text-meta` / `label` / `data` / `lead` / `heading` /
+    `value` — never `text-[…rem]`. UI labels are sans; mono is for numbers, moves and IDs.
+  - Selection is `bg-selected text-ink` (a `Button` gets it from `aria-pressed`), hover is
+    `hover:bg-raised`, radii are `rounded-md` for controls and `rounded-sm` for inline badges.
+  - A screen that switches how a list is drawn uses `components/ui/view-toggle.tsx` and
+    `lib/ui/viewPreference.ts`, the way Notes and Collections do.
 - Components carry a doc comment saying *why* they are shaped the way they are; keep that
   habit — the reasoning is the part that is not obvious from the JSX.
 - Native `select`/`textarea` styled with Tailwind is the norm over heavy widgets.
