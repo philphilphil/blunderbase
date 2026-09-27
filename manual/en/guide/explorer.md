@@ -8,8 +8,14 @@ you reached that position, how you scored, and the worst move you played there. 
 it.
 
 The chips above the table narrow which of your games count: **speed** keeps only the time
-controls you leave on, and **played** keeps only games from the last 30 days, 90 days or
-year, counted back from today. Once you have a [collection](collections.md), **in**
+controls you leave on, and **date** is the same date filter as the one over your
+[games](games.md): two date fields and the quick picks Today, 7d, 30d, 90d and 1y, each
+counted back from today. **Today** is the quick way to look over the openings you just
+faced. A pick fills the fields with the days it covers, so you can nudge it from there,
+and a link to "the last 30 days" still means the last 30 days when you open it next month;
+typed dates stay the dates you typed. **Clear**, or the **×** on the chip, counts every
+game again.
+Once you have a [collection](collections.md), **collection**, beside the date,
 keeps only the games in one of them, so a league season has an opening tree of its own; on
 **All games**, a collection's games are in the tree like every other. The tree, its book
 line and the games below all follow these, and the filter stays in the page's address, so a

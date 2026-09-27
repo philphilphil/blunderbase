@@ -458,15 +458,16 @@ def _register_insight(server: MCPServer, coach: Coach) -> None:
         min_games: int = 1,
         speeds: list[str] | None = None,
         since: str | None = None,
+        until: str | None = None,
         collection: str | int | None = None,
     ) -> TextContent:
         """The owner's personal opening tree from a position: how often they played each
         continuation, how they scored, the average win% they gave away playing it, and
         where they leave their own book. Enter by FEN, by ECO code, or by neither for the
         starting position. There is no reference database here — this is their games only.
-        `speeds` (like ["blitz","rapid"]), `since` (an ISO date or a relative window like
-        '90d') and `collection` (a name or id from list_collections) narrow which of their
-        games count.
+        `speeds` (like ["blitz","rapid"]), `since` and `until` (ISO dates or timestamps, or
+        a relative window like '90d') and `collection` (a name or id from list_collections)
+        narrow which of their games count.
         The accuracy numbers (`blunders`, `avg_win_loss`) count the owner's own moves, so
         they are zero and null on a continuation only the opponent ever played there."""
         start = args.fen(fen, required=False)
@@ -482,6 +483,7 @@ def _register_insight(server: MCPServer, coach: Coach) -> None:
                 min_games=max(1, int(min_games)),
                 speeds=[speed for speed in chosen if speed is not None],
                 since=args.when(since, "since"),
+                until=args.when(until, "until"),
                 collection=_collection_id(session, ref),
             )
         return payloads.result(tree)

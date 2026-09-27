@@ -19,7 +19,14 @@ import { msg } from '@lingui/core/macro'
 import { ApiError } from '@/lib/api/client'
 import { SPEEDS as GAME_SPEEDS } from '@/lib/api/types'
 import type { ReferenceSource, Speed as GameSpeed } from '@/lib/api/types'
-import { DEFAULT_WINDOWS, WINDOW_DAYS, type WindowKey } from '@/routes/stats/kit/analytics'
+import {
+  dayEnd,
+  dayStart,
+  parseDay,
+  parsePreset,
+  presetStart,
+  type DayPreset,
+} from '@/lib/days'
 
 /** What the source control can be on. `mine` is the owner's own games — the default. */
 export type ExplorerSource = 'mine' | ReferenceSource
@@ -111,27 +118,62 @@ export function parseOwnSpeeds(value: string | null): GameSpeed[] {
   return unique.length > 0 ? unique : [...GAME_SPEEDS]
 }
 
-/** The periods the owner's tree can be narrowed to — the Stats page's own windows. */
-export const PERIODS: readonly WindowKey[] = DEFAULT_WINDOWS
+/**
+ * `?period=30d` — one of the date popover's quick picks, kept as the pick rather than as
+ * its dates, so a link to "the last 30 days" means the last 30 days whenever it is opened.
+ * The Stats windows' `90d` and `1y` read the same as before. Anything else is none.
+ */
+export function parsePeriod(value: string | null): DayPreset | null {
+  return parsePreset(value)
+}
 
-/** `?period=90d`; anything else is every game the owner has. */
-export function parsePeriod(value: string | null): WindowKey {
-  return PERIODS.find((period) => period === value) ?? 'all'
+/**
+ * `?from=2026-09-01&to=2026-09-27` — days typed into the popover's fields, which win over
+ * a pick. Either end may be left open; a range with neither is none. A reversed range is
+ * put the right way round rather than read as empty, since two dates typed in the wrong
+ * order still say which days were meant.
+ */
+export interface DayRange {
+  from: string | undefined
+  to: string | undefined
+}
+
+export function parseDayRange(from: string | null, to: string | null): DayRange | null {
+  const start = parseDay(from) ?? undefined
+  const end = parseDay(to) ?? undefined
+  if (!start && !end) return null
+  if (start && end && start > end) return { from: end, to: start }
+  return { from: start, to: end }
+}
+
+/**
+ * The days the tree is counting, as the popover's fields show them: a typed range as it
+ * is, a pick as the day it reaches back to with the end left open (it runs to now).
+ */
+export function playedDays(period: DayPreset | null, range: DayRange | null): DayRange | null {
+  if (range) return range
+  return period ? { from: presetStart(period), to: undefined } : null
 }
 
 /**
  * What the owner's tree sends for its lenses, and what it leaves out. Every speed on
  * is no speed filter, so a game whose speed was never parsed still counts until somebody
  * names the speeds they want — the rule the Stats page keeps. No collection is every game.
+ *
+ * The days go as the reader's local midnights turned into instants: "today" is the day on
+ * their wall, and the server, which only knows UTC, cannot work that out for them.
  */
 export function ownFilterQuery(
   speeds: readonly GameSpeed[],
-  period: WindowKey,
+  period: DayPreset | null,
   collection: number | null = null,
-): { speed?: GameSpeed[]; days?: number; collection?: number } {
+  range: DayRange | null = null,
+): { speed?: GameSpeed[]; since?: string; until?: string; collection?: number } {
+  const days = playedDays(period, range)
   return {
     ...(speeds.length < GAME_SPEEDS.length ? { speed: [...speeds] } : {}),
-    ...(period === 'all' ? {} : { days: WINDOW_DAYS[period] }),
+    ...(days?.from ? { since: dayStart(days.from) } : {}),
+    ...(days?.to ? { until: dayEnd(days.to) } : {}),
     ...(collection === null ? {} : { collection }),
   }
 }

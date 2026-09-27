@@ -14,6 +14,8 @@ import { Input } from '@/components/ui/input'
 import { cn } from '@/lib/utils'
 import { useNoteTags } from '@/lib/api/queries'
 import { NOTE_SCOPES, NOTE_SOURCES } from '@/lib/api/types'
+import { presetOf, presetStart } from '@/lib/days'
+import { DATE_PANEL_WIDTH, DateRangePanel } from '@/routes/games/components/DateRangePanel'
 import { DebouncedInput } from '@/routes/games/components/FilterBar'
 import {
   FilterPopover,
@@ -36,20 +38,6 @@ import {
   type NoteFilterGroup,
   type NoteFilters,
 } from '../filters'
-
-/** Presets for the date popover, in days back from today. */
-const DATE_PRESETS: { label: string; days: number }[] = [
-  { label: '7d', days: 7 },
-  { label: '30d', days: 30 },
-  { label: '90d', days: 90 },
-  { label: '12m', days: 365 },
-]
-
-function isoDay(offsetDays: number): string {
-  const date = new Date()
-  date.setDate(date.getDate() - offsetDays)
-  return date.toISOString().slice(0, 10)
-}
 
 export interface NoteFilterBarProps {
   filters: NoteFilters
@@ -83,9 +71,17 @@ export function NoteFilterBar({ filters, onChange, className }: NoteFilterBarPro
           label={i18n._(GROUP_LABELS[group])}
           value={groupSummary(group, filters)}
           onClear={() => onChange(clearGroup(filters, group))}
-          width={group === 'date' ? '15.625rem' : '14.5rem'}
+          width={group === 'date' ? DATE_PANEL_WIDTH : '14.5rem'}
         >
-          {() => <GroupPanel group={group} filters={filters} patch={patch} onChange={onChange} />}
+          {(close) => (
+            <GroupPanel
+              group={group}
+              filters={filters}
+              patch={patch}
+              onChange={onChange}
+              close={close}
+            />
+          )}
         </FilterPopover>
       ))}
 
@@ -103,11 +99,14 @@ function GroupPanel({
   filters,
   patch,
   onChange,
+  close,
 }: {
   group: NoteFilterGroup
   filters: NoteFilters
   patch: (next: Partial<NoteFilters>) => void
   onChange: (next: NoteFilters) => void
+  /** Closes the popover, for the panels whose gestures finish the choice (the date's). */
+  close: () => void
 }) {
   const { t, i18n } = useLingui()
   switch (group) {
@@ -220,41 +219,18 @@ function GroupPanel({
 
     case 'date':
       return (
-        <>
-          <PopoverLabel>
-            <Trans>Written between</Trans>
-          </PopoverLabel>
-          <div className="flex items-center gap-1.5">
-            <Input
-              type="date"
-              aria-label={t`Written from`}
-              value={filters.since ?? ''}
-              onChange={(event) => patch({ since: event.target.value || undefined })}
-              className="h-7 text-data"
-            />
-            <span className="text-faint">→</span>
-            <Input
-              type="date"
-              aria-label={t`Written until`}
-              value={filters.until ?? ''}
-              onChange={(event) => patch({ until: event.target.value || undefined })}
-              className="h-7 text-data"
-            />
-          </div>
-          <div className="flex gap-1">
-            {DATE_PRESETS.map((preset) => (
-              <Button
-                key={preset.label}
-                variant="secondary"
-                size="xs"
-                onClick={() => patch({ since: isoDay(preset.days), until: undefined })}
-                className="flex-1"
-              >
-                {preset.label}
-              </Button>
-            ))}
-          </div>
-        </>
+        <DateRangePanel
+          heading={<Trans>Written between</Trans>}
+          from={filters.since}
+          to={filters.until}
+          preset={presetOf(filters.since, filters.until)}
+          onRange={(since, until) => patch({ since, until })}
+          onPreset={(preset) => patch({ since: presetStart(preset), until: undefined })}
+          onClear={() => patch({ since: undefined, until: undefined })}
+          close={close}
+          fromLabel={t`Written from`}
+          toLabel={t`Written until`}
+        />
       )
   }
 }

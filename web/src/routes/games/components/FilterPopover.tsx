@@ -48,12 +48,18 @@ export function FilterChipButton({
   label,
   summary,
   onClear,
+  placeholder,
   ...props
 }: React.ComponentProps<'button'> & {
   label: string
   /** The chip's current value, or null when the group is unset. */
   summary: string | null
   onClear?: () => void
+  /**
+   * For a chip that already sits under its label (the explorer's rows): it then reads as
+   * its value alone, or this when unset, and `label` only names it for a screen reader.
+   */
+  placeholder?: string
 }) {
   const { t } = useLingui()
   const active = summary !== null
@@ -68,10 +74,18 @@ export function FilterChipButton({
     >
       <button
         type="button"
+        aria-label={placeholder === undefined ? undefined : label}
         className="inline-flex items-center gap-1.5 rounded-md px-2.5 outline-none focus-visible:ring-1 focus-visible:ring-accent-teal/55 focus-visible:ring-inset"
         {...props}
       >
-        {active ? (
+        {placeholder !== undefined ? (
+          <>
+            <span className={active ? 'text-accent-teal' : undefined}>
+              {summary ?? placeholder}
+            </span>
+            <span className="text-dim">▾</span>
+          </>
+        ) : active ? (
           <>
             <span>{label}:</span>
             <span className="font-mono text-accent-teal">{summary}</span>
@@ -115,12 +129,15 @@ export function FilterPopover({
   onClear,
   children,
   width = '14.5rem',
+  placeholder,
 }: {
   label: string
   value: string | null
   onClear?: () => void
   children: (close: () => void) => ReactNode
   width?: string
+  /** See `FilterChipButton`. */
+  placeholder?: string
 }) {
   const [open, setOpen] = useState(false)
   const host = useRef<HTMLDivElement>(null)
@@ -148,6 +165,7 @@ export function FilterPopover({
         label={label}
         summary={value}
         onClear={onClear}
+        placeholder={placeholder}
         aria-expanded={open}
         aria-controls={open ? panelId : undefined}
         onClick={() => setOpen((current) => !current)}

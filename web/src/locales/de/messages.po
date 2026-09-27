@@ -1204,12 +1204,13 @@ msgid "Drop everything still queued"
 msgstr "Alles verwerfen, was noch wartet"
 
 #: src/components/shell/QueueIndicator.tsx
-msgid "Clear {queued}?"
-msgstr "{queued} leeren?"
-
-#: src/components/shell/QueueIndicator.tsx
+#: src/routes/games/components/DateRangePanel.tsx
 msgid "Clear"
 msgstr "Leeren"
+
+#: src/components/shell/QueueIndicator.tsx
+msgid "Clear {queued}?"
+msgstr "{queued} leeren?"
 
 #: src/components/shell/QueueMeter.tsx
 msgid "{running} running, {queued} queued"
@@ -1584,6 +1585,37 @@ msgstr "Schiefer"
 msgid "Red"
 msgstr "Rot"
 
+#. Date preset button
+#: src/lib/days.ts
+#: src/routes/explorer/components/OwnFilters.tsx
+#: src/routes/notes/presentation.ts
+msgid "Today"
+msgstr "Heute"
+
+#. Date preset: the last 7 days
+#: src/lib/days.ts
+#: src/routes/stats/kit/analytics.ts
+msgid "7d"
+msgstr "7T"
+
+#. Date preset: the last 30 days
+#: src/lib/days.ts
+#: src/routes/stats/kit/analytics.ts
+msgid "30d"
+msgstr "30T"
+
+#. Date preset: the last 90 days
+#: src/lib/days.ts
+#: src/routes/stats/kit/analytics.ts
+msgid "90d"
+msgstr "90T"
+
+#. Date preset: the last year
+#: src/lib/days.ts
+#: src/routes/stats/kit/analytics.ts
+msgid "1y"
+msgstr "1J"
+
 #: src/lib/desktop/NativeFeedback.tsx
 msgid "Analysis finished with errors"
 msgstr "Analyse mit Fehlern beendet"
@@ -1775,6 +1807,10 @@ msgid "One move on"
 msgstr "Einen Zug vor"
 
 #: src/lib/ui/shortcuts.ts
+msgid "The game’s next move, leaving any line"
+msgstr "Der nächste Zug der Partie, auch aus einer Variante heraus"
+
+#: src/lib/ui/shortcuts.ts
 msgid "The previous flagged move"
 msgstr "Der vorherige markierte Zug"
 
@@ -1797,11 +1833,6 @@ msgstr "Die Ausgangsstellung"
 #: src/lib/ui/shortcuts.ts
 msgid "The last move"
 msgstr "Der letzte Zug"
-
-#: src/lib/ui/shortcuts.ts
-#: src/routes/game/components/BoardPanel.tsx
-msgid "Play the game through"
-msgstr "Die Partie durchspielen"
 
 #: src/lib/ui/shortcuts.ts
 msgid "Previous game in your games list"
@@ -5175,6 +5206,22 @@ msgid "No game of yours goes any further than this position."
 msgstr "Keine deiner Partien geht über diese Stellung hinaus."
 
 #: src/routes/explorer/components/OwnFilters.tsx
+msgid "Last 7 days"
+msgstr "Letzte 7 Tage"
+
+#: src/routes/explorer/components/OwnFilters.tsx
+msgid "Last 30 days"
+msgstr "Letzte 30 Tage"
+
+#: src/routes/explorer/components/OwnFilters.tsx
+msgid "Last 90 days"
+msgstr "Letzte 90 Tage"
+
+#: src/routes/explorer/components/OwnFilters.tsx
+msgid "Last year"
+msgstr "Letztes Jahr"
+
+#: src/routes/explorer/components/OwnFilters.tsx
 #: src/routes/explorer/components/ReferenceFilters.tsx
 #: src/routes/stats/StatsPage.tsx
 #: src/routes/stats/cards/TimeControlCard.tsx
@@ -5212,6 +5259,18 @@ msgid "corr."
 msgstr "Fern."
 
 #: src/routes/explorer/components/OwnFilters.tsx
+#: src/routes/games/filters.ts
+#: src/routes/notes/filters.ts
+msgid "from {since}"
+msgstr "ab {since}"
+
+#: src/routes/explorer/components/OwnFilters.tsx
+#: src/routes/games/filters.ts
+#: src/routes/notes/filters.ts
+msgid "until {until}"
+msgstr "bis {until}"
+
+#: src/routes/explorer/components/OwnFilters.tsx
 #: src/routes/explorer/components/ReferenceFilters.tsx
 msgid "speed"
 msgstr "Bedenkzeit"
@@ -5221,19 +5280,26 @@ msgstr "Bedenkzeit"
 msgid "correspondence"
 msgstr "Fernschach"
 
-#. Chip marking the engine row for the move the game actually played
 #: src/routes/explorer/components/OwnFilters.tsx
-#: src/routes/game/components/MaiaPanel.tsx
-msgid "played"
-msgstr "gespielt"
+#: src/routes/games/components/columns.ts
+#: src/routes/games/filters.ts
+msgid "Date"
+msgstr "Datum"
 
 #: src/routes/explorer/components/OwnFilters.tsx
-msgid "Played within"
-msgstr "Gespielt im Zeitraum"
+#: src/routes/games/components/FilterBar.tsx
+msgid "Played between"
+msgstr "Gespielt zwischen"
 
 #: src/routes/explorer/components/OwnFilters.tsx
-msgid "in"
-msgstr "in"
+#: src/routes/games/components/FilterBar.tsx
+msgid "Played from"
+msgstr "Gespielt ab"
+
+#: src/routes/explorer/components/OwnFilters.tsx
+#: src/routes/games/components/FilterBar.tsx
+msgid "Played until"
+msgstr "Gespielt bis"
 
 #: src/routes/explorer/components/PositionNotes.tsx
 msgid "Your notes on this position"
@@ -5411,10 +5477,6 @@ msgstr "Vorheriger Zug"
 #: src/routes/game/components/BoardPanel.tsx
 msgid "Last"
 msgstr "Letzter Zug"
-
-#: src/routes/game/components/BoardPanel.tsx
-msgid "Stop playing through"
-msgstr "Abspielen anhalten"
 
 #: src/routes/game/components/BoardPanel.tsx
 msgid "Previous flagged move"
@@ -5687,6 +5749,11 @@ msgstr "Die Stufen nebeneinander vergleichen"
 #: src/routes/game/components/MaiaPanel.tsx
 msgid "Play {san} on the analysis board"
 msgstr "{san} auf dem Analysebrett spielen"
+
+#. Chip marking the engine row for the move the game actually played
+#: src/routes/game/components/MaiaPanel.tsx
+msgid "played"
+msgstr "gespielt"
 
 #: src/routes/game/components/MaiaPanel.tsx
 msgid "likely continuation"
@@ -6360,29 +6427,6 @@ msgstr "{count, plural, one {Die Partie geht mitsamt ihrer Analyse, den Notizen 
 msgid "{count, plural, one {Delete it} other {Delete them}}"
 msgstr "{count, plural, one {Partie löschen} other {Partien löschen}}"
 
-#. Date preset button: the last 7 days
-#: src/routes/games/components/FilterBar.tsx
-#: src/routes/stats/kit/analytics.ts
-msgid "7d"
-msgstr "7T"
-
-#. Date preset button: the last 30 days
-#: src/routes/games/components/FilterBar.tsx
-#: src/routes/stats/kit/analytics.ts
-msgid "30d"
-msgstr "30T"
-
-#. Date preset button: the last 90 days
-#: src/routes/games/components/FilterBar.tsx
-#: src/routes/stats/kit/analytics.ts
-msgid "90d"
-msgstr "90T"
-
-#. Date preset button: the last 12 months
-#: src/routes/games/components/FilterBar.tsx
-msgid "12m"
-msgstr "12M"
-
 #: src/routes/games/components/FilterBar.tsx
 msgid "In the collection"
 msgstr "In der Sammlung"
@@ -6448,18 +6492,6 @@ msgstr "Filtername"
 msgctxt "button"
 msgid "Save"
 msgstr "Speichern"
-
-#: src/routes/games/components/FilterBar.tsx
-msgid "Played between"
-msgstr "Gespielt zwischen"
-
-#: src/routes/games/components/FilterBar.tsx
-msgid "Played from"
-msgstr "Gespielt ab"
-
-#: src/routes/games/components/FilterBar.tsx
-msgid "Played until"
-msgstr "Gespielt bis"
 
 #: src/routes/games/components/FilterBar.tsx
 msgid "Imported from"
@@ -6630,11 +6662,6 @@ msgid "Mv"
 msgstr "Zg."
 
 #: src/routes/games/components/columns.ts
-#: src/routes/games/filters.ts
-msgid "Date"
-msgstr "Datum"
-
-#: src/routes/games/components/columns.ts
 msgid "Time"
 msgstr "Zeit"
 
@@ -6705,16 +6732,6 @@ msgstr "gewertet"
 msgctxt "filter chip"
 msgid "casual"
 msgstr "ungewertet"
-
-#: src/routes/games/filters.ts
-#: src/routes/notes/filters.ts
-msgid "from {since}"
-msgstr "ab {since}"
-
-#: src/routes/games/filters.ts
-#: src/routes/notes/filters.ts
-msgid "until {until}"
-msgstr "bis {until}"
 
 #: src/routes/games/filters.ts
 msgid "has blunders"
@@ -7892,10 +7909,6 @@ msgid "December {year}"
 msgstr "Dezember {year}"
 
 #: src/routes/notes/presentation.ts
-msgid "Today"
-msgstr "Heute"
-
-#: src/routes/notes/presentation.ts
 msgid "This week"
 msgstr "Diese Woche"
 
@@ -8312,10 +8325,6 @@ msgstr "Keine Partien mit Zeitstempel in diesem Zeitraum."
 #: src/routes/stats/cards/TimeOfDayCard.tsx
 msgid "{hour}:00 UTC"
 msgstr "{hour}:00 UTC"
-
-#: src/routes/stats/kit/analytics.ts
-msgid "1y"
-msgstr "1J"
 
 #: src/routes/stats/kit/analytics.ts
 msgid "the last 7 days"

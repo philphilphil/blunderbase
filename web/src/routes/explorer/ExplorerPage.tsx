@@ -32,7 +32,7 @@
  *   the position on the board and the board is the same board.
  *
  * The line, the scope, the source and both sources' filters — lichess's speeds and ratings,
- * the owner's speeds and period — all ride in the URL, so any
+ * the owner's speeds and days — all ride in the URL, so any
  * position in any book is a link and the back button walks backwards for free. The filters
  * and the scope are lenses (`replace: true`) — which book you are reading is not a place
  * you went — while playing a move is history.
@@ -81,6 +81,8 @@ import {
   SOURCE_LABELS,
   formatCsv,
   ownFilterQuery,
+  parseDayRange,
+  playedDays,
   parseOwnSpeeds,
   parsePeriod,
   parseRatings,
@@ -144,6 +146,10 @@ export function ExplorerPage() {
   // The owner's own two lenses, in params of their own (`parseOwnSpeeds` says why).
   const ownSpeeds = useMemo(() => parseOwnSpeeds(params.get('tc')), [params])
   const period = parsePeriod(params.get('period'))
+  // `?from=&to=`, days typed into the date popover; when set they win over the pick.
+  const fromParam = params.get('from')
+  const toParam = params.get('to')
+  const range = useMemo(() => parseDayRange(fromParam, toParam), [fromParam, toParam])
   // The third lens, `?collection=`. A collection the list no longer has (deleted since the
   // link was made) is read as none once the list is in, rather than as an empty tree.
   const collections = useCollections()
@@ -155,8 +161,8 @@ export function ExplorerPage() {
       ? requestedCollection
       : null
   const ownFilter = useMemo(
-    () => ownFilterQuery(ownSpeeds, period, collection),
-    [ownSpeeds, period, collection],
+    () => ownFilterQuery(ownSpeeds, period, collection, range),
+    [ownSpeeds, period, collection, range],
   )
   // `?fen=` roots the tree at a position whose move order nobody recorded — how a note
   // written about a position links back here, and how the coach can hand over a board.
@@ -223,14 +229,20 @@ export function ExplorerPage() {
    * replaces the history entry instead of adding one. The colour scope, the source and the
    * two lichess filters are all this; only playing a move is history.
    */
-  const setLens = useCallback(
-    (key: string, value: string | null) => {
+  const setLenses = useCallback(
+    (changes: Record<string, string | null>) => {
       const updated = new URLSearchParams(params)
-      if (value) updated.set(key, value)
-      else updated.delete(key)
+      for (const [key, value] of Object.entries(changes)) {
+        if (value) updated.set(key, value)
+        else updated.delete(key)
+      }
       setParams(updated, { replace: true, state: carried })
     },
     [carried, params, setParams],
+  )
+  const setLens = useCallback(
+    (key: string, value: string | null) => setLenses({ [key]: value }),
+    [setLenses],
   )
 
   const setScope = useCallback(
@@ -348,18 +360,17 @@ export function ExplorerPage() {
     return () => {
       const query = new URLSearchParams({ eco })
       if (scope) query.set('color', scope)
-      // The library filters by one speed and a start date, so a single speed and the period
+      // The library filters by one speed and a date range, so a single speed and the days
       // carry over; a set of two speeds has no spelling there and is left behind.
       if (ownFilter.speed?.length === 1) query.set('speed', ownFilter.speed[0])
-      if (ownFilter.days) {
-        const since = new Date(Date.now() - ownFilter.days * 86_400_000)
-        query.set('since', since.toISOString().slice(0, 10))
-      }
+      const days = playedDays(period, range)
+      if (days?.from) query.set('since', days.from)
+      if (days?.to) query.set('until', days.to)
       // The library is scoped by collection the same way, so the lens carries over whole.
       if (ownFilter.collection) query.set('collection', String(ownFilter.collection))
       navigate(`/games?${query.toString()}`)
     }
-  }, [tagged?.eco, scope, ownFilter, navigate])
+  }, [tagged?.eco, scope, ownFilter, period, range, navigate])
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -511,7 +522,12 @@ export function ExplorerPage() {
                 onSpeeds={(next) =>
                   setLens('tc', next.length === SPEEDS.length ? null : formatCsv(next))
                 }
-                onPeriod={(next) => setLens('period', next === 'all' ? null : next)}
+                // A quick pick and typed days are one lens: choosing either clears the other.
+                onPeriod={(next) => setLenses({ period: next, from: null, to: null })}
+                range={range}
+                onRange={(next) =>
+                  setLenses({ period: null, from: next?.from ?? null, to: next?.to ?? null })
+                }
                 collections={collectionList}
                 collection={collection}
                 onCollection={(next) => setLens('collection', next === null ? null : String(next))}

@@ -35,6 +35,15 @@ SpeedQuery = Annotated[
 DaysQuery = Annotated[
     int | None, Query(ge=1, description="only games played in the last this many days")
 ]
+# A precise range, for "what did I face today": the web app sends the reader's own local
+# midnights as aware timestamps, so the day is theirs and not UTC's. Both ends inclusive, as
+# on `/games`; `since` wins over `days` when both are sent.
+SinceQuery = Annotated[
+    datetime | None, Query(description="only games played at or after this moment")
+]
+UntilQuery = Annotated[
+    datetime | None, Query(description="only games played at or before this moment")
+]
 # The third lens, spelled the way `/games?collection=` spells it. An id no collection has
 # is an empty tree rather than a 404, the same answer the library gives it.
 CollectionQuery = Annotated[
@@ -56,6 +65,8 @@ def explore(
     ] = None,
     speed: SpeedQuery = None,
     days: DaysQuery = None,
+    since: SinceQuery = None,
+    until: UntilQuery = None,
     collection: CollectionQuery = None,
 ) -> Any:
     """Per continuation: frequency, score, average eval drop, and where book runs out."""
@@ -68,14 +79,25 @@ def explore(
         min_games=min_games,
         line=_line(line),
         speeds=speed,
-        since=_since(days),
+        since=_since(days, since),
+        until=_aware(until),
         collection=collection,
     )
 
 
-def _since(days: int | None) -> datetime | None:
-    """`days` as the moment it reaches back to. The window ends now, not at the newest game."""
+def _since(days: int | None, since: datetime | None) -> datetime | None:
+    """Where the range starts: `since` if sent, else `days` as the moment it reaches back
+    to. The window ends now, not at the newest game."""
+    if since is not None:
+        return _aware(since)
     return None if days is None else datetime.now(UTC) - timedelta(days=days)
+
+
+def _aware(moment: datetime | None) -> datetime | None:
+    """A timestamp sent without an offset is read as UTC, the way `played_at` is stored."""
+    if moment is None or moment.tzinfo is not None:
+        return moment
+    return moment.replace(tzinfo=UTC)
 
 
 def _line(value: str | None) -> list[str]:
@@ -118,6 +140,8 @@ def find_positions(
     limit: Annotated[int, Query(ge=1, le=MAX_MOVES)] = 20,
     speed: SpeedQuery = None,
     days: DaysQuery = None,
+    since: SinceQuery = None,
+    until: UntilQuery = None,
     collection: CollectionQuery = None,
 ) -> list[Any]:
     return explorer_service.find_positions(
@@ -126,6 +150,7 @@ def find_positions(
         color=color,
         limit=limit,
         speeds=speed,
-        since=_since(days),
+        since=_since(days, since),
+        until=_aware(until),
         collection=collection,
     )

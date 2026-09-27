@@ -10,6 +10,7 @@ from __future__ import annotations
 import json
 import time
 from collections.abc import Iterator
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -1270,6 +1271,32 @@ def test_the_explorer_and_its_games_narrow_by_speed_and_days(api: TestClient) ->
     # The fixtures were played long enough ago that a day's window finds none of them.
     assert api.get("/explorer", params={"days": 1}).json()["totals"]["games"] == 0
     assert api.get("/explorer", params={"days": 0}).status_code == 422
+
+
+def test_the_explorer_and_its_games_narrow_to_a_date_range(api: TestClient) -> None:
+    start = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq -"
+    games = api.get("/games").json()["games"]
+    played = sorted(game["played_at"] for game in games if game["played_at"])
+    newest = datetime.fromisoformat(played[-1].replace("Z", "+00:00"))
+    # One inclusive range around the newest game: exactly the games played at that moment.
+    window = {
+        "since": (newest - timedelta(seconds=1)).isoformat(),
+        "until": newest.isoformat(),
+    }
+    expected = sum(1 for moment in played if moment == played[-1])
+
+    tree = api.get("/explorer", params=window).json()
+    rows = api.get("/explorer/positions", params={"fen": start, **window}).json()
+
+    assert tree["totals"]["games"] == expected
+    assert len(rows) == expected
+    # `until` alone keeps everything up to it; `since` wins over `days`.
+    assert api.get("/explorer", params={"until": newest.isoformat()}).json()["totals"][
+        "games"
+    ] == 6
+    assert api.get("/explorer", params={"days": 1, "since": played[0]}).json()["totals"][
+        "games"
+    ] == 6
 
 
 def test_the_explorer_and_its_games_narrow_to_a_collection(api: TestClient) -> None:

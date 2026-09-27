@@ -7,6 +7,7 @@ import { describe, expect, it, vi } from 'vitest'
 
 import { Providers } from '@/app/Providers'
 import type { ExplorerResponse, PositionOccurrence } from '@/lib/api/types'
+import { dayStart, localDay } from '@/lib/days'
 
 import { ExplorerPage } from './ExplorerPage'
 
@@ -359,16 +360,61 @@ describe('ExplorerPage sources', () => {
     await screen.findByText('1.e4')
     const tree = seen.find((url) => url.includes('/explorer?'))
     const games = seen.find((url) => url.includes('/explorer/positions'))
+    const since = `since=${encodeURIComponent(dayStart(localDay(90)))}`
     for (const asked of [tree, games]) {
       expect(asked).toContain('speed=blitz')
-      expect(asked).toContain('days=90')
+      expect(asked).toContain(since)
     }
     expect(screen.getByRole('button', { name: 'blitz' })).toHaveAttribute('aria-pressed', 'true')
     expect(screen.getByRole('button', { name: 'correspondence' })).toHaveAttribute(
       'aria-pressed',
       'false',
     )
+    expect(screen.getByRole('button', { name: 'Date' })).toHaveTextContent('Last 90 days')
+
+    vi.unstubAllGlobals()
+  })
+
+  it('picks today in the date popover, and shows the pick as its dates', async () => {
+    const user = userEvent.setup()
+    const seen = stubSources()
+    renderPage('/explorer?period=90d')
+
+    await screen.findByText('1.e4')
+    await user.click(screen.getByRole('button', { name: 'Date' }))
+    // The pick in force is lit, and the fields say what it means.
     expect(screen.getByRole('button', { name: '90d' })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByLabelText('Played from')).toHaveValue(localDay(90))
+    await user.click(screen.getByRole('button', { name: 'Today' }))
+
+    const today = localDay()
+    await waitFor(() => {
+      const asked = seen.filter((url) => url.includes('/explorer?')).at(-1)
+      expect(asked).toContain(`since=${encodeURIComponent(dayStart(today))}`)
+    })
+    // A pick is a finished choice: the popover is gone, and the chip says what is on.
+    expect(screen.queryByLabelText('Played from')).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Date' }))
+    expect(screen.getByRole('button', { name: 'Today' })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByRole('button', { name: '90d' })).toHaveAttribute('aria-pressed', 'false')
+    expect(screen.getByLabelText('Played from')).toHaveValue(today)
+    expect(screen.getByRole('button', { name: 'Date' })).toHaveTextContent('Today')
+
+    // A date typed by hand is a range of its own: no pick is lit any more.
+    await user.clear(screen.getByLabelText('Played from'))
+    await user.type(screen.getByLabelText('Played from'), '2026-01-01')
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Today' })).toHaveAttribute(
+        'aria-pressed',
+        'false',
+      ),
+    )
+    expect(screen.getByRole('button', { name: 'Date' })).toHaveTextContent('from 2026-01-01')
+
+    // Clear is inside the panel too, and closes it on every game.
+    await user.click(screen.getByRole('button', { name: 'Clear' }))
+    expect(screen.queryByLabelText('Played from')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Date' })).toHaveTextContent('All games')
 
     vi.unstubAllGlobals()
   })

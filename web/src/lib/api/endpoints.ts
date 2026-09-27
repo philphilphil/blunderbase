@@ -481,6 +481,10 @@ export interface ExplorerQuery {
   speed?: Speed[]
   /** Only games played in the last this many days. */
   days?: number
+  /** Only games played at or after this instant (ISO); wins over `days`. */
+  since?: string
+  /** Only games played at or before this instant (ISO). */
+  until?: string
   /** Only the games in this collection (its id). */
   collection?: number
 }
@@ -493,6 +497,8 @@ export interface PositionsQuery {
   limit?: number
   speed?: Speed[]
   days?: number
+  since?: string
+  until?: string
   /** The same collection lens as `ExplorerQuery`, so the games under a scoped tree match it. */
   collection?: number
 }

@@ -8,7 +8,7 @@ own one group:
 
 | Chip | Narrows by |
 |---|---|
-| **Date** | Played from and until, with 7d, 30d, 90d and 12m presets |
+| **Date** | Played from and until, with Today, 7d, 30d, 90d and 1y presets |
 | **Source** | Lichess, Chess.com, FICS, OTB, PGN, ICCF or Masters |
 | **Colour** | The side you had |
 | **Result** | Your result (win, loss, draw) or the PGN result (1-0, 0-1, ½-½) |

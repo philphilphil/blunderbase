@@ -107,7 +107,7 @@ class Continuation(NamedTuple):
 
 @dataclass(frozen=True, slots=True)
 class GameScope:
-    """Which of the owner's games a tree counts, beyond the colour: speeds, a start date and
+    """Which of the owner's games a tree counts, beyond the colour: speeds, a date range and
     a collection.
 
     Separate from `color` because the stored book is kept per owner colour and nothing
@@ -123,16 +123,23 @@ class GameScope:
 
     An empty speed set is no filter rather than a filter matching nothing, the same rule
     `GameFilters.speeds` keeps. The collection condition is the one `GameFilters` uses, so
-    the tree narrowed to a collection counts exactly the games its list shows.
+    the tree narrowed to a collection counts exactly the games its list shows. Both ends of
+    the date range are inclusive, as `GameFilters.since`/`until` are.
     """
 
     speeds: tuple[Speed, ...] | None = None
     since: datetime | None = None
+    until: datetime | None = None
     collection: int | None = None
 
     @property
     def narrows(self) -> bool:
-        return bool(self.speeds) or self.since is not None or self.collection is not None
+        return (
+            bool(self.speeds)
+            or self.since is not None
+            or self.until is not None
+            or self.collection is not None
+        )
 
     def conditions(self) -> list[ColumnElement[bool]]:
         clauses: list[ColumnElement[bool]] = []
@@ -140,6 +147,8 @@ class GameScope:
             clauses.append(Game.speed.in_(self.speeds))
         if self.since is not None:
             clauses.append(Game.played_at >= self.since)
+        if self.until is not None:
+            clauses.append(Game.played_at <= self.until)
         if self.collection is not None:
             clauses.append(in_collection_condition(self.collection))
         return clauses
@@ -149,12 +158,16 @@ EVERY_GAME = GameScope()
 
 
 def _scope(
-    speeds: Sequence[Speed] | None, since: datetime | None, collection: int | None
+    speeds: Sequence[Speed] | None,
+    since: datetime | None,
+    until: datetime | None,
+    collection: int | None,
 ) -> GameScope:
     """The scope a caller's keyword arguments describe, the way every entry point reads them."""
     return GameScope(
         speeds=tuple(speeds) if speeds else None,
         since=since,
+        until=until,
         collection=int(collection) if collection is not None else None,
     )
 
@@ -238,13 +251,14 @@ def opening_explorer(
     line: Sequence[str] | None = None,
     speeds: Sequence[Speed] | None = None,
     since: datetime | None = None,
+    until: datetime | None = None,
     collection: int | None = None,
 ) -> dict[str, Any]:
     """The owner's personal tree from one position: per continuation frequency, score,
     average eval drop, and where the owner leaves book.
 
-    `speeds`, `since` and `collection` narrow which games count — only these time controls,
-    only games played on or after that moment, only one collection's games — and apply to
+    `speeds`, `since`/`until` and `collection` narrow which games count — only these time
+    controls, only games played between those moments, only one collection's games — and apply to
     everything the payload says: the tree, its totals, the book walk and an ECO root
     (`GameScope`).
 
@@ -267,7 +281,7 @@ def opening_explorer(
     root is narrowed to one code's games and so is not what the book counted — folds its
     join rows live. The two paths are the same fold and produce the same payload.
     """
-    scope = _scope(speeds, since, collection)
+    scope = _scope(speeds, since, until, collection)
     path: list[dict[str, Any]] = []
     if fen:
         position = find_position(session, fen)
@@ -508,20 +522,21 @@ def find_positions(
     *,
     speeds: Sequence[Speed] | None = None,
     since: datetime | None = None,
+    until: datetime | None = None,
     collection: int | None = None,
 ) -> list[dict[str, Any]]:
     """"Have I been here before?" — the games that reached a position, with outcomes.
 
     Newest first, and both the ordering and the cap are the database's: the initial array
     is every game the owner has, and hydrating nine and a half thousand occurrences to hand
-    back fourteen of them was most of what this cost. `speeds`, `since` and `collection`
-    narrow the games the way they narrow `opening_explorer`, so the list under a filtered
-    tree is its games.
+    back fourteen of them was most of what this cost. `speeds`, `since`/`until` and
+    `collection` narrow the games the way they narrow `opening_explorer`, so the list under
+    a filtered tree is its games.
     """
     position = find_position(session, fen)
     if position is None:
         return []
-    scope = _scope(speeds, since, collection)
+    scope = _scope(speeds, since, until, collection)
     best = _ranked_occurrences(position.id, color=color, scope=scope)
     statement = (
         select(best)

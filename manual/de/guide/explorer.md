@@ -8,10 +8,16 @@ dein schlechtester war. `←` und `→` gehen die Variante entlang. **Partien in
 Variante** und **Deine Notizen zu dieser Stellung** stehen daneben.
 
 Mit den Chips über der Tabelle legst du fest, welche deiner Partien zählen: **Bedenkzeit**
-lässt nur die eingeschalteten Zeitkontrollen übrig, **gespielt** nur Partien der letzten
-30 Tage, 90 Tage oder des letzten Jahres, von heute an gerechnet. Sobald du eine
-[Sammlung](collections.md) hast, lässt **in** nur die Partien einer davon übrig; so hat
-auch eine Ligasaison ihren eigenen Eröffnungsbaum. Steht es auf **Alle Partien**, stehen die
+lässt nur die eingeschalteten Zeitkontrollen übrig, und **Datum** ist derselbe
+Datumsfilter wie über deinen [Partien](games.md): zwei Datumsfelder und die Schnellwahl
+Heute, 7T, 30T, 90T und 1J, jeweils von heute an zurückgerechnet. Mit **Heute** gehst du rasch
+die Eröffnungen durch, die dir eben begegnet sind. Eine Schnellwahl trägt ihre Tage in die
+Felder ein, sodass du von dort aus nachjustieren kannst, und ein Link auf „die letzten 30 Tage“
+meint auch im nächsten Monat die letzten 30 Tage; getippte Daten bleiben, was du getippt
+hast. **Leeren** oder das **×** am Chip zählt wieder alle Partien.
+Sobald du eine
+[Sammlung](collections.md) hast, lässt **Sammlung** neben dem Datum nur die Partien einer
+davon übrig; so hat auch eine Ligasaison ihren eigenen Eröffnungsbaum. Steht es auf **Alle Partien**, stehen die
 Partien einer Sammlung im Baum wie jede andere. Der Baum, seine Buchvariante und die Partien darunter
 richten sich nach alldem, und der Filter steht in der Adresse der Seite – ein gefilterter
 Baum ist also ein Link.

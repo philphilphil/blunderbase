@@ -19,11 +19,27 @@ import { cn } from '@/lib/utils'
  * A labelled row of chips. The label is set at the width of the longest one these pages
  * use, so stacked rows line their chips up; it names the group as well as showing it, so a
  * reader arriving at a pressed chip is told which filter it belongs to.
+ *
+ * `trailing` is a group that follows another on the same line rather than starting one, so
+ * there is no column to line up with and its label is as wide as its word.
  */
-export function ChipRow({ label, children }: { label: string; children: ReactNode }) {
+export function ChipRow({
+  label,
+  children,
+  trailing = false,
+}: {
+  label: string
+  children: ReactNode
+  trailing?: boolean
+}) {
   return (
     <div role="group" aria-label={label} className="flex flex-wrap items-center gap-1.5">
-      <span className="w-11 flex-none text-meta tracking-[.06em] text-dim uppercase">
+      <span
+        className={cn(
+          'flex-none text-meta tracking-[.06em] text-dim uppercase',
+          trailing ? 'pr-0.5' : 'w-11',
+        )}
+      >
         {label}
       </span>
       {children}

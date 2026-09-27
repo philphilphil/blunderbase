@@ -19,6 +19,7 @@ import { Input } from '@/components/ui/input'
 import { useCollections } from '@/lib/api/queries'
 import type { Collection, Color, Whose } from '@/lib/api/types'
 import { collectionPath, ruleFromFilters } from '@/lib/collections'
+import { presetOf, presetStart } from '@/lib/days'
 import { cn } from '@/lib/utils'
 import { Segmented } from '@/routes/stats/kit/states'
 
@@ -40,7 +41,8 @@ import { formatCount, OUTCOME_LABELS, SOURCE_LABELS } from '../format'
 import { MAX_LABEL_LENGTH, saveFilter, suggestLabel } from '../savedFilters'
 import { useCollectionNames } from '../useCollectionNames'
 import { CollectionDialog } from './CollectionDialog'
-import { FilterPopover, OptionButton, OptionRow, PopoverLabel, TriState } from './FilterPopover'
+import { DATE_PANEL_WIDTH, DateRangePanel } from './DateRangePanel'
+import { FilterPopover, OptionRow, PopoverLabel, TriState } from './FilterPopover'
 
 export interface FilterBarProps {
   filters: LibraryFilters
@@ -49,25 +51,8 @@ export interface FilterBarProps {
   trailing?: ReactNode
 }
 
-/**
- * Presets for the date popover, in days back from today. The labels are as short as the
- * four buttons they sit on, so each carries a comment saying what the letter stands for.
- */
-const DATE_PRESETS: { label: MessageDescriptor; days: number }[] = [
-  { label: msg({ message: '7d', comment: 'Date preset button: the last 7 days' }), days: 7 },
-  { label: msg({ message: '30d', comment: 'Date preset button: the last 30 days' }), days: 30 },
-  { label: msg({ message: '90d', comment: 'Date preset button: the last 90 days' }), days: 90 },
-  { label: msg({ message: '12m', comment: 'Date preset button: the last 12 months' }), days: 365 },
-]
-
 /** The two sides, title-cased the way the popover sets its options. */
 const COLOR_LABELS: Record<Color, MessageDescriptor> = { white: msg`White`, black: msg`Black` }
-
-function isoDay(offsetDays: number): string {
-  const date = new Date()
-  date.setDate(date.getDate() - offsetDays)
-  return date.toISOString().slice(0, 10)
-}
 
 export function FilterBar({ filters, onChange, trailing }: FilterBarProps) {
   const { i18n } = useLingui()
@@ -94,7 +79,9 @@ export function FilterBar({ filters, onChange, trailing }: FilterBarProps) {
           label={i18n._(GROUP_LABELS[group])}
           value={groupSummary(group, filters, collectionName)}
           onClear={() => onChange(clearGroup(filters, group))}
-          width={group === 'date' ? '15.625rem' : group === 'collection' ? '15rem' : '14.5rem'}
+          width={
+            group === 'date' ? DATE_PANEL_WIDTH : group === 'collection' ? '15rem' : '14.5rem'
+          }
         >
           {(close) =>
             group === 'collection' ? (
@@ -113,7 +100,7 @@ export function FilterBar({ filters, onChange, trailing }: FilterBarProps) {
                 }}
               />
             ) : (
-              <GroupPanel group={group} filters={filters} patch={patch} />
+              <GroupPanel group={group} filters={filters} patch={patch} close={close} />
             )
           }
         </FilterPopover>
@@ -358,48 +345,30 @@ function GroupPanel({
   group,
   filters,
   patch,
+  close,
 }: {
   group: FilterGroup
   filters: LibraryFilters
   patch: (next: Partial<LibraryFilters>) => void
+  /** Closes the popover, for the panels whose gestures finish the choice (the date's). */
+  close: () => void
 }) {
   const { t, i18n } = useLingui()
   switch (group) {
     case 'date':
       return (
-        <>
-          <PopoverLabel>
-            <Trans>Played between</Trans>
-          </PopoverLabel>
-          <div className="flex items-center gap-1.5">
-            <Input
-              type="date"
-              aria-label={t`Played from`}
-              value={filters.since ?? ''}
-              onChange={(event) => patch({ since: event.target.value || undefined })}
-              className="h-7 text-data"
-            />
-            <span className="text-faint">→</span>
-            <Input
-              type="date"
-              aria-label={t`Played until`}
-              value={filters.until ?? ''}
-              onChange={(event) => patch({ until: event.target.value || undefined })}
-              className="h-7 text-data"
-            />
-          </div>
-          <div className="flex gap-1">
-            {DATE_PRESETS.map((preset) => (
-              <OptionButton
-                key={preset.days}
-                onClick={() => patch({ since: isoDay(preset.days), until: undefined })}
-                className="flex-1"
-              >
-                {i18n._(preset.label)}
-              </OptionButton>
-            ))}
-          </div>
-        </>
+        <DateRangePanel
+          heading={<Trans>Played between</Trans>}
+          from={filters.since}
+          to={filters.until}
+          preset={presetOf(filters.since, filters.until)}
+          onRange={(since, until) => patch({ since, until })}
+          onPreset={(preset) => patch({ since: presetStart(preset), until: undefined })}
+          onClear={() => patch({ since: undefined, until: undefined })}
+          close={close}
+          fromLabel={t`Played from`}
+          toLabel={t`Played until`}
+        />
       )
 
     case 'source':

@@ -1,12 +1,16 @@
 import { describe, expect, it } from 'vitest'
 
+import { dayStart, localDay } from '@/lib/days'
+
 import {
   DEFAULT_RATINGS,
   DEFAULT_SPEEDS,
   formatCount,
   formatCsv,
   ownFilterQuery,
+  parseDayRange,
   parseOwnSpeeds,
+  playedDays,
   parsePeriod,
   parseRatings,
   parseSource,
@@ -109,14 +113,43 @@ describe('the owner’s own filters', () => {
     expect(parseOwnSpeeds('nonsense')).toHaveLength(5)
   })
 
-  it('reads a known period and nothing else', () => {
+  it('reads a quick pick and nothing else', () => {
     expect(parsePeriod('90d')).toBe('90d')
-    expect(parsePeriod('7d')).toBe('all')
-    expect(parsePeriod(null)).toBe('all')
+    expect(parsePeriod('today')).toBe('today')
+    expect(parsePeriod('all')).toBeNull()
+    expect(parsePeriod(null)).toBeNull()
   })
 
   it('sends nothing for every speed and every game', () => {
-    expect(ownFilterQuery(parseOwnSpeeds(null), 'all')).toEqual({})
-    expect(ownFilterQuery(['blitz'], '30d')).toEqual({ speed: ['blitz'], days: 30 })
+    expect(ownFilterQuery(parseOwnSpeeds(null), null)).toEqual({})
+  })
+
+  it('sends a pick as the local midnight it reaches back to, open to now', () => {
+    const query = ownFilterQuery(['blitz'], '30d')
+    expect(query).toEqual({ speed: ['blitz'], since: dayStart(localDay(30)) })
+  })
+
+  it('reads a day range, either end open, the right way round', () => {
+    expect(parseDayRange(null, null)).toBeNull()
+    expect(parseDayRange('garbage', '')).toBeNull()
+    expect(parseDayRange('2026-09-27', null)).toEqual({ from: '2026-09-27', to: undefined })
+    expect(parseDayRange('2026-09-27', '2026-09-01')).toEqual({
+      from: '2026-09-01',
+      to: '2026-09-27',
+    })
+  })
+
+  it('sends a typed range as the reader’s local midnights, over the pick', () => {
+    const query = ownFilterQuery(parseOwnSpeeds(null), '30d', null, {
+      from: '2026-09-27',
+      to: '2026-09-27',
+    })
+    expect(query.since).toBe(new Date(2026, 8, 27).toISOString())
+    expect(query.until).toBe(new Date(2026, 8, 27, 23, 59, 59, 999).toISOString())
+  })
+
+  it('shows a pick as the dates it means', () => {
+    expect(playedDays('today', null)).toEqual({ from: localDay(), to: undefined })
+    expect(playedDays(null, null)).toBeNull()
   })
 })
