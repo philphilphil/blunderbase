@@ -2,6 +2,7 @@ import { Trans, useLingui } from '@lingui/react/macro'
 import { Loader2, Trash2, X } from 'lucide-react'
 import { useMemo, useState } from 'react'
 
+import { Button } from '@/components/ui/button'
 import { commitsOnEnter } from '@/lib/ui/shortcuts'
 import { cn } from '@/lib/utils'
 
@@ -237,7 +238,7 @@ export function NoteComposer({
         // The box is what gives way when the column is short: `min-h-0`, so what shrinks is
         // the writing and never the row under it, and no resize handle — the slot decides
         // the height now.
-        className="min-h-0 w-full flex-1 resize-none rounded-md border border-input bg-raised px-2.5 py-1.5 text-[0.78125rem] leading-[1.5] text-ink outline-none placeholder:text-faint focus-visible:border-accent-teal/50"
+        className="min-h-0 w-full flex-1 resize-none rounded-md border border-input bg-raised px-2.5 py-1.5 text-lead text-ink outline-none placeholder:text-faint focus-visible:border-accent-teal/50"
       />
 
       {/*
@@ -263,7 +264,7 @@ export function NoteComposer({
           covering the note itself.
         */}
         {error ? (
-          <p className="absolute inset-x-0 bottom-full mb-1 truncate rounded-md border border-blunder/30 bg-raised px-1.5 py-1 text-[0.6875rem] text-blunder shadow-md">
+          <p className="absolute inset-x-0 bottom-full mb-1 truncate rounded-md border border-blunder/40 bg-raised px-1.5 py-1 text-label text-body shadow-md">
             {error.message}
           </p>
         ) : null}
@@ -283,7 +284,7 @@ export function NoteComposer({
                 // anywhere to land.
                 onMouseDown={(event) => event.preventDefault()}
                 onClick={() => addTag(tag)}
-                className="rounded-sm border border-edge bg-elevated px-1.5 py-0.5 font-mono text-[0.6875rem] text-soft hover:border-accent-teal/50 hover:text-ink"
+                className="rounded-sm border border-edge bg-elevated px-1.5 py-0.5 font-mono text-label text-soft hover:border-accent-teal/50 hover:text-ink"
               >
                 {tag}
               </button>
@@ -291,7 +292,7 @@ export function NoteComposer({
           </div>
         ) : null}
 
-        <h2 className="shrink-0 font-mono text-[0.6875rem] text-dim">
+        <h2 className="shrink-0 font-mono text-label text-dim">
           {/* The one place the box names what it is about: on the game entire the board
               above it says nothing about that, and a filled-in box hides the placeholder. */}
           {target.kind === 'game' ? (
@@ -318,7 +319,7 @@ export function NoteComposer({
             type="button"
             onClick={() => setTags((current) => current.filter((entry) => entry !== tag))}
             title={t`Remove “${tag}”`}
-            className="flex items-center gap-1 rounded-sm border border-edge bg-chip-info px-1.5 py-0.5 font-mono text-[0.6875rem] text-soft hover:text-ink"
+            className="flex items-center gap-1 rounded-sm border border-edge bg-chip-info px-1.5 py-0.5 font-mono text-label text-soft hover:text-ink"
           >
             {tag}
             <X className="size-2.5" aria-hidden />
@@ -340,35 +341,30 @@ export function NoteComposer({
           }}
           placeholder={t`tag…`}
           aria-label={t`Tags`}
-          className="h-6 w-24 min-w-[4rem] flex-1 rounded-md border border-input bg-raised px-2 font-mono text-[0.6875rem] text-ink outline-none placeholder:text-faint focus-visible:border-accent-teal/50"
+          className="h-6 w-24 min-w-[4rem] flex-1 rounded-md border border-input bg-raised px-2 font-mono text-label text-ink outline-none placeholder:text-faint focus-visible:border-accent-teal/50"
         />
 
-        <button
-          type="button"
-          disabled={!ready}
-          onClick={save}
-          className={cn(
-            'flex shrink-0 items-center gap-1 rounded-md border px-2.5 py-[0.3125rem] text-xs',
-            ready
-              ? 'border-accent-teal/30 bg-accent-teal/10 text-accent-teal'
-              : 'border-edge bg-elevated text-faint-2',
-          )}
-        >
-          {pending ? <Loader2 className="size-3 animate-spin" aria-hidden /> : null}
+        {/* The standard buttons at the control row's size: Save is the region's one
+            primary action, so the filled accent (dimmed until there is something to save);
+            Delete is the quiet bordered square beside it, red only under the pointer. */}
+        <Button type="button" size="sm" disabled={!ready} onClick={save}>
+          {pending ? <Loader2 className="animate-spin" aria-hidden /> : null}
           <Trans>Save note</Trans>
-        </button>
+        </Button>
         {/* ⌘↵ saves and Escape leaves the box; the box itself is always there, so there is
             no Cancel to press. */}
         {editing !== null && onDelete ? (
-          <button
+          <Button
             type="button"
+            variant="outline"
+            size="icon-sm"
             onClick={() => onDelete(editing)}
             aria-label={t`Delete this note`}
             title={t`Delete this note`}
-            className="shrink-0 px-0.5 text-faint hover:text-blunder"
+            className="text-soft hover:border-blunder/40 hover:text-blunder"
           >
             <Trash2 className="size-3.5" aria-hidden />
-          </button>
+          </Button>
         ) : null}
       </div>
     </section>

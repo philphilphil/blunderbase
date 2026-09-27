@@ -4,7 +4,14 @@
  * The profile carries one rating series per platform *and* speed. Overlaying blitz on
  * classical says nothing (the scales are different populations), while overlaying Lichess
  * blitz on Chess.com blitz is exactly the comparison worth having — so the speeds are
- * stacked as separate charts and the platforms share each chart's axes, one line each.
+ * separate charts and the platforms share each chart's axes, one line each.
+ *
+ * The charts sit two to a row. Stacked one under another at the full width of the main
+ * column, each was a wide, flat strip — a rating curve squashed to 120 pixels tall — and
+ * three speeds pushed everything under them off the screen. Two up, each chart is taller
+ * and closer to the shape a rating history reads in, and from two speeds up the panel is
+ * shorter for it.
+ * Below `lg` the column is too narrow for two, and they stack again.
  *
  * The points are taken from the games themselves, so the window is applied here rather
  * than by the API, and it is anchored on the newest rated game across every series so all
@@ -24,6 +31,7 @@ import {
   type ChartConfig,
 } from '@/components/ui/chart'
 import { SectionHead } from '@/components/shell/Section'
+import { Button } from '@/components/ui/button'
 import { useProfile } from '@/lib/api/queries'
 import type { Platform, RatingSeries } from '@/lib/api/types'
 import { rem, scaleMargin, scalePx } from '@/lib/ui/scale'
@@ -42,6 +50,9 @@ import {
   type WindowKey,
 } from '@/routes/stats/kit/analytics'
 import { Bar, EmptyBlock, ErrorBlock, LegendSwatch, Segmented } from '@/routes/stats/kit/states'
+
+/** The charts, two to a row (see the doc comment); the loading bars take the same grid. */
+const GRID = 'grid grid-cols-2 gap-x-6 gap-y-5 max-lg:grid-cols-1'
 
 /** Drawn in this order, so the platform colours never move between charts. */
 const PLATFORMS: Platform[] = ['lichess', 'chesscom', 'fics', 'otb']
@@ -170,7 +181,7 @@ function newestPoint(all: RatingSeries[]): string | null {
 
 function Move({ move }: { move: number }) {
   return (
-    <span className={cn('font-mono tabular', move > 0 ? 'text-good' : 'text-blunder')}>
+    <span className={cn('font-mono text-label tabular', move > 0 ? 'text-good' : 'text-blunder')}>
       {move > 0 ? `+${move}` : `−${Math.abs(move)}`}
     </span>
   )
@@ -179,29 +190,31 @@ function Move({ move }: { move: number }) {
 function SpeedGraph({
   chart,
   tick,
+  className,
 }: {
   chart: SpeedChart
   /** The axis formatter the window calls for: days inside a quarter, months beyond it. */
   tick: (value: string) => string
+  className?: string
 }) {
   const { i18n } = useLingui()
   return (
-    <div className="flex flex-col gap-1">
+    <div className={cn('flex min-w-0 flex-col gap-1.5', className)}>
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-        <span className="text-[0.6875rem] font-medium text-soft">
+        <span className="text-data font-semibold text-ink">
           {speedLabel(chart.speed, i18n)}
         </span>
         <div className="flex-1" />
         {chart.lines.map((line) => (
           <LegendSwatch key={line.platform} color={PLATFORM_COLOR[line.platform]}>
             {PLATFORM_LABEL[line.platform]}
-            <span className="font-mono tabular text-soft">{line.last}</span>
+            <span className="font-mono text-value tabular text-ink">{line.last}</span>
             {line.move !== null && line.move !== 0 ? <Move move={line.move} /> : null}
           </LegendSwatch>
         ))}
       </div>
 
-      <ChartContainer config={CHART} className="aspect-auto h-[7.5rem] w-full">
+      <ChartContainer config={CHART} className="aspect-auto h-[9.5rem] w-full">
         {/* The right margin is the width of half a date label: the panel has no card padding
             to spill the last tick into any more, so the plot has to keep that room itself or
             "Sept 2026" is cut off by the section's edge. */}
@@ -215,8 +228,8 @@ function SpeedGraph({
             minTickGap={scalePx(44)}
             tickFormatter={tick}
             tick={{
-              fontSize: rem(9.5),
-              fill: 'var(--bb-dim-2)',
+              fontSize: rem(10),
+              fill: 'var(--bb-dim)',
               fontFamily: 'var(--font-mono)',
             }}
           />
@@ -227,7 +240,7 @@ function SpeedGraph({
             domain={['dataMin - 25', 'dataMax + 25']}
             tick={{
               fontSize: rem(10),
-              fill: 'var(--bb-dim-2)',
+              fill: 'var(--bb-dim)',
               fontFamily: 'var(--font-mono)',
             }}
           />
@@ -259,7 +272,7 @@ function SpeedGraph({
   )
 }
 
-/** The checked/unchecked square in front of a speed row — teal-filled when shown. */
+/** The checked/unchecked square in front of a speed row — blue-filled when shown. */
 function CheckboxGlyph({ checked }: { checked: boolean }) {
   return (
     <span
@@ -312,20 +325,21 @@ function SpeedsMenu({
 
   return (
     <div ref={container} className="relative flex-none">
-      <button
+      <Button
         type="button"
+        variant="outline"
+        size="sm"
         aria-haspopup="menu"
         aria-expanded={open}
         onClick={() => setOpen((was) => !was)}
-        className="flex items-center gap-1 rounded-md border border-edge px-1.5 py-0.5 text-[0.6875rem] text-soft transition-colors hover:border-edge-hover hover:text-ink"
       >
         <Trans>speeds</Trans>
         {charts.length !== allCharts.length ? (
-          <span className="font-mono tabular text-dim-2">
+          <span className="font-mono tabular text-dim">
             {charts.length}/{allCharts.length}
           </span>
         ) : null}
-      </button>
+      </Button>
 
       {open ? (
         <div
@@ -343,11 +357,11 @@ function SpeedsMenu({
                 aria-checked={checked}
                 aria-label={speedLabel(chart.speed, i18n)}
                 onClick={() => toggleHiddenSpeed(chart.speed)}
-                className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-[0.6875rem] text-soft transition-colors hover:bg-raised hover:text-ink"
+                className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-data text-soft transition-colors hover:bg-raised hover:text-ink"
               >
                 <CheckboxGlyph checked={checked} />
                 <span className="flex-1 truncate">{speedLabel(chart.speed, i18n)}</span>
-                <span className="font-mono tabular text-dim-2">{chart.games}</span>
+                <span className="font-mono text-label tabular text-dim">{chart.games}</span>
               </button>
             )
           })}
@@ -407,9 +421,9 @@ export function RatingCard() {
       />
 
       {profile.isPending ? (
-        <div data-testid="loading" className="flex flex-col gap-3">
-          <Bar className="h-[7.5rem] w-full rounded-lg" />
-          <Bar className="h-[7.5rem] w-full rounded-lg" />
+        <div data-testid="loading" className={GRID}>
+          <Bar className="h-[9.5rem] w-full rounded-md" />
+          <Bar className="h-[9.5rem] w-full rounded-md" />
         </div>
       ) : profile.isError ? (
         <ErrorBlock
@@ -430,11 +444,17 @@ export function RatingCard() {
           <Trans>Every speed is hidden. Pick one in the speeds menu.</Trans>
         </EmptyBlock>
       ) : (
-        <div className="flex flex-col gap-3.5">
-          {charts.map((chart) => (
+        <div className={GRID}>
+          {charts.map((chart, index) => (
             <SpeedGraph
               key={chart.speed}
               chart={chart}
+              // Only a lone chart takes the whole row. The last of an odd number keeps its
+              // half: a full-width chart at this height is the wide, flat strip the 2-up
+              // grid exists to avoid, and a gap beside it costs less than that.
+              className={
+                charts.length === 1 && index === 0 ? 'col-span-full' : undefined
+              }
               // A quarter reads in days; a year or the whole archive reads in months.
               tick={windowKey === '30d' || windowKey === '90d' ? shortDate : monthYear}
             />

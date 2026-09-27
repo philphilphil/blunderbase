@@ -18,6 +18,7 @@ import { msg } from '@lingui/core/macro'
 import { useLingui } from '@lingui/react/macro'
 import { Eye, EyeOff } from 'lucide-react'
 
+import { buttonVariants } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { cn } from '@/lib/utils'
 import type { LinePreviewPrefs, RowPreview } from '@/lib/board/linePreview'
@@ -25,7 +26,7 @@ import { setLinePreviewPrefs, useLinePreviewPrefs } from '@/lib/board/linePrevie
 
 /** The one select shape the board's settings dialog uses throughout, like `SettingsCheck`. */
 export const SETTINGS_SELECT =
-  'h-8 rounded-md border border-input bg-elevated px-2 text-xs text-soft outline-none'
+  'h-8 rounded-md border border-input bg-elevated px-2 text-data text-body outline-none'
 const SELECT = SETTINGS_SELECT
 
 const MODES: { value: RowPreview; label: MessageDescriptor }[] = [
@@ -52,7 +53,7 @@ export function Range({ id, label, value, min, max, step = 1, suffix = '', disab
     <div className={cn('flex min-w-52 flex-1 flex-col gap-1.5', disabled && 'opacity-50')}>
       <div className="flex items-center justify-between gap-2">
         <Label htmlFor={id}>{label}</Label>
-        <span className="font-mono text-[0.6875rem] text-dim">{value}{suffix}</span>
+        <span className="font-mono text-label text-soft">{value}{suffix}</span>
       </div>
       <input id={id} type="range" min={min} max={max} step={step} value={value} disabled={disabled} onChange={(event) => onChange(Number(event.target.value))} className="h-1.5 w-full accent-accent-teal" />
     </div>
@@ -68,7 +69,7 @@ export function SettingsCheck({ id, label, checked, disabled, onChange }: {
   onChange: (checked: boolean) => void
 }) {
   return (
-    <label htmlFor={id} className={cn('inline-flex items-center gap-2 text-[0.6875rem] text-soft', disabled && 'opacity-50')}>
+    <label htmlFor={id} className={cn('inline-flex items-center gap-2 text-label text-soft', disabled && 'opacity-50')}>
       <input id={id} type="checkbox" checked={checked} disabled={disabled} onChange={(event) => onChange(event.target.checked)} className="size-3 accent-accent-teal" />
       {label}
     </label>
@@ -113,9 +114,11 @@ const ROW_SHORT: Record<RowPreview, MessageDescriptor> = {
  * DRESSED AS A CONTROL, NOT AS A READOUT. It sits in a header row whose other chips — `d20`,
  * `1.4M nodes`, `MPV 5` — are all facts about the run, and in their vocabulary (a bordered
  * mono chip) it read as a fourth fact rather than as the one thing on the row that can be
- * clicked. The eye says what the setting is about, and the tint says it is on: teal while
- * hovering a line draws something, quiet and struck through while it draws nothing — the
- * same on/off vocabulary the compare toggle in the pane beside it uses.
+ * clicked. So it is the strip's `xs` ghost button, sans and `rounded-md` like every other
+ * control, and not a bordered data badge. The eye says what the setting is about: open,
+ * with the mode in the accent, while hovering a line draws something; struck through and
+ * quiet while it draws nothing. The accent sits on the eye and the word only — a blue fill
+ * is what a pressed toggle wears, and this is a cycler, not a toggle.
  */
 export function LinePreviewRowChip() {
   const { t, i18n } = useLingui()
@@ -135,13 +138,12 @@ export function LinePreviewRowChip() {
       }
       title={says}
       className={cn(
-        'inline-flex flex-none items-center gap-1 rounded-sm border px-1 py-px font-mono text-[0.625rem] transition-colors',
-        on
-          ? 'border-accent-teal/35 bg-accent-teal/10 text-accent-teal hover:border-accent-teal/60'
-          : 'border-edge text-dim hover:border-edge-hover hover:text-soft',
+        buttonVariants({ variant: 'ghost', size: 'xs' }),
+        'flex-none',
+        on ? 'text-accent-teal hover:text-accent-link' : 'text-soft',
       )}
     >
-      <Icon className="size-2.5 flex-none" aria-hidden />
+      <Icon className="size-3 flex-none" aria-hidden />
       {mode}
     </button>
   )

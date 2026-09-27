@@ -3,6 +3,7 @@ import { Pin, PinOff } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 
 import { ClassificationBadge } from '@/components/badges/ClassificationBadge'
+import { buttonVariants } from '@/components/ui/button'
 import type { Classification, MoveRow } from '@/lib/api/types'
 import { GLYPHS, glyphFor, isFlagged } from '@/lib/chess/classification'
 import { formatScore, formatWinLoss, type Score } from '@/lib/chess/evaluation'
@@ -10,6 +11,7 @@ import { useNotation } from '@/lib/chess/notationPrefs'
 import { cn } from '@/lib/utils'
 
 import { formatRemaining, plyLabel, type MovePair } from '../gameModel'
+import { PANE_COUNT, TAB, TAB_ON, TAB_ROW } from './paneTabs'
 
 /**
  * The inline note design 1a puts under a flagged move: what it cost and what was better.
@@ -274,14 +276,16 @@ export function MoveList({
   return (
     <div data-testid="move-list" className={cn('flex min-h-0 flex-col', className)}>
       {showTabRow ? (
-      <div className="@container flex h-[2.1875rem] flex-none items-stretch border-b border-line bg-panel pr-2.5">
+      // `@container` on top of the shared strip: the ply count below hides by this row's own
+      // width, which only a container query can read.
+      <div className={cn(TAB_ROW, '@container')}>
         <Tab active={tab === 'moves'} onClick={() => setTab('moves')}>
           <Trans>Moves</Trans>
         </Tab>
         <Tab active={tab === 'flagged'} onClick={() => setTab('flagged')}>
           <Trans>Flagged</Trans>
           {flaggedCount > 0 ? (
-            <span className="ml-1.5 font-mono text-[0.625rem] tabular text-blunder">{flaggedCount}</span>
+            <span className="font-mono text-meta text-blunder">{flaggedCount}</span>
           ) : null}
         </Tab>
         <div className="flex-1" />
@@ -296,10 +300,10 @@ export function MoveList({
           window; it is kept because that window is real and a clipped PGN button is not
           worth the two words.
         */}
-        <div className="flex flex-none items-center gap-2.5 whitespace-nowrap font-mono text-[0.625rem] tabular text-faint">
+        <div className="flex flex-none items-center gap-1.5 whitespace-nowrap">
           {/* And on a desktop whose track is at its 15.625rem floor, by the row's own width:
               German's "Markiert" and "Halbzüge" are longer than the words this was fitted to. */}
-          <span className="max-md:hidden @max-[16.5rem]:hidden">
+          <span className={cn(PANE_COUNT, 'max-md:hidden @max-[16.5rem]:hidden')}>
             <Trans>{plyCount} plies</Trans>
           </span>
           <PgnButton pgn={pgn} />
@@ -315,7 +319,7 @@ export function MoveList({
             className="flex w-full items-center gap-2 px-3 pb-1 pt-2.5 text-left"
           >
             <div className="h-px flex-1 bg-hairline" />
-            <span className="font-mono text-[0.625rem] text-faint hover:text-soft">
+            <span className="text-label text-dim hover:text-soft">
               <Trans>moves 1–{collapsedThrough} collapsed</Trans>
             </span>
             <div className="h-px flex-1 bg-hairline" />
@@ -323,7 +327,7 @@ export function MoveList({
         ) : null}
 
         {rows.length === 0 ? (
-          <p className="px-3 py-6 text-center text-[0.71875rem] text-dim">
+          <p className="px-3 py-6 text-center text-data text-dim">
             {tab === 'flagged' ? (
               <Trans>Nothing flagged in this game.</Trans>
             ) : (
@@ -332,7 +336,7 @@ export function MoveList({
           </p>
         ) : null}
 
-        <div className="flex flex-col px-1.5 font-mono text-[0.78125rem]">
+        <div className="flex flex-col px-1.5 font-mono text-lead">
           {orphans}
           {rows.map((pair) => {
             const isActivePair =
@@ -344,12 +348,12 @@ export function MoveList({
               <div key={pair.moveNumber} ref={isActivePair ? activeRow : undefined}>
                 <div
                   className={cn(
-                    'flex h-7 items-center rounded-[0.3125rem] px-1.5',
+                    'flex h-7 items-center rounded-md px-1.5',
                     isActivePair ? 'bg-row-active' : 'hover:bg-raised',
                   )}
                 >
                   <span
-                    className={cn('w-[2rem] flex-none tabular', isActivePair ? 'text-dim' : 'text-faint')}
+                    className={cn('w-[2rem] flex-none tabular', isActivePair ? 'text-dim' : 'text-dim-2')}
                   >
                     {pair.moveNumber}.
                   </span>
@@ -411,7 +415,9 @@ const TIME_TROUBLE = 20
 
 /**
  * One clock reading, right-aligned against the move it belongs to and a size smaller than
- * the move, because it is context and not the thing being read.
+ * the move, because it is context and not the thing being read. Context, but still data:
+ * `dim-2`, the quietest step that clears AA, rather than `faint`, which is kept for marks
+ * nobody has to read.
  *
  * `--bb-mistake` under twenty seconds, so a run of orange down the last ten rows sits
  * beside the run of `??` badges that shares a cause. The cell keeps its width when there
@@ -423,8 +429,8 @@ function ClockCell({ seconds }: { seconds: number | undefined }) {
     <span
       data-testid="move-clock"
       className={cn(
-        'w-[2.25rem] flex-none pr-1.5 text-right text-[0.65625rem] tabular',
-        low ? 'text-mistake' : 'text-faint',
+        'w-[2.25rem] flex-none pr-1.5 text-right text-label tabular',
+        low ? 'text-mistake' : 'text-dim-2',
       )}
     >
       {formatRemaining(seconds)}
@@ -481,13 +487,12 @@ export function PgnButton({ pgn }: { pgn?: string }) {
       id={PGN_BUTTON_ID}
       onClick={() => void copy()}
       title={t`Copy this game as PGN (C)`}
+      // The strip's own control size (a text button, so `xs` rather than the icon square
+      // `PANE_TOOL`), and idle in `soft` like every other control: it used to sit in `faint`
+      // with the ply count, which read as a caption rather than something to press.
       className={cn(
-        'transition-colors',
-        state === 'copied'
-          ? 'text-accent-teal'
-          : state === 'failed'
-            ? 'text-blunder'
-            : 'text-faint hover:text-soft',
+        buttonVariants({ variant: 'ghost', size: 'xs' }),
+        state === 'copied' ? 'text-accent-teal' : state === 'failed' ? 'text-blunder' : 'text-soft',
       )}
     >
       {/* `PGN` is the format's name and stays in every language; the two flashes are prose. */}
@@ -534,12 +539,15 @@ function MoveCell({
         // `min-w-0` so the row can never push past the track: at the 250px band the two
         // move cells are what has to give, and the san truncates rather than the number,
         // the clock or the glyph badge being shoved off the right edge.
-        'flex h-5 min-w-0 flex-1 items-center gap-[0.3125rem] rounded-[0.25rem] px-1 text-left',
+        // The current move is the app's one selected state (`--bb-selected` with the accent
+        // ringed inside it), the same blue a selected row or segment wears, on the
+        // blue-grey `row-active` of its pair. SAN is primary data, so `ink` at rest.
+        'flex h-5 min-w-0 flex-1 items-center gap-[0.3125rem] rounded-md px-1 text-left',
         active
-          ? 'bg-accent-teal/10 text-bright shadow-[inset_0_0_0_0.0625rem_color-mix(in_srgb,var(--bb-accent)_55%,transparent)]'
+          ? 'bg-selected text-bright ring-1 ring-inset ring-accent-teal/55'
           : flagged
             ? cn(GLYPHS[glyph!].textClass, 'font-medium hover:text-bright')
-            : 'text-body hover:text-bright',
+            : 'text-ink hover:text-bright',
       )}
     >
       <span className="truncate">{san}</span>
@@ -556,7 +564,7 @@ function MoveCell({
  * It replaces the dot this used to be. A dot was the smallest mark that could be seen at
  * all, but it read as another status pip beside the glyph badge; a page with a fold and two
  * ruled lines says *what* it is at the same size, which is what makes a noted move findable
- * from the table rather than only from the notes track. Teal, not a classification colour,
+ * from the table rather than only from the notes track. The accent, not a classification colour,
  * because a note is the reader's own mark and not the engine's verdict — and outlined, not
  * filled, so it stays quieter than the badge sitting next to it.
  */
@@ -620,7 +628,7 @@ function Variation({
     <div
       data-testid={quiet ? 'kept-variation' : 'move-variation'}
       data-pinned={lineId !== null ? 'true' : undefined}
-      className="group/line flex gap-2 py-1 pl-[2.625rem] pr-2 font-mono text-[0.6875rem] leading-[1.5]"
+      className="group/line flex gap-2 py-1 pl-[2.625rem] pr-2 font-mono text-data leading-[1.5]"
     >
       {/*
         The rail is what says at a glance whether a line is only today's reading or something
@@ -652,7 +660,7 @@ function Variation({
           return (
             <span key={`${index}-${san}`} className="inline-flex items-baseline gap-1">
               {ply % 2 === 0 || index === 0 ? (
-                <span className={cn('tabular', quiet ? 'text-faint-2' : 'text-faint')}>
+                <span className={cn('tabular', quiet ? 'text-faint' : 'text-dim-2')}>
                   {Math.floor(ply / 2) + 1}
                   {ply % 2 === 0 ? '.' : '…'}
                 </span>
@@ -663,14 +671,14 @@ function Variation({
                 onClick={() => onSelectMove?.(index)}
                 title={title}
                 className={cn(
-                  'inline-flex items-center gap-0.5 rounded-[0.1875rem] px-0.5',
+                  'inline-flex items-center gap-0.5 rounded-sm px-0.5',
                   active
                     ? 'bg-brilliant/15 text-bright'
                     : quiet
-                      ? cn('text-dim-3', onSelectMove && 'hover:text-ink')
+                      ? cn('text-dim', onSelectMove && 'hover:text-ink')
                       : onSelectMove
-                        ? 'text-soft-2 hover:text-ink'
-                        : 'text-soft-2',
+                        ? 'text-soft hover:text-ink'
+                        : 'text-soft',
                 )}
               >
                 {notate(san)}
@@ -746,7 +754,7 @@ function PinButton({
       }
       className={cn(
         'ml-0.5 opacity-0 transition-opacity focus-visible:opacity-100 group-hover/line:opacity-100',
-        extendable ? 'text-brilliant/70 hover:text-brilliant' : 'text-faint hover:text-brilliant',
+        extendable ? 'text-brilliant/70 hover:text-brilliant' : 'text-soft hover:text-brilliant',
       )}
     >
       <Pin className="size-2.5" aria-hidden />
@@ -761,7 +769,7 @@ function Annotation({ annotation }: { annotation: MoveAnnotation }) {
   const color = glyph ? GLYPHS[glyph].color : 'var(--bb-blunder)'
   const winLoss = formatWinLoss(annotation.winLoss)
   return (
-    <div className="flex gap-2 py-1.5 pl-[2.625rem] pr-2 font-sans text-[0.71875rem] italic leading-[1.5] text-soft-2">
+    <div className="flex gap-2 py-1.5 pl-[2.625rem] pr-2 font-sans text-data italic leading-[1.5] text-soft">
       <div className="w-0.5 flex-none rounded-sm opacity-50" style={{ background: color }} />
       <div>
         {/* Whose move this is about, first and in the move list's own mono, so the note is
@@ -818,17 +826,10 @@ function Tab({
       // reader who is being read to.
       aria-pressed={active}
       onClick={onClick}
-      className={cn(
-        // The selected tab is the pane's own surface pushed up into the chrome strip, with
-        // its own sliver of that surface laid over the strip's bottom rule — so the tab and
-        // the pane under it read as one region, the way a desktop tool draws a tab. That is
-        // a stronger and quieter signal than the accent underline it replaces, and it costs
-        // the strip no colour at all.
-        'relative flex items-center px-3 text-xs transition-colors',
-        active
-          ? 'bg-surface font-medium text-ink after:absolute after:inset-x-0 after:-bottom-px after:h-px after:bg-surface'
-          : 'text-dim hover:text-ink',
-      )}
+      // The shared pane tab (`./paneTabs`): the selected tab is the pane's own surface pushed
+      // up into the chrome strip, so this strip and the notes and graph strips are one idiom
+      // rather than three hand-copied class strings.
+      className={cn(TAB, active && TAB_ON)}
     >
       {children}
     </button>

@@ -121,13 +121,19 @@ export function formatDrop(drop: number | null): string {
   return `${MINUS}${Math.round(drop)}%`
 }
 
-/** How a drop is coloured: the design paints the ACPL column by severity. */
+/**
+ * How a drop is coloured in the table's Worst column: by severity from an inaccuracy up,
+ * and plain `soft` below that. A small drop is the routine case, and painting it green
+ * made the quietest games the brightest cells in the column. Only `GameRow` uses this;
+ * the explorer and the book panel colour their average drops through
+ * `routes/explorer/stats.ts`, which already ends in `soft` the same way.
+ */
 export function dropTone(drop: number | null): string {
   if (drop === null) return 'text-dim-2'
   if (drop >= 30) return 'text-blunder'
   if (drop >= 15) return 'text-mistake'
   if (drop >= 7) return 'text-inaccuracy'
-  return 'text-good'
+  return 'text-soft'
 }
 
 /**
@@ -158,9 +164,9 @@ export function flagCounts(game: GameCard): FlagCount[] {
 }
 
 /**
- * The run chip a card can draw, or null when nothing has run over it. A card knows only that
- * a pass is done and whether somebody asked for one — not the limits — so the chip says
- * "Analysed", coloured when a requested run is among them.
+ * The run a card can show, or null when nothing has run over it. A card knows only that a
+ * pass is done and whether somebody asked for one — not the limits — so the Analysis cell
+ * says "Analysed", in the requested purple when a requested run is among them.
  */
 export function analysisOf(game: GameCard): RunShape | null {
   if (!game.analyzed) return null

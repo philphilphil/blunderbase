@@ -8,6 +8,7 @@ import { BOARD_SETTINGS_ID } from '@/components/board/BoardSettings'
 import { LichessConnectCard } from '@/components/lichess/ConnectLichess'
 import { SetPageChrome } from '@/components/shell/PageChrome'
 import { PageBody } from '@/components/shell/PageHeader'
+import { buttonVariants } from '@/components/ui/button'
 import { liveBest, liveScore, useStreamSession } from '@/lib/analysis'
 import {
   useDeleteLine,
@@ -139,13 +140,21 @@ export const MOVES_WIDTH_KEY = 'blunderbase.gameMovesWidth'
  * then renders 1.2× larger. The *band* boundaries are physical pixels, because media queries
  * do not scale with the root (`index.css`).
  *
+ * These have to switch where the CSS does — `min-[90rem]` (1440) and `min-[100rem]` (1600)
+ * on the moves column, `xl` (1280) for the board column's floor — or a drag is clamped
+ * against a floor the screen is not drawing. They used to switch the right column's floor at
+ * 1280 while the CSS moved it at 1440, so between the two a drag stopped 5rem short of where
+ * the column could actually go. Hence four bands where there are three column widths: 1280
+ * is where the board gains its floor, not where the column changes.
+ *
  * The board's own floor only holds from `xl` up. Below it the board yields instead: at 1280
  * physical pixels the sidebar and the right column have already spent most of the row, and a
  * floor there would buy a horizontal scrollbar rather than a bigger board.
  */
 const BANDS = [
   { from: 1600, right: 35.25, board: 26.25 },
-  { from: 1280, right: 31.75, board: 26.25 },
+  { from: 1440, right: 31.75, board: 26.25 },
+  { from: 1280, right: 26.875, board: 26.25 },
   { from: 0, right: 26.875, board: 0 },
 ] as const
 
@@ -2011,9 +2020,14 @@ export function GameStudio({ game: from }: { game: StudioGame }) {
               type="button"
               onClick={() => setPracticeOpen(true)}
               title={t`Play this position out against the computer (P)`}
-              className="flex flex-none items-center gap-1 rounded-md border border-edge bg-elevated px-2.5 py-[0.3125rem] text-xs text-soft hover:text-ink max-md:py-1.5"
+              // The row's tool button. The phone's taller target stays (`max-md:`), which is
+              // what the control row's two-line wrap there is measured with.
+              className={cn(
+                buttonVariants({ variant: 'secondary', size: 'sm' }),
+                'max-md:h-auto max-md:py-1.5',
+              )}
             >
-              <Swords className="size-3" aria-hidden />
+              <Swords aria-hidden />
               <Trans comment="Button in the transport row that opens the practice dialog">
                 Practise
               </Trans>
@@ -2043,13 +2057,14 @@ export function GameStudio({ game: from }: { game: StudioGame }) {
                   ? t`Back to ${backToGameLabel}, where you left it`
                   : t`Back to the game you came from, where you left it`
               }
-              // The explorer's way back wears the same colour (`WAY_BACK`).
+              // The explorer's way back wears the same colour (`WAY_BACK`), at the row's
+              // standard button height.
               className={cn(
                 WAY_BACK,
-                'min-w-0 max-w-[16rem] truncate px-2.5 py-[0.3125rem] text-xs max-md:py-1.5',
+                'flex h-7 min-w-0 max-w-[16rem] items-center px-2.5 text-data max-md:h-auto max-md:py-1.5',
               )}
             >
-              ← {backToGameLabel ?? t`Previous game`}
+              <span className="truncate">← {backToGameLabel ?? t`Previous game`}</span>
             </Link>
           ) : null}
         </>
@@ -2114,7 +2129,7 @@ export function GameStudio({ game: from }: { game: StudioGame }) {
    * would be two places to look for the same thing.
    */
   const referenceComposer = (
-    <div className="flex min-w-0 flex-col justify-center rounded-md border border-dashed border-edge-strong px-3 text-[0.71875rem] leading-relaxed text-dim">
+    <div className="flex min-w-0 flex-col justify-center rounded-md border border-dashed border-edge-strong px-3 text-data leading-relaxed text-dim">
       <Trans>
         Notes hang off a game in your library. Add this one and it can be annotated like any other
         — counted in no statistic, since you did not play it.
@@ -2345,7 +2360,9 @@ export function GameStudio({ game: from }: { game: StudioGame }) {
           and nothing else, so the direction is decided in `resize`: rightwards is a narrower
           right column and a bigger board. Every drag is clamped against the row's measured
           width and this band's floors (`BANDS`), and the `min-w` classes hold the same
-          floors in CSS for a width no drag produced.
+          floors in CSS for a width no drag produced. The splitter carries a grip at its
+          middle and a title, because a hairline nobody is told about is a resize nobody
+          finds.
 
           Below `xl` the board column has no floor of its own: the sidebar is still 200
           design pixels there and the right column cannot go under a move row plus a book
@@ -2438,7 +2455,7 @@ export function GameStudio({ game: from }: { game: StudioGame }) {
             // column's 508 come to 1271, which fits; the 1280 band asked for 508 more than
             // it had and the notes track was clipped off the right edge of a window that
             // cannot scroll sideways. The bands themselves are unchanged, they just start
-            // one step later.
+            // one step later. `BANDS` switches at the same widths.
             'min-[90rem]:min-w-[31.75rem] min-[90rem]:grid-cols-[18.75rem_minmax(0,1fr)]',
             'min-[100rem]:min-w-[35.25rem] min-[100rem]:grid-cols-[21.25rem_minmax(0,1fr)]',
             // Untouched, this column takes everything the board column does not: the board

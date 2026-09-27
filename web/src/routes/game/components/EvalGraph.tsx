@@ -207,12 +207,12 @@ export function EvalGraph({
         <GraphTabs tab={tab} timed={timed} onTabChange={setTab} />
         <span className="flex-1" />
         {ownerSide ? (
-          <label className="inline-flex cursor-pointer select-none items-center gap-1 text-[0.625rem] text-dim">
+          <label className="inline-flex cursor-pointer select-none items-center gap-1 text-label text-soft hover:text-ink">
             <input
               type="checkbox"
               checked={onlyMine}
               onChange={(e) => setOnlyMine(e.target.checked)}
-              className="size-2.5 accent-accent"
+              className="size-3 accent-accent"
             />
             <Trans>only mine</Trans>
           </label>
@@ -265,7 +265,7 @@ export function EvalGraph({
           />
         </div>
       ) : points.length === 0 ? (
-        <div className="flex min-h-[2.875rem] min-w-0 items-center justify-center rounded-md border border-dashed border-edge-strong bg-graph-bg text-center text-[0.6875rem] text-dim [grid-area:plot]">
+        <div className="flex min-h-[2.875rem] min-w-0 items-center justify-center rounded-md border border-dashed border-edge-strong bg-graph-bg text-center text-label text-dim [grid-area:plot]">
           <Trans>No evaluations yet — run an analysis pass to draw the curve.</Trans>
         </div>
       ) : (
@@ -456,7 +456,7 @@ function CurveReadout({ payload }: { payload?: { payload?: SeriesPoint }[] }) {
   const point = payload?.[0]?.payload
   if (!point || !Number.isInteger(point.ply)) return null
   return (
-    <div className="pointer-events-none rounded-md border border-edge-strong bg-elevated px-2 py-1 text-[0.65625rem] whitespace-nowrap shadow-[0_0.25rem_0.75rem_var(--bb-shadow)]">
+    <div className="pointer-events-none rounded-md border border-edge-strong bg-elevated px-2 py-1 text-label whitespace-nowrap shadow-[0_0.25rem_0.75rem_var(--bb-shadow)]">
       <span className="font-mono tabular text-dim">
         {point.ply < 0 ? (
           <Trans comment="Stands in for a move number at the starting position">start</Trans>
@@ -547,7 +547,7 @@ function PlayerTally({
     <div
       role="group"
       aria-label={t`${name}: ${counts}, ${acplProse}`}
-      className="flex min-w-0 flex-col items-center gap-[0.15625rem] text-[0.65625rem]"
+      className="flex min-w-0 flex-col items-center gap-[0.15625rem] text-label"
     >
       <span className="flex min-w-0 max-w-full items-center gap-1.5">
         <SideDot side={side} size="sm" />
@@ -581,7 +581,7 @@ function PlayerTally({
             </span>
           </Fragment>
         ))}
-        <span className="text-right font-mono tabular text-body-3">{row.acpl ?? '—'}</span>
+        <span className="text-right font-mono text-data text-body">{row.acpl ?? '—'}</span>
         <span title={t`Average centipawn loss`} className="font-mono text-dim">
           <Trans comment="Abbreviation of “average centipawn loss”, beside the number itself">
             ACPL

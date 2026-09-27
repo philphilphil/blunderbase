@@ -395,7 +395,7 @@ export function MaiaPanel({
           {!showHuman ? null : comparing ? (
             <CompareGrid columns={comparison} onHoverMove={onHoverMove} onPlayLine={onPlayLine} />
           ) : human.length === 0 ? (
-            <p className="px-1 py-1 text-[0.6875rem] text-dim">
+            <p className="px-1 py-1 text-data text-dim">
               {live?.pending ? <Trans>Reading this position…</Trans> : '–'}
             </p>
           ) : (
@@ -449,7 +449,7 @@ export function MaiaPanel({
               // name it draws is the engine picker, the way the Maia label is the level's.
               <LiveSearchStatus stream={search.stream} dot={false} pick />
             ) : (
-              <span className="truncate text-[0.6875rem] font-semibold tracking-[0.02em] text-ink">
+              <span className="truncate text-label font-semibold text-ink">
                 {run?.engine ?? t`No engine run`}
               </span>
             )}
@@ -460,7 +460,7 @@ export function MaiaPanel({
               <span
                 data-testid="maia-engine-along-line"
                 title={t`The rest of the line this run gave, from where the board now stands`}
-                className="flex-none rounded-sm border border-brilliant/35 bg-brilliant/10 px-[0.3125rem] py-px font-mono text-[0.625rem] text-brilliant"
+                className="flex-none rounded-sm border border-brilliant/35 bg-brilliant/10 px-[0.3125rem] py-px text-meta text-brilliant"
               >
                 <Trans>along its line</Trans>
               </span>
@@ -481,17 +481,17 @@ export function MaiaPanel({
                   {/* The limit the run stopped each move at, whichever of the three it was:
                       a run from the Analyse dialog carries one, an import pass nodes. */}
                   {run?.depth ? (
-                    <span className="flex-none font-mono text-[0.625rem] tabular text-dim">
+                    <span className="flex-none font-mono text-meta text-dim">
                       d{run.depth}
                     </span>
                   ) : null}
                   {run?.seconds ? (
-                    <span className="flex-none font-mono text-[0.625rem] tabular text-dim">
+                    <span className="flex-none font-mono text-meta text-dim">
                       <Trans>{run.seconds}s a move</Trans>
                     </span>
                   ) : null}
                   {nodes !== '—' ? (
-                    <span className="flex-none font-mono text-[0.625rem] tabular text-dim @max-[30rem]:hidden">
+                    <span className="flex-none font-mono text-meta text-dim @max-[30rem]:hidden">
                       <Trans>{nodes} nodes</Trans>
                     </span>
                   ) : null}
@@ -499,11 +499,13 @@ export function MaiaPanel({
               )}
             </div>
             {onLive && search ? (
-              // The search's line count, where the run's `MPV` chip stands on the other
-              // tab: the same fact about the other claim, in the same shape.
+              // The search's line count, where the run's `MPV` readout stands on the other
+              // tab: the same fact about the other claim, in the same place — but drawn as
+              // the control it is, since this one can be changed and that one cannot.
               <LiveLinesChip stream={search.stream} />
             ) : run?.multipv ? (
-              <span className="flex-none rounded-sm border border-edge px-[0.3125rem] py-px font-mono text-[0.625rem] tabular text-dim">
+              // A readout, not a control: a data badge (`rounded-sm`), never a button shape.
+              <span className="flex-none rounded-sm border border-edge px-[0.3125rem] py-px font-mono text-meta text-dim">
                 MPV {run.multipv}
               </span>
             ) : null}
@@ -546,7 +548,7 @@ export function MaiaPanel({
           ) : /* Switched off, the column holds its place and says nothing at all — the same
               rule the human column beside it follows. */
           !showEngine ? null : engine.length === 0 ? (
-            <p className="px-1 py-1 text-[0.6875rem] text-dim">–</p>
+            <p className="px-1 py-1 text-data text-dim">–</p>
           ) : (
             <div className="flex flex-col gap-0.5">
               {engine.map((line) => {
@@ -588,7 +590,7 @@ export function MaiaPanel({
             label={t`Peek at the line`}
           />
           {peekLabel ? (
-            <span className="font-mono text-[0.59375rem] text-dim">{peekLabel}</span>
+            <span className="font-mono text-meta text-dim">{peekLabel}</span>
           ) : null}
         </div>
       ) : null}
@@ -641,8 +643,12 @@ function EnginePaneTabs({ search, idle }: { search: EnginePaneSearch; idle: bool
         return (
           <span
             key={tab}
+            // The strip's `xs` control (h-6, `text-label`, `rounded-md`), drawn by hand rather
+            // than from `buttonVariants` because the pill is this wrapper, which also holds
+            // the stop square: the fill and the hover belong to it, not to either button.
+            // Selected is the app's one selected state, `--bb-selected` behind `ink`.
             className={cn(
-              'inline-flex h-6 items-center rounded-sm transition-colors',
+              'inline-flex h-6 items-center rounded-md transition-colors',
               selected ? 'bg-selected' : 'hover:bg-raised',
             )}
           >
@@ -655,10 +661,10 @@ function EnginePaneTabs({ search, idle }: { search: EnginePaneSearch; idle: bool
               title={starts ? t`Analyse this position continuously` : undefined}
               onClick={() => search.onTabChange(tab)}
               className={cn(
-                'inline-flex h-6 items-center gap-1.5 rounded-sm px-1.5 text-[0.6875rem]',
+                'inline-flex h-6 items-center gap-1.5 rounded-md px-2 text-label font-medium',
                 'outline-none focus-visible:bg-raised disabled:opacity-50',
                 stoppable && 'pr-1',
-                selected ? 'font-semibold text-ink' : 'text-dim hover:text-ink',
+                selected ? 'text-ink' : 'text-soft hover:text-ink',
               )}
             >
               <span className={cn('size-1.5 flex-none rounded-full', dot)} />
@@ -671,7 +677,7 @@ function EnginePaneTabs({ search, idle }: { search: EnginePaneSearch; idle: bool
                 title={t`Stop live analysis`}
                 data-testid="engine-pane-live-stop"
                 onClick={() => search.stream.setEnabled(false)}
-                className="mr-0.5 inline-flex size-5 items-center justify-center rounded-sm text-dim outline-none transition-colors hover:bg-raised hover:text-blunder focus-visible:bg-raised"
+                className="mr-0.5 inline-flex size-5 items-center justify-center rounded-md text-soft outline-none transition-colors hover:bg-raised hover:text-blunder focus-visible:bg-raised"
               >
                 <Square className="size-2.5" fill="currentColor" strokeWidth={0} />
               </button>
@@ -733,7 +739,7 @@ function LevelLabel({
   const pickable = levels.length > 1 && onSelectLevel !== undefined
   if (!pickable) {
     return (
-      <span className="inline-flex flex-none items-center gap-1 whitespace-nowrap text-[0.6875rem] font-semibold tracking-[0.02em] text-ink">
+      <span className="inline-flex flex-none items-center gap-1 whitespace-nowrap text-label font-semibold text-ink">
         {label}
         <HumanMark />
       </span>
@@ -745,13 +751,13 @@ function LevelLabel({
     // had room to give. What yields in a narrow column is the spacer, never the name.
     <span
       data-testid="maia-level-picker"
-      className="relative inline-flex flex-none items-center gap-0.5 rounded-[0.1875rem] hover:bg-raised"
+      className="relative inline-flex flex-none items-center gap-0.5 rounded-md hover:bg-raised"
     >
-      <span className="inline-flex items-center gap-1 whitespace-nowrap text-[0.6875rem] font-semibold tracking-[0.02em] text-ink">
+      <span className="inline-flex items-center gap-1 whitespace-nowrap text-label font-semibold text-ink">
         {label}
         <HumanMark />
       </span>
-      <ChevronDown className="size-2.5 flex-none text-faint" aria-hidden />
+      <ChevronDown className="size-2.5 flex-none text-soft" aria-hidden />
       <select
         aria-label={t`Maia level`}
         title={t`Which level the human column speaks for`}
@@ -789,10 +795,12 @@ function CompareToggle({ on, onChange }: { on: boolean; onChange: (next: boolean
       aria-label={label}
       onClick={() => onChange(!on)}
       className={cn(
-        'inline-flex flex-none items-center rounded-sm border px-1 py-px',
+        // Lit in Maia's purple rather than the selected blue: what it switches on is the
+        // human column's own view, and purple is that column's colour everywhere.
+        'inline-flex flex-none items-center rounded-md border px-1 py-px',
         on
           ? 'border-brilliant/40 bg-brilliant/12 text-brilliant'
-          : 'border-edge text-dim hover:border-edge-hover hover:text-soft',
+          : 'border-edge text-soft hover:border-edge-hover hover:text-ink',
       )}
     >
       <Columns3 className="size-3" aria-hidden />
@@ -853,11 +861,11 @@ function CompareColumn({
       data-rating={column.rating ?? ''}
       className="flex min-w-0 flex-col gap-0.5"
     >
-      <span className="truncate border-b border-line pb-1 font-mono text-[0.625rem] font-semibold text-brilliant">
+      <span className="truncate border-b border-line pb-1 font-mono text-label font-semibold text-brilliant">
         {column.rating ?? 'Maia'}
       </span>
       {column.moves.length === 0 ? (
-        <span className="py-1 font-mono text-[0.625rem] text-dim">–</span>
+        <span className="py-1 font-mono text-data text-dim">–</span>
       ) : (
         column.moves.map((move) => (
           <CompareRow
@@ -909,24 +917,24 @@ function CompareRow({
       onMouseLeave={() => onHoverMove?.(null)}
       title={t`Play ${san} on the analysis board`}
       className={cn(
-        'relative flex w-full items-baseline gap-1 overflow-hidden rounded-[0.1875rem] border-l-2 px-1 py-px text-left',
+        'relative flex w-full items-baseline gap-1 overflow-hidden rounded-sm border-l-2 px-1 py-px text-left',
         move.played ? null : 'border-transparent',
         onPlay ? 'hover:bg-raised' : 'cursor-default',
       )}
       style={move.played ? { borderLeftColor: hue, background: tint(hue, 7) } : undefined}
     >
-      <span className="relative w-3 flex-none font-mono text-[0.59375rem] tabular text-faint">
+      <span className="relative w-3 flex-none font-mono text-meta text-dim-2">
         {move.rank}
       </span>
       <span
         className={cn(
-          'relative min-w-0 flex-1 truncate font-mono text-[0.625rem]',
-          verdict ? verdict.textClass : 'text-soft',
+          'relative min-w-0 flex-1 truncate font-mono text-data',
+          verdict ? verdict.textClass : 'text-body',
         )}
       >
         {san}
       </span>
-      <span className="relative flex-none font-mono text-[0.59375rem] tabular text-dim">
+      <span className="relative flex-none font-mono text-meta text-dim">
         {move.probability === null ? '—' : `${Math.round(move.probability * 100)}%`}
       </span>
     </button>
@@ -938,7 +946,7 @@ function LivePill({ pending }: { pending: boolean }) {
   return (
     <span
       data-testid="maia-live"
-      className="inline-flex flex-none items-center gap-1 rounded-sm border border-brilliant/30 bg-brilliant/10 px-1.5 py-px font-mono text-[0.59375rem] text-brilliant @max-[12rem]:hidden"
+      className="inline-flex flex-none items-center gap-1 rounded-sm border border-brilliant/30 bg-brilliant/10 px-1.5 py-px text-meta text-brilliant @max-[12rem]:hidden"
     >
       <span
         className={cn('size-1 rounded-full bg-brilliant', pending && 'animate-pulse')}
@@ -992,7 +1000,7 @@ function HumanRow({
       onMouseLeave={() => onHoverMove?.(null)}
       title={t`Play ${san} on the analysis board`}
       className={cn(
-        'flex w-full items-baseline gap-2 rounded-[0.25rem] border-l-2 px-1.5 py-[0.1875rem] text-left',
+        'flex w-full items-baseline gap-2 rounded-md border-l-2 px-1.5 py-[0.1875rem] text-left',
         move.played ? null : 'border-transparent',
         // The fill is an inline background, and an inline background beats any
         // `hover:bg-*`, so the hover affordance is an inset ring instead — which also
@@ -1006,14 +1014,16 @@ function HumanRow({
     >
       <span
         className={cn(
-          'min-w-0 flex-1 truncate font-mono text-[0.6875rem]',
-          verdict ? verdict.textClass : 'text-soft',
+          // A move nobody flagged is still the thing being read, so `body`, not `soft`.
+          'min-w-0 flex-1 truncate font-mono text-data',
+          verdict ? verdict.textClass : 'text-body',
         )}
       >
         {san}
       </span>
-      {/* The card's only quantity now, so it carries the weight the loss chip used to. */}
-      <span className="w-[1.75rem] flex-none text-right font-mono text-[0.6875rem] tabular text-ink">
+      {/* The card's only quantity now, so it carries the weight the loss chip used to.
+          2rem holds "100%" in the mono at this size. */}
+      <span className="w-[2rem] flex-none text-right font-mono text-data text-ink">
         {move.probability === null ? '—' : `${Math.round(move.probability * 100)}%`}
       </span>
       <DeltaChip move={move} />
@@ -1043,12 +1053,12 @@ function DeltaChip({ move }: { move: HumanMoveView }) {
   const best = move.classification === 'best'
 
   return (
-    <span className="flex w-[1.25rem] flex-none justify-end">
+    <span className="flex w-[1.5rem] flex-none justify-end">
       {verdict ? (
         <span
           title={verdict.label}
           className={cn(
-            'rounded-[0.1875rem] border px-[0.1875rem] py-px text-center font-mono text-[0.59375rem] font-bold',
+            'rounded-sm border px-[0.1875rem] py-px text-center font-mono text-label font-bold',
             best ? 'border-transparent' : '',
           )}
           style={
@@ -1129,14 +1139,14 @@ function EngineRow({
       }}
       title={line.text || plyLabel(ply)}
       className={cn(
-        'flex items-baseline gap-1.5 rounded-[0.25rem] px-1 py-[0.1875rem]',
+        'flex items-baseline gap-1.5 rounded-md px-1 py-[0.1875rem]',
         verdict ? null : 'hover:bg-raised',
       )}
       style={verdict ? { background: tint(verdict.color, 6) } : undefined}
     >
       <span
         className={cn(
-          'min-w-[2.5rem] flex-none rounded-[0.1875rem] px-1 py-px text-right font-mono text-[0.625rem] tabular',
+          'min-w-[3.25rem] flex-none rounded-sm px-1 py-px text-right font-mono text-label font-semibold tabular',
           verdict ? '' : line.multipv === 1 ? 'bg-cell-strong text-ink-2' : 'bg-cell text-body-3',
         )}
         style={verdict ? { background: tint(verdict.color, 13), color: verdict.color } : undefined}
@@ -1145,7 +1155,7 @@ function EngineRow({
       </span>
       <div className="flex min-w-0 flex-1 flex-wrap items-baseline gap-x-1 gap-y-0.5">
         {line.sans.length === 0 ? (
-          <span className="font-mono text-[0.6875rem] text-soft">—</span>
+          <span className="font-mono text-data text-dim">—</span>
         ) : (
           line.sans.map((san, index) => {
             const k = index + 1
@@ -1156,6 +1166,8 @@ function EngineRow({
                   san={san}
                   ply={k}
                   className={cn(
+                    // The top line is the one being read, so `ink`; the others `body`.
+                    line.multipv === 1 ? 'text-ink' : 'text-body',
                     // The verdict belongs to the move that was played, which is the first one.
                     index === 0 ? verdict?.textClass : undefined,
                     // Where the preview stands, and what it has already walked past — the
@@ -1181,7 +1193,7 @@ function EngineRow({
       {line.played ? (
         <span
           className={cn(
-            'flex-none rounded-[0.1875rem] border px-1 py-px font-mono text-[0.59375rem]',
+            'flex-none rounded-sm border px-1 py-px text-meta',
             verdict ? '' : 'border-edge text-dim',
           )}
           style={
@@ -1214,7 +1226,7 @@ function Rollout({
       data-testid="maia-rollout"
       className="flex flex-col gap-1 border-t border-line pt-[0.4375rem]"
     >
-      <span className="font-mono text-[0.59375rem] uppercase tracking-[0.04em] text-faint">
+      <span className="text-meta uppercase tracking-[.06em] text-dim-2">
         <Trans>likely continuation</Trans>
       </span>
       <div className="flex flex-wrap items-baseline gap-x-1 gap-y-0.5">
@@ -1230,7 +1242,7 @@ function Rollout({
               }
             />
             {move.probability === null ? null : (
-              <span className="font-mono text-[0.59375rem] tabular text-faint">
+              <span className="font-mono text-meta text-dim-2">
                 {Math.round(move.probability * 100)}%
               </span>
             )}
@@ -1245,7 +1257,7 @@ function Rollout({
 function PlyNumber({ ply, first }: { ply: number; first: boolean }) {
   if (ply % 2 === 1 && !first) return null
   return (
-    <span className="font-mono text-[0.59375rem] tabular text-faint">
+    <span className="font-mono text-meta text-dim-2">
       {Math.floor(ply / 2) + 1}
       {ply % 2 === 0 ? '.' : '…'}
     </span>
@@ -1283,7 +1295,7 @@ function MoveButton({
         data-ply={ply}
         onMouseEnter={onMouseEnter}
         onMouseLeave={onMouseLeave}
-        className={cn('font-mono text-[0.6875rem] text-soft', className)}
+        className={cn('font-mono text-data text-body', className)}
       >
         {notate(san)}
       </span>
@@ -1297,7 +1309,7 @@ function MoveButton({
       onMouseEnter={onMouseEnter}
       onMouseLeave={onMouseLeave}
       className={cn(
-        'rounded-[0.1875rem] font-mono text-[0.6875rem] text-soft hover:text-ink hover:underline',
+        'rounded-sm font-mono text-data text-body hover:text-ink hover:underline',
         className,
       )}
     >

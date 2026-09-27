@@ -20,10 +20,11 @@ own one group:
 The line above the table says how many games match. **Clear** next to it drops every chip
 at once, and a chip's own clear drops just that group.
 
-In the table, the **Source** chip on a Lichess or Chess.com row is a link: it opens the
-game on that site in a new tab, without opening the row here. A PGN you uploaded keeps the
-link too when the file came from one of those sites. FICS, OTB and typed correspondence
-games have no page anywhere, and their chip is just a chip.
+In the table, the **Source** column names the site beside a coloured dot. On a Lichess or
+Chess.com row it is a link, with a small arrow when you point at it: it opens the game on
+that site in a new tab, without opening the row here. A PGN you uploaded keeps the link too
+when the file came from one of those sites. FICS, OTB and typed correspondence games have
+no page anywhere, and their source is just a name.
 
 ## Search the table
 
@@ -43,6 +44,10 @@ whole filtered library, not to the page in front of you. The footer sets the row
 — **Fit** is as many as the window has room for — and pages with the arrows beside the
 count.
 
+The **Analysis** column says **Analysed** or **Unanalysed** in plain words, in purple when
+a run you asked for is among them. The only badges in the table are the `??`, `?` and `?!`
+flags. The **Worst** column is coloured only when the drop is an inaccuracy or worse.
+
 ## Read the list without the engine
 
 `⇧E`, or the computer in the title bar, drops the **Worst** column and the flag badges from
@@ -59,8 +64,8 @@ engine** when you have read it.
 
 ## Act on several games at once
 
-Tick rows, or the box in the header for the whole page, and the footer offers **Queue
-analysis**, **Delete** and **Clear selection**. **Queue analysis** gives each game the
+Tick rows, or the box in the header for the whole page — a ticked row turns blue, with a
+bar down its left edge — and the footer offers **Queue analysis**, **Delete** and **Clear selection**. **Queue analysis** gives each game the
 import pass, at the budget and in the place in the queue every imported game gets; a
 deeper look at one game is **Analyse** on the game itself. What a pass costs is in
 [Analysis](analysis.md#which-pass-does-a-game-get).

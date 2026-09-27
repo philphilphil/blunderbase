@@ -45,7 +45,7 @@ export function FlaggedMoments({
   if (flagged.length === 0) {
     return (
       <div className={cn('flex items-start justify-center px-3 py-6', className)}>
-        <p className="text-center text-[0.71875rem] text-dim">
+        <p className="text-center text-data text-dim">
           <Trans>Nothing flagged in this game.</Trans>
         </p>
       </div>
@@ -61,20 +61,31 @@ export function FlaggedMoments({
         // engine draws what it would have played instead. Standing *after* it would show
         // the position the mistake already produced, which explains nothing.
         const target = move.ply - 1
+        const selected = cursor === target
         return (
           <button
             key={move.ply}
             type="button"
             onClick={() => onSelect(target)}
+            // The app's selected row: `--bb-selected` with the accent bar down its left edge,
+            // the same as a selected game in the table. The ply number is metadata, so it
+            // rises to `soft` on the blue, where `dim` would fall below AA.
             className={cn(
               'flex items-center gap-2 border-b border-hairline px-3 py-2 text-left last:border-b-0',
-              cursor === target ? 'bg-selected' : 'hover:bg-raised',
+              selected
+                ? 'bg-selected shadow-[inset_0.125rem_0_0_var(--bb-accent)]'
+                : 'hover:bg-raised',
             )}
           >
-            <span className="w-9 flex-none font-mono text-[0.6875rem] tabular text-faint">
+            <span
+              className={cn(
+                'w-9 flex-none font-mono text-label',
+                selected ? 'text-soft' : 'text-dim',
+              )}
+            >
               {plyLabel(move.ply)}
             </span>
-            <span className="min-w-0 flex-1 truncate font-mono text-[0.78125rem] text-ink">
+            <span className="min-w-0 flex-1 truncate font-mono text-lead text-ink">
               {move.san ? notate(move.san) : null}
             </span>
             {/*
@@ -82,7 +93,7 @@ export function FlaggedMoments({
               The engine's own move is deliberately not here: it is two more columns on a
               375px row, and it is the first thing the board draws once the row is tapped.
             */}
-            <span className="flex-none font-mono text-[0.6875rem] tabular text-blunder">
+            <span className="flex-none font-mono text-label text-blunder">
               {formatWinLoss(move.win_loss)}
             </span>
             <ClassificationBadge classification={move.classification} size="sm" />

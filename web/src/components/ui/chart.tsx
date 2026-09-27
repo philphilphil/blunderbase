@@ -46,7 +46,7 @@ export function ChartContainer({
         data-slot="chart"
         data-chart={chartId}
         className={cn(
-          "flex aspect-video justify-center overflow-hidden text-[0.6875rem] [&_.recharts-cartesian-axis-tick_text]:fill-dim [&_.recharts-cartesian-grid_line[stroke='#ccc']]:stroke-hairline [&_.recharts-curve.recharts-tooltip-cursor]:stroke-edge [&_.recharts-sector[stroke='#fff']]:stroke-transparent [&_.recharts-surface]:outline-none",
+          "flex aspect-video justify-center overflow-hidden text-label [&_.recharts-cartesian-axis-tick_text]:fill-dim [&_.recharts-cartesian-grid_line[stroke='#ccc']]:stroke-hairline [&_.recharts-curve.recharts-tooltip-cursor]:stroke-edge [&_.recharts-sector[stroke='#fff']]:stroke-transparent [&_.recharts-surface]:outline-none",
           className,
         )}
         {...props}
@@ -108,12 +108,12 @@ export function ChartTooltipContent({
   return (
     <div
       className={cn(
-        'min-w-[8rem] rounded-md border border-edge bg-elevated px-2.5 py-2 text-[0.6875rem] shadow-xl',
+        'min-w-[8rem] rounded-md border border-edge bg-elevated px-2.5 py-2 text-label shadow-xl',
         className,
       )}
     >
       {!hideLabel && label !== undefined && (
-        <div className="mb-1 font-mono text-[0.625rem] text-dim">
+        <div className="mb-1 font-mono text-meta text-dim">
           {labelFormatter ? labelFormatter(label, payload) : String(label)}
         </div>
       )}

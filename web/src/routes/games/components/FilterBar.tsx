@@ -7,9 +7,11 @@ import { msg } from '@lingui/core/macro'
 import { Trans, useLingui } from '@lingui/react/macro'
 import { useEffect, useRef, useState } from 'react'
 
+import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import type { Color, Whose } from '@/lib/api/types'
 import { cn } from '@/lib/utils'
+import { Segmented } from '@/routes/stats/kit/states'
 
 import {
   clearGroup,
@@ -25,7 +27,7 @@ import {
 } from '../filters'
 import { OUTCOME_LABELS, SOURCE_LABELS } from '../format'
 import { MAX_LABEL_LENGTH, saveFilter, suggestLabel } from '../savedFilters'
-import { FilterPopover, OptionRow, PopoverLabel, TriState } from './FilterPopover'
+import { FilterPopover, OptionButton, OptionRow, PopoverLabel, TriState } from './FilterPopover'
 
 export interface FilterBarProps {
   filters: LibraryFilters
@@ -97,31 +99,24 @@ const WHOSE_OPTIONS: { label: MessageDescriptor; value: Whose; title: MessageDes
   { label: msg`All`, value: 'all', title: msg`Both together` },
 ]
 
+/**
+ * Mine / Others / All, as the app's one `Segmented` — the control the explorer's own
+ * source switch and the stats windows are — so it has the same height as the chips beside
+ * it, the same sans label and the same selected blue, rather than a mono copy of its own.
+ */
 function WhoseToggle({ value, onChange }: { value: Whose; onChange: (whose: Whose) => void }) {
   const { t, i18n } = useLingui()
   return (
-    <div
-      role="group"
-      aria-label={t`Whose games`}
-      className="flex overflow-hidden rounded-md border border-edge bg-elevated font-mono text-[0.71875rem]"
-    >
-      {WHOSE_OPTIONS.map((option, index) => (
-        <button
-          key={option.value}
-          type="button"
-          aria-pressed={value === option.value}
-          title={i18n._(option.title)}
-          onClick={() => onChange(option.value)}
-          className={cn(
-            'px-2.5 py-1 transition-colors',
-            index > 0 && 'border-l border-edge',
-            value === option.value ? 'bg-selected text-ink' : 'text-dim hover:text-ink',
-          )}
-        >
-          {i18n._(option.label)}
-        </button>
-      ))}
-    </div>
+    <Segmented
+      label={t`Whose games`}
+      value={value}
+      onChange={onChange}
+      options={WHOSE_OPTIONS.map((option) => ({
+        value: option.value,
+        label: i18n._(option.label),
+        title: i18n._(option.title),
+      }))}
+    />
   )
 }
 
@@ -173,7 +168,7 @@ function SaveFilter({ filters }: { filters: LibraryFilters }) {
           setLabel(suggestLabel(filters))
           setOpen((current) => !current)
         }}
-        className="px-1 text-[0.71875rem] text-accent-teal transition-colors hover:text-accent-link disabled:cursor-not-allowed disabled:text-faint"
+        className="px-1 text-label text-accent-teal transition-colors hover:text-accent-link disabled:cursor-not-allowed disabled:text-dim-2"
       >
         <Trans>Save filter</Trans>
       </button>
@@ -181,7 +176,7 @@ function SaveFilter({ filters }: { filters: LibraryFilters }) {
         // Anchored to the bar rather than to the chip below `md`, like every other panel
         // on this bar — this one sits at its right-hand end, where a 250px panel has the
         // least room of all.
-        <div className="bb-pop-in absolute top-[calc(100%+0.375rem)] left-0 z-30 flex flex-col gap-2.5 rounded-lg border border-edge bg-elevated p-2.5 shadow-[0_1.125rem_2.5rem_-1.125rem_var(--bb-shadow)] md:w-[15.625rem] max-md:right-0">
+        <div className="bb-pop-in absolute top-[calc(100%+0.375rem)] left-0 z-30 flex flex-col gap-2.5 rounded-md border border-edge bg-elevated p-2.5 shadow-[0_1.125rem_2.5rem_-1.125rem_var(--bb-shadow)] md:w-[15.625rem] max-md:right-0">
           <PopoverLabel>
             <Trans>Save this cut as</Trans>
           </PopoverLabel>
@@ -194,16 +189,11 @@ function SaveFilter({ filters }: { filters: LibraryFilters }) {
             onKeyDown={(event) => {
               if (event.key === 'Enter') commit()
             }}
-            className="h-7 text-[0.71875rem]"
+            className="h-7 text-data"
           />
-          <button
-            type="button"
-            disabled={label.trim() === ''}
-            onClick={commit}
-            className="rounded-md bg-accent-teal px-2.5 py-1.5 text-[0.71875rem] font-semibold text-accent-ink transition-colors hover:bg-accent-hover disabled:opacity-50"
-          >
+          <Button type="button" size="sm" disabled={label.trim() === ''} onClick={commit}>
             <Trans context="button">Save</Trans>
-          </button>
+          </Button>
         </div>
       ) : null}
     </div>
@@ -233,7 +223,7 @@ function GroupPanel({
               aria-label={t`Played from`}
               value={filters.since ?? ''}
               onChange={(event) => patch({ since: event.target.value || undefined })}
-              className="h-7 text-[0.71875rem]"
+              className="h-7 text-data"
             />
             <span className="text-faint">→</span>
             <Input
@@ -241,19 +231,18 @@ function GroupPanel({
               aria-label={t`Played until`}
               value={filters.until ?? ''}
               onChange={(event) => patch({ until: event.target.value || undefined })}
-              className="h-7 text-[0.71875rem]"
+              className="h-7 text-data"
             />
           </div>
           <div className="flex gap-1">
             {DATE_PRESETS.map((preset) => (
-              <button
+              <OptionButton
                 key={preset.days}
-                type="button"
                 onClick={() => patch({ since: isoDay(preset.days), until: undefined })}
-                className="flex-1 rounded-sm border border-edge bg-raised px-2 py-1 text-[0.71875rem] text-soft hover:border-edge-hover hover:text-ink"
+                className="flex-1"
               >
                 {i18n._(preset.label)}
-              </button>
+              </OptionButton>
             ))}
           </div>
         </>
@@ -324,9 +313,9 @@ function GroupPanel({
             placeholder={t`B22, or just C6`}
             value={filters.eco ?? ''}
             onChange={(event) => patch({ eco: event.target.value.toUpperCase() || undefined })}
-            className="h-7 font-mono text-[0.71875rem]"
+            className="h-7 font-mono text-data"
           />
-          <span className="text-[0.6875rem] leading-snug text-dim">
+          <span className="text-label text-dim">
             <Trans>
               A prefix matches the whole family — <span className="font-mono">C6</span> is every
               Caro-Kann from C60 to C69.
@@ -355,7 +344,7 @@ function GroupPanel({
             placeholder="600+0"
             value={filters.time_control ?? ''}
             onChange={(event) => patch({ time_control: event.target.value || undefined })}
-            className="h-7 font-mono text-[0.71875rem]"
+            className="h-7 font-mono text-data"
           />
         </>
       )
@@ -443,7 +432,7 @@ export function DebouncedInput({
       {...props}
       value={draft}
       onChange={(event) => setDraft(event.target.value)}
-      className={cn('h-7 text-[0.71875rem]', props.className)}
+      className={cn('h-7 text-data', props.className)}
     />
   )
 }

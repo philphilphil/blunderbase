@@ -37,10 +37,10 @@ export function SectionHead({
       {/* The heading never wraps: a two-line "Last 30 days" beside a segmented control is
           the rule losing its argument with the controls on it, and the detail beside it is
           the part that can afford to be truncated instead. */}
-      <h2 className="flex-none text-[0.875rem] font-semibold whitespace-nowrap text-ink">
+      <h2 className="flex-none text-heading font-semibold whitespace-nowrap text-ink">
         {title}
       </h2>
-      {detail ? <span className="min-w-0 truncate text-[0.6875rem] text-dim">{detail}</span> : null}
+      {detail ? <span className="min-w-0 truncate text-label text-dim">{detail}</span> : null}
       {end ? <div className="ml-auto flex items-baseline gap-2.5">{end}</div> : null}
     </header>
   )

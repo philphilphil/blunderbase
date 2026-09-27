@@ -5,13 +5,13 @@ import type * as React from 'react'
 import { cn } from '@/lib/utils'
 
 const badgeVariants = cva(
-  'inline-flex w-fit shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-sm border px-1.5 py-px text-[0.625rem] leading-4 [&>svg]:size-3',
+  'inline-flex w-fit shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-sm border px-1.5 py-px [&>svg]:size-3',
   {
     variants: {
       variant: {
         default: 'border-edge bg-elevated text-soft',
         outline: 'border-edge-strong bg-transparent text-soft',
-        dashed: 'border-dashed border-edge-strong bg-transparent text-dim-2',
+        dashed: 'border-dashed border-edge-strong bg-transparent text-dim',
         accent: 'border-accent-teal/30 bg-accent-teal/10 text-accent-teal',
         // The colour a run somebody asked for wears (`RUN_STYLES.requested`), borrowed for
         // anything else that is "the owner's own choice" rather than a default.
@@ -21,8 +21,10 @@ const badgeVariants = cva(
         good: 'border-good/30 bg-good/10 text-good',
       },
       size: {
-        default: '',
-        md: 'px-2 py-0.5 text-[0.71875rem]',
+        // The size is in the variant, not the base, so the line height pinned here survives
+        // tailwind-merge (a font size after a `leading-*` drops it).
+        default: 'text-meta leading-4',
+        md: 'px-2 py-0.5 text-label',
       },
     },
     defaultVariants: { variant: 'default', size: 'default' },

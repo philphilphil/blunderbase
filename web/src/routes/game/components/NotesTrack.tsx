@@ -39,7 +39,7 @@ import { cn } from '@/lib/utils'
 
 import type { NoteRow } from '../notesModel'
 import { BookPanel, type BookEntry, type BookMove } from './BookPanel'
-import { TAB, TAB_ON, TAB_ROW } from './paneTabs'
+import { PANE_COUNT, PANE_TOOL, TAB, TAB_ON, TAB_ROW } from './paneTabs'
 
 export type NotesTrackTab = 'book' | 'notes'
 
@@ -171,7 +171,7 @@ export function NotesTrack({
         {/* The count belongs to whichever pane is open, in the quietest type on the row —
             and it is the part that leaves when the track is too narrow for it and the
             explorer arrow both, since the arrow is the only way out of this pane. */}
-        <span className="flex items-center font-mono text-[0.625rem] text-faint tabular @max-[13rem]:hidden">
+        <span className={cn('flex items-center', PANE_COUNT, '@max-[13rem]:hidden')}>
           {active === 'book' ? (
             <Plural value={games} one="# game" other="# games" />
           ) : (
@@ -191,9 +191,9 @@ export function NotesTrack({
             onClick={onOpenInExplorer}
             aria-label={t`Open this position in the explorer`}
             title={t`Open this position in the explorer`}
-            className="ml-1.5 flex flex-none items-center rounded-sm border border-edge bg-elevated px-1 py-px text-dim transition-colors hover:border-edge-hover hover:text-ink"
+            className={cn(PANE_TOOL, 'ml-1 self-center')}
           >
-            <ArrowUpRight className="size-3" aria-hidden />
+            <ArrowUpRight className="size-3.5" aria-hidden />
           </button>
         ) : null}
       </div>
@@ -220,10 +220,10 @@ export function NotesTrack({
                 title={opening.name}
                 className="flex items-baseline gap-2 px-3 pt-2 pb-1"
               >
-                <span className="truncate text-[0.75rem] font-semibold text-ink">
+                <span className="truncate text-data font-semibold text-ink">
                   {opening.name}
                 </span>
-                <span className="flex-none font-mono text-[0.625rem] text-dim">{opening.eco}</span>
+                <span className="flex-none font-mono text-meta text-dim">{opening.eco}</span>
               </div>
             ) : null}
             <BookPanel
@@ -325,7 +325,7 @@ function NoteList({
 
   if (notes.length === 0 && !stub) {
     return (
-      <p className="px-3 py-4 text-[0.71875rem] text-faint">
+      <p className="px-3 py-4 text-data text-dim">
         <Trans>No notes in this game yet.</Trans>
       </p>
     )
@@ -338,12 +338,12 @@ function NoteList({
           type="button"
           data-testid="game-note-stub"
           onClick={onWriteGameNote}
-          className={cn(ROW, 'py-1.5', gameNoteActive ? 'bg-row-active' : 'hover:bg-elevated')}
+          className={cn(ROW, 'py-1.5', gameNoteActive ? 'bg-row-active' : 'hover:bg-raised')}
         >
           <span className={cn(LABEL, 'text-dim')} title={t`On the game`}>
             {gameLabel}
           </span>
-          <span className="min-w-0 flex-1 text-xs leading-[1.45] text-faint">
+          <span className="min-w-0 flex-1 text-data text-dim">
             <Trans>What was this game about? Click to write.</Trans>
           </span>
         </button>
@@ -356,8 +356,8 @@ function NoteList({
           <div
             key={row.note.id}
             className={cn(
-              'flex flex-col rounded-[0.3125rem] transition-colors',
-              row.note.id === activeNoteId ? 'bg-row-active' : 'hover:bg-elevated',
+              'flex flex-col rounded-md transition-colors',
+              row.note.id === activeNoteId ? 'bg-row-active' : 'hover:bg-raised',
             )}
           >
             <button
@@ -376,7 +376,7 @@ function NoteList({
                 // position, which is where clicking the row goes.
                 className={cn(
                   LABEL,
-                  row.elsewhere ? 'text-faint' : row.onLine ? 'text-brilliant' : 'text-dim',
+                  row.elsewhere ? 'text-dim-2' : row.onLine ? 'text-brilliant' : 'text-dim',
                 )}
                 title={
                   row.elsewhere
@@ -392,8 +392,8 @@ function NoteList({
               </span>
               <span
                 className={cn(
-                  'line-clamp-2 min-w-0 flex-1 text-xs leading-[1.45]',
-                  row.elsewhere ? 'text-dim' : 'text-soft-2',
+                  'line-clamp-2 min-w-0 flex-1 text-data',
+                  row.elsewhere ? 'text-dim' : 'text-body',
                 )}
               >
                 {row.note.text}
@@ -401,7 +401,7 @@ function NoteList({
             </button>
             {row.elsewhere ? (
               // Indented to the text column: the row's padding, the label's width, the gap.
-              <span className="flex min-w-0 pr-1.5 pb-1.5 pl-[4.5rem] text-[0.625rem] text-faint">
+              <span className="flex min-w-0 pr-1.5 pb-1.5 pl-[4.5rem] text-meta text-dim-2">
                 {row.originHref ? (
                   <Link
                     to={row.originHref}
@@ -462,6 +462,6 @@ function Origin({ row }: { row: NoteRow }) {
 }
 
 /** A Notes-tab row's button: the label column, then the words. */
-const ROW = 'flex w-full items-baseline gap-2.5 rounded-[0.3125rem] px-1.5 text-left'
+const ROW = 'flex w-full items-baseline gap-2.5 rounded-md px-1.5 text-left'
 /** The label column — `6.Bc4`, `game` — whose width the origin line indents past. */
-const LABEL = 'w-14 flex-none font-mono text-[0.6875rem] tabular'
+const LABEL = 'w-14 flex-none font-mono text-label'

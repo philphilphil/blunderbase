@@ -30,6 +30,17 @@ describe('RunBadge', () => {
     expect(screen.getByText(/500k/)).not.toHaveClass('text-deep')
   })
 
+  it('keeps the requested colour as plain text and leaves the plain import pass quiet', () => {
+    const { rerender } = render(
+      <RunBadge plain run={{ nodes: 500_000, multipv: 2, requested: true }} />,
+    )
+    expect(screen.getByText(/500k/)).toHaveClass('text-deep')
+    expect(screen.getByText(/500k/)).not.toHaveClass('border')
+    rerender(<RunBadge plain run={{ nodes: 500_000, multipv: 2, requested: false }} />)
+    expect(screen.getByText(/500k/)).not.toHaveClass('text-deep')
+    expect(screen.getByText(/500k/)).toHaveClass('text-dim')
+  })
+
   it('says a Maia fill is one rather than printing the budget it was queued with', () => {
     render(<RunBadge run={{ nodes: 500_000, multipv: 1, maia_only: true }} />)
     expect(screen.getByText('Maia fill')).toBeInTheDocument()

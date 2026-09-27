@@ -12,13 +12,40 @@ import { cn } from '@/lib/utils'
  * and the dialog's choices are the only honest description of what ran. The colour says
  * whether somebody asked for it, which is the run that answers for a move. Legacy rows
  * render from the nodes and lines they stored, the same way.
+ *
+ * `plain` drops the chip and keeps the words, for a column where every row has a run and
+ * fifty filled chips would be the loudest thing on the screen while saying the least: the
+ * import pass is quiet metadata (`dim`), and a run somebody asked for keeps its `deep`
+ * purple as text — that one is the exception worth seeing.
  */
-export function RunBadge({ run, className }: { run: RunShape; className?: string }) {
+export function RunBadge({
+  run,
+  plain = false,
+  className,
+}: {
+  run: RunShape
+  plain?: boolean
+  className?: string
+}) {
+  const kind = runKind(run)
+  if (plain) {
+    return (
+      <span
+        className={cn(
+          'inline-flex items-center text-label whitespace-nowrap',
+          kind === 'requested' ? RUN_STYLES.requested.textClass : 'text-dim',
+          className,
+        )}
+      >
+        {runLabel(run)}
+      </span>
+    )
+  }
   return (
     <span
       className={cn(
-        'inline-flex items-center rounded-[0.3125rem] border px-2 py-[0.1875rem] text-[0.71875rem] whitespace-nowrap',
-        RUN_STYLES[runKind(run)].chipClass,
+        'inline-flex items-center rounded-sm border px-1.5 py-px text-label whitespace-nowrap',
+        RUN_STYLES[kind].chipClass,
         className,
       )}
     >
@@ -27,12 +54,23 @@ export function RunBadge({ run, className }: { run: RunShape; className?: string
   )
 }
 
-/** The dashed chip a game with no run at all gets. */
-export function UnanalysedBadge({ className }: { className?: string }) {
+/**
+ * What a game with no run at all shows: the dashed chip, or — `plain` — the word alone in
+ * `dim-2`, for the same column the plain `RunBadge` sits in.
+ */
+export function UnanalysedBadge({
+  plain = false,
+  className,
+}: {
+  plain?: boolean
+  className?: string
+}) {
   return (
     <span
       className={cn(
-        'inline-flex items-center rounded-[0.3125rem] border border-dashed border-edge-strong px-2 py-[0.1875rem] text-[0.71875rem] text-dim-2',
+        plain
+          ? 'inline-flex items-center text-label whitespace-nowrap text-dim-2'
+          : 'inline-flex items-center rounded-sm border border-dashed border-edge-strong px-1.5 py-px text-label whitespace-nowrap text-dim-2',
         className,
       )}
     >
@@ -55,16 +93,26 @@ const STATUS_LABEL: Record<RunStatus, MessageDescriptor> = {
   failed: msg`Failed`,
 }
 
+/**
+ * Where a run is in the queue. Queued, running and done are a dot and a word — routine
+ * states, told apart by the dot's colour. A failed run is the one that needs the owner, so
+ * it alone keeps a chip, framed and tinted in the blunder red that means "something went
+ * wrong". The word itself stays `body`, as in `.bb-error`: red on its own red tint falls
+ * under AA on the panel the game header sits on.
+ */
 export function RunStatusBadge({ status, className }: { status: RunStatus; className?: string }) {
   const { i18n } = useLingui()
   return (
     <span
       className={cn(
-        'inline-flex items-center gap-1.5 rounded-[0.3125rem] border border-edge-strong bg-raised px-2 py-[0.1875rem] text-[0.71875rem] text-soft',
+        'inline-flex items-center gap-1.5 text-label whitespace-nowrap',
+        status === 'failed'
+          ? 'rounded-sm border border-blunder/40 bg-blunder/6 px-1.5 py-px text-body'
+          : 'text-soft',
         className,
       )}
     >
-      <span className={cn('size-[0.3125rem] rounded-full', STATUS_DOT[status])} />
+      <span className={cn('size-[0.3125rem] flex-none rounded-full', STATUS_DOT[status])} />
       {i18n._(STATUS_LABEL[status])}
     </span>
   )

@@ -122,7 +122,21 @@ describe('GamesPage — filtering analysis coverage', () => {
       const requests = vi.mocked(fetch).mock.calls.map(([input]) => String(input))
       expect(requests.some((request) => request.includes('analyzed=false'))).toBe(true)
     })
-    expect(screen.getByRole('button', { name: /Analysis:unanalysed/ })).toBeInTheDocument()
+    const chip = screen.getByRole('button', { name: /Analysis:unanalysed/ })
+    // A set chip wears the one selected state, so a glance down the bar finds it.
+    expect(chip.parentElement).toHaveClass('bg-selected')
+    // `expanded`: the chip, not the Source column's sort button.
+    expect(
+      screen.getByRole('button', { name: /^Source/, expanded: false }).parentElement,
+    ).not.toHaveClass('bg-selected')
+  })
+
+  it('keeps Mine / Others / All a labelled group of pressed buttons', async () => {
+    draw()
+    await loaded()
+    const group = screen.getByRole('group', { name: 'Whose games' })
+    expect(group).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'All' })).toHaveAttribute('aria-pressed')
   })
 })
 

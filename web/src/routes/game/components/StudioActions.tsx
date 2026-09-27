@@ -9,8 +9,8 @@
  *
  * Which of them is a button and which is a line in the ⋯ menu is decided by how often it is
  * pressed. **Add to library** is the one affirmative act on a model game's screen and exists
- * only while the game is one, so it is a lit chip in the row. The way back to the explorer
- * and the tree behind a finished correspondence game are pressed once a session at most, and
+ * only while the game is one, so it is a button in the row with its word in the accent. The
+ * way back to the explorer and the tree behind a finished correspondence game are pressed once a session at most, and
  * they are what `useStudioMenu` hands to `RowMenu` — a row that carried them as buttons was
  * a row that wrapped.
  *
@@ -22,6 +22,7 @@ import { Trans, useLingui } from '@lingui/react/macro'
 import { useState, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 
+import { buttonVariants } from '@/components/ui/button'
 import { SETTING_DEFAULTS } from '@/lib/api/appSettings'
 import {
   useAppSettings,
@@ -34,8 +35,14 @@ import { cn } from '@/lib/utils'
 import type { StudioGame } from '../GamePage'
 import type { RowMenuItem } from './RowMenu'
 
-/** The board row's button metrics — shared with everything else in that band. */
-const BUTTON = 'flex-none rounded-md border px-2.5 py-[0.3125rem] text-xs max-md:py-1.5'
+/**
+ * The board row's button: the app's tool button at the row's `sm`, with the phone's taller
+ * target below `md` — the same metrics as everything else in that band (`BoardPanel`).
+ */
+const BUTTON = cn(
+  buttonVariants({ variant: 'secondary', size: 'sm' }),
+  'flex-none max-md:h-auto max-md:py-1.5',
+)
 
 export function StudioActions({
   game,
@@ -149,13 +156,15 @@ function AddToLibrary({
         add.error?.message ??
         t`Kept as somebody else’s game: analysed and annotated like your own, counted in no statistic.`
       }
-      // Teal-tinted, the row's vocabulary for the one control that is doing something rather
-      // than showing something. It is the only affirmative act on a model game's screen.
+      // The accent on the word only: the one affirmative act on a model game's screen, and
+      // the one control in the row that is doing something rather than showing something.
+      // Not a blue frame or fill, which would make it read as a toggle already on. A failed
+      // add keeps its red frame — an error is one of the few things strong colour is for.
       className={cn(
         BUTTON,
         add.isError
-          ? 'border-blunder/40 bg-blunder/10 text-blunder'
-          : 'border-accent-teal/30 bg-accent-teal/10 text-accent-teal hover:border-accent-teal/50',
+          ? 'border-blunder/40 bg-blunder/10 text-blunder hover:bg-blunder/15 hover:text-blunder'
+          : 'text-accent-teal hover:text-accent-link',
       )}
     >
       {add.isPending ? (

@@ -10,11 +10,17 @@
  *
  * The button draws nothing at all when there is nothing rare to hold, which is the ordinary
  * library game — so the row does not grow a permanent ⋯ to hold an empty list.
+ *
+ * The ⋯ is the row's tool button as an `icon-sm` square, the row's `h-7` (below `md` the
+ * phone's taller `max-md:py-1.5`, like the rest of the row). While the menu is
+ * open it is lit the way a pressed toggle is (`aria-expanded` standing in for
+ * `aria-pressed`), so "open" and "on" look the same everywhere.
  */
 import { useLingui } from '@lingui/react/macro'
 import { MoreHorizontal } from 'lucide-react'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 
+import { buttonVariants } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 
 export interface RowMenuItem {
@@ -63,20 +69,18 @@ export function RowMenu({ items, className }: { items: RowMenuItem[]; className?
         title={t`More for this game`}
         onClick={() => setOpen((was) => !was)}
         className={cn(
-          'flex flex-none items-center rounded-md border px-2 py-[0.3125rem] text-xs max-md:py-1.5',
-          open
-            ? 'border-accent-teal/30 bg-accent-teal/10 text-accent-teal'
-            : 'border-edge bg-elevated text-dim hover:text-ink',
+          buttonVariants({ variant: 'secondary', size: 'icon-sm' }),
+          'flex-none max-md:h-auto max-md:py-1.5 aria-expanded:border-accent-teal/45 aria-expanded:bg-selected aria-expanded:text-ink aria-expanded:[&_svg]:text-accent-teal',
         )}
       >
-        <MoreHorizontal className="size-3.5" aria-hidden />
+        <MoreHorizontal aria-hidden />
       </button>
       {open ? (
         // Above the button rather than below it: this row is the last thing in the board
         // column, and a menu opening downwards would hang off the bottom of the window.
         <div
           role="menu"
-          className="bb-card absolute bottom-[calc(100%+0.25rem)] left-0 z-40 flex min-w-[12rem] flex-col py-1 shadow-[0_0.5rem_1.5rem_var(--bb-shadow)]"
+          className="bb-card absolute bottom-[calc(100%+0.25rem)] left-0 z-40 flex min-w-[12rem] flex-col rounded-md py-1 shadow-[0_0.5rem_1.5rem_var(--bb-shadow)]"
         >
           {items.map((item) => (
             <button
@@ -87,11 +91,11 @@ export function RowMenu({ items, className }: { items: RowMenuItem[]; className?
                 setOpen(false)
                 item.onSelect()
               }}
-              className="flex items-center gap-3 px-3 py-1.5 text-left text-xs text-soft hover:bg-raised hover:text-ink"
+              className="flex items-center gap-3 px-3 py-1.5 text-left text-data text-body hover:bg-raised hover:text-ink"
             >
               <span className="flex-1 whitespace-nowrap">{item.label}</span>
               {item.shortcut ? (
-                <span className="flex-none font-mono text-[0.625rem] text-dim-2">
+                <span className="flex-none font-mono text-meta text-dim-2">
                   {item.shortcut}
                 </span>
               ) : null}

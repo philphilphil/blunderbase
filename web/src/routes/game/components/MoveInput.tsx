@@ -123,14 +123,15 @@ export function MoveInput({ board, onPlay, onClose, focusNonce = 0, className }:
         placeholder={t`Nf3, exd5, O-O…`}
         aria-invalid={resolution.kind === 'none' && text.length >= 2 ? true : undefined}
         className={cn(
-          'h-[1.625rem] w-[6.5rem] rounded-md border border-edge bg-elevated px-2 font-mono text-xs text-ink outline-none transition-colors',
+          // `h-7`, the row's budgeted height, so opening the box never makes the row taller.
+          'h-7 w-[6.5rem] rounded-md border border-edge bg-elevated px-2 font-mono text-data text-ink outline-none transition-colors',
           'placeholder:text-faint focus-visible:border-accent-teal/50 aria-invalid:border-blunder max-md:h-8',
         )}
       />
       {hint ? (
         <span
           role="status"
-          className={cn('font-mono text-[0.6875rem] whitespace-nowrap', hint.tone)}
+          className={cn('font-mono text-label whitespace-nowrap', hint.tone)}
         >
           {hint.text}
         </span>

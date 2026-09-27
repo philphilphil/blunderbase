@@ -52,12 +52,12 @@ export function DeleteGamesDialog({
         <div className="flex flex-col gap-1.5">
           <h2
             id="delete-games-title"
-            className="flex items-center gap-2 text-[0.875rem] font-semibold text-ink"
+            className="flex items-center gap-2 text-heading font-semibold text-ink"
           >
             <TriangleAlert className="size-3.5 text-blunder" aria-hidden />
             <Plural value={count} one="Delete 1 game" other="Delete # games" />
           </h2>
-          <p className="text-[0.75rem] leading-[1.65] text-dim">
+          <p className="text-data leading-[1.65] text-soft">
             {/* One message per form rather than two words swapped inside a shared frame:
                 which noun the rest of the sentence agrees with is a per-language decision,
                 and a language with more than two forms has nowhere to put them otherwise. */}
@@ -70,7 +70,7 @@ export function DeleteGamesDialog({
         </div>
         <form onSubmit={submit} className="flex flex-col gap-4">
           {error ? (
-            <p className="rounded-md border border-blunder/28 bg-blunder/5 px-2.5 py-2 text-[0.75rem] text-blunder">
+            <p role="alert" className="bb-error">
               {error}
             </p>
           ) : null}

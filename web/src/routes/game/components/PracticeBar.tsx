@@ -11,13 +11,20 @@
  *
  * The status is one sentence and it changes in place. A reply that could not be had is a
  * sentence here too, with a retry, since the reader can do nothing else until it comes.
+ *
+ * The buttons are the app's tool button (`secondary` at `sm`), and Show / Hide the engine
+ * is a toggle lit by `aria-pressed` the way every pressed toggle is, rather than a tint of
+ * its own.
  */
 import { Trans, useLingui } from '@lingui/react/macro'
 import { Eye, EyeOff, Loader2, RotateCcw, Square } from 'lucide-react'
 
+import { buttonVariants } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 
 import type { PracticeGame, PracticePhase, PracticeResult } from '../practice'
+
+const BUTTON = buttonVariants({ variant: 'secondary', size: 'sm' })
 
 export interface PracticeBarProps {
   game: PracticeGame
@@ -67,21 +74,21 @@ export function PracticeBar({
       )}
     >
       <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-        <span className="text-[0.625rem] tracking-[0.06em] text-dim-2 uppercase">
+        <span className="text-meta tracking-[0.06em] text-dim uppercase">
           {game.side === 'white' ? (
             <Trans>Practice · you play White against {opponent}</Trans>
           ) : (
             <Trans>Practice · you play Black against {opponent}</Trans>
           )}
         </span>
-        <span className="flex items-center gap-1.5 text-xs text-ink">
+        <span className="flex items-center gap-1.5 text-data text-ink">
           {error ? (
             <span className="text-blunder">{error}</span>
           ) : result ? (
             <ResultText result={result} side={game.side} />
           ) : phase === 'thinking' || thinking ? (
             <>
-              <Loader2 className="size-3 animate-spin" aria-hidden />
+              <Loader2 className="size-3.5 animate-spin" aria-hidden />
               <Trans>{opponent} is thinking…</Trans>
             </>
           ) : phase === 'reviewing' ? (
@@ -94,11 +101,7 @@ export function PracticeBar({
 
       <div className="flex flex-none flex-wrap items-center gap-1.5">
         {error ? (
-          <button
-            type="button"
-            onClick={onRetry}
-            className="rounded-md border border-edge bg-elevated px-2.5 py-[0.3125rem] text-xs text-soft hover:text-ink"
-          >
+          <button type="button" onClick={onRetry} className={BUTTON}>
             <Trans>Try again</Trans>
           </button>
         ) : null}
@@ -107,9 +110,13 @@ export function PracticeBar({
           onClick={onTakeBack}
           disabled={!canTakeBack}
           title={t`Take back your last move and the reply to it`}
-          className="flex items-center gap-1 rounded-md border border-edge bg-elevated px-2.5 py-[0.3125rem] text-xs text-soft hover:text-ink disabled:opacity-45 disabled:hover:text-soft"
+          // Disabled, it still shows its tooltip: the base would swallow the hover.
+          className={cn(
+            BUTTON,
+            'disabled:pointer-events-auto disabled:cursor-default disabled:hover:bg-elevated disabled:hover:text-body',
+          )}
         >
-          <RotateCcw className="size-3" aria-hidden />
+          <RotateCcw aria-hidden />
           <Trans>Take back</Trans>
         </button>
         <button
@@ -117,27 +124,18 @@ export function PracticeBar({
           onClick={onToggleReveal}
           aria-pressed={game.reveal}
           title={t`Show or hide the evaluation, the engine lines and Maia (H)`}
-          className={cn(
-            'flex items-center gap-1 rounded-md border px-2.5 py-[0.3125rem] text-xs',
-            game.reveal
-              ? 'border-accent-teal/30 bg-accent-teal/10 text-accent-teal'
-              : 'border-edge bg-elevated text-soft hover:text-ink',
-          )}
+          className={BUTTON}
         >
-          {game.reveal ? (
-            <EyeOff className="size-3" aria-hidden />
-          ) : (
-            <Eye className="size-3" aria-hidden />
-          )}
+          {game.reveal ? <EyeOff aria-hidden /> : <Eye aria-hidden />}
           {game.reveal ? <Trans>Hide the engine</Trans> : <Trans>Show the engine</Trans>}
         </button>
         <button
           type="button"
           onClick={onStop}
           title={t`Stop practising; the moves stay on the board as a line (P)`}
-          className="flex items-center gap-1 rounded-md border border-edge bg-elevated px-2.5 py-[0.3125rem] text-xs text-soft hover:text-ink"
+          className={BUTTON}
         >
-          <Square className="size-3" aria-hidden />
+          <Square aria-hidden />
           <Trans>Stop</Trans>
         </button>
       </div>

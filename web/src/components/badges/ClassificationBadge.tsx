@@ -9,13 +9,14 @@ export type GlyphSize = 'sm' | 'md'
  * `??` fills it, so the two read as different weights of the same thing when they are the
  * same size. Padding sizes both instead: `?` comes out narrow, `??` wide, and the shared
  * height and radius are what keep them one family. Height and radius therefore stay fixed —
- * only the width is allowed to follow the glyph.
+ * only the width is allowed to follow the glyph. Both sizes set the glyph at `text-meta`,
+ * the type scale's floor; `sm` is the shorter box, not a smaller letter.
  */
 const SIZES: Record<GlyphSize, string> = {
   // The size the game cards use in the dashboard strip.
-  sm: 'px-[0.1875rem] h-[0.9375rem] text-[0.59375rem] rounded-[0.1875rem]',
+  sm: 'px-[0.1875rem] h-[0.9375rem] text-meta rounded-sm',
   // The size on the states sheet and in the move list.
-  md: 'px-[0.1875rem] h-4 text-[0.625rem] rounded-[0.1875rem]',
+  md: 'px-[0.1875rem] h-4 text-meta rounded-sm',
 }
 
 /**
@@ -65,7 +66,7 @@ export function ClassificationBadge({
   return (
     <span
       className={cn(
-        'inline-flex items-center gap-1.5 font-mono text-[0.78125rem]',
+        'inline-flex items-center gap-1.5 font-mono text-data',
         style.textClass,
         className,
       )}

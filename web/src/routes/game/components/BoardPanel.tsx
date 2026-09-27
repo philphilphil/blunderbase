@@ -20,6 +20,7 @@ import { SideDot } from '@/components/badges/SideDot'
 import { Board, type BoardArrow, type BoardSquare } from '@/components/board/Board'
 import { BoardSettingsButton } from '@/components/board/BoardSettings'
 import { AnalyseButton } from '@/components/analysis/AnalyseButton'
+import { buttonVariants } from '@/components/ui/button'
 import type { Color, GameRunSummary, GameSummary, MoveRow, RunResponse } from '@/lib/api/types'
 import { glyphFor } from '@/lib/chess/classification'
 import { formatScore, type Score } from '@/lib/chess/evaluation'
@@ -489,7 +490,7 @@ export function BoardPanel({
            1.25    the board column's `py-2.5`, both ends
            3       the two player rows flanking the board, `h-6` each
            1.5     this panel's three `gap-2`s: player → board row → player → transport
-           1.75    the transport row: `text-xs` buttons at `py-[0.3125rem]`, plus their border
+           1.75    the transport row: Button `sm` and the transport groups, both `h-7`
           -------
           12.8125  which is `calc(100dvh-12.8125rem)`
 
@@ -604,7 +605,7 @@ export function BoardPanel({
           {previewCaption ? (
             // A scrubbed board must never be mistaken for the game, and the caption is the
             // only thing on screen that says so — over the squares, where the eye already is.
-            <span className="bb-chip pointer-events-none absolute right-1.5 top-1.5 px-1.5 py-px font-mono text-[0.625rem] text-soft">
+            <span className="bb-chip pointer-events-none absolute right-1.5 top-1.5 px-1.5 py-px font-mono text-meta text-soft">
               {previewCaption}
             </span>
           ) : null}
@@ -667,6 +668,14 @@ export function BoardPanel({
         board was not going to use. Nothing wraps at a width that fits, so no ordinary window
         sees any of this. The groups wrap whole for the same reason: a group split over two
         lines is worse than a group that moved.
+
+        Every labelled button in the row is the app's one tool button (`buttonVariants`,
+        `secondary` at `sm`), whose `h-7` is exactly the 1.75rem the budget above reserves —
+        so the row is the standard control rather than eight hand-copied class strings that
+        had each drifted by a shade. Below `md` each one keeps `max-md:h-auto max-md:py-1.5`,
+        the thumb-sized target the phone's two-line budget was measured with. The groups are
+        told apart by their order and a hairline rule, not by boxes round them: a box per
+        group would make the row wider and busier to say what the order already says.
       */}
       <div className="flex flex-wrap items-center gap-2 max-md:gap-1.5">
         {inRow ? (
@@ -710,31 +719,33 @@ export function BoardPanel({
         )}
 
         {onNote ? (
+          // A toggle while the composer is open, lit the one way every pressed toggle is
+          // (`aria-pressed` on the tool button) rather than with a tint of its own.
           <button
             type="button"
             onClick={onNote}
             aria-pressed={noting}
             title={t`Write a note about this position (N)`}
-            className={cn(
-              'flex flex-none items-center gap-1 rounded-md border px-2.5 py-[0.3125rem] text-xs max-md:py-1.5',
-              noting
-                ? 'border-accent-teal/30 bg-accent-teal/10 text-accent-teal'
-                : 'border-edge bg-elevated text-soft hover:text-ink',
-            )}
+            className={cn(ROW_BUTTON, 'flex-none')}
           >
-            <StickyNote className="size-3" aria-hidden />
+            <StickyNote aria-hidden />
             <Trans comment="Button in the transport row that opens the note composer">Note</Trans>
           </button>
         ) : null}
 
         {inLine && onExitAnalysis ? (
+          // The analysis line's own purple, the colour the score chip turns while a line is
+          // walked: the one semantic one-off in the row, at the row's standard size.
           <button
             type="button"
             onClick={onExitAnalysis}
             title={t`Leave the analysis line and go back to the game (Esc)`}
-            className="flex flex-none items-center gap-1 rounded-md border border-brilliant/30 bg-brilliant/10 px-2.5 py-[0.3125rem] text-xs text-brilliant max-md:py-1.5"
+            className={cn(
+              ROW_BUTTON,
+              'flex-none border-brilliant/40 bg-brilliant/10 text-brilliant hover:bg-brilliant/15 hover:text-brilliant',
+            )}
           >
-            <Undo2 className="size-3" aria-hidden />
+            <Undo2 aria-hidden />
             <Trans>Back to game</Trans>
           </button>
         ) : null}
@@ -753,12 +764,18 @@ export function BoardPanel({
           onto a third line of their own, which spent a third of a `rem` of pinned height on
           two small pieces of text and took it straight out of the tab pane underneath.
         */}
-        {inRow ? <div className="flex flex-none items-center gap-2 max-md:hidden">{readouts}</div> : null}
-
-        <Rule />
+        {inRow ? (
+          <>
+            <div className="flex flex-none items-center gap-2 max-md:hidden">{readouts}</div>
+            {/* Only here, where the readouts stand against the transport. On the desktop only
+                the spacer stands to the transport's left, and a rule there divided the arrows
+                from empty space. */}
+            <Rule />
+          </>
+        ) : null}
 
         <div className="flex flex-none items-center gap-2 max-md:order-first max-md:gap-1.5">
-          <div className="flex flex-none overflow-hidden rounded-md border border-edge bg-elevated">
+          <div className={TRANSPORT_GROUP}>
             <TransportButton
               label={t`First`}
               hint="Home"
@@ -786,7 +803,6 @@ export function BoardPanel({
             <TransportButton
               label={t`Last`}
               hint="End"
-              last={!onToggleAutoplay}
               disabled={cursor >= plyCount - 1}
               onClick={() => onSeek(plyCount - 1)}
             >
@@ -799,16 +815,15 @@ export function BoardPanel({
               <TransportButton
                 label={playing ? t`Stop playing through` : t`Play the game through`}
                 hint="Space"
-                last
                 // Spent at the end of the game, like the ⏭ beside it: there is nothing left
                 // to play through. Disabled rather than gone, so the group keeps its shape.
                 disabled={!playing && cursor >= plyCount - 1}
                 onClick={onToggleAutoplay}
               >
                 {playing ? (
-                  <Pause className="size-3 text-accent-teal" aria-hidden />
+                  <Pause className="size-3.5 text-accent-teal" aria-hidden />
                 ) : (
-                  <Play className="size-3" aria-hidden />
+                  <Play className="size-3.5" aria-hidden />
                 )}
               </TransportButton>
             ) : null}
@@ -822,11 +837,11 @@ export function BoardPanel({
             the jump existed was to read the shortcut sheet. Stepping ⏭ twenty times to reach
             it is not a review on a mouse either.
 
-            A group of its own rather than two more cells in the transport group: that group's
-            dividers are drawn by the cell *before* each boundary, so the two sets stay
-            separately bounded and the transport group's last divider is its own business.
+            A group of its own rather than two more cells in the transport group: the jumps
+            are a different question (where is the next mistake?) from the arrows (where is
+            the next move?), and the gap between the two groups is what says so.
           */}
-          <div className="flex flex-none overflow-hidden rounded-md border border-edge bg-elevated">
+          <div className={TRANSPORT_GROUP}>
             <TransportButton
               label={t`Previous flagged move`}
               hint="↑"
@@ -841,7 +856,6 @@ export function BoardPanel({
             <TransportButton
               label={t`Next flagged move`}
               hint="↓"
-              last
               disabled={nextFlagged == null}
               onClick={() => nextFlagged != null && onSeek(nextFlagged)}
             >
@@ -924,25 +938,32 @@ function PlayerRow({
       className="flex h-6 flex-none items-center gap-2 pl-6 max-md:hidden"
     >
       <SideDot side={side} size="sm" />
+      {/* The names are the primary data on this row and read at the body size (`text-lead`):
+          the owner in `ink` at a heavier weight, the opponent one step down the ladder in
+          `ink-2` — told apart by weight, not dimmed into metadata. The rating and the
+          material are data too, so `soft` rather than `dim`. */}
       <span
-        className={cn('min-w-0 truncate text-[0.75rem]', owner ? 'font-medium text-ink' : 'text-soft')}
+        className={cn(
+          'min-w-0 truncate text-lead',
+          owner ? 'font-semibold text-ink' : 'font-medium text-ink-2',
+        )}
       >
         {name ?? t({ message: 'unknown', comment: 'Stands in for a player the game does not name' })}
       </span>
-      <span className="flex-none font-mono text-[0.6875rem] tabular text-dim">{rating ?? '—'}</span>
+      <span className="flex-none font-mono text-label tabular text-soft">{rating ?? '—'}</span>
       {captured.length > 0 ? (
         // A size up from the text beside it: a figurine reads by its silhouette, and at
         // the rating's size the queen and the bishop are the same blob. `leading-none` keeps
         // the taller glyph inside the row's `h-6`.
-        <span aria-hidden className="flex-none text-[1.0625rem] leading-none tracking-tight text-dim-2">
+        <span aria-hidden className="flex-none text-[1.0625rem] leading-none tracking-tight text-dim">
           {captured.map((role) => CAPTURED_GLYPH[role]).join('')}
         </span>
       ) : null}
       {advantage !== 0 ? (
         <span
           className={cn(
-            'flex-none font-mono text-[0.6875rem] tabular',
-            advantage > 0 ? 'text-soft' : 'text-faint',
+            'flex-none font-mono text-label tabular',
+            advantage > 0 ? 'text-soft' : 'text-dim',
           )}
           title={advantage > 0 ? t`Up ${advantage} in material` : t`Down ${deficit} in material`}
         >
@@ -994,24 +1015,36 @@ function BoardTools({
    *
    * They are four buttons of equal weight sitting side by side, so anything that differs
    * between them — a wider box, a smaller glyph, a text arrow beside three drawn icons —
-   * reads as a difference in kind that is not there. The compact box is `size-6` — the
-   * player row's own `h-6`, so the four fill the row they ride rather than floating inside
-   * it — with the icon centred and `p-0` overriding whatever padding the button brought
-   * with it (`BoardSettingsButton` has its own, for the row it used to stand in).
+   * reads as a difference in kind that is not there. The compact box is the ghost `icon-xs`
+   * square, `size-6` — the player row's own `h-6`, so the four fill the row they ride
+   * rather than floating inside it. Ghost rather than bordered: four boxes on the name row
+   * were the busiest thing beside the board, and an icon on the row's own ground says
+   * "button" by its hover. The border, fill and padding `BoardSettingsButton` brings for the
+   * row it used to stand in are taken off (`border-0 bg-transparent p-0`).
+   *
+   * In the control row (the phone, the explorer's stand-in) they are that row's tool
+   * buttons, and the gear and the keyboard are icon squares at the row's height (`p-0`
+   * again, so the gear's own padding does not push its icon out of the square). Below `md`
+   * they take the row's `max-md:h-auto max-md:py-1.5` like every other button there, so the
+   * phone's line of them keeps one thumb-sized height.
+   *
+   * On is `aria-pressed`, lit the one way every pressed toggle in the app is (`button.tsx`):
+   * the selected fill with the icon in the accent.
    */
   const icon = 'size-4'
   const shape = compact
-    ? 'flex size-6 flex-none items-center justify-center rounded border p-0 max-md:p-0'
-    : 'flex flex-none items-center rounded-md border px-2.5 py-[0.3125rem] text-xs max-md:py-1.5'
-  const quiet = 'border-edge bg-elevated text-dim hover:text-ink'
-  const lit = 'border-accent-teal/30 bg-accent-teal/10 text-accent-teal'
+    ? cn(buttonVariants({ variant: 'ghost', size: 'icon-xs' }), 'flex-none border-0 bg-transparent p-0 max-md:p-0')
+    : cn(ROW_BUTTON, 'flex-none')
+  const square = compact
+    ? shape
+    : cn(
+        buttonVariants({ variant: 'secondary', size: 'icon-sm' }),
+        'flex-none p-0 max-md:h-auto max-md:py-1.5',
+      )
 
   return (
     <>
-      <BoardSettingsButton
-        className={compact ? cn(shape, quiet) : undefined}
-        iconClassName={compact ? icon : undefined}
-      />
+      <BoardSettingsButton className={square} iconClassName={icon} />
 
       <button
         type="button"
@@ -1019,7 +1052,7 @@ function BoardTools({
         // Only the icon-only one needs a label of its own; the row's button says its word.
         aria-label={compact ? t`Flip the board` : undefined}
         title={t`Flip the board (F)`}
-        className={cn(shape, quiet, !compact && 'text-soft')}
+        className={shape}
       >
         {/* A drawn icon rather than the `⇅` this button used to carry: an arrow pair is a
             *swap*, and what this does is turn the board over — the mirror the icon draws.
@@ -1041,7 +1074,7 @@ function BoardTools({
             ? t`Hints (H): the standing arrows on the board. The engine is hidden anyway (⇧E).`
             : t`Hints (H) — everything that answers the position: the board's arrows and marks, and the engine and Maia columns. Off, to read it yourself first.`
         }
-        className={cn(shape, hints ? lit : quiet)}
+        className={shape}
       >
         {compact ? <Lightbulb className={icon} aria-hidden /> : <Trans>Hints</Trans>}
       </button>
@@ -1056,7 +1089,7 @@ function BoardTools({
           aria-pressed={moveEntry.open}
           aria-label={t`Type a move (M)`}
           title={t`Type a move (M) — Nf3, exd5, O-O — instead of dragging it`}
-          className={cn(shape, moveEntry.open ? lit : quiet, !compact && 'px-2')}
+          className={square}
         >
           <Keyboard className={icon} aria-hidden />
         </button>
@@ -1092,7 +1125,7 @@ function Readouts({
   const { t } = useLingui()
   return (
     <>
-      <span className="font-mono text-[0.6875rem] tabular whitespace-nowrap text-dim">
+      <span className="font-mono text-label tabular whitespace-nowrap text-dim">
         {inLine ? (
           <Trans>analysis +{lineDepth}</Trans>
         ) : (
@@ -1108,7 +1141,9 @@ function Readouts({
               : undefined
           }
           className={cn(
-            'rounded-sm border px-1.5 py-0.5 font-mono text-[0.6875rem] tabular',
+            // A size up from the ply beside it and semibold: the score is the one number on
+            // the row that answers the position, the way an eval chip does everywhere else.
+            'rounded-sm border px-1.5 py-0.5 font-mono text-data font-semibold tabular',
             // The analysis board's own purple, the colour "Back to game" is drawn in: the
             // reader is inside a line, and this number belongs to the line rather than to
             // the game.
@@ -1125,11 +1160,23 @@ function Readouts({
 }
 
 /**
- * One cell of a transport group. The divider between two cells is drawn by the cell before
- * it, which is what `last` turns off — so a group's cells all have to exist at the same
- * breakpoints as each other (see the flagged pair, which is a group of its own for exactly
- * that reason). Below `md` the cell grows into a thumb-sized target; it is the same button.
+ * The control row's labelled button: the app's tool button (`button.tsx`, `secondary` at
+ * `sm`, `h-7`) with the phone's thumb-sized height put back below `md` — the height the
+ * phone's two-line `100dvh` budget was measured with.
  */
+const ROW_BUTTON = cn(
+  buttonVariants({ variant: 'secondary', size: 'sm' }),
+  'max-md:h-auto max-md:py-1.5',
+)
+
+/**
+ * A transport group: one bordered strip of cells, ruled between them by the group itself
+ * (`divide-x`) rather than by each cell remembering whether it is the last. `h-7`, the row's
+ * budgeted height, border included; below `md` the cells set the height instead.
+ */
+const TRANSPORT_GROUP =
+  'inline-flex h-7 flex-none divide-x divide-hairline overflow-hidden rounded-md border border-edge bg-elevated max-md:h-auto'
+
 /**
  * The rule between two groups of the transport row. Decoration and nothing else, so it is
  * `aria-hidden` and carries no `role="separator"`: a screen reader walking the row wants the
@@ -1137,15 +1184,20 @@ function Readouts({
  * the row wraps and a vertical rule is as likely to open a line as to divide one.
  */
 function Rule() {
-  return <span aria-hidden className="h-5 w-px flex-none self-center bg-edge max-md:hidden" />
+  return <span aria-hidden className="h-4 w-px flex-none self-center bg-hairline max-md:hidden" />
 }
 
+/**
+ * One cell of a transport group. `text-body` idle and the neutral `raised` hover: the cells
+ * used to hover in the selection blue, which made every arrow under the pointer look like
+ * the current move. Below `md` the cell grows into a thumb-sized target; it is the same
+ * button.
+ */
 function TransportButton({
   children,
   label,
   hint,
   disabled,
-  last,
   onClick,
 }: {
   children: ReactNode
@@ -1154,7 +1206,6 @@ function TransportButton({
    * name — a screen reader is reading a button, not a shortcut sheet. */
   hint?: string
   disabled?: boolean
-  last?: boolean
   onClick: () => void
 }) {
   return (
@@ -1164,10 +1215,7 @@ function TransportButton({
       title={hint ? `${label} (${hint})` : label}
       disabled={disabled}
       onClick={onClick}
-      className={cn(
-        'px-2.5 py-[0.3125rem] text-xs text-soft hover:bg-selected hover:text-ink disabled:cursor-default disabled:text-faint-2 disabled:hover:bg-transparent max-md:px-3 max-md:py-1.5 max-md:text-sm',
-        !last && 'border-r border-edge',
-      )}
+      className="grid min-w-8 place-items-center px-2 text-data text-body transition-colors hover:bg-raised hover:text-ink disabled:cursor-default disabled:text-faint-2 disabled:hover:bg-transparent max-md:px-3 max-md:py-1.5 max-md:text-sm"
     >
       {children}
     </button>

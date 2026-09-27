@@ -100,4 +100,19 @@ describe('ColumnSplitter', () => {
     window.removeEventListener('keydown', onWindowKeyDown)
   })
 
+  it('shows it can be dragged: a grip on the line, a title, and a mark while it moves', () => {
+    const { splitter } = renderSplitter()
+    expect(splitter).toHaveAttribute('title', 'Drag to resize · double-click to reset')
+
+    // The grip is the part that answers in blue, under the pointer, the keyboard and a drag.
+    const grip = screen.getByTestId('splitter-grip')
+    expect(grip).toHaveClass('rounded-full', 'bg-edge-strong', 'group-hover:bg-accent-teal')
+    expect(grip).toHaveClass('group-focus-visible:bg-accent-teal', 'group-data-[dragging]:bg-accent-teal')
+
+    expect(splitter).not.toHaveAttribute('data-dragging')
+    fireEvent.pointerDown(splitter, { button: 0, pointerId: 1, clientX: 600 })
+    expect(splitter).toHaveAttribute('data-dragging')
+    fireEvent.pointerUp(splitter, { pointerId: 1, clientX: 600 })
+    expect(splitter).not.toHaveAttribute('data-dragging')
+  })
 })

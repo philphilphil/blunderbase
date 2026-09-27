@@ -18,10 +18,15 @@
  * While ⇧E is also on the button stays, and the tooltip says so: pressing it clears this
  * game's own flag, but the screen stays quiet until the mode is turned off too — otherwise
  * a press would seem to have done nothing.
+ *
+ * The row's tool button, with the accent on its word and icon only. A blue border or fill
+ * would make it read as a toggle that is already on — in this app the blue frame means
+ * pressed, selected or focused, and this button is none of those until it is pressed.
  */
 import { Trans, useLingui } from '@lingui/react/macro'
 import { Eye } from 'lucide-react'
 
+import { buttonVariants } from '@/components/ui/button'
 import { useSetGameEngineHidden } from '@/lib/api/queries'
 import { toast } from '@/lib/toast'
 import { cn } from '@/lib/utils'
@@ -55,11 +60,12 @@ export function EngineRevealButton({
           : t`The engine was held back on this game when it was imported, so you could read it first. Show its evaluations, badges and lines now.`
       }
       className={cn(
-        'flex flex-none items-center gap-1 rounded-md border border-accent-teal/30 bg-accent-teal/10 px-2.5 py-[0.3125rem] text-xs text-accent-teal hover:bg-accent-teal/15 disabled:opacity-60 max-md:py-1.5',
+        buttonVariants({ variant: 'secondary', size: 'sm' }),
+        'flex-none text-accent-teal hover:text-accent-link max-md:h-auto max-md:py-1.5',
         className,
       )}
     >
-      <Eye className="size-3" aria-hidden />
+      <Eye aria-hidden />
       <Trans comment="Button in the transport row that reveals the engine on a game imported with it hidden">
         Show the engine
       </Trans>

@@ -23,7 +23,7 @@ import { cn } from '@/lib/utils'
 export function ChipRow({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div role="group" aria-label={label} className="flex flex-wrap items-center gap-1.5">
-      <span className="w-11 flex-none text-[0.65625rem] tracking-[.06em] text-dim-2 uppercase">
+      <span className="w-11 flex-none text-meta tracking-[.06em] text-dim uppercase">
         {label}
       </span>
       {children}
@@ -52,11 +52,14 @@ export function FilterChip({
       aria-label={name}
       title={title}
       onClick={onClick}
+      // Sans, like every other label: a chip names a choice ("blitz", "2000+"), and mono is
+      // for figures that must line up. On is the app's one selected state (`Button`'s
+      // `aria-pressed`), so a pressed chip and a pressed toggle are the same blue.
       className={cn(
-        'rounded-md border px-[0.4375rem] py-[0.0625rem] font-mono text-[0.6875rem] tabular transition-colors',
+        'inline-flex h-6 items-center rounded-md border px-2 font-sans text-label tabular transition-colors',
         on
-          ? 'border-accent-teal/35 bg-accent-teal/10 text-accent-teal'
-          : 'border-edge text-dim hover:text-ink',
+          ? 'border-accent-teal/45 bg-selected text-ink'
+          : 'border-edge text-soft hover:border-edge-hover hover:text-ink',
       )}
     >
       {label}

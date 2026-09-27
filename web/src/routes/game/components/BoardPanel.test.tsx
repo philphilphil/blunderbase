@@ -1,5 +1,6 @@
 import type { DrawShape } from '@lichess-org/chessground/draw'
 import { fireEvent, render, screen } from '@testing-library/react'
+import { Chess } from 'chessops/chess'
 import type { ReactNode } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -515,5 +516,87 @@ describe('BoardPanel transport row', () => {
     expect(children.indexOf(settings)).toBe(0)
     expect(children.indexOf(navigation)).toBe(children.length - 1)
     expect(navigation.className).toContain('max-md:order-first')
+  })
+
+  it('lights Note as a pressed toggle while the composer is open', () => {
+    const onNote = vi.fn()
+    const { rerender } = renderPanel({ onNote, noting: false })
+    const note = screen.getByRole('button', { name: 'Note' })
+    // The one selected idiom (`button.tsx`): `aria-pressed` on the tool button, not a tint
+    // of the button's own.
+    expect(note).toHaveAttribute('aria-pressed', 'false')
+    expect(note.className).not.toContain('bg-accent-teal/10')
+    fireEvent.click(note)
+    expect(onNote).toHaveBeenCalledTimes(1)
+
+    rerender(
+      <TooltipProvider delayDuration={0}>
+        <BoardPanel
+          position={AFTER_E4}
+          orientation="white"
+          lastMove={undefined}
+          upcoming={BLUNDER}
+          engineBest="c7c6"
+          maia={null}
+          win={46}
+          score={{ cp: 40 }}
+          cursor={0}
+          plyCount={4}
+          hints
+          onHintsChange={vi.fn()}
+          onFlip={vi.fn()}
+          onSeek={vi.fn()}
+          finishedRun={null}
+          activeRun={null}
+          progress={null}
+          pending={false}
+          onNote={onNote}
+          noting
+        />
+      </TooltipProvider>,
+    )
+    const pressed = screen.getByRole('button', { name: 'Note' })
+    expect(pressed).toHaveAttribute('aria-pressed', 'true')
+    expect(pressed.className).toContain('aria-pressed:bg-selected')
+  })
+
+  it('keeps every transport cell’s accessible name, and its key in the tooltip only', () => {
+    renderPanel({ onToggleAutoplay: vi.fn(), nextFlagged: 2, previousFlagged: 0, cursor: 1 })
+    for (const [name, key] of [
+      ['First', 'Home'],
+      ['Previous', '←'],
+      ['Next', '→'],
+      ['Last', 'End'],
+      ['Play the game through', 'Space'],
+      ['Previous flagged move', '↑'],
+      ['Next flagged move', '↓'],
+    ] as const) {
+      const button = screen.getByRole('button', { name })
+      expect(button).toHaveAttribute('title', `${name} (${key})`)
+    }
+  })
+
+  it('keeps the row at its budgeted height, and the phone’s taller targets below md', () => {
+    // `h-7` is the 1.75rem the board's `100dvh` budget reserves for this row; the
+    // `max-md:` overrides are what the phone's two-line budget was measured with.
+    renderPanel({ onNote: vi.fn() })
+    const note = screen.getByRole('button', { name: 'Note' })
+    expect(note).toHaveClass('h-7', 'max-md:h-auto', 'max-md:py-1.5')
+    const group = screen.getByRole('button', { name: 'First' }).parentElement!
+    expect(group).toHaveClass('h-7', 'max-md:h-auto')
+  })
+
+  it('gives the phone row’s icon squares the same thumb-sized height as its labelled buttons', () => {
+    // In the row (the phone), the gear, the keyboard and ⋯ are `icon-sm` squares; below
+    // `md` they take the row's `max-md:h-auto max-md:py-1.5` like Flip and Hints beside them.
+    renderPanel({
+      toolsInRow: true,
+      moveEntry: { open: false, onOpenChange: vi.fn(), board: Chess.default(), onPlay: vi.fn(), focusNonce: 0 },
+      menu: [{ id: 'x', label: 'Something rare', onSelect: vi.fn() }],
+    })
+    for (const name of ['Board settings', 'Type a move (M)', 'More for this game']) {
+      expect(screen.getByRole('button', { name })).toHaveClass('max-md:h-auto', 'max-md:py-1.5')
+    }
+    expect(screen.getByRole('button', { name: 'Hints' })).toHaveClass('max-md:h-auto', 'max-md:py-1.5')
   })
 })

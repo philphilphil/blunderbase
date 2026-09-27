@@ -16,10 +16,10 @@
 
 [data-md-color-scheme="slate"] {
   --bb-void: #1d1e1f;
-  --bb-panel: #292a2a;
+  --bb-panel: #2c2d2e;
   --bb-surface: #232424;
   --bb-elevated: #303131;
-  --bb-raised: #343535;
+  --bb-raised: #363738;
   --bb-cell: #2b2c2c;
 
   --bb-hairline: #3a3c3b;
@@ -48,11 +48,11 @@
 /* --- light: the app's `:root.light` ------------------------------------ */
 
 [data-md-color-scheme="default"] {
-  --bb-void: #e7e7e4;
-  --bb-panel: #f2f2f0;
-  --bb-surface: #fafaf8;
+  --bb-void: #e4e4e1;
+  --bb-panel: #efefec;
+  --bb-surface: #fbfbfa;
   --bb-elevated: #f4f4f1;
-  --bb-raised: #ebebe8;
+  --bb-raised: #e5e5e1;
   --bb-cell: #f2f2ef;
 
   --bb-hairline: #dcdcd8;
@@ -64,8 +64,8 @@
   --bb-text: #202020;
   --bb-body: #3b3b39;
   --bb-muted: #5c5c59;
-  --bb-dim: #71716e;
-  --bb-faint: #8a8a86;
+  --bb-dim: #696966;
+  --bb-faint: #767672;
 
   --bb-accent: #245f9e;
   --bb-accent-hover: #1d4e83;

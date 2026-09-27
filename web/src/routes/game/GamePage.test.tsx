@@ -2142,6 +2142,21 @@ describe('the board/moves splitter', () => {
     expect(storage.getItem(MOVES_WIDTH_KEY)).toBe('26.875')
   })
 
+  it('keeps the narrow floor up to 1440, where the CSS moves it', async () => {
+    renderPage()
+    await screen.findByText('Scandinavian Defense')
+    // 1300px is `xl` — the board has its floor — but under `min-[90rem]`, so the column is
+    // still drawn at its narrow floor. The clamp used to switch at 1280 and stop the drag
+    // at 31.75rem, five rem short of where the column could go.
+    const splitter = rowWidth(1200, 1300)
+
+    drag(splitter, 560, 2400)
+    expect(movesColumn().style.flexBasis).toBe('26.875rem')
+    // And the board's floor holds from 1280: 75rem of row less its 26.25rem.
+    drag(splitter, 560, -400)
+    expect(movesColumn().style.flexBasis).toBe('48.75rem')
+  })
+
   it('widens it no further than the board’s floor allows', async () => {
     renderPage()
     await screen.findByText('Scandinavian Defense')

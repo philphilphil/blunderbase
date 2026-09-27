@@ -127,7 +127,8 @@ describe('the analysis columns', () => {
     expect(dropTone(58)).toBe('text-blunder')
     expect(dropTone(20)).toBe('text-mistake')
     expect(dropTone(9)).toBe('text-inaccuracy')
-    expect(dropTone(2)).toBe('text-good')
+    // A small drop is routine, not good news: it reads as ordinary text, not green.
+    expect(dropTone(2)).toBe('text-soft')
     expect(dropTone(null)).toBe('text-dim-2')
   })
 })

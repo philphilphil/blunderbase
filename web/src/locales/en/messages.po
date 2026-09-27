@@ -230,6 +230,13 @@ msgstr "The search was closed for sitting idle."
 msgid "The search ended."
 msgstr "The search ended."
 
+#. The live search runs on this server, not on a remote runner
+#: src/components/analysis/InfiniteAnalysisPanel.tsx
+#: src/routes/engines/HostBadge.tsx
+#: src/routes/engines/RolesForm.tsx
+msgid "local"
+msgstr "local"
+
 #: src/components/analysis/InfiniteAnalysisPanel.tsx
 msgid "Live analysis"
 msgstr "Live analysis"
@@ -3795,6 +3802,26 @@ msgstr "No games in {period}. Widen the window, or play some chess."
 msgid "Against the {windowKey} before this one, once there is one to compare."
 msgstr "Against the {windowKey} before this one, once there is one to compare."
 
+#: src/routes/dashboard/WorstMomentsRow.tsx
+#: src/routes/explorer/components/MoveTreeTable.tsx
+#: src/routes/explorer/components/ReferenceMoveTable.tsx
+#: src/routes/game/components/BookPanel.tsx
+#: src/routes/games/components/columns.ts
+#: src/routes/games/filters.ts
+#: src/routes/stats/cards/BlundersByPhaseCard.tsx
+msgid "Opening"
+msgstr "Opening"
+
+#: src/routes/dashboard/WorstMomentsRow.tsx
+#: src/routes/stats/cards/BlundersByPhaseCard.tsx
+msgid "Middlegame"
+msgstr "Middlegame"
+
+#: src/routes/dashboard/WorstMomentsRow.tsx
+#: src/routes/stats/cards/BlundersByPhaseCard.tsx
+msgid "Endgame"
+msgstr "Endgame"
+
 #. Stands in for a player the game does not name
 #: src/routes/dashboard/WorstMomentsRow.tsx
 #: src/routes/explorer/stats.ts
@@ -3811,6 +3838,10 @@ msgstr "{move} vs {opponent} — {cost} win chance, better: {better}"
 #: src/routes/dashboard/WorstMomentsRow.tsx
 msgid "{move} vs {opponent} — {cost} win chance"
 msgstr "{move} vs {opponent} — {cost} win chance"
+
+#: src/routes/dashboard/WorstMomentsRow.tsx
+msgid "Best: {better}"
+msgstr "Best: {better}"
 
 #: src/routes/dashboard/WorstMomentsRow.tsx
 msgid "Worst recent moments"
@@ -4365,11 +4396,6 @@ msgstr "This computer"
 #: src/routes/engines/EnginesPage.tsx
 msgid "Threads and hash belong to one process of one engine. How many processes a machine runs at once — passes, boards and correspondence searches together — is set per machine on <0>Machines</0>."
 msgstr "Threads and hash belong to one process of one engine. How many processes a machine runs at once — passes, boards and correspondence searches together — is set per machine on <0>Machines</0>."
-
-#: src/routes/engines/HostBadge.tsx
-#: src/routes/engines/RolesForm.tsx
-msgid "local"
-msgstr "local"
 
 #: src/routes/engines/HostBadge.tsx
 msgid "{runnerName} is not connected"
@@ -4931,15 +4957,6 @@ msgstr "Avg drop"
 msgid "Blund"
 msgstr "Blund"
 
-#: src/routes/explorer/components/MoveTreeTable.tsx
-#: src/routes/explorer/components/ReferenceMoveTable.tsx
-#: src/routes/game/components/BookPanel.tsx
-#: src/routes/games/components/columns.ts
-#: src/routes/games/filters.ts
-#: src/routes/stats/cards/BlundersByPhaseCard.tsx
-msgid "Opening"
-msgstr "Opening"
-
 #. Button in the transport row that opens the note composer
 #: src/routes/explorer/components/MoveTreeTable.tsx
 #: src/routes/game/components/BoardPanel.tsx
@@ -5257,6 +5274,10 @@ msgstr "None of your games reached this position."
 #: src/routes/game/components/BookPanel.tsx
 msgid "Your games from this position"
 msgstr "Your games from this position"
+
+#: src/routes/game/components/ColumnSplitter.tsx
+msgid "Drag to resize · double-click to reset"
+msgstr "Drag to resize · double-click to reset"
 
 #: src/routes/game/components/EngineRevealButton.tsx
 msgid "The engine was held back on this game when it was imported. Show it — the screen stays quiet until ⇧E is off as well."
@@ -7606,16 +7627,8 @@ msgid "moves 1–12"
 msgstr "moves 1–12"
 
 #: src/routes/stats/cards/BlundersByPhaseCard.tsx
-msgid "Middlegame"
-msgstr "Middlegame"
-
-#: src/routes/stats/cards/BlundersByPhaseCard.tsx
 msgid "moves 13+"
 msgstr "moves 13+"
-
-#: src/routes/stats/cards/BlundersByPhaseCard.tsx
-msgid "Endgame"
-msgstr "Endgame"
 
 #: src/routes/stats/cards/BlundersByPhaseCard.tsx
 msgid "thin material"

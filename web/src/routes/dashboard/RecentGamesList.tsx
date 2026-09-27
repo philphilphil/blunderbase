@@ -12,6 +12,7 @@ import { Link } from 'react-router-dom'
 
 import { ClassificationBadge } from '@/components/badges/ClassificationBadge'
 import { SectionHead } from '@/components/shell/Section'
+import { buttonVariants } from '@/components/ui/button'
 import { useGameCards } from '@/lib/api/queries'
 import type { GameCard as GameCardRow, WorstMoment } from '@/lib/api/types'
 import { formatWinLoss } from '@/lib/chess/evaluation'
@@ -102,13 +103,13 @@ function GameRow({ game, engineHidden }: { game: GameCardRow; engineHidden: bool
       // the row above so the hairlines do not double up.
       className="-mt-px flex items-center gap-2 border-t border-hairline px-1 py-[0.4375rem] transition-colors first:mt-0 first:border-t-0 hover:bg-raised max-md:py-2.5"
     >
-      <span className={cn('font-mono text-[0.6875rem] font-semibold', outcome.text)}>
+      <span className={cn('font-mono text-label font-semibold', outcome.text)}>
         {typeof outcome.letter === 'string' ? outcome.letter : i18n._(outcome.letter)}
       </span>
-      <span className="flex-1 truncate text-[0.71875rem] text-ink">
+      <span className="flex-1 truncate text-data text-ink">
         {game.opponent ?? t`Unknown`}
       </span>
-      <span className="font-mono text-[0.625rem] tabular text-dim">
+      <span className="font-mono text-label tabular text-soft">
         {game.opponent_rating ?? '—'}
       </span>
       {engineHidden ? null : heldBack ? (
@@ -120,7 +121,7 @@ function GameRow({ game, engineHidden }: { game: GameCardRow; engineHidden: bool
           />
         </span>
       ) : (
-        <span className={cn('font-mono text-[0.6875rem] tabular', worst ? 'text-body' : 'text-dim-2')}>
+        <span className={cn('font-mono text-label tabular', worst ? 'text-body' : 'text-dim-2')}>
           {worst ? formatWinLoss(worst.win_loss) : '—'}
         </span>
       )}
@@ -153,7 +154,7 @@ export function RecentGamesList() {
       <SectionHead
         title={t`Recent games`}
         end={
-          <Link to="/games" className="text-[0.6875rem] text-accent-teal hover:text-accent-link">
+          <Link to="/games" className="text-label text-accent-teal hover:text-accent-link">
             {total === undefined ? t`All games` : t`All ${total}`}
           </Link>
         }
@@ -170,10 +171,7 @@ export function RecentGamesList() {
         <EmptyBlock
           className="flex-none"
           action={
-            <Link
-              to="/library/import"
-              className="rounded-md bg-accent-teal px-2.5 py-1 text-[0.6875rem] font-semibold text-accent-ink hover:bg-accent-hover"
-            >
+            <Link to="/library/import" className={buttonVariants({ size: 'sm' })}>
               <Trans>Import games</Trans>
             </Link>
           }

@@ -85,7 +85,7 @@ export function TableFooter({
     <div className="@container flex h-[2.875rem] flex-none items-center gap-3 border-t border-hairline bg-panel px-5 max-md:h-auto max-md:flex-wrap max-md:gap-x-3 max-md:gap-y-1.5 max-md:px-3 max-md:py-2.5">
       {selectedCount > 0 ? (
         <>
-          <span className="flex-none font-mono text-[0.71875rem] tabular text-accent-teal">
+          <span className="flex-none font-mono text-data tabular text-accent-teal">
             <Trans>{selected} selected</Trans>
           </span>
           <span className="h-4 w-px bg-line" />
@@ -113,14 +113,14 @@ export function TableFooter({
           </Button>
         </>
       ) : (
-        <span className="text-[0.71875rem] text-dim-2">
+        <span className="text-label text-dim">
           <Trans>Select rows to queue analysis over them, or to delete them.</Trans>
         </span>
       )}
 
       {/* The one thing on the row that may truncate: it repeats what the rows already show. */}
       {message ? (
-        <span title={message} className="min-w-0 truncate font-mono text-[0.6875rem] text-good">
+        <span title={message} className="min-w-0 truncate font-mono text-label text-good">
           {message}
         </span>
       ) : null}
@@ -136,7 +136,7 @@ export function TableFooter({
         German labels — the words that the controls already imply leave instead: the range
         text first, then the "Rows" caption. The phone wraps (`max-md:`) and keeps both.
       */}
-      <label className="flex flex-none items-center gap-1.5 text-[0.6875rem] text-dim-2">
+      <label className="flex flex-none items-center gap-1.5 text-label text-dim">
         <span className="md:@max-[50rem]:sr-only">
           <Trans>Rows</Trans>
         </span>
@@ -147,7 +147,7 @@ export function TableFooter({
             const value = event.target.value
             onPageSizeChange(value === 'fit' ? 'fit' : Number(value))
           }}
-          className="rounded-md border border-edge-input bg-elevated px-1.5 py-0.5 font-mono text-[0.6875rem] text-soft focus-visible:border-edge-hover focus-visible:outline-none"
+          className="h-7 rounded-md border border-edge-input bg-elevated px-1.5 font-mono text-label text-body focus-visible:border-edge-hover focus-visible:outline-none"
         >
           {PAGE_SIZE_OPTIONS.map((option) => (
             <option key={String(option)} value={String(option)}>
@@ -165,7 +165,7 @@ export function TableFooter({
         >
           <ChevronLeft className="size-3.5" aria-hidden />
         </PageStep>
-        <span className="font-mono text-[0.6875rem] tabular text-soft" aria-live="polite">
+        <span className="font-mono text-label tabular text-body" aria-live="polite">
           {formatCount(page)} / {formatCount(pageCount)}
         </span>
         <PageStep
@@ -177,7 +177,7 @@ export function TableFooter({
         </PageStep>
       </div>
 
-      <span className="flex-none font-mono text-[0.6875rem] tabular text-dim-2 md:@max-[56rem]:hidden">
+      <span className="flex-none font-mono text-label tabular text-dim md:@max-[56rem]:hidden">
         <Trans>
           {firstRow}–{lastRow} of {games}
         </Trans>

@@ -6,6 +6,7 @@ import { useEngineSetup } from './useEngineSetup'
 import { Plural, useLingui } from '@lingui/react/macro'
 import { ChevronDown } from 'lucide-react'
 
+import { buttonVariants } from '@/components/ui/button'
 import type { StreamSessionApi } from '@/lib/analysis'
 import type { EngineHost } from '@/lib/engines/hosts'
 import { cn } from '@/lib/utils'
@@ -91,10 +92,11 @@ export function useDefaultEngineLabel(stream: StreamSessionApi): string {
   return name ? t`analysis engine — ${name}` : t`analysis engine`
 }
 
-// Pickers you can actually hit: a 2rem row, text at the size the rest of the panel reads
-// at, and room around it. Anything smaller was a target you had to aim for.
+// Pickers you can actually hit: a 2rem row (the switch beside them is sized to it), text at
+// the scale's data size, and room around it. Anything smaller was a target you had to aim
+// for. The value shown is the choice itself, so `body` rather than a control's idle `soft`.
 const SELECT_CLASS =
-  'h-8 rounded-md border border-input bg-elevated px-2 text-xs text-soft outline-none transition-colors hover:border-edge-hover focus-visible:border-accent-teal/50 disabled:opacity-50'
+  'h-8 rounded-md border border-input bg-elevated px-2 text-data text-body outline-none transition-colors hover:border-edge-hover focus-visible:border-accent-teal/50 disabled:opacity-50'
 
 interface ControlProps {
   stream: StreamSessionApi
@@ -218,10 +220,13 @@ export function LivePickers({ stream, fen, className }: ControlProps) {
 }
 
 /**
- * How many lines the search reports, as a chip with the select laid over it — the shape
- * of the run's own `MPV 3` chip, in the same strip, because it is the same fact about the
- * other claim. A 2rem select beside three mono readouts was the one thing on the engine
- * pane's title that did not belong to it.
+ * How many lines the search reports, as a small control with the select laid over it, in
+ * the place the run's own `MPV 3` readout stands on the other tab, because it is the same
+ * fact about the other claim. A 2rem select beside three mono readouts was the one thing
+ * on the engine pane's title that did not belong to it.
+ *
+ * It wears the strip's `xs` control (the outline button) rather than the readout's badge:
+ * this one can be changed and `MPV 3` cannot, and a reader should see which is which.
  */
 export function LiveLinesChip({ stream, className }: { stream: StreamSessionApi; className?: string }) {
   const { t } = useLingui()
@@ -230,13 +235,10 @@ export function LiveLinesChip({ stream, className }: { stream: StreamSessionApi;
   return (
     <span
       data-testid="live-lines-chip"
-      className={cn(
-        'relative inline-flex flex-none items-center gap-0.5 rounded-sm border border-edge px-[0.3125rem] py-px font-mono text-[0.625rem] tabular text-dim hover:border-edge-hover hover:text-soft',
-        className,
-      )}
+      className={cn(buttonVariants({ variant: 'outline', size: 'xs' }), 'relative flex-none', className)}
     >
       <Plural value={lines} one="# line" other="# lines" />
-      <ChevronDown className="size-2.5 flex-none text-faint" aria-hidden />
+      <ChevronDown className="size-3 flex-none text-soft" aria-hidden />
       <select
         aria-label={t`Lines`}
         value={String(stream.multipv)}

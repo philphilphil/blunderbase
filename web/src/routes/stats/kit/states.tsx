@@ -365,7 +365,13 @@ export function DeltaText({
   )
 }
 
-/** The bordered inline group the design uses for `30d · 90d · 1y`. */
+/**
+ * The bordered inline group the design uses for `30d · 90d · 1y`.
+ *
+ * The same height as a `sm` Button (h-7) so it sits in a toolbar beside one without a
+ * seam, in sans like every other label, and lit with the app's one selected state
+ * (`bg-selected text-ink`) rather than a tint of its own.
+ */
 export function Segmented<T extends string>({
   value,
   options,
@@ -384,7 +390,7 @@ export function Segmented<T extends string>({
       role="group"
       aria-label={label}
       className={cn(
-        'flex overflow-hidden rounded-md border border-edge font-mono text-[0.6875rem]',
+        'inline-flex h-7 items-stretch overflow-hidden rounded-md border border-edge bg-elevated font-sans text-label',
         className,
       )}
     >
@@ -396,9 +402,9 @@ export function Segmented<T extends string>({
           aria-pressed={option.value === value}
           onClick={() => onChange(option.value)}
           className={cn(
-            'px-2.5 py-1 transition-colors',
-            index > 0 && 'border-l border-edge',
-            option.value === value ? 'bg-selected text-ink' : 'text-dim hover:text-ink',
+            'px-2.5 transition-colors',
+            index > 0 && 'border-l border-hairline',
+            option.value === value ? 'bg-selected text-ink' : 'text-soft hover:text-ink',
           )}
         >
           {option.label}
@@ -419,7 +425,7 @@ export function LegendSwatch({
   children: ReactNode
 }) {
   return (
-    <span className="inline-flex items-center gap-1.5 text-[0.65625rem] text-dim">
+    <span className="inline-flex items-center gap-1.5 text-label text-soft">
       <span
         className="h-[0.125rem] w-[0.4375rem]"
         style={

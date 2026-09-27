@@ -1,6 +1,6 @@
 # Partien
 
-## Die Liste filtern
+## Die Liste filtern { #filter-the-list }
 
 Der Schalter links in der Filterleiste wählt **Meine**, **Fremde** oder **Alle**: deine
 eigenen Partien, die aus den Referenzdatenbanken übernommenen oder beides. Die Chips daneben
@@ -20,29 +20,34 @@ stehen je für eine Filtergruppe:
 Die Zeile über der Tabelle zeigt, wie viele Partien passen. **Leeren** daneben setzt alle
 Chips auf einmal zurück; jeder Chip hat zusätzlich sein eigenes Kreuz.
 
-In der Tabelle ist der Chip **Quelle** einer Lichess- oder Chess.com-Zeile ein Link: Er
-öffnet die Partie auf der Seite in einem neuen Tab, ohne hier die Zeile zu öffnen. Ein
-hochgeladenes PGN behält den Link, wenn die Datei von einer der beiden Seiten stammt.
-FICS-, OTB- und von Hand angelegte Fernschachpartien haben nirgends eine Seite; ihr Chip
-ist nur ein Chip.
+In der Tabelle nennt die Spalte **Quelle** die Seite, mit einem farbigen Punkt davor. In
+einer Lichess- oder Chess.com-Zeile ist sie ein Link, an dem ein kleiner Pfeil erscheint,
+wenn du darauf zeigst: Er öffnet die Partie auf der Seite in einem neuen Tab, ohne hier die
+Zeile zu öffnen. Ein hochgeladenes PGN behält den Link, wenn die Datei von einer der beiden
+Seiten stammt. FICS-, OTB- und von Hand angelegte Fernschachpartien haben nirgends eine
+Seite; bei ihnen steht nur der Name.
 
-## In der Tabelle suchen
+## In der Tabelle suchen { #search-the-table }
 
 `/` setzt den Cursor ins Suchfeld. Gesucht wird in Gegnername, ECO-Code und im Text des PGN.
 
-## Einen Filter speichern
+## Einen Filter speichern { #save-a-filter }
 
 **Filter speichern** gibt dem aktuellen Filter einen Namen und hängt ihn in der
 Seitenleiste unter **Partien** ein, mit der Trefferzahl daneben. Zwei sind vorgegeben:
 **Niederlagen mit Schwarz** und **Grobe Patzer**. Fährst du über
 einen selbst gespeicherten, erscheint das Kreuz zum Entfernen.
 
-## Sortieren und blättern
+## Sortieren und blättern { #sort-and-page }
 
 Ein Klick auf eine Spaltenüberschrift sortiert danach, ein zweiter dreht die Richtung um.
 Sortiert wird die ganze gefilterte Liste, nicht nur die sichtbare Seite. Die Fußzeile legt
 die Zeilen pro Seite fest – **Fit** sind so viele, wie ins Fenster passen – und blättert mit
 den Pfeilen neben der Zahl.
+
+Die Spalte **Analyse** sagt schlicht **Analysiert** oder **Nicht analysiert**, in Lila,
+wenn eine von dir angeforderte Analyse dabei ist. Symbole gibt es in der Tabelle nur für
+`??`, `?` und `?!`. Die Spalte **Verlust** ist erst ab einer Ungenauigkeit eingefärbt.
 
 ## Die Liste ohne Engine lesen { #read-the-list-without-the-engine }
 
@@ -59,9 +64,10 @@ aussieht wie immer, ist eine Partie, die mit ausgeblendeter Engine importiert wu
 ([Analyse](analysis.md#hide-the-engine-on-new-games)); öffne sie und drück **Engine
 zeigen**, wenn du sie gelesen hast.
 
-## Mehrere Partien auf einmal bearbeiten
+## Mehrere Partien auf einmal bearbeiten { #act-on-several-games-at-once }
 
-Hake Zeilen an, oder das Kästchen im Kopf für die ganze Seite. Die Fußzeile bietet dann
+Hake Zeilen an, oder das Kästchen im Kopf für die ganze Seite; eine angehakte Zeile wird
+blau, mit einem Balken am linken Rand. Die Fußzeile bietet dann
 **Analyse einreihen**, **Löschen** und **Auswahl aufheben**. **Analyse einreihen** gibt
 jeder Partie die Importanalyse, mit dem Budget und dem Platz in der Warteschlange, den jede
 importierte Partie bekommt; genauer hinsehen lässt du bei einer einzelnen Partie mit
@@ -76,7 +82,7 @@ angehefteten Varianten. Notizen zu einer *Stellung* bleiben. Es gibt kein Rückg
 Löschung wird gemerkt, damit eine spätere Synchronisierung die Partie nicht wieder
 hereinholt; dieses Gedächtnis löschst du unter [Bibliothek → Verwalten](library.md#manage).
 
-## Eine gefilterte Liste teilen
+## Eine gefilterte Liste teilen { #share-a-filtered-list }
 
 Die Filter stehen in der Adresszeile. Jeder Ausschnitt der Bibliothek ist also ein Link, den
 du verschicken oder als Lesezeichen ablegen kannst. Die aktuelle Seite und die Zeilen pro

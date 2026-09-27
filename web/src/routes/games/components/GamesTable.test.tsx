@@ -74,6 +74,7 @@ describe('GamesTable states', () => {
       error: new Error('no game with id 12'),
     })
     expect(screen.getByText('no game with id 12')).toBeInTheDocument()
+    expect(screen.getByRole('alert')).toHaveClass('bb-error')
     await userEvent.click(screen.getByRole('button', { name: 'Try again' }))
     expect(props.onRetry).toHaveBeenCalledOnce()
   })
@@ -208,6 +209,33 @@ describe('GamesTable source chip', () => {
     setup()
     expect(screen.queryByRole('link', { name: /Lichess/ })).not.toBeInTheDocument()
     expect(screen.getByText('Lichess')).toBeInTheDocument()
+  })
+
+  it('says the source as plain text rather than as a framed chip', () => {
+    setup({ games: [{ ...GAME, url: 'https://lichess.org/abcd1234' } as GameCard] })
+    // Routine metadata down a column is words, not fifty bordered badges.
+    expect(screen.getByRole('link', { name: /Lichess/ }).className).not.toMatch(/\bborder\b/)
+    expect(screen.getByText('Analysed').className).not.toMatch(/\bborder\b/)
+  })
+})
+
+describe('GamesTable selection', () => {
+  it('lights a selected row with the one selected state', () => {
+    setup({ selected: new Set([12]) })
+    const row = screen.getAllByRole('row').find((node) => node.hasAttribute('data-games-row'))!
+    expect(row).toHaveAttribute('aria-selected', 'true')
+    expect(row).toHaveClass('bg-selected')
+    // Metadata that reads dim on a plain row rises on the selected blue, where dim is sub-AA.
+    expect(screen.getByText('B02')).toHaveClass('text-soft')
+    expect(screen.getByText('Analysed')).toHaveClass('text-soft')
+  })
+
+  it('keeps a requested run in its purple on a selected row', () => {
+    setup({ games: [{ ...GAME, requested: true } as GameCard], selected: new Set([12]) })
+    // The exception stays the exception: only the routine dim metadata rises to soft.
+    const cell = screen.getByText('Analysed')
+    expect(cell).toHaveClass('text-deep')
+    expect(cell).not.toHaveClass('text-soft')
   })
 })
 

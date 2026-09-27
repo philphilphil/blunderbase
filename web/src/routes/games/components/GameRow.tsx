@@ -1,6 +1,18 @@
 /**
- * One 40px row of design 2b: mono and tabular throughout, with the two name columns set in
- * Geist so they read as prose next to the numbers.
+ * One 40px row of design 2b. The row is set in Geist at the data size, and every number
+ * that has to line up down a column — date, ratings, result, clock, moves, the drop — is
+ * mono and tabular. The two names are a step larger (`text-lead`), because they are what
+ * a row is looked up by.
+ *
+ * Routine metadata is text, and only exceptions are badges. Where the game came from and
+ * that an import pass ran over it are true of nearly every row, so the Source and Analysis
+ * cells say it in plain words (a coloured dot for the source) rather than in fifty tinted
+ * chips; a run somebody asked for keeps its purple as text. The flag badges stay badges,
+ * because a blunder is the exception a row is scanned for.
+ *
+ * A selected row is `bg-selected` with the accent bar on its left edge, the one selected
+ * idiom for list rows. The dim metadata in it (the ECO, "Analysed", the phone's date)
+ * rises to `soft` there, since `dim` on the selected blue falls under AA.
  *
  * Below `md` the same 13 cells are re-laid as a two-line card on the grid `columns.ts`
  * describes, rather than as a line that would need 800px to be read. Nothing is
@@ -53,9 +65,8 @@ export interface GameRowProps {
    * The engine is hidden (⇧E, `lib/ui/engineVisibility`), so this row says nothing about
    * how the game was played: no `Worst` cell — the table has dropped that column and the
    * header with it — and no flag badges. What stays is what the engine did not decide: the
-   * run chip (a pass happened, and whether one was asked for), the "analyse" affordance where
-   * none has, and
-   * the delete button that shares the flags cell.
+   * Analysis cell (a pass happened, and whether one was asked for), the "analyse" affordance
+   * where none has, and the delete button that shares the flags cell.
    */
   engineHidden?: boolean
 }
@@ -87,9 +98,11 @@ export const GameRow = memo(function GameRow({
   const ownerSide = game.is_owner_game === false ? null : (game.color ?? null)
   const nameClass = (side: 'white' | 'black') =>
     cn(
-      'truncate font-sans text-[0.78125rem]',
-      ownerSide === side ? 'font-semibold text-ink' : selected ? 'text-bright' : 'text-body',
+      'truncate text-lead',
+      ownerSide === side ? 'font-semibold text-ink' : selected ? 'text-bright' : 'text-ink-2',
     )
+  // What reads `dim` on a plain row reads `soft` on a selected one (see the doc above).
+  const meta = selected ? 'text-soft' : 'text-dim'
 
   return (
     <div
@@ -109,13 +122,13 @@ export const GameRow = memo(function GameRow({
       className={cn(
         // `select-none`: a shift-click extends the selection of rows, and must not also
         // paint a run of text blue from the last row clicked to this one.
-        'group flex cursor-pointer items-center gap-2.5 border-t border-raised px-5 font-mono text-[0.71875rem] tabular outline-none select-none',
+        'group flex cursor-pointer items-center gap-2.5 border-t border-hairline px-5 font-sans text-data outline-none select-none',
         ROW_HEIGHT,
         PHONE_CARD,
         'max-md:gap-x-2 max-md:gap-y-1 max-md:px-3 max-md:py-2',
         selected
-          ? 'bg-accent-teal/8 shadow-[inset_0.125rem_0_0_var(--bb-accent)]'
-          : 'hover:bg-elevated-2 focus-visible:bg-elevated-2',
+          ? 'bg-selected shadow-[inset_0.125rem_0_0_var(--bb-accent)]'
+          : 'hover:bg-raised focus-visible:bg-raised',
       )}
     >
       <span {...cell('select', 'flex items-center')}>
@@ -131,7 +144,7 @@ export const GameRow = memo(function GameRow({
           className={cn(
             // Large enough to distinguish from the row around it as a click target. The
             // whole visible square is the button, so a near-hit selects instead of opening.
-            'size-[1.125rem] rounded-[0.1875rem] border transition-colors',
+            'size-[1.125rem] rounded-sm border transition-colors',
             selected
               ? 'border-accent-teal bg-accent-teal'
               : 'border-edge-strong hover:border-edge-hover',
@@ -139,38 +152,50 @@ export const GameRow = memo(function GameRow({
         />
       </span>
 
-      <span {...cell('date', 'text-body max-md:text-dim')}>{formatGameDate(game.played_at)}</span>
+      <span
+        {...cell('date', cn('font-mono tabular text-body', selected ? 'max-md:text-soft' : 'max-md:text-dim'))}
+      >
+        {formatGameDate(game.played_at)}
+      </span>
 
       <span {...cell('white', nameClass('white'))} title={game.white ?? undefined}>
         {game.white ?? '—'}
       </span>
 
-      <span {...cell('white_rating', 'text-right text-soft')}>{game.white_rating ?? '—'}</span>
+      <span {...cell('white_rating', 'text-right font-mono tabular text-body')}>
+        {game.white_rating ?? '—'}
+      </span>
 
       <span {...cell('black', nameClass('black'))} title={game.black ?? undefined}>
         {game.black ?? '—'}
       </span>
 
-      <span {...cell('black_rating', 'text-right text-soft')}>{game.black_rating ?? '—'}</span>
+      <span {...cell('black_rating', 'text-right font-mono tabular text-body')}>
+        {game.black_rating ?? '—'}
+      </span>
 
       <span
-        {...cell('opening', 'truncate font-sans text-[0.78125rem] text-body')}
+        {...cell('opening', 'truncate text-body')}
         title={[game.opening, game.eco].filter(Boolean).join(' · ') || undefined}
       >
         {game.opening ?? t`Unknown opening`}{' '}
-        {game.eco ? <span className="font-mono text-dim">{game.eco}</span> : null}
+        {game.eco ? <span className={cn('font-mono', meta)}>{game.eco}</span> : null}
       </span>
 
-      <span {...cell('result', cn('text-center font-semibold', outcomeTone(game.outcome)))}>
+      <span
+        {...cell('result', cn('text-center font-mono font-semibold tabular', outcomeTone(game.outcome)))}
+      >
         {formatResult(game.result)}
       </span>
 
-      <span {...cell('time', 'truncate text-soft')}>{formatTimeControl(game)}</span>
+      <span {...cell('time', 'truncate font-mono tabular text-soft')}>{formatTimeControl(game)}</span>
 
-      <span {...cell('moves', 'text-right text-soft')}>{moveCount(game.ply_count)}</span>
+      <span {...cell('moves', 'text-right font-mono tabular text-soft')}>
+        {moveCount(game.ply_count)}
+      </span>
 
       {engineHidden ? null : quiet ? (
-        <span {...cell('worst', 'flex items-center justify-end text-dim')}>
+        <span {...cell('worst', cn('flex items-center justify-end', meta))}>
           <EyeOff
             className="size-3"
             role="img"
@@ -178,25 +203,32 @@ export const GameRow = memo(function GameRow({
           />
         </span>
       ) : (
-        <span {...cell('worst', cn('text-right', dropTone(drop)))}>{formatDrop(drop)}</span>
+        <span {...cell('worst', cn('text-right font-mono tabular', dropTone(drop)))}>
+          {formatDrop(drop)}
+        </span>
       )}
 
-      <span {...cell('source')}>
-        {/* A link to the game on its site where it has one; the click stops in the chip
-            rather than also opening the row (`SourceBadge`). */}
+      <span {...cell('source', 'flex items-center')}>
+        {/* A dot and the site's name, a link to the game there where it has one; the click
+            stops in the link rather than also opening the row (`SourceBadge`). */}
         <SourceBadge
           source={game.source}
+          variant="plain"
           size="sm"
           href={game.url}
           title={game.url ? t`Open this game on the site it came from` : undefined}
         />
       </span>
 
-      <span {...cell('tier')}>
+      <span {...cell('tier', 'flex items-center')}>
         {analysis ? (
-          <RunBadge run={analysis} className="px-1.5 py-px text-[0.625rem]" />
+          <RunBadge
+            run={analysis}
+            plain
+            className={selected && !analysis.requested ? 'text-soft' : undefined}
+          />
         ) : (
-          <UnanalysedBadge className="px-1.5 py-px text-[0.625rem]" />
+          <UnanalysedBadge plain className={selected ? 'text-soft' : undefined} />
         )}
       </span>
 
@@ -219,7 +251,7 @@ export const GameRow = memo(function GameRow({
               onAnalyse(game.id)
             }}
             disabled={analysing}
-            className="text-[0.65625rem] text-accent-teal hover:text-accent-link disabled:text-dim max-md:rounded-md max-md:border max-md:border-edge max-md:px-2 max-md:py-1"
+            className="text-label text-accent-teal hover:text-accent-link disabled:text-dim max-md:rounded-md max-md:border max-md:border-edge max-md:px-2 max-md:py-1"
           >
             {analysing ? t`queueing…` : t`analyse`}
           </button>
@@ -239,7 +271,7 @@ export const GameRow = memo(function GameRow({
             event.stopPropagation()
             onDelete(game.id)
           }}
-          className="ml-auto shrink-0 rounded-[0.1875rem] p-0.5 text-dim-2 opacity-0 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100 hover:text-blunder focus-visible:opacity-100 max-md:hidden"
+          className="ml-auto shrink-0 rounded-sm p-0.5 text-soft opacity-0 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100 hover:text-blunder focus-visible:opacity-100 max-md:hidden"
         >
           <X className="size-3" aria-hidden />
         </button>

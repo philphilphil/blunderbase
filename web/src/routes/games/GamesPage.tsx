@@ -17,11 +17,11 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 
 import { SetPageChrome } from '@/components/shell/PageChrome'
+import { Button } from '@/components/ui/button'
 import { ApiError } from '@/lib/api/client'
 import { useDeleteGames, useRequestAnalysisBatch } from '@/lib/api/queries'
 import { useEngineHidden } from '@/lib/ui/engineVisibility'
 import { isTyping } from '@/lib/ui/shortcuts'
-import { cn } from '@/lib/utils'
 
 import { DeleteGamesDialog } from './components/DeleteGamesDialog'
 import { DebouncedInput, FilterBar } from './components/FilterBar'
@@ -291,27 +291,27 @@ export function GamesPage() {
             wrong half to give up. The two buttons wrap under it. */}
         <div className="flex items-end gap-3 max-md:flex-wrap max-md:gap-y-2.5">
           <div className="flex flex-col gap-[0.1875rem]">
-            <h1 className="text-[1.1875rem] font-semibold tracking-[-0.01em] text-ink">
+            <h1 className="text-title text-ink">
               <Trans>Games</Trans>
             </h1>
             {/* One `Trans` per case rather than a count swapped inside a shared frame: the
                 sentence is what a translator needs whole, and the mono count is part of it. */}
-            <p className="text-[0.78125rem] text-dim">
+            <p className="text-data text-dim">
               {library.status === 'pending' ? (
                 t`Counting…`
               ) : active === 1 ? (
                 <Trans>
-                  <span className="font-mono text-soft">{totalGames}</span> of your games match this
+                  <span className="font-mono text-body">{totalGames}</span> of your games match this
                   filter
                 </Trans>
               ) : active > 0 ? (
                 <Trans>
-                  <span className="font-mono text-soft">{totalGames}</span> of your games match
+                  <span className="font-mono text-body">{totalGames}</span> of your games match
                   these {active} filters
                 </Trans>
               ) : (
                 <Trans>
-                  <span className="font-mono text-soft">{totalGames}</span> games in the database
+                  <span className="font-mono text-body">{totalGames}</span> games in the database
                 </Trans>
               )}
             </p>
@@ -325,25 +325,20 @@ export function GamesPage() {
             placeholder={t`Opponent, ECO, PGN text…`}
             value={filters.text ?? ''}
             onCommit={(value) => setFilters({ ...filters, text: value || undefined })}
-            className="h-8 w-[13.75rem] text-xs max-md:w-full"
+            className="w-[13.75rem] max-md:w-full"
           />
 
           {active > 0 ? (
-            <button
-              type="button"
-              onClick={() => setFilters({})}
-              className="rounded-md border border-edge-input px-2.5 py-1.5 text-xs text-soft transition-colors hover:border-edge-hover hover:text-ink"
-            >
+            <Button type="button" size="sm" variant="outline" onClick={() => setFilters({})}>
               <Trans>Clear {active}</Trans>
-            </button>
+            </Button>
           ) : null}
 
-          <Link
-            to="/library/import"
-            className="rounded-md border border-edge-input px-2.5 py-1.5 text-xs text-soft transition-colors hover:border-edge-hover hover:text-ink"
-          >
-            <Trans>Import</Trans>
-          </Link>
+          <Button asChild size="sm" variant="outline">
+            <Link to="/library/import">
+              <Trans>Import</Trans>
+            </Link>
+          </Button>
         </div>
 
         <FilterBar filters={filters} onChange={setFilters} />
@@ -414,21 +409,24 @@ function refusalReason(error: unknown, fallback: string): string {
   return fallback
 }
 
+/**
+ * What the body says when the query came back empty. An unboxed block of text in the
+ * middle of the table's own space: the table is already the region, and a dashed card
+ * inside it was a second frame around one sentence. An empty library has one thing to do,
+ * so importing is the filled primary; a filter that matched nothing is routine and gets
+ * the quieter outline.
+ */
 function EmptyState({ active, onClear }: { active: number; onClear: () => void }) {
   return (
-    <div
-      className={cn(
-        'flex max-w-md flex-col items-center gap-2.5 rounded-xl border border-dashed border-edge-strong bg-panel/60 p-10 text-center max-md:p-6',
-      )}
-    >
-      <span className="text-[0.8125rem] font-semibold text-ink">
+    <div className="mx-auto flex max-w-[28rem] flex-col items-center gap-2.5 py-10 text-center max-md:py-6">
+      <span className="text-heading font-semibold text-ink">
         {active > 0 ? (
           <Trans>Nothing matches these filters</Trans>
         ) : (
           <Trans>No games yet</Trans>
         )}
       </span>
-      <p className="text-[0.78125rem] leading-relaxed text-dim">
+      <p className="text-data leading-relaxed text-dim">
         {active > 0 ? (
           <Trans>
             Loosen a filter — the library only ever shows games that are already imported.
@@ -440,20 +438,15 @@ function EmptyState({ active, onClear }: { active: number; onClear: () => void }
         )}
       </p>
       {active > 0 ? (
-        <button
-          type="button"
-          onClick={onClear}
-          className="rounded-md border border-edge-input px-2.5 py-1 text-[0.71875rem] text-soft hover:border-edge-hover hover:text-ink"
-        >
+        <Button type="button" size="sm" variant="outline" onClick={onClear}>
           <Trans>Clear the filters</Trans>
-        </button>
+        </Button>
       ) : (
-        <Link
-          to="/library/import"
-          className="rounded-md border border-edge-input px-2.5 py-1 text-[0.71875rem] text-soft hover:border-edge-hover hover:text-ink"
-        >
-          <Trans>Go to import</Trans>
-        </Link>
+        <Button asChild size="sm">
+          <Link to="/library/import">
+            <Trans>Go to import</Trans>
+          </Link>
+        </Button>
       )}
     </div>
   )

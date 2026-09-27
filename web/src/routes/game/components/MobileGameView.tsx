@@ -6,6 +6,7 @@ import type { ReactNode } from 'react'
 
 import { SideDot } from '@/components/badges/SideDot'
 import { RunStatusBadge, UnanalysedBadge } from '@/components/badges/RunBadge'
+import { buttonVariants } from '@/components/ui/button'
 import type { Color, GameRunSummary, GameSummary, RunResponse } from '@/lib/api/types'
 import { formatScore, type Score } from '@/lib/chess/evaluation'
 import { cn } from '@/lib/utils'
@@ -265,14 +266,14 @@ function CompactHeader({
       className="flex h-[2.75rem] flex-none items-center gap-2 border-b border-hairline px-3"
     >
       <div className="flex min-w-0 flex-1 flex-col gap-px">
-        <div className="flex min-w-0 items-center gap-1.5 text-[0.71875rem] leading-tight">
+        <div className="flex min-w-0 items-center gap-1.5 text-data font-medium text-ink">
           <Name side="white" name={game.white} rating={game.white_rating} won={winner === 'white'} owner={game.color === 'white'} />
-          <span className="flex-none text-faint-2">
+          <span className="flex-none font-normal text-faint">
             <Trans>vs</Trans>
           </span>
           <Name side="black" name={game.black} rating={game.black_rating} won={winner === 'black'} owner={game.color === 'black'} />
         </div>
-        <div className="flex min-w-0 items-center gap-1.5 text-[0.625rem] leading-tight text-dim">
+        <div className="flex min-w-0 items-center gap-1.5 text-meta text-dim">
           {/*
             The evaluation of the position on the board, in the brightest tone on the line:
             it is the only thing here that changes as the game is walked, and the one number
@@ -282,21 +283,21 @@ function CompactHeader({
           */}
           {engineHidden ? null : (
             <>
-              <span className="flex-none font-mono tabular text-ink">{formatScore(score)}</span>
-              <span className="flex-none text-faint-2">·</span>
+              <span className="flex-none font-mono text-data tabular text-ink">{formatScore(score)}</span>
+              <span className="flex-none text-faint">·</span>
             </>
           )}
-          <span className="flex-none font-mono tabular">{formatResult(game.result)}</span>
-          <span className="flex-none text-faint-2">·</span>
+          <span className="flex-none font-mono tabular text-soft">{formatResult(game.result)}</span>
+          <span className="flex-none text-faint">·</span>
           {/* The ply readout the transport row gives up below `md`; free here. */}
-          <span className="flex-none font-mono tabular text-faint">
+          <span className="flex-none font-mono tabular">
             <Trans>
               ply {plyNumber}/{plyCount}
             </Trans>
           </span>
           {game.opening ? (
             <>
-              <span className="flex-none text-faint-2">·</span>
+              <span className="flex-none text-faint">·</span>
               <span className="truncate">{game.opening}</span>
             </>
           ) : null}
@@ -318,9 +319,9 @@ function CompactHeader({
             rel="noreferrer"
             aria-label={t`Open this game on the site it came from`}
             title={t`Open this game on the site it came from`}
-            className="flex size-7 items-center justify-center rounded-md border border-edge bg-elevated text-dim hover:text-ink"
+            className={buttonVariants({ variant: 'secondary', size: 'icon-sm' })}
           >
-            <ExternalLink className="size-3.5" aria-hidden />
+            <ExternalLink aria-hidden />
           </a>
         ) : null}
         <PgnButton pgn={pgn} />
@@ -361,10 +362,12 @@ function Name({
   return (
     <span className="inline-flex min-w-0 max-w-[48%] items-center gap-1">
       <SideDot side={side} size="sm" className="flex-none" />
-      <span className={cn('truncate', owner && 'font-medium', won ? 'text-good' : owner ? 'text-ink' : 'text-soft')}>
+      {/* Names are the header's primary data: the owner a weight heavier, the opponent in
+          `ink-2` rather than dimmed, and the winner in the result's green. */}
+      <span className={cn('truncate', owner && 'font-semibold', won ? 'text-good' : owner ? 'text-ink' : 'text-ink-2')}>
         {name ?? t`unknown`}
       </span>
-      <span className="flex-none font-mono text-[0.625rem] tabular text-faint">{rating ?? '—'}</span>
+      <span className="flex-none font-mono text-meta font-normal tabular text-dim">{rating ?? '—'}</span>
     </span>
   )
 }
@@ -421,17 +424,17 @@ function TabStrip({
             aria-selected={selected}
             onClick={() => onTabChange(name)}
             className={cn(
-              'flex flex-1 items-center justify-center gap-1.5 whitespace-nowrap text-xs',
+              'flex flex-1 items-center justify-center gap-1.5 whitespace-nowrap text-data',
               selected
                 ? 'font-medium text-ink shadow-[inset_0_-0.125rem_0_var(--bb-accent)]'
-                : 'text-dim hover:text-ink',
+                : 'text-soft hover:text-ink',
             )}
           >
             {i18n._(TAB_LABEL[name])}
             {count > 0 ? (
               <span
                 className={cn(
-                  'font-mono text-[0.625rem] tabular',
+                  'font-mono text-meta tabular',
                   name === 'eval' ? 'text-blunder' : 'text-accent-teal',
                 )}
               >

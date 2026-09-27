@@ -176,7 +176,7 @@ function TimeReadout({ payload }: { payload?: { payload?: TimeSeriesPoint }[] })
   const point = payload?.[0]?.payload
   if (!point || !Number.isInteger(point.ply)) return null
   return (
-    <div className="pointer-events-none rounded-md border border-edge-strong bg-elevated px-2 py-1 text-[0.65625rem] whitespace-nowrap shadow-[0_0.25rem_0.75rem_var(--bb-shadow)]">
+    <div className="pointer-events-none rounded-md border border-edge-strong bg-elevated px-2 py-1 text-label whitespace-nowrap shadow-[0_0.25rem_0.75rem_var(--bb-shadow)]">
       <span className="font-mono tabular text-dim">{plyLabel(point.ply)}</span>{' '}
       <span className="font-mono tabular text-body-3">{formatSeconds(point.seconds)}</span>
     </div>
@@ -253,7 +253,7 @@ function TimeTally({
     <div
       role="group"
       aria-label={t`${name}: ${average} per move, longest ${longest}, ${remaining} left`}
-      className="flex min-w-0 flex-col items-center gap-[0.15625rem] text-[0.65625rem]"
+      className="flex min-w-0 flex-col items-center gap-[0.15625rem] text-label"
     >
       <span className="flex min-w-0 max-w-full items-center gap-1.5">
         <SideDot side={side} size="sm" />
@@ -265,20 +265,20 @@ function TimeTally({
         first line, what was left on the second.
       */}
       <span className="grid grid-cols-[auto_1fr_auto_1fr] items-baseline gap-x-[0.3125rem] gap-y-[0.09375rem]">
-        <span className="text-right font-mono tabular text-body-3">{average}</span>
+        <span className="text-right font-mono text-body">{average}</span>
         <span title={t`Average time per move`} className="font-mono text-dim">
           <Trans comment="Label beside a player's average time per move">avg</Trans>
         </span>
         <span
           title={longestAt ? t`The longest think, on move ${longestAt}` : undefined}
-          className="text-right font-mono tabular text-body-3"
+          className="text-right font-mono text-body"
         >
           {longest}
         </span>
         <span className="font-mono text-dim">
           <Trans comment="Label beside a player's longest think">max</Trans>
         </span>
-        <span className="text-right font-mono tabular text-body-3">{remaining}</span>
+        <span className="text-right font-mono text-body">{remaining}</span>
         <span title={t`Time left at the end`} className="font-mono text-dim">
           <Trans comment="Label beside the time a player had left at the end">left</Trans>
         </span>

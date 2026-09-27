@@ -125,6 +125,14 @@ describe('MoveList', () => {
     expect(onSelectPly).toHaveBeenCalledWith(1)
   })
 
+  it('lights the current move in the one selected state, and only that move', () => {
+    renderList([move(0, 'e4'), move(1, 'd5')], { cursor: 1 })
+    const cellOf = (san: string) => screen.getByText(san).closest('button')!
+    // `--bb-selected`, the blue every selected row and segment wears — not a tint of its own.
+    expect(cellOf('d5')).toHaveClass('bg-selected')
+    expect(cellOf('e4')).not.toHaveClass('bg-selected')
+  })
+
   it('puts the inline annotation under the move it is about, and names that move', () => {
     renderList([move(0, 'e4'), move(1, 'Nxe4', { classification: 'blunder' })], {
       annotation: {
@@ -531,7 +539,8 @@ describe('MoveList', () => {
       // 0:19 is White's third move; the 2:50 beside it is not in trouble.
       expect(cells[4]).toHaveTextContent('0:19')
       expect(cells[4]!.className).toContain('text-mistake')
-      expect(cells[5]!.className).toContain('text-faint')
+      // A reading out of trouble is still data, so the quietest AA step rather than `faint`.
+      expect(cells[5]!.className).toContain('text-dim-2')
     })
 
     it('draws no column at all for a game played without clocks', () => {

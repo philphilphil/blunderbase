@@ -89,7 +89,7 @@ const GRID =
   'grid grid-cols-[3.625rem_2.125rem_3rem_3.25rem_minmax(0,1fr)] items-center gap-2'
 
 /** A move row's own metrics, so the two tables either side of the divider stay in step. */
-const ROW = cn(GRID, 'h-[1.625rem] rounded-[0.3125rem] px-1.5 font-mono text-[0.6875rem] tabular')
+const ROW = cn(GRID, 'h-[1.625rem] rounded-md px-1.5 font-mono text-data')
 
 export function BookPanel({ moves, ply, onPlay, onPreview, className }: BookPanelProps) {
   const { t } = useLingui()
@@ -99,7 +99,7 @@ export function BookPanel({ moves, ply, onPlay, onPreview, className }: BookPane
     return (
       <p
         data-testid="book-panel-empty"
-        className={cn('px-3 py-6 text-center text-[0.71875rem] text-dim', className)}
+        className={cn('px-3 py-6 text-center text-data text-dim', className)}
       >
         <Trans>None of your games reached this position.</Trans>
       </p>
@@ -117,7 +117,7 @@ export function BookPanel({ moves, ply, onPlay, onPreview, className }: BookPane
         role="row"
         className={cn(
           GRID,
-          'h-5 border-b border-hairline px-1.5 text-[0.5625rem] tracking-[.06em] text-faint uppercase',
+          'h-5 border-b border-hairline px-1.5 text-meta tracking-[.06em] text-dim uppercase',
         )}
       >
         <span>
@@ -141,13 +141,13 @@ export function BookPanel({ moves, ply, onPlay, onPreview, className }: BookPane
         const split = splitOf(move)
         const cells = (
           <>
-            <span className="text-body-3">
+            <span className="text-ink">
               {plyLabel(ply)}
               {/* SAN is optional on the payload; the UCI is never missing and is still a
                   move somebody can read, which beats a blank cell. */}
               {move.san ? notate(move.san) : move.uci}
             </span>
-            <span className="text-right text-dim">{move.games ?? 0}</span>
+            <span className="text-right text-body">{move.games ?? 0}</span>
             <ScoreBar split={split} className="w-full" />
             <span className={cn('text-right', dropTone(move.avg_win_loss))}>
               {formatAvgDrop(move.avg_win_loss)}
@@ -157,7 +157,7 @@ export function BookPanel({ moves, ply, onPlay, onPreview, className }: BookPane
             <span
               title={move.name ?? undefined}
               data-testid="book-move-opening"
-              className="truncate font-sans text-[0.6875rem] text-soft-2"
+              className="truncate font-sans text-data font-semibold text-ink"
             >
               {move.name}
             </span>
@@ -175,7 +175,7 @@ export function BookPanel({ moves, ply, onPlay, onPreview, className }: BookPane
             onPointerLeave={() => onPreview?.(null)}
             onFocus={() => onPreview?.([move.uci])}
             onBlur={() => onPreview?.(null)}
-            className={cn(ROW, 'text-left transition-colors hover:bg-elevated')}
+            className={cn(ROW, 'text-left transition-colors hover:bg-raised')}
           >
             {cells}
           </button>

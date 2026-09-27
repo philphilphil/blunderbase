@@ -230,6 +230,13 @@ msgstr "Die Suche wurde wegen Untätigkeit beendet."
 msgid "The search ended."
 msgstr "Die Suche ist beendet."
 
+#. The live search runs on this server, not on a remote runner
+#: src/components/analysis/InfiniteAnalysisPanel.tsx
+#: src/routes/engines/HostBadge.tsx
+#: src/routes/engines/RolesForm.tsx
+msgid "local"
+msgstr "lokal"
+
 #: src/components/analysis/InfiniteAnalysisPanel.tsx
 msgid "Live analysis"
 msgstr "Live-Analyse"
@@ -3795,6 +3802,26 @@ msgstr "Keine Partien – {period}. Erweitere den Zeitraum, oder spiel ein bissc
 msgid "Against the {windowKey} before this one, once there is one to compare."
 msgstr "Gegenüber dem {windowKey}-Zeitraum davor, sobald es einen zum Vergleichen gibt."
 
+#: src/routes/dashboard/WorstMomentsRow.tsx
+#: src/routes/explorer/components/MoveTreeTable.tsx
+#: src/routes/explorer/components/ReferenceMoveTable.tsx
+#: src/routes/game/components/BookPanel.tsx
+#: src/routes/games/components/columns.ts
+#: src/routes/games/filters.ts
+#: src/routes/stats/cards/BlundersByPhaseCard.tsx
+msgid "Opening"
+msgstr "Eröffnung"
+
+#: src/routes/dashboard/WorstMomentsRow.tsx
+#: src/routes/stats/cards/BlundersByPhaseCard.tsx
+msgid "Middlegame"
+msgstr "Mittelspiel"
+
+#: src/routes/dashboard/WorstMomentsRow.tsx
+#: src/routes/stats/cards/BlundersByPhaseCard.tsx
+msgid "Endgame"
+msgstr "Endspiel"
+
 #. Stands in for a player the game does not name
 #: src/routes/dashboard/WorstMomentsRow.tsx
 #: src/routes/explorer/stats.ts
@@ -3811,6 +3838,10 @@ msgstr "{move} gegen {opponent} – {cost} Gewinnchance, besser: {better}"
 #: src/routes/dashboard/WorstMomentsRow.tsx
 msgid "{move} vs {opponent} — {cost} win chance"
 msgstr "{move} gegen {opponent} – {cost} Gewinnchance"
+
+#: src/routes/dashboard/WorstMomentsRow.tsx
+msgid "Best: {better}"
+msgstr "Am besten: {better}"
 
 #: src/routes/dashboard/WorstMomentsRow.tsx
 msgid "Worst recent moments"
@@ -4365,11 +4396,6 @@ msgstr "Dieser Computer"
 #: src/routes/engines/EnginesPage.tsx
 msgid "Threads and hash belong to one process of one engine. How many processes a machine runs at once — passes, boards and correspondence searches together — is set per machine on <0>Machines</0>."
 msgstr "Threads und Hash gehören zu einem Prozess einer Engine. Wie viele Prozesse eine Maschine gleichzeitig laufen lässt – Durchläufe, Bretter und Fernschachsuchen zusammen –, wird je Maschine unter <0>Maschinen</0> festgelegt."
-
-#: src/routes/engines/HostBadge.tsx
-#: src/routes/engines/RolesForm.tsx
-msgid "local"
-msgstr "lokal"
 
 #: src/routes/engines/HostBadge.tsx
 msgid "{runnerName} is not connected"
@@ -4931,15 +4957,6 @@ msgstr "Ø verschenkt"
 msgid "Blund"
 msgstr "Patzer"
 
-#: src/routes/explorer/components/MoveTreeTable.tsx
-#: src/routes/explorer/components/ReferenceMoveTable.tsx
-#: src/routes/game/components/BookPanel.tsx
-#: src/routes/games/components/columns.ts
-#: src/routes/games/filters.ts
-#: src/routes/stats/cards/BlundersByPhaseCard.tsx
-msgid "Opening"
-msgstr "Eröffnung"
-
 #. Button in the transport row that opens the note composer
 #: src/routes/explorer/components/MoveTreeTable.tsx
 #: src/routes/game/components/BoardPanel.tsx
@@ -5257,6 +5274,10 @@ msgstr "Keine deiner Partien hat diese Stellung erreicht."
 #: src/routes/game/components/BookPanel.tsx
 msgid "Your games from this position"
 msgstr "Deine Partien ab dieser Stellung"
+
+#: src/routes/game/components/ColumnSplitter.tsx
+msgid "Drag to resize · double-click to reset"
+msgstr "Ziehen zum Anpassen · Doppelklick setzt zurück"
 
 #: src/routes/game/components/EngineRevealButton.tsx
 msgid "The engine was held back on this game when it was imported. Show it — the screen stays quiet until ⇧E is off as well."
@@ -7606,16 +7627,8 @@ msgid "moves 1–12"
 msgstr "Züge 1–12"
 
 #: src/routes/stats/cards/BlundersByPhaseCard.tsx
-msgid "Middlegame"
-msgstr "Mittelspiel"
-
-#: src/routes/stats/cards/BlundersByPhaseCard.tsx
 msgid "moves 13+"
 msgstr "Züge 13+"
-
-#: src/routes/stats/cards/BlundersByPhaseCard.tsx
-msgid "Endgame"
-msgstr "Endspiel"
 
 #: src/routes/stats/cards/BlundersByPhaseCard.tsx
 msgid "thin material"

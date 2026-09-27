@@ -17,6 +17,7 @@ import { Trans, useLingui } from '@lingui/react/macro'
 import type * as React from 'react'
 import { useEffect, useRef } from 'react'
 
+import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import type { GameCard } from '@/lib/api/types'
 import { useEngineHidden } from '@/lib/ui/engineVisibility'
@@ -158,7 +159,7 @@ export function GamesTable({
         // took the strip to 346px, which is exactly a 375px screen's content width, and
         // `Worst` fell off the end on its own. `gap-x-2` leaves about 30px in hand while
         // the padding stays at `px-3`, so the chips still line up with the cards below.
-        className="flex h-[2.125rem] flex-none items-center gap-2.5 border-b border-hairline bg-panel px-5 text-[0.65625rem] tracking-[.06em] text-dim-2 uppercase select-none max-md:h-auto max-md:flex-wrap max-md:gap-x-2 max-md:gap-y-1.5 max-md:px-3 max-md:py-2"
+        className="flex h-[2.125rem] flex-none items-center gap-2.5 border-b border-hairline bg-panel px-5 text-meta font-medium tracking-[.06em] text-dim uppercase select-none max-md:h-auto max-md:flex-wrap max-md:gap-x-2 max-md:gap-y-1.5 max-md:px-3 max-md:py-2"
       >
         {columns.map((col) => {
           const active = col.sort === sort.key
@@ -174,7 +175,7 @@ export function GamesTable({
                   onClick={onToggleAll}
                   disabled={games.length === 0}
                   className={cn(
-                    'size-[1.125rem] rounded-[0.1875rem] border transition-colors',
+                    'size-[1.125rem] rounded-sm border transition-colors',
                     allSelected
                       ? 'border-accent-teal bg-accent-teal'
                       : 'border-edge-strong hover:border-edge-hover',
@@ -202,8 +203,8 @@ export function GamesTable({
                   onClick={() => onSortChange(nextSort(sort, col.sort!))}
                   aria-sort={active ? (sort.direction === 'asc' ? 'ascending' : 'descending') : 'none'}
                   className={cn(
-                    'uppercase transition-colors hover:text-ink',
-                    active ? 'text-soft' : 'text-dim-2',
+                    'uppercase transition-colors',
+                    active ? 'text-ink' : 'text-dim hover:text-soft',
                   )}
                 >
                   {col.label ? i18n._(col.label) : null}
@@ -266,7 +267,7 @@ function LoadingRows({ columns, rows = 14 }: { columns: Column[]; rows?: number 
           data-games-row
           style={{ opacity: 1 - index * (0.6 / rows) }}
           className={cn(
-            'flex items-center gap-2.5 border-t border-raised px-5',
+            'flex items-center gap-2.5 border-t border-hairline px-5',
             ROW_HEIGHT,
             PHONE_CARD,
             'max-md:gap-x-2 max-md:gap-y-1 max-md:px-3 max-md:py-2',
@@ -276,7 +277,7 @@ function LoadingRows({ columns, rows = 14 }: { columns: Column[]; rows?: number 
             <span key={col.id} style={cellStyle(col)} className={cellClass(col)}>
               {col.id === 'select' ? null : (
                 <Skeleton
-                  className="h-[0.5625rem] rounded-[0.1875rem]"
+                  className="h-[0.5625rem] rounded-sm"
                   style={{ width: col.width === 'flex' ? '30%' : remWidth(Math.min(Number(col.width), 90)) }}
                 />
               )}
@@ -288,24 +289,25 @@ function LoadingRows({ columns, rows = 14 }: { columns: Column[]; rows?: number 
   )
 }
 
+/**
+ * The query failed: the app's one error box (`.bb-error`), with the heading in the blunder
+ * red and the backend's own message in body text, and the retry beside it as an ordinary
+ * button rather than inside a card of its own.
+ */
 function ErrorState({ error, onRetry }: { error: Error | null; onRetry: () => void }) {
   const { t } = useLingui()
   return (
     <div className="flex flex-1 items-center justify-center p-10 max-md:p-4">
-      <div className="flex max-w-md flex-col items-start gap-2.5 rounded-xl border border-blunder/28 bg-blunder/5 p-5">
-        <span className="text-[0.75rem] font-semibold text-blunder">
-          <Trans>Could not load the library</Trans>
-        </span>
-        <p className="text-[0.78125rem] leading-relaxed text-soft">
-          {error?.message ?? t`The backend did not answer.`}
-        </p>
-        <button
-          type="button"
-          onClick={onRetry}
-          className="rounded-md border border-edge-input px-2.5 py-1 text-[0.71875rem] text-soft hover:border-edge-hover hover:text-ink"
-        >
+      <div className="flex max-w-md flex-col items-start gap-2.5">
+        <div role="alert" className="bb-error">
+          <span className="font-semibold text-blunder">
+            <Trans>Could not load the library</Trans>
+          </span>
+          <p className="mt-1 leading-relaxed">{error?.message ?? t`The backend did not answer.`}</p>
+        </div>
+        <Button type="button" size="sm" variant="outline" onClick={onRetry}>
           <Trans>Try again</Trans>
-        </button>
+        </Button>
       </div>
     </div>
   )

@@ -13,6 +13,7 @@ import { Loader2, RefreshCw } from 'lucide-react'
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 
+import { buttonVariants } from '@/components/ui/button'
 import { useSyncSchedule, useImportJobs, useStartImport } from '@/lib/api/queries'
 import type { ImportJob, Source } from '@/lib/api/types'
 import { useImportProgress } from '@/routes/import/useImportProgress'
@@ -31,8 +32,12 @@ const PLATFORM_LABEL: Record<Syncable, string> = {
 /** Enough history to find the last good sync of each source without paging. */
 const JOB_LIMIT = 25
 
-const BUTTON =
-  'inline-flex items-center gap-1.5 rounded-md bg-accent-teal px-2.5 py-[0.4375rem] text-xs font-semibold text-accent-ink transition-colors hover:bg-accent-hover disabled:cursor-default disabled:opacity-60 disabled:hover:bg-accent-teal'
+/**
+ * The page's primary action: the filled button at the control standard's `sm`, so it
+ * stands at the same height as Import PGN beside it. A bare class string rather than
+ * `<Button>`, because the no-accounts case renders it on a Link.
+ */
+const BUTTON = buttonVariants({ variant: 'default', size: 'sm' })
 
 export interface SyncTarget {
   source: Syncable
@@ -116,7 +121,7 @@ export function SyncAllButton() {
   return (
     <>
       {failure ? (
-        <span className="max-w-[24ch] truncate text-[0.6875rem] text-blunder" title={failure}>
+        <span className="max-w-[24ch] truncate text-label text-blunder" title={failure}>
           {failure}
         </span>
       ) : null}
@@ -132,12 +137,16 @@ export function SyncAllButton() {
                 .map((target) => `${PLATFORM_LABEL[target.source]}: ${target.username}`)
                 .join(' · ')
         }
-        className={cn(BUTTON)}
+        // Still hoverable while it syncs, so the title keeps saying which accounts it is on.
+        className={cn(
+          BUTTON,
+          'disabled:pointer-events-auto disabled:cursor-default disabled:hover:bg-accent-teal',
+        )}
       >
         {syncing ? (
-          <Loader2 className="size-3 animate-spin" aria-hidden />
+          <Loader2 className="size-3.5 animate-spin" aria-hidden />
         ) : (
-          <RefreshCw className="size-3" aria-hidden />
+          <RefreshCw className="size-3.5" aria-hidden />
         )}
         {syncing ? t`Syncing` : t`Sync all`}
       </button>

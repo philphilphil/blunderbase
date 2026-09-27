@@ -178,7 +178,7 @@ function readCollapsed(): boolean {
 function SectionLabel({ children }: { children: ReactNode }) {
   if (useCollapsed()) return <div className="mx-2 my-1.5 h-px bg-hairline" />
   return (
-    <div className="px-2 pt-1.5 pb-2 text-[0.625rem] tracking-[0.12em] text-faint uppercase">
+    <div className="px-2 pt-1.5 pb-2 text-meta tracking-[0.12em] text-dim-2 uppercase">
       {children}
     </div>
   )
@@ -186,7 +186,7 @@ function SectionLabel({ children }: { children: ReactNode }) {
 
 /** The quiet label over a fold's contents — "Filters", "Your lines · black", "Reports". */
 function FoldLabel({ children }: { children: ReactNode }) {
-  return <div className="px-1.5 py-1 text-[0.625rem] text-faint">{children}</div>
+  return <div className="px-1.5 py-1 text-meta text-dim-2">{children}</div>
 }
 
 function Item({
@@ -227,12 +227,12 @@ function Item({
     >
       {({ isActive }) => (
         <>
-          <Icon className={cn('size-3.5 flex-none', isActive ? 'text-body-3' : 'text-faint')} />
+          <Icon className={cn('size-3.5 flex-none', isActive ? 'text-body-3' : 'text-dim')} />
           {collapsed ? null : label}
           {trailing && !collapsed ? (
             <>
               <span className="flex-1" />
-              <span className={cn('font-mono text-[0.6875rem] tabular text-dim', trailingClass)}>
+              <span className={cn('font-mono text-label tabular text-dim', trailingClass)}>
                 {trailing}
               </span>
             </>
@@ -308,7 +308,7 @@ function DotRow({
       {trailing !== undefined ? (
         <>
           <span className="flex-1" />
-          <span className={cn('font-mono text-[0.625rem] tabular text-dim', trailingClass)}>
+          <span className={cn('font-mono text-meta tabular text-dim', trailingClass)}>
             {trailing}
           </span>
         </>
@@ -357,7 +357,7 @@ function CorrespondenceStrip() {
     </div>
   )
   return (
-    <div className="mt-2 border-t border-line px-1.5 pt-2 text-[0.625rem] text-dim">
+    <div className="mt-2 border-t border-line px-1.5 pt-2 text-meta text-dim">
       {row('bg-good', t`searches`, `${inUse} / ${data.slots ?? 0}`)}
       {parked > 0 ? row('bg-mistake', t`parked, warm`, String(parked)) : null}
       {queued > 0 ? row('bg-accent-teal', t`waiting`, String(queued)) : null}
@@ -395,7 +395,7 @@ function EngineRoster() {
         </div>
       ))}
       {engines.data?.length === 0 ? (
-        <div className="px-2 py-[0.4375rem] text-[0.75rem] text-faint">
+        <div className="px-2 py-[0.4375rem] text-[0.75rem] text-dim-2">
           <Trans>No engines configured</Trans>
         </div>
       ) : null}
@@ -444,7 +444,7 @@ function SavedFilterRow({
           aria-label={t`Forget the saved filter “${name}”`}
           title={t`Forget this filter`}
           onClick={() => removeSavedFilter(id)}
-          className="absolute inset-y-0 right-0 hidden items-center bg-raised px-1 text-faint hover:text-blunder group-hover/saved:flex"
+          className="absolute inset-y-0 right-0 hidden items-center bg-raised px-1 text-dim hover:text-blunder group-hover/saved:flex"
         >
           ×
         </button>
@@ -466,7 +466,7 @@ function SavedFilters({ search }: { search: string }) {
         <SavedFilterRow key={filter.id} {...filter} search={search} />
       ))}
       {filters.length === 0 ? (
-        <div className="px-2 py-[0.4375rem] text-[0.75rem] text-faint">
+        <div className="px-2 py-[0.4375rem] text-[0.75rem] text-dim-2">
           <Trans>No saved filters yet</Trans>
         </div>
       ) : null}
@@ -492,7 +492,7 @@ function YourLines({ search }: { search: string }) {
           key={eco}
           to={`/games?eco=${eco}${scope ? `&color=${scope}` : ''}`}
           title={t`${name} — ${played} of your last ${sample} games`}
-          leading={<span className="font-mono text-[0.625rem] text-dim">{eco}</span>}
+          leading={<span className="font-mono text-meta text-dim">{eco}</span>}
           trailing={`${Math.round(score)}%`}
           trailingClass={scoreTone(score)}
         >
@@ -500,7 +500,7 @@ function YourLines({ search }: { search: string }) {
         </DotRow>
       ))}
       {games.isPending || lines.length > 0 ? null : (
-        <div className="px-2 py-[0.4375rem] text-[0.75rem] text-faint">
+        <div className="px-2 py-[0.4375rem] text-[0.75rem] text-dim-2">
           <Trans>No openings on record yet</Trans>
         </div>
       )}
@@ -649,7 +649,7 @@ function NavFooter({ collapsed, onToggle }: { collapsed: boolean; onToggle: () =
           href={`${REPO}/blob/main/CHANGELOG.md`}
           target="_blank"
           rel="noreferrer"
-          className="font-mono text-[0.625rem] text-dim-2 transition-colors hover:text-ink"
+          className="font-mono text-meta text-dim-2 transition-colors hover:text-ink"
           title={t`Blunderbase ${VERSION_LABEL} — what changed`}
         >
           {VERSION_LABEL}

@@ -51,21 +51,30 @@
  *
  * Raw palette first, semantic aliases second; only the semantic names are meant
  * to be used from components. Every colour in the app resolves through a
- * `--bb-*` name — nothing outside this file names a hex.
+ * `--bb-*` name — no component names a hex. The one copy outside this file is the
+ * `--bb-panel` pair for the browser's `theme-color` (`index.html` and
+ * `lib/ui/theme.tsx`), plus the manual's `manual/en/assets/manual.css`: when a
+ * surface or text token changes here, change them too.
+ *
+ * Contrast (WCAG), dark: the panel sits 1.13:1 off the surface; hover (`--bb-raised`)
+ * reads 1.30:1 on the surface and 1.16:1 on the panel; the selected fill 1.61:1 on the
+ * surface. `dim` is 5.39:1 and `dim-2` 4.81:1 on the panel, `faint` 4.49:1 on the
+ * surface — which is why faint is for decoration and not for anything one must read.
  * ----------------------------------------------------------------------- */
 :root {
   color-scheme: dark;
 
   /* surfaces — darkest to lightest */
   --bb-void: #1d1e1f; /* app background, the ground panes sit on */
-  --bb-panel: #292a2a; /* chrome: titlebar, rail, pane titles */
+  --bb-panel: #2c2d2e; /* chrome: titlebar, rail, pane titles — 1.13:1 off the surface */
   --bb-surface: #232424; /* content canvas */
   --bb-surface-2: #212222;
   --bb-elevated: #303131; /* chips, inputs, buttons */
   --bb-elevated-2: #2b2c2c; /* note cards */
-  --bb-raised: #343535; /* hover */
+  --bb-raised: #363738; /* hover — 1.30:1 on the surface, 1.16 on the panel */
   --bb-raised-2: #313232; /* nav active */
-  --bb-selected: #29445b; /* selected row / segmented-control active */
+  /* The one selected fill: rows, segments, pressed toggles. Accent text on it is 4.53:1. */
+  --bb-selected: #2b4760;
   --bb-avatar: #3a3b3b;
 
   /* lines */
@@ -85,7 +94,7 @@
   --bb-body-3: #c6c6c1;
   --bb-muted: #b6b5b0;
   --bb-muted-2: #aaa9a4;
-  --bb-dim-3: #a0a09a;
+  --bb-dim-3: #a7a69f;
   --bb-dim: #a3a29c;
   --bb-dim-2: #9a998f;
   --bb-faint: #8b8a82;
@@ -142,7 +151,9 @@
   --bb-track: #3a3c3b; /* progress / meter troughs */
   --bb-meter: #6b6f6d; /* filled meter, quiet */
   --bb-meter-2: #5a5e5c; /* filled meter, quieter still */
-  --bb-row-active: #2f3030; /* the move-list pair under the cursor */
+  /* The move-list pair under the cursor: a blue-grey, so "where you are" never reads as
+     the neutral hover (`--bb-raised`) passing over it. */
+  --bb-row-active: #2b3139;
   --bb-cell: #2b2c2c; /* engine-panel cell */
   --bb-cell-strong: #313232; /* engine-panel cell, top line */
   --bb-eval-track: #3a3c3b;
@@ -224,22 +235,24 @@
  * (`--bb-panel`) is a shade *darker* than the canvas it frames rather than
  * brighter, which is what stops a toolbar or a rail reading as a floating card.
  * The accent blue and the Maia purple are darkened until they clear WCAG AA on
- * `--bb-surface` (accent 5.6:1, deep 5.3:1); blunder and mistake keep their
+ * `--bb-surface` and `--bb-panel` alike (accent 6.3:1 / 5.7:1, deep 6.9:1 / 6.2:1);
+ * blunder and mistake keep their
  * saturated hues instead, see below. Only the raw palette is redefined — every
  * alias below picks the new values up.
  * ----------------------------------------------------------------------- */
 :root.light {
   color-scheme: light;
 
-  --bb-void: #e7e7e4;
-  --bb-panel: #f2f2f0;
-  --bb-surface: #fafaf8;
+  --bb-void: #e4e4e1;
+  --bb-panel: #efefec; /* 1.11:1 off the surface */
+  --bb-surface: #fbfbfa;
   --bb-surface-2: #f7f7f5;
   --bb-elevated: #f4f4f1;
   --bb-elevated-2: #f7f7f5;
-  --bb-raised: #ebebe8;
-  --bb-raised-2: #e8e8e5;
-  --bb-selected: #dbe6f2;
+  /* Hover has to read on the panel as well as on the canvas: 1.10:1 and 1.22:1. */
+  --bb-raised: #e5e5e1;
+  --bb-raised-2: #e2e2de;
+  --bb-selected: #d3e1f0; /* accent on it 4.93:1, ink 12.3:1 */
   --bb-avatar: #dcdcd8;
 
   --bb-hairline: #dcdcd8;
@@ -256,12 +269,15 @@
   --bb-body-2: #444442;
   --bb-body-3: #4e4e4b;
   --bb-muted: #5c5c59;
-  --bb-muted-2: #656562;
-  --bb-dim-3: #6a6a67;
-  --bb-dim: #71716e;
-  --bb-dim-2: #787874;
-  --bb-faint: #8a8a86;
-  --bb-faint-2: #9a9a95;
+  /* Evenly stepped (about 1.06:1 apart) so the ramp stays a hierarchy rather than one
+     grey, and every step down through dim-2 clears AA on the panel as well as the
+     surface. `faint` does not on the panel (3.96:1), which is why it is decoration only. */
+  --bb-muted-2: #61615e;
+  --bb-dim-3: #656562;
+  --bb-dim: #696966;
+  --bb-dim-2: #6d6d69;
+  --bb-faint: #767672;
+  --bb-faint-2: #8c8c87;
 
   --bb-accent: #245f9e;
   --bb-accent-hover: #1d4e83;
@@ -295,7 +311,7 @@
   --bb-track: #dededa;
   --bb-meter: #7f8589;
   --bb-meter-2: #949996;
-  --bb-row-active: #e9e9e5;
+  --bb-row-active: #e8eef4;
   --bb-cell: #f2f2ef;
   --bb-cell-strong: #eaeae6;
   --bb-eval-track: #d7d7d3;
@@ -309,7 +325,7 @@
   --bb-graph-tick: #7a7a76;
   --bb-card-grad-a: #fafaf8;
   --bb-card-grad-b: #f4f4f1;
-  --bb-chip-neutral: #efefec;
+  --bb-chip-neutral: #eaeae6;
   --bb-chip-info: #e7eef6;
   --bb-chip-info-edge: #b9cde2;
   --bb-chip-good: #e8f0ea;
@@ -458,6 +474,37 @@
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
+}
+
+/*
+ * The type scale (docs/design/README.md, "Type scale"): seven named steps, each a role
+ * rather than a size, so a component asks for "a label" or "a data cell" and the pixel
+ * value is decided once, here. Rendered size is the design pixel × 1.2 (the root scale).
+ *
+ *   meta 10 · label 11 · data 12 · lead 13 · heading 14 · value 15 · title 19
+ *
+ * `meta` is the floor: nothing in the app is set smaller. A plain `@theme` rather than
+ * `inline` because these are literal lengths, not references to another variable.
+ * `lib/utils.ts` teaches tailwind-merge the same seven names — without that `cn()` takes
+ * `text-meta` for a colour and drops it (or the colour) as a conflict.
+ */
+@theme {
+  --text-meta: 0.625rem;
+  --text-meta--line-height: 0.875rem;
+  --text-label: 0.6875rem;
+  --text-label--line-height: 1rem;
+  --text-data: 0.75rem;
+  --text-data--line-height: 1rem;
+  --text-lead: 0.8125rem;
+  --text-lead--line-height: 1.25rem;
+  --text-heading: 0.875rem;
+  --text-heading--line-height: 1.25rem;
+  --text-value: 0.9375rem;
+  --text-value--line-height: 1.25rem;
+  --text-title: 1.1875rem;
+  --text-title--line-height: 1.5rem;
+  --text-title--letter-spacing: -0.01em;
+  --text-title--font-weight: 600;
 }
 
 @layer base {
@@ -614,7 +661,7 @@
     padding: 0 0.625rem;
     border-bottom: 1px solid var(--bb-line);
     background: var(--bb-panel);
-    font-size: 0.6875rem;
+    font-size: 0.75rem;
     /* The height is declared, so the row must not be allowed to wrap its way past it: a
        strip too narrow for everything on it clips its last chip instead of becoming two
        lines and pushing the pane's own contents down. */
@@ -623,6 +670,22 @@
   }
   .tabular {
     font-variant-numeric: tabular-nums;
+  }
+  /*
+   * An error message where one belongs inline: a pane that could not load, a form the
+   * server refused. The red is on the frame — a thin border and a bar down the left edge —
+   * and the words stay `--bb-body`, because red text on its own red tint sits under AA on
+   * the light panel and an error is exactly the message that has to be read. A call site
+   * may still colour an icon or the first word `text-blunder`.
+   */
+  .bb-error {
+    border: 1px solid color-mix(in srgb, var(--bb-blunder) 40%, transparent);
+    box-shadow: inset 0.125rem 0 0 var(--bb-blunder);
+    background: color-mix(in srgb, var(--bb-blunder) 6%, transparent);
+    border-radius: 0.25rem;
+    padding: 0.5rem 0.75rem;
+    color: var(--bb-body);
+    font-size: 0.75rem;
   }
   /*
    * How things arrive. Three entrances and no more, so every dialog, popover and tooltip in

@@ -1,4 +1,5 @@
-import { useEffect, useRef } from 'react'
+import { useLingui } from '@lingui/react/macro'
+import { useEffect, useRef, useState } from 'react'
 
 import { cn } from '@/lib/utils'
 
@@ -17,6 +18,13 @@ const NUDGE_PX = 16
  * travelled since it went down, and whoever owns the width decides what that is worth —
  * which is what keeps the floors, the container and the clamping in one place, the page
  * that has them, rather than half here.
+ *
+ * A hairline alone did not say it could be moved: nobody finds a resize they were never
+ * shown, and the only hint was a cursor that changes once the pointer is already on the
+ * line. So the line carries a short grip at its middle — three design pixels of the same
+ * rule colour, quiet at rest — that turns the interaction blue under the pointer, with the
+ * keyboard on it, and for as long as a drag lasts (`data-dragging`, since a drag that
+ * outruns the strip is no longer hovering it). The title says the two gestures it takes.
  */
 export function ColumnSplitter({
   label,
@@ -38,8 +46,11 @@ export function ColumnSplitter({
   onReset: () => void
   className?: string
 }) {
+  const { t } = useLingui()
   /** Where the pointer went down. Null between drags, which is also "not dragging". */
   const origin = useRef<number | null>(null)
+  /** The same fact as state, for the grip — a ref does not re-render anything. */
+  const [dragging, setDragging] = useState(false)
 
   useEffect(
     () => () => {
@@ -52,6 +63,7 @@ export function ColumnSplitter({
   const stop = () => {
     if (origin.current === null) return
     origin.current = null
+    setDragging(false)
     document.body.style.userSelect = ''
     onResizeEnd()
   }
@@ -61,7 +73,9 @@ export function ColumnSplitter({
       role="separator"
       aria-orientation="vertical"
       aria-label={label}
+      title={t`Drag to resize · double-click to reset`}
       tabIndex={0}
+      data-dragging={dragging ? '' : undefined}
       className={cn(
         'group flex flex-none cursor-col-resize touch-none justify-center px-[0.3125rem] select-none',
         className,
@@ -72,6 +86,7 @@ export function ColumnSplitter({
         // keeps reporting here instead of being dropped where the pointer went.
         event.currentTarget.setPointerCapture(event.pointerId)
         origin.current = event.clientX
+        setDragging(true)
         // A drag across two columns of text would otherwise select them both.
         document.body.style.userSelect = 'none'
         onResizeStart()
@@ -100,8 +115,14 @@ export function ColumnSplitter({
     >
       {/* At rest it is the workspace's own board/moves rule, in the weight every other
           boundary on the screen carries; under the pointer it darkens to say it can be
-          dragged. */}
-      <span className="w-px flex-none bg-edge-strong transition-colors group-hover:bg-edge-hover" />
+          dragged. The grip sits on its middle and is the part that answers in blue. */}
+      <span className="relative w-px flex-none bg-edge-strong transition-colors group-hover:bg-edge-hover">
+        <span
+          data-testid="splitter-grip"
+          aria-hidden
+          className="absolute top-1/2 left-1/2 h-8 w-[0.1875rem] -translate-x-1/2 -translate-y-1/2 rounded-full bg-edge-strong transition-colors group-hover:bg-accent-teal group-focus-visible:bg-accent-teal group-data-[dragging]:bg-accent-teal"
+        />
+      </span>
     </div>
   )
 }

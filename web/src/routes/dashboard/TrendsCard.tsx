@@ -148,7 +148,7 @@ export function TrendsCard({ className }: { className?: string }) {
       <SectionHead
         title={t`Last ${days} days`}
         detail={
-          <span className="font-mono text-[0.625rem] tabular text-dim-2">
+          <span className="font-mono text-label tabular text-dim">
             {speed.isPending ? '…' : played} · {ending}
           </span>
         }
@@ -187,11 +187,11 @@ export function TrendsCard({ className }: { className?: string }) {
           <div className="flex flex-col gap-2.5">
             {metrics.map((metric) => (
               <div key={metric.label} className="flex items-baseline gap-2">
-                <span className="flex-1 text-[0.71875rem] text-soft">{metric.label}</span>
-                <span className="font-mono text-[0.9375rem] tabular text-ink">{metric.value}</span>
+                <span className="flex-1 text-data text-soft">{metric.label}</span>
+                <span className="font-mono text-value tabular text-ink">{metric.value}</span>
                 <span className="w-11 text-right">
                   {compareSpeed.isPending || comparePhase.isPending ? (
-                    <span className="font-mono text-[0.6875rem] text-faint">…</span>
+                    <span className="font-mono text-label text-faint">…</span>
                   ) : (
                     <DeltaText tone={deltaTone(metric.delta, metric.lowerIsBetter)}>
                       {formatDelta(metric.delta, metric.digits)}
@@ -201,7 +201,7 @@ export function TrendsCard({ className }: { className?: string }) {
               </div>
             ))}
           </div>
-          <p className="border-t border-hairline pt-2.5 text-[0.6875rem] leading-relaxed text-dim-2">
+          <p className="border-t border-hairline pt-2.5 text-label leading-relaxed text-dim">
             {dry ? i18n._(dry) : t`Against the ${windowKey} before this one, once there is one to compare.`}
           </p>
         </>

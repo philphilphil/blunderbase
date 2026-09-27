@@ -13,9 +13,15 @@ where you are in the game and what the position is worth. The row under that is 
 to the game — analyse, note, practise — and, hard right, the buttons that step through it.
 What this game rarely needs, such as the way back to the explorer, is behind the **⋯**.
 
+The line between the board and the column on its right can be dragged; its grip turns blue
+when you point at it. Reached with Tab, the arrow keys nudge it, and a double-click puts it
+back where it started. The width is remembered in this browser. The board and the move
+column each keep a minimum width, so neither can be squeezed out.
+
 The bar across the top names the opening, where the game came from, its time control and
-how it ended. On a Lichess or Chess.com game the source chip there is a link that opens the
-game on that site in a new tab; on a phone the same link is the arrow beside the PGN button.
+how it ended. On a Lichess or Chess.com game the source there is a link that opens the
+game on that site in a new tab, and a small arrow shows when you point at it; on a phone
+the same link is the arrow beside the PGN button.
 
 ## What the badges mean
 

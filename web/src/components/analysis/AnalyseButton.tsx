@@ -1,8 +1,8 @@
 /**
  * **Analyse…**, which opens the dialog where a run is shaped (engine, lines, limit, moves)
  * rather than queueing one outright — there is no single "right" run to put behind a bare
- * button. Tinted once a run has finished over the game, and still pressable: re-analysis is
- * always a new run.
+ * button. Its label turns the accent once a run has finished over the game, and it stays
+ * pressable: re-analysis is always a new run.
  *
  * While a run somebody asked for is queued or running it disables and carries a spinner and
  * the progress, with the run's own description (`d24 · 2 lines`) in the tooltip. An import
@@ -89,11 +89,19 @@ export function AnalyseButton({
         ? t`Analysed — choose a run to go deeper (A)`
         : t`Choose an engine, a limit and the moves to analyse (A)`
 
+  // The pill is the wrapper, so it wears the tool button (`secondary`) at the placement's
+  // standard size — `xs` in the strip, `sm` in the control row — and the stop square fits
+  // inside it. The phone's taller row target (`max-md:`) is the control row's own, kept.
+  //
+  // Done is said in the accent on the label and icon only. It used to tint the whole pill
+  // blue, which is what a pressed toggle looks like; the blue fill and border now mean
+  // selected or pressed and nothing else, and a finished run is neither.
+  const icon = strip ? 'size-3' : 'size-3.5'
   return (
     <span
       className={cn(
-        'inline-flex flex-none items-center rounded-md border',
-        finishedRun ? 'border-accent-teal/30 bg-accent-teal/10' : 'border-edge bg-elevated',
+        'inline-flex flex-none items-center rounded-md border border-edge bg-elevated',
+        strip ? 'h-6' : 'h-7 max-md:h-auto',
       )}
     >
       <Tooltip>
@@ -104,20 +112,18 @@ export function AnalyseButton({
             onClick={onAnalyse}
             aria-label={busy ? undefined : name}
             className={cn(
-              'flex flex-none items-center gap-1 rounded-md disabled:cursor-default',
-              strip
-                ? 'h-6 px-1.5 text-[0.6875rem]'
-                : 'px-2.5 py-[0.3125rem] text-xs max-md:py-1.5',
+              'flex h-full flex-none items-center rounded-md font-medium transition-colors enabled:hover:bg-raised disabled:cursor-default',
+              strip ? 'gap-1 px-2 text-label' : 'gap-1.5 px-2.5 text-data max-md:py-1.5',
               stoppable && (strip ? 'pr-1' : 'pr-1.5'),
-              finishedRun ? 'text-accent-teal' : 'text-soft hover:text-ink',
+              finishedRun ? 'text-accent-teal' : 'text-body hover:text-ink',
             )}
           >
             {waiting ? (
-              <Pause className="size-3" aria-hidden />
+              <Pause className={icon} aria-hidden />
             ) : busy ? (
-              <Loader2 className="size-3 animate-spin" aria-hidden />
+              <Loader2 className={cn(icon, 'animate-spin')} aria-hidden />
             ) : (
-              <AnalyseIcon className="size-3" />
+              <AnalyseIcon className={icon} />
             )}
             <span className={cn(strip && '@max-[24rem]:sr-only')}>
               {waiting ? t`Paused` : percent !== null ? `${percent}%` : name}
@@ -134,7 +140,7 @@ export function AnalyseButton({
           data-testid="analyse-stop"
           disabled={stopping}
           onClick={onStop}
-          className="mr-0.5 inline-flex size-5 items-center justify-center rounded-sm text-dim outline-none transition-colors hover:bg-raised hover:text-blunder focus-visible:bg-raised disabled:opacity-50"
+          className="mr-0.5 inline-flex size-5 items-center justify-center rounded-md text-soft outline-none transition-colors hover:bg-raised hover:text-blunder focus-visible:bg-raised disabled:opacity-50"
         >
           <Square className="size-2.5" fill="currentColor" strokeWidth={0} />
         </button>

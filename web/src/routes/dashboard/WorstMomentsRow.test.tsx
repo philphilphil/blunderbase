@@ -86,6 +86,34 @@ describe('WorstMomentsRow — dashboard moment cards (design 2a)', () => {
     expect(card).toHaveTextContent('24…Nxe4')
   })
 
+  it('names the move the engine wanted and the phase under the board', () => {
+    useWorstMoments.mockReturnValue(
+      answered([
+        moment({ phase: 'middlegame', game: { id: 7, source: 'lichess', opponent: 'jazzoz' } }),
+      ]),
+    )
+    draw()
+
+    const card = screen.getByRole('link', { name: /jazzoz/ })
+    expect(card).toHaveTextContent('Best: d6')
+    expect(card).toHaveTextContent('Middlegame')
+  })
+
+  it('leaves the best-move line out when the engine named none', () => {
+    useWorstMoments.mockReturnValue(
+      answered([
+        moment({
+          best_move_san: null,
+          best_move_uci: null,
+          game: { id: 7, source: 'lichess', opponent: 'jazzoz' },
+        }),
+      ]),
+    )
+    draw()
+
+    expect(screen.getByRole('link', { name: /jazzoz/ })).not.toHaveTextContent('Best:')
+  })
+
   it('falls back to the whole library when the window holds nothing, and relabels', () => {
     // The empty window is a real answer for someone reading an imported archive rather
     // than playing into it, and an empty panel is not.

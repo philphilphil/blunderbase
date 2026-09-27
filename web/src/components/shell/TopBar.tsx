@@ -90,7 +90,7 @@ export function TopBar({ onOpenNav }: { onOpenNav: () => void }) {
           target="_blank"
           rel="noreferrer"
           title={t`This is the public demo: look at everything, change nothing. Get your own Blunderbase at blunderbase.org.`}
-          className="flex flex-none items-center gap-1.5 rounded-md border border-chip-info-edge bg-chip-info px-2 py-[0.1875rem] text-[0.6875rem] font-medium text-info transition-colors hover:border-edge-hover hover:text-ink"
+          className="flex flex-none items-center gap-1.5 rounded-md border border-chip-info-edge bg-chip-info px-2 py-[0.1875rem] text-label font-medium text-info transition-colors hover:border-edge-hover hover:text-ink"
         >
           <Trans>Demo</Trans>
           <span className="text-dim max-md:hidden">
@@ -101,14 +101,14 @@ export function TopBar({ onOpenNav }: { onOpenNav: () => void }) {
       <div className="h-[1.125rem] w-px bg-line max-md:hidden" />
 
       {breadcrumb.length > 0 ? (
-        <div className="flex min-w-0 items-center gap-[0.4375rem] text-xs text-dim max-md:hidden">
+        <div className="flex min-w-0 items-center gap-[0.4375rem] text-data text-soft max-md:hidden">
           {breadcrumb.map((crumb, index) => (
             <Fragment key={index}>
               {index > 0 ? <span className="text-faint-2">/</span> : null}
               {crumb.to ? (
                 <Link
                   to={crumb.to}
-                  className={cn('truncate text-dim hover:text-ink', crumb.mono && 'font-mono')}
+                  className={cn('truncate text-soft hover:text-ink', crumb.mono && 'font-mono')}
                 >
                   {crumb.label}
                 </Link>
@@ -134,7 +134,7 @@ export function TopBar({ onOpenNav }: { onOpenNav: () => void }) {
           rel="noreferrer"
           aria-label={t`Open the manual for this page`}
           title={t`Open the manual for this page`}
-          className="flex flex-none items-center rounded-md p-1 text-faint transition-colors hover:bg-raised hover:text-ink"
+          className="flex flex-none items-center rounded-md p-1 text-dim transition-colors hover:bg-raised hover:text-ink"
         >
           <CircleHelp className="size-3.5" aria-hidden />
         </a>
@@ -165,7 +165,7 @@ export function TopBar({ onOpenNav }: { onOpenNav: () => void }) {
         onClick={palette.open}
         aria-label={t`Search everything`}
         title={t`Search everything (⌘K)`}
-        className="flex flex-none items-center gap-1.5 rounded-md border border-edge bg-elevated px-2.5 py-[0.3125rem] font-mono text-[0.6875rem] text-dim transition-colors hover:border-edge-hover hover:text-ink max-md:px-2"
+        className="flex flex-none items-center gap-1.5 rounded-md border border-edge bg-elevated px-2.5 py-[0.3125rem] font-mono text-label text-soft transition-colors hover:border-edge-hover hover:text-ink max-md:px-2"
       >
         <Search className="size-3.5 md:hidden" aria-hidden />
         <span className="max-md:hidden">⌘K</span>

@@ -5,6 +5,7 @@ import { ChevronDown } from 'lucide-react'
 import { Fragment, useEffect, useRef, useState } from 'react'
 
 import { MiniBoard } from '@/components/board/MiniBoard'
+import { buttonVariants } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { formatNps, formatVariation, liveLineId, type StreamSessionApi } from '@/lib/analysis'
 import type { StreamEndReason, StreamLine } from '@/lib/api/types'
@@ -107,7 +108,7 @@ function LineTokens({
           <Fragment key={k}>
             {offset > 0 ? ' ' : null}
             <span className="whitespace-nowrap">
-              {number ? <span className="text-dim">{number}</span> : null}
+              {number ? <span className="text-meta text-dim-2">{number}</span> : null}
               <span
                 data-ply={k}
                 role={onPlay ? 'button' : undefined}
@@ -129,7 +130,7 @@ function LineTokens({
                 className={cn(
                   // No padding on the marked token: a background that widened as the
                   // preview walked would shove the rest of the line along under the pointer.
-                  'rounded-[0.1875rem]',
+                  'rounded-sm',
                   previewPly !== null && k === previewPly
                     ? 'bg-selected text-accent-teal'
                     : previewPly !== null && k < previewPly
@@ -171,14 +172,14 @@ function HostChip({ runner }: { runner: string | null }) {
   return runner === null ? (
     <span
       data-testid="infinite-analysis-host"
-      className="flex-none rounded-sm border border-edge bg-elevated px-1.5 py-px font-mono text-[0.59375rem] text-dim"
+      className="flex-none rounded-sm border border-edge bg-elevated px-1.5 py-px text-meta text-dim"
     >
-      local
+      <Trans comment="The live search runs on this server, not on a remote runner">local</Trans>
     </span>
   ) : (
     <span
       data-testid="infinite-analysis-host"
-      className="inline-flex min-w-0 items-center gap-1 rounded-sm border border-edge bg-elevated px-1.5 py-px text-[0.59375rem] text-soft"
+      className="inline-flex min-w-0 items-center gap-1 rounded-sm border border-edge bg-elevated px-1.5 py-px text-meta text-soft"
     >
       <span className="size-1 flex-none rounded-full bg-accent-teal" />
       <span className="truncate" title={runner}>{runner}</span>
@@ -237,7 +238,8 @@ export function LiveSearchStatus({
       data-testid="infinite-analysis-engine"
       title={session?.engine}
       className={cn(
-        'truncate text-xs font-semibold text-ink',
+        // The same size as the stored run's engine name on the Run tab beside it.
+        'truncate text-label font-semibold text-ink',
         pick ? 'min-w-0 max-w-[10rem] shrink' : 'max-w-[45%] flex-none',
       )}
     >
@@ -268,9 +270,9 @@ export function LiveSearchStatus({
       {pick ? (
         // Shrinks rather than holding its width: the name truncates before anything to its
         // right is pushed off a strip that has run out of room.
-        <span className="relative inline-flex min-w-0 shrink items-center gap-0.5 rounded-[0.1875rem] hover:bg-raised">
+        <span className="relative inline-flex min-w-0 shrink items-center gap-0.5 rounded-md hover:bg-raised">
           {name}
-          <ChevronDown className="size-2.5 flex-none text-faint" aria-hidden />
+          <ChevronDown className="size-2.5 flex-none text-soft" aria-hidden />
           <select
             aria-label={t`Engine`}
             value={stream.engineId === null ? '' : String(stream.engineId)}
@@ -314,17 +316,17 @@ export function LiveSearchMeta({ stream }: { stream: StreamSessionApi }) {
           first, then nodes, then depth. They are what a glance can do without; the switch
           at the end of that strip is not. Outside a container these never apply. */}
       {snapshot?.depth ? (
-        <span className="flex-none whitespace-nowrap font-mono text-[0.625rem] tabular text-dim @max-[24rem]:hidden">
+        <span className="flex-none whitespace-nowrap font-mono text-meta text-dim @max-[24rem]:hidden">
           d{snapshot.depth}
         </span>
       ) : null}
       {nodes ? (
-        <span className="flex-none whitespace-nowrap font-mono text-[0.625rem] tabular text-dim @max-[30rem]:hidden">
+        <span className="flex-none whitespace-nowrap font-mono text-meta text-dim @max-[30rem]:hidden">
           <Trans>{nodes} nodes</Trans>
         </span>
       ) : null}
       {snapshot?.nps ? (
-        <span className="flex-none whitespace-nowrap font-mono text-[0.625rem] tabular text-dim @max-[36rem]:hidden">
+        <span className="flex-none whitespace-nowrap font-mono text-meta text-dim @max-[36rem]:hidden">
           {formatNps(snapshot.nps)}
         </span>
       ) : null}
@@ -439,11 +441,11 @@ export function LiveSearchLines({
       <div className={className}>
         <div className="flex items-center gap-2 px-3 py-2.5">
           <span className="size-1.5 flex-none rounded-full bg-edge-strong" />
-          <span className="text-[0.71875rem] text-dim">
+          <span className="text-data text-dim">
             <Trans>Analyse this position continuously.</Trans>
           </span>
         </div>
-        {note ? <p className="px-3 pb-2.5 text-[0.6875rem] text-dim">{note}</p> : null}
+        {note ? <p className="px-3 pb-2.5 text-label text-dim">{note}</p> : null}
       </div>
     )
   }
@@ -454,11 +456,11 @@ export function LiveSearchLines({
     <div className={className}>
       {offer ? (
         <div className="mx-1.5 mb-1.5 rounded-md border border-mistake/28 bg-mistake/5 px-2.5 py-2">
-          <p className="text-[0.71875rem] text-mistake">
+          <p className="text-data text-mistake">
             {i18n._(reasonSentence(offer.reason, where))}
           </p>
           {offer.error ? (
-            <p className="mt-1 font-mono text-[0.625rem] text-mistake/80">{offer.error}</p>
+            <p className="mt-1 font-mono text-meta text-mistake/80">{offer.error}</p>
           ) : null}
           <div className="mt-2 flex flex-wrap items-center gap-1.5">
             {offer.candidates.map((host) => {
@@ -468,7 +470,7 @@ export function LiveSearchLines({
                   key={host.engineId}
                   type="button"
                   onClick={() => stream.resume(host.engineId)}
-                  className="rounded-md border border-edge bg-elevated px-2 py-[0.1875rem] text-[0.6875rem] text-soft transition-colors hover:border-edge-hover hover:text-ink"
+                  className={buttonVariants({ variant: 'secondary', size: 'xs' })}
                 >
                   <Trans>Resume on {engine}</Trans>
                 </button>
@@ -477,7 +479,7 @@ export function LiveSearchLines({
             <button
               type="button"
               onClick={stream.dismissOffer}
-              className="rounded-md px-2 py-[0.1875rem] text-[0.6875rem] text-dim transition-colors hover:text-ink"
+              className={buttonVariants({ variant: 'ghost', size: 'xs' })}
             >
               <Trans>Dismiss</Trans>
             </button>
@@ -485,10 +487,10 @@ export function LiveSearchLines({
         </div>
       ) : null}
 
+      {/* The app's one error box: the message in body text inside a red frame, so a failure
+          reads as a failure without a paragraph of red to squint through. */}
       {phase === 'error' && error ? (
-        <p className="mx-1.5 mb-1.5 rounded-md border border-blunder/28 bg-blunder/5 px-2.5 py-2 text-[0.71875rem] text-blunder">
-          {error.message}
-        </p>
+        <p className="bb-error mx-1.5 mb-1.5">{error.message}</p>
       ) : null}
 
       {showLines ? (
@@ -499,7 +501,7 @@ export function LiveSearchLines({
               ? 'infinite-analysis-pending'
               : 'infinite-analysis-lines'
           }
-          className="flex flex-col px-1.5 pb-1.5 font-mono text-[0.71875rem]"
+          className="flex flex-col px-1.5 pb-1.5 font-mono text-data"
         >
           {slots.map((line, index) => {
             if (line === null) {
@@ -550,11 +552,11 @@ export function LiveSearchLines({
                   onHoverMove?.(null)
                   onHoverLine?.(null)
                 }}
-                className="relative flex h-[1.625rem] items-center gap-[0.5625rem] rounded-[0.3125rem] px-1.5 hover:bg-raised"
+                className="relative flex h-[1.625rem] items-center gap-[0.5625rem] rounded-md px-1.5 hover:bg-raised"
               >
                 <span
                   className={cn(
-                    'min-w-11 rounded-[0.1875rem] px-1.5 py-0.5 text-right tabular',
+                    'min-w-11 rounded-sm px-1.5 py-0.5 text-right text-label font-semibold tabular',
                     line.multipv === 1 ? 'bg-cell-strong text-ink-2' : 'bg-cell text-body-3',
                   )}
                 >
@@ -562,7 +564,8 @@ export function LiveSearchLines({
                 </span>
                 <span
                   data-testid="infinite-analysis-pv"
-                  className="flex-1 truncate text-soft"
+                  // The top line is the one being read, so `ink`; the others `body`.
+                  className={cn('flex-1 truncate', line.multipv === 1 ? 'text-ink' : 'text-body')}
                   title={text || undefined}
                 >
                   {sans.length > 0 ? (
@@ -597,7 +600,7 @@ export function LiveSearchLines({
                       label={t`Peek at the line`}
                     />
                     {caption ? (
-                      <span className="font-mono text-[0.59375rem] text-dim">{caption}</span>
+                      <span className="font-mono text-meta text-dim">{caption}</span>
                     ) : null}
                   </div>
                 ) : null}

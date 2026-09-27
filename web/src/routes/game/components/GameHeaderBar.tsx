@@ -3,6 +3,7 @@ import { ChevronLeft, ChevronRight } from 'lucide-react'
 
 import { SourceBadge } from '@/components/badges/SourceBadge'
 import { RunStatusBadge, UnanalysedBadge } from '@/components/badges/RunBadge'
+import { buttonVariants } from '@/components/ui/button'
 import type { GameRunSummary, GameSummary, RunResponse } from '@/lib/api/types'
 import { relative } from '@/lib/mcp/status'
 import { cn } from '@/lib/utils'
@@ -34,6 +35,13 @@ import { formatResult, formatTimeControl } from '../gameModel'
  * first because they are about *which* game this is, which is what the rest of the line
  * describes — and they are simply absent on a game reached any other way, rather than
  * present and dead.
+ *
+ * Chips only for exceptions. The opening is the heading; the ECO, the source, the time
+ * control and the result are plain text in the type scale, told apart by weight and tone
+ * rather than each boxed — a row of bordered chips was the noisiest line on the screen
+ * while saying the least. What keeps a chip is what is
+ * unusual about this game ("not your game") or about the app's work on it (a run queued,
+ * running or failed; never analysed).
  */
 export function GameHeaderBar({
   game,
@@ -74,7 +82,7 @@ export function GameHeaderBar({
         // place in a page nobody is looking at or a running total of a library — and
         // neither is a thing the reader wanted to know. The two arrows say all there is:
         // there is a game that way, or there is not.
-        <div className="flex flex-none overflow-hidden rounded-md border border-edge bg-elevated">
+        <div className="flex flex-none divide-x divide-hairline overflow-hidden rounded-md border border-edge bg-elevated">
           <StepButton
             label={t`Previous game`}
             hint="["
@@ -86,7 +94,6 @@ export function GameHeaderBar({
             hint="]"
             onClick={trail.onNext}
             icon={ChevronRight}
-            last
           />
         </div>
       ) : null}
@@ -95,41 +102,40 @@ export function GameHeaderBar({
           handful of mono characters, and a truncated ECO or result says nothing at all. It
           keeps a floor, so a narrow bar drops the lesser facts below rather than squeezing
           the opening's name down to an ellipsis. */}
-      <h1 className="min-w-[6rem] truncate text-sm font-semibold text-ink">
+      <h1 className="min-w-[6rem] truncate text-heading font-semibold text-ink">
         {game.opening ?? t`Unnamed opening`}
       </h1>
       {game.eco ? (
-        <span className="flex-none rounded-sm border border-edge px-[0.3125rem] py-px font-mono text-[0.6875rem] tabular text-dim">
-          {game.eco}
-        </span>
+        <span className="flex-none font-mono text-label tabular text-dim">{game.eco}</span>
       ) : null}
-      {/* The chip is the way to the game on its own site, where it has one: the same fact,
-          made clickable, rather than a sixth thing on the line. */}
+      {/* The source is the way to the game on its own site, where it has one: the same fact,
+          made clickable, rather than a sixth thing on the line. Plain — a dot and the name,
+          with the outward arrow only while the link is pointed at. */}
       <SourceBadge
         source={game.source}
-        size="sm"
+        variant="plain"
         className="flex-none"
         href={game.url}
         title={game.url ? t`Open this game on the site it came from` : undefined}
       />
       {timeControl ? (
-        <span className="flex-none font-mono text-[0.6875rem] text-dim @max-[40rem]:hidden">
+        <span className="flex-none font-mono text-label text-soft @max-[40rem]:hidden">
           {timeControl}
         </span>
       ) : null}
-      <span className="flex-none text-faint-2">·</span>
-      <span className="flex-none font-mono text-[0.6875rem] tabular text-soft">
+      <span className="flex-none text-faint">·</span>
+      <span className="flex-none font-mono text-label tabular text-body">
         {formatResult(game.result)}
       </span>
       {game.rated === false ? (
-        <span className="flex-none text-[0.6875rem] text-faint @max-[40rem]:hidden">
+        <span className="flex-none text-label text-dim-2 @max-[40rem]:hidden">
           <Trans>casual</Trans>
         </span>
       ) : null}
       {game.is_owner_game === false ? (
         <span
           title={t`Added from the reference explorer. Analysed and annotated like any other game, and counted in no statistic.`}
-          className="flex-none rounded-sm border border-dashed border-edge-strong px-[0.3125rem] py-px text-[0.625rem] text-dim"
+          className="flex-none rounded-sm border border-dashed border-edge-strong px-[0.3125rem] py-px text-meta text-dim"
         >
           <Trans>not your game</Trans>
         </span>
@@ -148,26 +154,29 @@ export function GameHeaderBar({
       )}
       {/* First to leave on a narrow bar: the badge beside it already says whether a run
           exists, and "when" is the least of what this line tells. */}
-      <span className="flex-none font-mono text-[0.625rem] text-faint @max-[48rem]:hidden">
+      <span className="flex-none font-mono text-meta text-dim-2 @max-[48rem]:hidden">
         {analysedAt ? t`analysed ${analysedAt}` : t`never analysed`}
       </span>
     </div>
   )
 }
 
-/** One end of the run: the same cell the board's transport is built from, at bar height. */
+/**
+ * One end of the run: the ghost `icon-xs` square in a bordered pair, the same shape as the
+ * board's transport group, ruled by the group (`divide-x`). A spent end stays drawn in the
+ * `faint-2` of a spent transport cell rather than fading the whole button, so the pair keeps
+ * its outline.
+ */
 function StepButton({
   label,
   hint,
   onClick,
   icon: Icon,
-  last,
 }: {
   label: string
   hint: string
   onClick: (() => void) | null
   icon: typeof ChevronLeft
-  last?: boolean
 }) {
   return (
     <button
@@ -177,11 +186,13 @@ function StepButton({
       disabled={!onClick}
       onClick={() => onClick?.()}
       className={cn(
-        'px-1.5 py-1 text-soft transition-colors hover:bg-selected hover:text-ink disabled:cursor-default disabled:text-faint-2 disabled:hover:bg-transparent',
-        !last && 'border-r border-edge',
+        buttonVariants({ variant: 'ghost', size: 'icon-xs' }),
+        // A spent step still answers a hover with its tooltip: the base's
+        // `disabled:pointer-events-none` would swallow the title that says why it is spent.
+        'rounded-none disabled:pointer-events-auto disabled:cursor-default disabled:text-faint-2 disabled:opacity-100 disabled:hover:bg-transparent',
       )}
     >
-      <Icon className="size-3.5" aria-hidden />
+      <Icon aria-hidden />
     </button>
   )
 }

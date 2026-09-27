@@ -223,6 +223,12 @@ export type RunKind = 'requested' | 'import'
 
 export interface RunStyle {
   chipClass: string
+  /**
+   * The same distinction as bare text, for where a run is a line of metadata rather than a
+   * chip — the plain `RunBadge`, the queue. Only the colour: the fill and border are what
+   * a plain run leaves out.
+   */
+  textClass: string
   color: string
 }
 
@@ -235,10 +241,12 @@ export interface RunStyle {
 export const RUN_STYLES: Record<RunKind, RunStyle> = {
   import: {
     chipClass: 'border-edge-strong bg-raised text-soft',
+    textClass: 'text-soft',
     color: 'var(--bb-muted)',
   },
   requested: {
     chipClass: 'border-deep/28 bg-deep/10 text-deep',
+    textClass: 'text-deep',
     color: 'var(--bb-deep)',
   },
 }

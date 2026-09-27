@@ -40,11 +40,13 @@ const LIGHT_QUERY = '(prefers-color-scheme: light)'
 /**
  * The `--bb-panel` of each theme, for the browser-chrome `theme-color` meta: the
  * titlebar is what runs along the top of the page, so it is the colour the browser's
- * own chrome should continue.
+ * own chrome should continue. A meta tag cannot read a CSS variable, so these are copies
+ * of the hex in `index.css` (and in `index.html`'s bootstrap): when the panel moves there,
+ * move them too.
  */
 const THEME_COLOR: Record<ResolvedTheme, string> = {
-  dark: '#292a2a',
-  light: '#f2f2f0',
+  dark: '#2c2d2e',
+  light: '#efefec',
 }
 
 export function isThemePreference(value: unknown): value is ThemePreference {

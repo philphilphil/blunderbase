@@ -156,7 +156,8 @@ describe('MaiaPanel', () => {
   it('leaves a move with no probability and no verdict in its neutral treatment', () => {
     render(<MaiaPanel rating="1700" human={HUMAN} engine={ENGINE} ply={1} />)
     const unknown = screen.getAllByTestId('maia-row')[1]
-    expect(within(unknown).getByText('a6')).toHaveClass('text-soft')
+    // Neutral is `body`: an unflagged move is still primary content, never below it.
+    expect(within(unknown).getByText('a6')).toHaveClass('text-body')
     expect(unknown).toHaveTextContent('—')
   })
 

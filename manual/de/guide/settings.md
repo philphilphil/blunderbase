@@ -1,12 +1,12 @@
 # Einstellungen
 
-## Sprache wechseln
+## Sprache wechseln { #change-the-language }
 
 Im Kontomenü unter **Sprache** wechselst du zwischen Deutsch und Englisch. Die Einstellung
 gehört zum Browser, nicht zum Konto: das Handy auf Deutsch und der Rechner auf Englisch ist
 also kein Problem. Die Seite lädt dabei neu, speichere eine offene Notiz vorher.
 
-## Erscheinungsbild wechseln
+## Erscheinungsbild wechseln { #switch-the-theme }
 
 Ebenfalls im Kontomenü: **Dunkel**, **Hell** oder **Dem System folgen**. Dunkel ist die
 Voreinstellung.
@@ -21,8 +21,8 @@ jede Partie und übersteht das Neuladen. Er gehört zu diesem Browser.
 Ausgeblendet verliert die Partieansicht den Bewertungsbalken und die Bewertung, die
 `??`-Markierungen und die eingefärbten Zeilen, den Bewertungsverlauf, die Bereiche von
 Engine und Maia und die Live-Engine; die Partienliste verliert die Spalte **Verlust** und
-ihre Symbole, und die neuesten Partien auf der Startseite verlieren den Verlust und das
-Symbol in jeder Zeile. Es bleibt die Partie selbst – die Züge, die Uhren, deine Notizen – und das,
+ihre Symbole, und die Übersicht verliert die schlimmsten Momente und bei jeder der neuesten
+Partien den Verlust und das Symbol. Es bleibt die Partie selbst – die Züge, die Uhren, deine Notizen – und das,
 was Blunderbase *getan* hat: die Markierung, die sagt, was gelaufen ist und wie weit es
 geschaut hat, und **Analysieren**. Genau das drückst du, wenn dein eigenes Urteil
 geschrieben ist.
@@ -32,7 +32,7 @@ hereinkommt, dann die Engine für sie einschalten –, ist das eine Einstellung 
 Bibliothek und nicht des Browsers: **Analyse → Engine-Durchläufe → Neue Partien**,
 beschrieben unter [Analyse](analysis.md#hide-the-engine-on-new-games).
 
-## Das Brett einstellen
+## Das Brett einstellen { #set-up-the-board }
 
 Das Zahnrad unter dem Brett oder `S` öffnet die **Bretteinstellungen**. Sie gelten nur in
 diesem Browser.
@@ -45,24 +45,24 @@ diesem Browser.
 | **Notation** | Wie die Figuren geschrieben werden, auf jeder Seite: deutsche Buchstaben (`Sc3`), englische Buchstaben (`Nc3`) oder Figurinen (`♞c3`) |
 | **Ton** | Ein Klick bei jedem Zug, und wie laut |
 
-## Die Tour wiederholen
+## Die Tour wiederholen { #replay-the-tour }
 
 **Tour erneut anzeigen** im Kontomenü startet die Tour in fünf Schritten neu. **Zurück** und
 **Weiter** führen hindurch, **Überspringen** oder `Esc` beendet sie. Schritte, deren
 Bedienelement gerade nicht auf dem Bildschirm ist, werden ausgelassen.
 
-## Die Befehlspalette
+## Die Befehlspalette { #the-command-palette }
 
 ⌘K öffnet die Befehlspalette. Ohne Eingabe listet sie die Seiten; ab zwei Zeichen findet
 sie auch Partien, Gegner, Eröffnungen und Notizen, deine gespeicherten Filter und die
 Statistik-Berichte. `↵` öffnet den markierten Eintrag.
 
-## Alle Tastenkürzel
+## Alle Tastenkürzel { #every-keyboard-shortcut }
 
 `?` oder die Tastatur-Schaltfläche in der Titelleiste zeigt die Tasten, die auf dem
 aktuellen Bildschirm gelten.
 
-### Überall
+### Überall { #anywhere }
 
 | Taste | Wirkung |
 |---|---|
@@ -73,7 +73,7 @@ aktuellen Bildschirm gelten.
 | `⌘⇧I` | Importieren |
 | `Esc` | Schließen, was gerade offen ist |
 
-### Eine Partie analysieren: Navigation
+### Eine Partie analysieren: Navigation { #analysing-a-game-moving-about-it }
 
 | Taste | Wirkung |
 |---|---|
@@ -85,7 +85,7 @@ aktuellen Bildschirm gelten.
 | `Leertaste` | Die Partie abspielen |
 | `[` `]` | Vorige und nächste Partie deiner Liste |
 
-### Eine Partie analysieren: das Brett
+### Eine Partie analysieren: das Brett { #analysing-a-game-the-board }
 
 | Taste | Wirkung |
 |---|---|
@@ -101,7 +101,7 @@ aktuellen Bildschirm gelten.
 | `S` | Bretteinstellungen |
 | `Esc` | Zurück zur Partie |
 
-### Eine Partie analysieren: die Partie selbst
+### Eine Partie analysieren: die Partie selbst { #analysing-a-game-the-game-itself }
 
 | Taste | Wirkung |
 |---|---|
@@ -111,7 +111,7 @@ aktuellen Bildschirm gelten.
 | `P` | Diese Stellung gegen den Computer ausspielen, oder aufhören |
 | `C` | PGN kopieren |
 
-### Die Partientabelle
+### Die Partientabelle { #the-library-table }
 
 | Taste | Wirkung |
 |---|---|
@@ -120,7 +120,7 @@ aktuellen Bildschirm gelten.
 | `↵` | Die Partie unter dem Cursor öffnen |
 | `/` | In der Liste suchen |
 
-### Im Explorer eine Variante entlanggehen
+### Im Explorer eine Variante entlanggehen { #walking-a-line-in-the-explorer }
 
 | Taste | Wirkung |
 |---|---|

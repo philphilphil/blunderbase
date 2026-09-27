@@ -2,13 +2,17 @@ import type * as React from 'react'
 
 import { cn } from '@/lib/utils'
 
-/** The dense library table from design 2b: 10px uppercase head, hairline rows, hover tint. */
+/**
+ * The dense library table from design 2b: a `text-meta` uppercase head, hairline rows, the
+ * one hover (`--bb-raised`) and the one selected fill (`--bb-selected`). The head is `dim`
+ * rather than `faint` because a column name is read, not decoration.
+ */
 function Table({ className, ...props }: React.ComponentProps<'table'>) {
   return (
     <div data-slot="table-container" className="relative w-full overflow-x-auto">
       <table
         data-slot="table"
-        className={cn('w-full caption-bottom border-collapse text-xs', className)}
+        className={cn('w-full caption-bottom border-collapse text-data', className)}
         {...props}
       />
     </div>
@@ -44,7 +48,7 @@ function TableRow({ className, ...props }: React.ComponentProps<'tr'>) {
     <tr
       data-slot="table-row"
       className={cn(
-        'border-b border-hairline transition-colors hover:bg-raised data-[state=selected]:bg-raised-2',
+        'border-b border-hairline transition-colors hover:bg-raised data-[state=selected]:bg-selected',
         className,
       )}
       {...props}
@@ -57,7 +61,7 @@ function TableHead({ className, ...props }: React.ComponentProps<'th'>) {
     <th
       data-slot="table-head"
       className={cn(
-        'h-7 px-2.5 text-left align-middle text-[0.625rem] font-normal tracking-[0.1em] text-faint uppercase',
+        'h-7 px-2.5 text-left align-middle text-meta font-normal tracking-[.06em] text-dim uppercase',
         className,
       )}
       {...props}
@@ -77,7 +81,7 @@ function TableCell({ className, ...props }: React.ComponentProps<'td'>) {
 
 function TableCaption({ className, ...props }: React.ComponentProps<'caption'>) {
   return (
-    <caption data-slot="table-caption" className={cn('mt-3 text-[0.6875rem] text-dim', className)} {...props} />
+    <caption data-slot="table-caption" className={cn('mt-3 text-label text-dim', className)} {...props} />
   )
 }
 

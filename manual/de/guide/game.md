@@ -1,6 +1,6 @@
 # Eine Partie analysieren
 
-## Durch die Partie gehen
+## Durch die Partie gehen { #move-through-the-game }
 
 ← und → gehen einen Zug vor oder zurück, ↑ und ↓ springen zum vorigen und nächsten
 markierten Zug, Pos1 und Ende an Anfang und Ende, die Leertaste spielt die Partie ab. `F`
@@ -15,18 +15,24 @@ ist. Die Zeile darunter ist das, was du mit der Partie machst – analysieren, n
 und ganz rechts die Schaltflächen, mit denen du durch sie gehst. Was eine Partie selten
 braucht, etwa der Weg zurück zum Explorer, liegt hinter dem **⋯**.
 
-Die Leiste oben nennt die Eröffnung, die Herkunft der Partie, ihre Bedenkzeit und den
-Ausgang. Bei einer Lichess- oder Chess.com-Partie ist der Quellen-Chip dort ein Link, der
-die Partie auf der Seite in einem neuen Tab öffnet; auf dem Telefon ist derselbe Link der
-Pfeil neben der PGN-Schaltfläche.
+Die Linie zwischen dem Brett und der Spalte rechts davon lässt sich ziehen; zeigst du auf
+sie, wird ihr Griff blau. Erreichst du sie mit Tab, verschieben die Pfeiltasten sie ein
+Stück, und ein Doppelklick setzt sie auf den Anfang zurück. Die Breite merkt sich dieser
+Browser. Brett und Zugspalte behalten jeweils eine Mindestbreite, keins von beiden lässt
+sich also wegdrücken.
 
-## Was die Markierungen bedeuten
+Die Leiste oben nennt die Eröffnung, die Herkunft der Partie, ihre Bedenkzeit und den
+Ausgang. Bei einer Lichess- oder Chess.com-Partie ist die Quelle dort ein Link, der die
+Partie auf der Seite in einem neuen Tab öffnet; zeigst du darauf, erscheint ein kleiner
+Pfeil. Auf dem Telefon ist derselbe Link der Pfeil neben der PGN-Schaltfläche.
+
+## Was die Markierungen bedeuten { #what-the-badges-mean }
 
 Die Zugspalte kennzeichnet Züge mit `??`, `?`, `?!` oder `!` und färbt die betroffenen
 Zeilen ein. Der Reiter **Markiert** neben **Züge** zeigt nur diese. Wann ein Zug welche
 Markierung bekommt, steht unter [Analyse](analysis.md).
 
-## Der Bewertungsverlauf
+## Der Bewertungsverlauf { #read-the-evaluation-graph }
 
 Die Kurve unter dem Brett ist die Bewertung Zug für Zug; ein Klick darauf springt an die
 Stelle. Form und Markierungen der Kurve sind Bretteinstellungen.
@@ -47,7 +53,7 @@ Bedenkzeit; der Zug selbst und seine Uhr stehen in der Zugliste daneben. Der ers
 jeder Seite fällt vor dem Start der Uhr und zählt nicht. Ein Klick springt an die Stelle,
 wie beim Bewertungsverlauf. `T` öffnet diesen Reiter, `V` führt zurück zur **Bewertung**.
 
-## Engine-Varianten und die Vorschau
+## Engine-Varianten und die Vorschau { #engine-lines-and-the-preview }
 
 Die Varianten unter dem Brett stammen aus der gespeicherten Analyse, so viele, wie sie
 behalten hat: voreingestellt zwei bei der Analyse, die jede Partie beim Import bekommt, bei
@@ -82,7 +88,7 @@ ist ausgeschaltet, ein Runner ist weg –, sagt er in sich selbst, und nichts wi
 eingereiht. Gibt es gar keine Engine, bietet er stattdessen an, Stockfish in diesem Browser
 einzurichten; siehe [Engines](../operate/engines.md#the-engine-in-your-browser).
 
-## Einen eigenen Zug ausprobieren
+## Einen eigenen Zug ausprobieren { #try-a-move-of-your-own }
 
 Spiel einen Zug auf dem Brett, und du bist in einer Variante; `Esc` bringt dich zur Partie
 zurück. **Diese Variante anheften** speichert sie mit der Partie, sodass sie beim nächsten
@@ -127,7 +133,7 @@ Du kannst die Engine live rechnen lassen und nachsehen, wo es schiefging, oder d
 mit **Diese Variante anheften** behalten. Verlässt du die Variante oder gehst zur Partie
 zurück, endet das Üben ebenfalls. Gespeichert wird nichts, solange du nichts anheftest.
 
-## Die Engine live rechnen lassen
+## Die Engine live rechnen lassen { #run-the-live-engine }
 
 Das Engine-Feld hat zwei Reiter, **Analyse** und **Live**: was die gespeicherte Analyse
 gefunden hat, und was eine Engine jetzt gerade findet, ohne etwas zu speichern. Ein Klick
@@ -144,7 +150,7 @@ Sobald du die Partie verlässt, wechselt das Feld von selbst auf **Live**, solan
 Suche läuft – die gespeicherte Analyse hat die Stellung, in der du jetzt stehst, nie
 gesehen.
 
-## Was ein Mensch ziehen würde
+## Was ein Mensch ziehen würde { #what-a-human-would-play }
 
 Das Maia-Feld zeigt fünf Züge mit ihrer jeweiligen Wahrscheinlichkeit auf der gewählten
 Spielstärke, nicht den besten Zug. Eine Variante gibt es dazu nicht; warum, steht unter

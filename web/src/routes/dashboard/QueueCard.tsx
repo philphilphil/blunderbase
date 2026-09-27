@@ -10,6 +10,7 @@ import { Link } from 'react-router-dom'
 import { QueueDestinations } from '@/components/shell/QueueDestinations'
 import { QueueMeter } from '@/components/shell/QueueMeter'
 import { SectionHead } from '@/components/shell/Section'
+import { Button } from '@/components/ui/button'
 import { useGames, useMaiaFill, useQueueStatus, useRetryFailed } from '@/lib/api/queries'
 import type { RunStatus } from '@/lib/api/types'
 import { RUN_STYLES, runKind, runLabel } from '@/lib/chess/classification'
@@ -26,8 +27,12 @@ import { useRunActivity, type RunActivity } from './useRunActivity'
  * not what it did: it searches nothing and only asks the human-move model for the levels a
  * game is missing. Labelling one with its budget is how the card would report a pass over
  * a game to an owner who had asked for the missing Maia levels and nothing else.
+ *
+ * Plain coloured text rather than a chip, like the run's own label on other rows: four
+ * rows of bordered, filled chips in a narrow rail were the loudest thing on it, and the
+ * colour alone already says which kind of work a row is.
  */
-const MAIA_CHIP = 'border-brilliant/40 bg-brilliant/10 text-brilliant'
+const MAIA_TEXT = 'text-brilliant'
 
 /** How many rows the card shows before it collapses the rest into a count. */
 const ROWS = 4
@@ -42,8 +47,10 @@ const DOT: Record<RunStatus, string> = {
 }
 
 /**
- * A row's own words for a status. Lower case and one word each, because they are chips in a
- * 10.5px column rather than headings.
+ * A row's own words for a status. Lower case and one word each, because they sit in a
+ * narrow column at the end of a row rather than being headings. They are quiet on purpose:
+ * the dot in front of the row already carries the status colour, and red is kept for a
+ * failure.
  */
 const STATUS_WORD: Record<RunStatus, MessageDescriptor> = {
   queued: msg`queued`,
@@ -68,14 +75,14 @@ function RunRow({
   return (
     <div
       className={cn(
-        'flex items-center gap-2 rounded-[0.3125rem] px-1 py-1.5',
+        'flex items-center gap-2 rounded-md px-1 py-1.5',
         run.status === 'failed' ? 'bg-blunder/5' : 'hover:bg-raised',
       )}
     >
       <span className={cn('size-[0.3125rem] flex-none rounded-full', DOT[run.status])} />
       <span
         className={cn(
-          'flex-1 truncate text-[0.71875rem]',
+          'flex-1 truncate text-data',
           run.status === 'queued' ? 'text-soft' : 'text-body',
         )}
       >
@@ -84,35 +91,33 @@ function RunRow({
       <span
         title={run.maiaOnly ? t`the missing Maia levels only; nothing is searched` : undefined}
         className={cn(
-          'rounded-sm border px-1.5 py-px text-[0.59375rem] whitespace-nowrap',
-          run.maiaOnly ? MAIA_CHIP : style.chipClass,
+          'text-label whitespace-nowrap',
+          run.maiaOnly ? MAIA_TEXT : style.textClass,
         )}
       >
         {run.maiaOnly ? 'maia' : runLabel(run)}
       </span>
       {run.status === 'failed' ? (
         <>
-          <span className="font-mono text-[0.65625rem] text-blunder" title={run.error ?? undefined}>
+          <span className="font-mono text-label text-blunder" title={run.error ?? undefined}>
             <Trans>failed</Trans>
           </span>
-          <button
+          <Button
             type="button"
+            variant="ghost"
+            size="xs"
             onClick={onRetry}
             disabled={retrying || run.gameId === null}
-            className="text-[0.65625rem] text-accent-teal hover:text-accent-link disabled:opacity-50"
+            className="-my-1 text-accent-teal hover:text-accent-link"
           >
             {retrying ? t`queued` : t`retry`}
-          </button>
+          </Button>
         </>
       ) : (
         <span
           className={cn(
-            'font-mono text-[0.65625rem] tabular',
-            run.status === 'done'
-              ? 'text-good'
-              : run.status === 'running'
-                ? 'text-soft'
-                : 'text-dim-2',
+            'font-mono text-label tabular',
+            run.status === 'running' ? 'text-soft' : 'text-dim',
           )}
         >
           {run.status === 'running'
@@ -182,7 +187,7 @@ export function QueueCard() {
           </span>
         }
         end={
-          <span className="font-mono text-[0.6875rem] tabular text-soft">
+          <span className="font-mono text-label tabular text-soft">
             {running}/{outstanding}
           </span>
         }
@@ -231,20 +236,20 @@ export function QueueCard() {
                 />
               ))}
               {hidden > 0 ? (
-                <div className="px-1 py-1.5 text-[0.6875rem] text-dim-2">
+                <div className="px-1 py-1.5 text-label text-dim">
                   <Trans>+ {hidden} more queued</Trans>
                 </div>
               ) : null}
             </div>
           ) : outstanding > 0 ? (
-            <p className="text-[0.6875rem] leading-relaxed text-dim-2">
+            <p className="text-label leading-relaxed text-dim">
               <Trans>
                 {queued} queued and {running} running. Individual runs appear here as the
                 socket reports them.
               </Trans>
             </p>
           ) : (
-            <p className="text-[0.6875rem] leading-relaxed text-dim-2">
+            <p className="text-label leading-relaxed text-dim">
               <Trans>
                 Nothing outstanding.{' '}
                 <Link to="/games" className="text-accent-teal hover:text-accent-link">
@@ -256,7 +261,7 @@ export function QueueCard() {
           )}
 
           {workersOff ? (
-            <p className="border-t border-hairline pt-2.5 text-[0.6875rem] leading-relaxed text-mistake">
+            <p className="border-t border-hairline pt-2.5 text-label leading-relaxed text-mistake">
               <Trans>
                 This process is not draining the queue. Runs will sit there until a worker
                 picks them up.

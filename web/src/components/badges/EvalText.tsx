@@ -16,14 +16,16 @@ export function EvalText({
   className?: string
 }) {
   const value = score?.mate ?? score?.cp ?? null
+  // No score and a level 0.00 are read like any other value, so they sit on `dim` — the
+  // lowest step that still clears AA — rather than on `faint`, which is decoration only.
   const tone =
     value === null
-      ? 'text-faint'
+      ? 'text-dim'
       : value > 0
         ? 'text-body'
         : value < 0
           ? 'text-soft-2'
-          : 'text-faint'
+          : 'text-dim'
   return (
     <span className={cn('font-mono tabular', tone, className)}>
       {formatScore(score, { signed })}

@@ -3,9 +3,11 @@ import { forwardRef, type ReactNode } from 'react'
 import { cn } from '@/lib/utils'
 
 /**
- * The page heading: a 21px title with a 12.5px line under it and the page's own actions
- * pushed to the right, over a minimum height so the row does not jump as a subtitle
- * resolves from "Reading the database…" to a sentence about the library.
+ * The page heading: the type scale's `title` (19 design px, its weight and tracking come
+ * with it) with a `data` line under it and the page's own actions pushed to the right, over
+ * a minimum height so the row does not jump as a subtitle resolves from "Reading the
+ * database…" to a sentence about the library. The title is a step down from the 21px it
+ * was, so every page header and the games page's own h1 agree on one size.
  *
  * Below `md` the row is allowed to wrap: a title and a pair of buttons do not share 375px,
  * and a second line is better than either half being squeezed out of legibility. The
@@ -30,10 +32,8 @@ export function PageHeader({
       )}
     >
       <div className="flex min-w-0 flex-col gap-[0.125rem]">
-        <h1 className="text-[1.3125rem] leading-none font-semibold tracking-[-0.02em] text-ink">
-          {title}
-        </h1>
-        {description ? <p className="text-[0.78125rem] text-dim">{description}</p> : null}
+        <h1 className="text-title leading-none text-ink">{title}</h1>
+        {description ? <p className="text-data text-dim">{description}</p> : null}
       </div>
       <div className="flex-1" />
       {actions}

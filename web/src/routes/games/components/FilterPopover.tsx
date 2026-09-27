@@ -2,15 +2,47 @@
  * The dropdown chips over design 2b's table.
  *
  * A chip is a button that opens a small panel anchored under it. Deliberately hand-rolled
- * rather than pulled from `components/ui`: the design's chip is 4px/9px with an 11.5px
- * label and two states (teal when the group is set, hairline when it is not), and the
- * panel is the only floating surface in either of these two screens.
+ * rather than pulled from `components/ui`: the chip is two buttons in one frame (open, and
+ * clear once set), and the panel is the only floating surface in either of these two
+ * screens.
+ *
+ * The chip is as tall as a `sm` Button (h-7) so the bar's controls share one line, and it
+ * has the app's two states: the tool look (`elevated`, `body` text) when the group is
+ * unset, and the one selected state (`bg-selected`, `ink`, the accent on the border) when
+ * it is set, with the summary picked out in the accent so a glance down the bar finds the
+ * filters that are on. The options inside a panel light the same way.
  */
 import { useLingui } from '@lingui/react/macro'
 import type * as React from 'react'
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react'
 
 import { cn } from '@/lib/utils'
+
+/**
+ * One option button inside a panel — `OptionRow`, `TriState` and the date presets — so
+ * the three cannot drift apart: bordered tool look when off, the selected blue when on.
+ * `selected` undefined is a plain action (a preset), which has no pressed state to report.
+ */
+export function OptionButton({
+  selected,
+  className,
+  ...props
+}: React.ComponentProps<'button'> & { selected?: boolean }) {
+  return (
+    <button
+      type="button"
+      aria-pressed={selected}
+      className={cn(
+        'rounded-md border px-2 py-1 text-label transition-colors',
+        selected
+          ? 'border-accent-teal/45 bg-selected text-ink'
+          : 'border-edge bg-elevated text-body hover:bg-raised hover:text-ink',
+        className,
+      )}
+      {...props}
+    />
+  )
+}
 
 export function FilterChipButton({
   label,
@@ -28,26 +60,26 @@ export function FilterChipButton({
   return (
     <span
       className={cn(
-        'inline-flex items-center rounded-md border text-[0.71875rem] transition-colors',
+        'inline-flex h-7 items-stretch rounded-md border font-sans text-label transition-colors',
         active
-          ? 'border-accent-teal/30 bg-accent-teal/10 text-accent-teal'
-          : 'border-edge bg-elevated text-soft hover:border-edge-hover hover:text-ink',
+          ? 'border-accent-teal/45 bg-selected text-ink'
+          : 'border-edge bg-elevated text-body hover:bg-raised hover:text-ink',
       )}
     >
       <button
         type="button"
-        className="inline-flex items-center gap-1.5 px-2.5 py-1 outline-none"
+        className="inline-flex items-center gap-1.5 rounded-md px-2.5 outline-none focus-visible:ring-1 focus-visible:ring-accent-teal/55 focus-visible:ring-inset"
         {...props}
       >
         {active ? (
           <>
-            <span className="text-[0.71875rem]">{label}:</span>
-            <span className="font-mono">{summary}</span>
+            <span>{label}:</span>
+            <span className="font-mono text-accent-teal">{summary}</span>
           </>
         ) : (
           <>
             {label}
-            <span className="text-faint">▾</span>
+            <span className="text-dim">▾</span>
           </>
         )}
       </button>
@@ -56,7 +88,7 @@ export function FilterChipButton({
           type="button"
           aria-label={t`Clear ${label} filter`}
           onClick={onClear}
-          className="px-1.5 py-1 text-accent-teal/70 outline-none hover:text-accent-teal"
+          className="rounded-md px-1.5 text-soft outline-none hover:text-ink focus-visible:ring-1 focus-visible:ring-accent-teal/55 focus-visible:ring-inset"
         >
           ×
         </button>
@@ -126,7 +158,7 @@ export function FilterPopover({
           // Handed over rather than set, so `max-md:right-0` can win below the breakpoint:
           // an inline width outranks every class.
           style={{ '--panel-width': width } as React.CSSProperties}
-          className="bb-pop-in absolute top-[calc(100%+0.375rem)] left-0 z-30 flex flex-col gap-2.5 rounded-lg border border-edge bg-elevated p-2.5 shadow-[0_1.125rem_2.5rem_-1.125rem_var(--bb-shadow)] md:w-[var(--panel-width)] max-md:right-0"
+          className="bb-pop-in absolute top-[calc(100%+0.375rem)] left-0 z-30 flex flex-col gap-2.5 rounded-md border border-edge bg-elevated p-2.5 shadow-[0_1.125rem_2.5rem_-1.125rem_var(--bb-shadow)] md:w-[var(--panel-width)] max-md:right-0"
         >
           {children(() => setOpen(false))}
         </div>
@@ -138,7 +170,7 @@ export function FilterPopover({
 /** The label over one block inside a popover. */
 export function PopoverLabel({ children }: { children: ReactNode }) {
   return (
-    <span className="text-[0.625rem] tracking-[.1em] text-faint uppercase">{children}</span>
+    <span className="text-meta tracking-[.1em] text-dim uppercase">{children}</span>
   )
 }
 
@@ -159,20 +191,13 @@ export function OptionRow<T extends string>({
       {options.map((option) => {
         const selected = value === option
         return (
-          <button
+          <OptionButton
             key={option}
-            type="button"
-            aria-pressed={selected}
+            selected={selected}
             onClick={() => onChange(selected ? undefined : option)}
-            className={cn(
-              'rounded-sm border px-2 py-1 text-[0.71875rem] transition-colors',
-              selected
-                ? 'border-accent-teal/35 bg-accent-teal/10 text-accent-teal'
-                : 'border-edge bg-raised text-soft hover:border-edge-hover hover:text-ink',
-            )}
           >
             {labels?.[option] ?? option}
-          </button>
+          </OptionButton>
         )
       })}
     </div>
@@ -200,20 +225,14 @@ export function TriState({
       ].map(({ label, next }) => {
         const selected = value === next
         return (
-          <button
+          <OptionButton
             key={label}
-            type="button"
-            aria-pressed={selected}
+            selected={selected}
             onClick={() => onChange(selected ? undefined : next)}
-            className={cn(
-              'flex-1 rounded-sm border px-2 py-1 text-[0.71875rem] transition-colors',
-              selected
-                ? 'border-accent-teal/35 bg-accent-teal/10 text-accent-teal'
-                : 'border-edge bg-raised text-soft hover:border-edge-hover hover:text-ink',
-            )}
+            className="flex-1"
           >
             {label}
-          </button>
+          </OptionButton>
         )
       })}
     </div>

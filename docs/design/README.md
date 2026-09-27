@@ -42,9 +42,8 @@ directory are local snapshots pulled 2026-08-25.
     the light theme and lighter in the dark one. Boundaries between panes are
     `--bb-edge-strong`; boundaries inside one are `--bb-hairline` or `--bb-line`.
   - **The radius scale was pulled in** to 3/4/5/6 design pixels, so a control is
-    rounded and a region is not. The old `rounded-xl`/`rounded-2xl` card radii are
-    now barely more than `rounded-md`, which is what flattened the screens the
-    rebuild did not touch by hand.
+    rounded and a region is not. Which radius goes where is now part of the control
+    standard below.
   - **The neutral ramp is grey, not blue-black**, and the accent is a muted blue
     (`#83b7e3` dark, `#245f9e` light) rather than the flagship teal — a bright
     accent is what made the app read as a dashboard. Maia keeps its purple, and
@@ -59,6 +58,73 @@ directory are local snapshots pulled 2026-08-25.
     `EvalGraph` is unchanged in behaviour; only its frame is.
   - The three-state theme mechanism, the pre-paint bootstrap and the token layer
     are unchanged — see "Themes" below, which still describes how it works.
+- **Polish pass: one type scale, one control standard** (2026-09-26). A pass inside
+  the restrained direction above, not a new one: same panes, rail, tokens and
+  components, with the ad-hoc sizes, the hand-copied button strings and the four
+  different "selected" tints folded into the rules below.
+  - **Type scale.** Seven named sizes, defined once as `--text-*` in a plain
+    `@theme` block in `web/src/index.css`, so Tailwind generates `text-<name>`.
+    Sizes are design px; rendered size is × 1.2 (the root scale).
+
+    | utility | size / line-height | weight | default colour | used for |
+    |---|---|---|---|---|
+    | `text-meta` | 0.625rem / 0.875rem (10) | 400 | `dim`, `dim-2` | depth/nps/nodes, "analysed …" stamps, counts in tab strips, table column heads (uppercase, tracking .06em). The floor: nothing is set smaller. |
+    | `text-label` | 0.6875rem / 1rem (11) | 400–500 | `soft` (controls), `dim` (captions) | xs controls, chips, segments, form labels, clocks, eval chips, a section's detail, legends |
+    | `text-data` | 0.75rem / 1rem (12) | 400 | `body` | table cells, list rows, sm/default button labels, engine and book lines, notes, tooltips |
+    | `text-lead` | 0.8125rem / 1.25rem (13, the body size) | 500–600 | `ink` | player names, move-list SAN, the note composer |
+    | `text-heading` | 0.875rem / 1.25rem (14) | 600 | `ink` | a section's h2, the game header's opening, dialog titles |
+    | `text-value` | 0.9375rem / 1.25rem (15) | 500 | `ink`, mono | key numbers: a chart's current rating, a trend's value |
+    | `text-title` | 1.1875rem / 1.5rem (19), −0.01em, 600 | 600 | `ink` | the page title (`PageHeader`, the games page) |
+
+    `web/src/lib/utils.ts` extends tailwind-merge with the same seven names. Without
+    that, `cn()` reads `text-meta` as a colour and silently drops it, or the colour
+    beside it; `utils.test.ts` pins the merge. Do not name a size after a colour alias
+    (`body`, `soft`, `line` …).
+
+    Notation has no utilities of its own: the move list is `font-mono text-lead`,
+    engine/Maia/live lines, variations and book rows are `font-mono text-data`, and an
+    eval chip is `font-mono text-label font-semibold tabular`. Everything else (nav,
+    labels, tabs, buttons, names, openings) is Geist sans, and a UI label is never mono.
+    A value that has to line up gets `font-mono` (which already brings tabular
+    figures) or `tabular`.
+  - **The text ladder.** `bright`/`ink` for primary data (names, SAN, the first line,
+    key values, the active tab or selection); `ink-2`/`body` for primary content;
+    `soft` for idle control text and secondary data; `dim`/`dim-2` for metadata only;
+    `faint` for decoration and tertiary marks only (separators, parentheses,
+    placeholders); `faint-2` for disabled and "passed" tokens only. A control's idle
+    text is never below `soft`, and essential data is never below `body`.
+  - **Controls** (`components/ui/button.tsx`). Sizes: `xs` (h-6, `text-label`,
+    size-3 icons — the pane-title strips), `sm` (h-7, `text-data`, size-3.5 icons —
+    the standard toolbar, control-row and footer button), `default` (h-8,
+    `text-data` — forms and dialogs), `lg` (h-9, `text-lead`), and the squares
+    `icon` (size-8), `icon-sm` (size-7) and `icon-xs` (size-6), each with a size-4
+    icon. The base carries no font size or gap: each size sets its own, because a
+    bare `buttonVariants(...)` string never passes through tailwind-merge. Variants:
+    `default` is the filled accent, at most one per region (Sync all, Resume, Save);
+    `secondary` is *the* tool button (`border-edge bg-elevated text-body`), which
+    replaced eight hand-copied class strings; `outline` and `ghost` are its quieter
+    neighbours; `destructive` and `link` as they were. `Segmented`
+    (`routes/stats/kit/states.tsx`) is h-7 to sit beside an `sm` button, `FilterChip`
+    (`components/ui/chip.tsx`) h-6, both sans. An error message is `.bb-error`: a
+    blunder-red frame and left bar around `body` text, never red text on a red tint,
+    which falls under AA on the light panel.
+  - **One selected state.** `bg-selected text-ink`, plus `border-accent-teal/45`
+    where the element has a border, and the accent on a pressed toggle's icon. A
+    `Button` gets it from `aria-pressed` (on `secondary`, `outline` and `ghost`, never
+    the filled `default`); `Segmented`, `FilterChip` and the rail use the same pair. A
+    selected list or table row adds a bar down its left edge
+    (`shadow-[inset_0.125rem_0_0_var(--bb-accent)]`). The move list's current move is
+    `bg-selected text-bright` with an inset accent ring; the pair under the cursor is
+    `--bb-row-active`, a blue-grey that does not read as hover. Pane tabs keep their own
+    idiom (the surface pushed up into the strip, `paneTabs.ts`). The accent tints
+    (`bg-accent-teal/10`, `/8`) are retired as selection. Blue means selection and
+    interaction; strong colour is kept for evaluation, results, classification glyphs,
+    errors and Maia's purple.
+  - **One hover**: `hover:bg-raised`. `--bb-raised` reads on the canvas and on the
+    chrome in both themes (dark 1.30:1 / 1.16:1, light 1.22:1 / 1.10:1).
+  - **Radii.** Controls, menus and popovers `rounded-md` (4px); inline data badges
+    (classification, counts, run and status chips) `rounded-sm` (3px); dialogs may keep
+    `rounded-xl` (5px); regions and panes none.
 - **Layout: Option 1a "Studio"** (chosen by Phil) — four columns: paired move
   table with glyph badges · board with Maia overlay · filled eval area chart ·
   notes/MCP column with recurring-mistake cards. Option 1b is not implemented.
@@ -93,9 +159,10 @@ directory are local snapshots pulled 2026-08-25.
     budget.
 - **Themes: dark / light / system** (owner feedback, 2026-08-26). This supersedes
   the earlier dark-only decision.
-  - **Dark is unchanged and stays the flagship look** — the design file's palette
-    to the hex — and it is the default for a fresh install. Picking `system` is
-    how the owner opts into following the OS.
+  - **Dark stays the flagship look** and is the default for a fresh install; its
+    values are the 2026-09-01 direction's, retuned by the 2026-09-26 polish pass
+    (panel, hover, selected, the cursor row and `dim-3`), not the design file's hex.
+    Picking `system` is how the owner opts into following the OS.
   - **Light is derived from the same design language**, not a second palette. The
     neutral ramp is inverted *by contrast rank*, so a token that was the quietest
     label in the dark is still the quietest label in the light: `#08090b` ground →
@@ -103,12 +170,23 @@ directory are local snapshots pulled 2026-08-25.
     borders → the `#d1d8e0`/`#bcc5cf` pair. The teal and purple keep their
     identity and are darkened only as far as contrast demands: `#3ecfd6` →
     `#0a7b82` (4.65:1 on the page ground), `#c9b0ff` → `#7b4cd8` (5.01:1).
-    Text tokens down through `--bb-dim-2` clear WCAG AA (≥4.5:1) on both the page
-    and card grounds; `--bb-faint`/`--bb-faint-2` are decorative (rules, chart
-    grid, disabled) and run at the same low contrast the dark theme gives them.
+    Text tokens down through `--bb-dim-2` clear WCAG AA (≥4.5:1) on both the
+    canvas and the chrome. Light, since 2026-09-26: `dim-2` #6d6d69 is 5.02:1 on
+    `--bb-surface` and 4.51:1 on `--bb-panel`, `dim` 5.32 / 4.78, `dim-3` 5.65 /
+    5.08, `soft-2` 6.00 / 5.39 — spaced about 1.06:1 apart so the ramp is still a
+    hierarchy. Dark: `dim-2` 5.43 / 4.81, `dim` 6.08 / 5.39. `--bb-faint` is 4.49:1
+    (dark) and 4.40:1 (light) on the canvas and below AA on the chrome (3.98 / 3.96),
+    so it and `--bb-faint-2` are decoration and disabled only (rules, chart grid,
+    separators). Accent text on `--bb-selected` is 4.53:1 dark and 4.93:1 light.
     Board squares and the chart palette have light variants of their own.
   - **Every colour resolves through the token layer.** `web/src/index.css` is the
-    only file in `web/` that names a hex: `:root` holds the dark palette (so any
+    only file in `web/src/` whose styles name a hex, with one exception: the
+    browser's `theme-color` cannot read a CSS variable, so the two `--bb-panel`
+    values are copied into `web/index.html` (the meta tag and the pre-paint script)
+    and `web/src/lib/ui/theme.tsx` (`THEME_COLOR`). The manual's
+    `manual/en/assets/manual.css` copies the surface and text tokens it uses for the
+    same reason. When one of those tokens changes, the copies change with it.
+    `:root` holds the dark palette (so any
     context without a class — jsdom, a stylesheet opened alone — still gets the
     flagship look) and `:root.light` restates the same `--bb-*` names. Components
     use Tailwind utilities or `var(--bb-*)`; board-overlay tints are
