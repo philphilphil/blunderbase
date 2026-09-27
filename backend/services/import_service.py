@@ -401,12 +401,15 @@ def ingest_games(
     # few thousand games stored under one answer, and the setting is the answer at the
     # moment the stream started, the way a run's budget is the budget when it was queued.
     hide_engine_from = app_settings.get_hide_engine_new_games(session)
+    # The collection rules, read once for the stream too — but, unlike the setting, read
+    # again at the next game whenever a rule is written meanwhile (`RuleBook.current`).
+    rules = collections_service.RuleBook()
 
     result = ImportResult()
     # The collections a rule filled during this stream. Announced once, when the stream
     # ends however it ends, rather than once per game: a first sync of a few hundred league
     # games would otherwise be a few hundred `collections.changed` frames, each one a
-    # refetch of the rail and of any open collection's score line in every tab.
+    # refetch of the collection list and of the Collections screen's cards in every tab.
     joined: set[int] = set()
     try:
         _ingest_stream(
@@ -420,6 +423,7 @@ def ingest_games(
             analyze=analyze,
             presume_owner=presume_owner,
             hide_engine_from=hide_engine_from,
+            rules=rules,
             settled=settled,
             sleep=sleep,
         )
@@ -440,6 +444,7 @@ def _ingest_stream(
     analyze: bool,
     presume_owner: bool,
     hide_engine_from: int,
+    rules: collections_service.RuleBook,
     settled: SettledHook | None,
     sleep: Callable[[float], None],
 ) -> None:
@@ -470,6 +475,7 @@ def _ingest_stream(
                     analyze=analyze,
                     presume_owner=presume_owner,
                     hide_engine_from=hide_engine_from,
+                    rules=rules,
                     sleep=sleep,
                 )
             except Exception as exc:
@@ -514,6 +520,7 @@ def _ingest_with_retries(
     analyze: bool,
     presume_owner: bool,
     hide_engine_from: int,
+    rules: collections_service.RuleBook,
     sleep: Callable[[float], None],
 ) -> IngestOutcome:
     """`ingest_game`, tried again while it is the database that is failing, not the game.
@@ -533,6 +540,7 @@ def _ingest_with_retries(
                 analyze=analyze,
                 presume_owner=presume_owner,
                 hide_engine_from=hide_engine_from,
+                rules=rules,
             )
         except Exception as exc:
             session.rollback()
@@ -560,6 +568,7 @@ def ingest_game(
     presume_owner: bool = True,
     hide_engine_from: int | None = None,
     owner_side: Color | None = None,
+    rules: collections_service.RuleBook | None = None,
 ) -> IngestOutcome:
     """Store one parsed game, or report the one that is already there.
 
@@ -584,6 +593,9 @@ def ingest_game(
     correspondence game, whose handle need not be an account here at all. It outranks the
     account match and makes the game the owner's, and it is set before the collection rules
     look at the game, so a rule that names a colour sees the side the game really has.
+
+    `rules` is the stream's `collections.RuleBook`, so a sync reads the collection rules
+    once rather than once per game; None reads them here, for a single game.
     """
     if accounts is None:
         accounts = AccountIndex.load(session)
@@ -663,7 +675,11 @@ def ingest_game(
     # so a collection's rule sees every one of them. In the game's own transaction, so a
     # game never exists without the memberships its rules gave it. A rule only ever takes
     # the owner's own games, so somebody else's is not worth the query.
-    joined = collections_service.assign_on_import(session, [game.id]) if is_owner_game else []
+    joined = (
+        collections_service.assign_on_import(session, [game.id], rules=rules)
+        if is_owner_game
+        else []
+    )
     return IngestOutcome(game=game, created=True, collections=tuple(joined))
 
 
@@ -671,14 +687,16 @@ def announce_collections(collection_ids: Iterable[int]) -> None:
     """Tell the screens that committed games joined these collections by rule, if any did.
 
     One call per import — a whole sync's stream, or one game added by name — and so one
-    `collections.changed` and one drop of the stats cache however many games the rules took
-    in: a collection's Stats is right the moment the import is over, and the import never
-    turns into a refetch per game.
+    `collections.changed` and one drop of the collection-scoped stats however many games the
+    rules took in: a collection's Stats is right the moment the import is over, and the
+    import never turns into a refetch per game.
     """
     touched = sorted(set(collection_ids))
     if not touched:
         return
-    collections_service.notify_changed(touched[0] if len(touched) == 1 else None)
+    collections_service.notify_changed(
+        touched[0] if len(touched) == 1 else None, membership=True
+    )
 
 
 def dedup_hash(parsed: ParsedGame) -> str:

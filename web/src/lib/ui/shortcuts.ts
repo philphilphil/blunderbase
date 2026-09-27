@@ -16,7 +16,7 @@
  * arrow does not, and one spelling for both is what stops that difference leaking into
  * every handler.
  *
- * The shell's own bindings (⌘K, ⌘1–5, ⇧E) are listed but not dispatched from here: they
+ * The shell's own bindings (⌘K, ⌘1–6, ⇧E) are listed but not dispatched from here: they
  * live in the components that own the dialogs, the router and the engine switch, and
  * lifting them out would move code that works to serve a list. What this table owes them
  * is an accurate line.
@@ -408,6 +408,7 @@ export const SHORTCUT_GROUPS: ShortcutGroup[] = [
       { keys: ['⌘3'], label: msg`Explorer` },
       { keys: ['⌘4'], label: msg`Notes` },
       { keys: ['⌘5'], label: msg`Stats` },
+      { keys: ['⌘6'], label: msg`Collections` },
       { keys: ['⌘⇧I'], label: msg`Import` },
       { keys: ['Esc'], label: msg`Close whatever is open` },
     ],

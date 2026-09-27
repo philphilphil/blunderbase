@@ -30,7 +30,6 @@
  * one note: `/notes?note=12` is where the command palette sends a note that has no game to
  * open, and it rings itself and scrolls into view.
  */
-import type { MessageDescriptor } from '@lingui/core'
 import { msg } from '@lingui/core/macro'
 import { Trans, useLingui } from '@lingui/react/macro'
 import { Download, FileText, LayoutGrid, List, Loader2, Rows3, StickyNote } from 'lucide-react'
@@ -41,6 +40,7 @@ import { SetPageChrome } from '@/components/shell/PageChrome'
 import { PageBody } from '@/components/shell/PageHeader'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
+import { ViewToggle, type ViewOption } from '@/components/ui/view-toggle'
 import { saveDownload } from '@/lib/api/client'
 import { useExportNotes, useNote, useNoteTags, useNotes } from '@/lib/api/queries'
 import type { NoteExportFormat, NoteResponse } from '@/lib/api/types'
@@ -180,7 +180,12 @@ export function NotesPage() {
         the selector on a 375px screen, so the bar takes the next line whole.
       */}
       <div data-tour="notes" className="flex flex-wrap items-center gap-2">
-        <ViewToggle view={view} />
+        <ViewToggle
+          views={VIEWS}
+          value={view}
+          onChange={setNoteView}
+          label={t`How to show the notes`}
+        />
         <NoteFilterBar
           filters={filters}
           onChange={setFilters}
@@ -244,12 +249,7 @@ export function NotesPage() {
   )
 }
 
-const VIEWS: {
-  id: NoteView
-  label: MessageDescriptor
-  icon: typeof Rows3
-  hint: MessageDescriptor
-}[] = [
+const VIEWS: readonly ViewOption<NoteView>[] = [
   { id: 'stream', label: msg`Stream`, icon: Rows3, hint: msg`One column, every note in full` },
   {
     id: 'sheet',
@@ -264,45 +264,6 @@ const VIEWS: {
     hint: msg`One line per note, with the game it was written on`,
   },
 ]
-
-/**
- * Stream, sheet or list, as one segmented control rather than three buttons.
- *
- * Radios in `aria` terms, because that is what they are: mutually exclusive ways of showing
- * one list, one of which is always on. Labels are hidden below `sm` — the icons
- * carry it on a phone, where the row is already tight.
- */
-function ViewToggle({ view }: { view: NoteView }) {
-  const { t, i18n } = useLingui()
-  return (
-    <div
-      role="radiogroup"
-      aria-label={t`How to show the notes`}
-      className="flex items-center rounded-md border border-edge bg-elevated p-px"
-    >
-      {VIEWS.map((option) => {
-        const on = view === option.id
-        return (
-          <button
-            key={option.id}
-            type="button"
-            role="radio"
-            aria-checked={on}
-            title={i18n._(option.hint)}
-            onClick={() => setNoteView(option.id)}
-            className={cn(
-              'flex items-center gap-1.5 rounded-[0.3125rem] px-2 py-[0.1875rem] text-[0.6875rem] transition-colors',
-              on ? 'bg-raised-2 text-ink' : 'text-dim hover:text-soft',
-            )}
-          >
-            <option.icon className="size-3.5" aria-hidden />
-            <span className="max-sm:sr-only">{i18n._(option.label)}</span>
-          </button>
-        )
-      })}
-    </div>
-  )
-}
 
 /**
  * A date rule: the label, a hairline to the end of the row, and the count.

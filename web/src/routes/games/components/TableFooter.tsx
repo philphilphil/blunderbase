@@ -25,8 +25,9 @@
  * "Add to…" comes first among the actions because it is the one a selection is most often
  * made for, and it opens the shared collection checklist (`CollectionChecklist`) above
  * itself — the footer is pinned to the bottom, so a panel below it would open off screen.
- * On a collection's page the footer also offers "Remove from collection": the checklist can
- * do the same, but on that page taking games out is the everyday act and deserves a button.
+ * With the Collection filter set the footer also offers "Remove from collection": the
+ * checklist can do the same, but in a list narrowed to one collection taking games out is
+ * the everyday act and deserves a button.
  * Both make the one line wider, so the words the pager implies leave earlier than they did.
  */
 import { Trans, useLingui } from '@lingui/react/macro'
@@ -49,7 +50,7 @@ export interface TableFooterProps {
   selectedGames?: readonly ChecklistGame[]
   /** "+ New collection from these N…" — the page opens `CollectionDialog` with them. */
   onNewCollection?: () => void
-  /** The page is one collection's: offer to take the selection out of it. */
+  /** The Collection filter is set: offer to take the selection out of that collection. */
   inCollection?: boolean
   removing?: boolean
   onRemoveFromCollection?: () => void
@@ -124,8 +125,8 @@ export function TableFooter({
               onClick={onRemoveFromCollection}
               aria-label={t`Remove from collection`}
             >
-              {/* The long form where there is room; "Remove" beside the collection's own
-                  header says the same thing where there is not. */}
+              {/* The long form where there is room; "Remove", with the Collection chip set
+                  over the table, says the same thing where there is not. */}
               <span className="md:@max-[60rem]:hidden">
                 <Trans>Remove from collection</Trans>
               </span>

@@ -19,7 +19,6 @@ const {
   useGames,
   useLiveState,
   useAppSettings,
-  useCollections,
   useCorrespondenceGames,
   useCorrespondenceStatus,
 } = vi.hoisted(() => ({
@@ -27,7 +26,6 @@ const {
   useGames: vi.fn(),
   useLiveState: vi.fn(),
   useAppSettings: vi.fn(),
-  useCollections: vi.fn(),
   useCorrespondenceGames: vi.fn(),
   useCorrespondenceStatus: vi.fn(),
 }))
@@ -36,21 +34,8 @@ vi.mock('@/lib/api/queries', () => ({
   useGames,
   useLiveState,
   useAppSettings,
-  useCollections,
   useCorrespondenceGames,
   useCorrespondenceStatus,
-}))
-
-// The dialog is its own file's to test (`CollectionDialog.test.tsx`); here it only has to
-// open, and to say what it was opened with.
-vi.mock('@/routes/games/components/CollectionDialog', () => ({
-  CollectionDialog: ({ onClose }: { onClose: () => void }) => (
-    <div role="dialog" aria-label="New collection">
-      <button type="button" onClick={onClose}>
-        close
-      </button>
-    </div>
-  ),
 }))
 
 const { useEvents } = vi.hoisted(() => ({ useEvents: vi.fn() }))
@@ -77,7 +62,6 @@ function stub(status: ConnectionStatus, reconnects: number) {
   useLiveState.mockReturnValue(pending)
   // Correspondence mode off, which is the default and what every test but its own wants.
   useAppSettings.mockReturnValue(pending)
-  useCollections.mockReturnValue(pending)
   useCorrespondenceGames.mockReturnValue(pending)
   useCorrespondenceStatus.mockReturnValue(pending)
   useEvents.mockReturnValue({ status, reconnects })
@@ -109,7 +93,6 @@ describe('the rail footer', () => {
     useEngines.mockReturnValue(pending)
     useLiveState.mockReturnValue(pending)
     useAppSettings.mockReturnValue(pending)
-    useCollections.mockReturnValue(pending)
     useCorrespondenceGames.mockReturnValue(pending)
     useCorrespondenceStatus.mockReturnValue(pending)
     useEvents.mockReturnValue({ status: 'open', reconnects: 0 })
@@ -355,107 +338,36 @@ describe('the library navigation', () => {
   })
 })
 
-describe('the collections fold', () => {
-  const COLLECTIONS = {
-    collections: [
-      {
-        id: 3,
-        name: '45-45 League',
-        color: 'good',
-        description: 'Season 2026',
-        rule: { source: 'lichess', time_control: '2700+45' },
-        game_count: 1_208,
-        created_at: '2026-09-01T00:00:00Z',
-      },
-      {
-        id: 7,
-        name: 'Tough losses',
-        color: 'blunder',
-        description: null,
-        rule: null,
-        game_count: 23,
-        created_at: '2026-09-02T00:00:00Z',
-      },
-    ],
-  }
+describe('collections', () => {
+  it('is a rail entry of its own, directly after Games', () => {
+    // Off the library, so the saved filters are folded away and the entries are adjacent.
+    draw({ path: '/' })
 
-  function drawWith(path: string, data: unknown = COLLECTIONS) {
-    stub('open', 0)
-    useCollections.mockReturnValue({ data, isPending: false })
-    render(
-      <Shell>
-        <MemoryRouter initialEntries={[path]}>
-          <SideNav />
-        </MemoryRouter>
-      </Shell>,
-    )
-  }
-
-  it('lists every collection under the saved filters, each a link to its page', () => {
-    drawWith('/games')
-
-    const league = screen.getByRole('link', { name: /45-45 League/ })
-    expect(league).toHaveAttribute('href', '/games?collection=3')
-    expect(league).toHaveTextContent('1,208')
-    expect(screen.getByRole('link', { name: /Tough losses/ })).toHaveAttribute(
+    const nav = screen.getByRole('navigation', { name: 'Sections' })
+    const names = within(nav)
+      .getAllByRole('link')
+      .map((link) => link.textContent?.trim())
+    expect(names.indexOf('Collections')).toBe(names.findIndex((name) => name?.startsWith('Games')) + 1)
+    expect(within(nav).getByRole('link', { name: 'Collections' })).toHaveAttribute(
       'href',
-      '/games?collection=7',
+      '/collections',
     )
-    // After the filters: the fold reads Filters, then Collections.
-    const labels = screen.getAllByText(/^(Filters|Collections)$/).map((node) => node.textContent)
-    expect(labels).toEqual(['Filters', 'Collections'])
   })
 
-  it('marks the collection whose page is open', () => {
-    drawWith('/games?collection=7&speed=blitz')
+  it('folds nothing under Games but the saved filters', () => {
+    draw({ path: '/games?collection=7' })
 
-    expect(screen.getByRole('link', { name: /Tough losses/ })).toHaveClass('bg-selected')
-    expect(screen.getByRole('link', { name: /45-45 League/ })).not.toHaveClass('bg-selected')
+    expect(screen.getByText('Filters')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'New collection' })).not.toBeInTheDocument()
   })
 
   it("keeps a Stats page's collection when the rail switches report", () => {
-    drawWith('/stats?collection=7&report=clock')
+    draw({ path: '/stats?collection=7&report=clock' })
 
     expect(screen.getByRole('link', { name: 'Blunder taxonomy' })).toHaveAttribute(
       'href',
       '/stats?report=blunders&collection=7',
     )
-  })
-
-  it('stays folded away off the library, like the saved filters', () => {
-    drawWith('/games/14')
-
-    expect(screen.queryByText('Collections')).not.toBeInTheDocument()
-    expect(screen.queryByRole('link', { name: /45-45 League/ })).not.toBeInTheDocument()
-  })
-
-  it('says so when there are none yet', () => {
-    drawWith('/games', { collections: [] })
-
-    expect(screen.getByText('No collections yet')).toBeInTheDocument()
-  })
-
-  it('opens the collection dialog from its +', async () => {
-    const user = userEvent.setup()
-    drawWith('/games')
-
-    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
-    await user.click(screen.getByRole('button', { name: 'New collection' }))
-    // Portalled out of the rail, which clips and never wraps.
-    const dialog = screen.getByRole('dialog', { name: 'New collection' })
-    expect(screen.getByRole('navigation', { name: 'Sections' })).not.toContainElement(dialog)
-
-    await user.click(within(dialog).getByRole('button', { name: 'close' }))
-    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
-  })
-
-  it('goes with the words when the rail folds to icons', async () => {
-    const user = userEvent.setup()
-    drawWith('/games')
-
-    await user.click(screen.getByRole('button', { name: 'Collapse the navigation' }))
-
-    expect(screen.queryByRole('link', { name: /45-45 League/ })).not.toBeInTheDocument()
   })
 })
 
@@ -527,35 +439,4 @@ describe('the phone drawer', () => {
 
     expect(onClose).toHaveBeenCalled()
   })
-
-  it('carries the collections fold on the library, the way the rail does', () => {
-    stub('open', 0)
-    useCollections.mockReturnValue({
-      data: {
-        collections: [
-          {
-            id: 3,
-            name: '45-45 League',
-            color: 'good',
-            game_count: 8,
-            created_at: '2026-09-01T00:00:00Z',
-          },
-        ],
-      },
-      isPending: false,
-    })
-    render(
-      <Shell>
-        <MemoryRouter initialEntries={['/games']}>
-          <NavDrawer open onClose={vi.fn()} />
-        </MemoryRouter>
-      </Shell>,
-    )
-
-    expect(screen.getByRole('link', { name: /45-45 League/ })).toHaveAttribute(
-      'href',
-      '/games?collection=3',
-    )
-  })
-
 })

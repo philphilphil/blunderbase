@@ -3,8 +3,9 @@
 Thin, like every router here: each handler hands its body to `services.collections` and
 shapes the answer. Filtering the library, Stats or the explorer by a collection is not
 here at all — it is the `collection` query parameter those routes already take through the
-shared filter vocabulary. Membership changes answer with the collection as it now reads, so
-the rail's count can be updated from the response rather than by a second request.
+shared filter vocabulary. Membership changes answer with how many games moved and the
+collection as it now reads, so the writing tab can tell from the response whether any game
+moved — and what to refresh — without a second request.
 """
 
 from __future__ import annotations
@@ -34,10 +35,23 @@ def _rule(rule: CollectionRule | None) -> dict[str, Any] | None:
     return rule.model_dump(mode="json", exclude_none=True) if rule is not None else None
 
 
-@router.get("", response_model=CollectionList, summary="Every collection")
-def list_collections(session: SessionDep) -> Any:
-    """By name, regardless of case, each with how many games it holds."""
-    return {"collections": collections_service.list_payloads(session)}
+@router.get(
+    "",
+    response_model=CollectionList,
+    # A row without a summary goes out without the key rather than with a null: the plain
+    # list is exactly what it was, and `summary` only appears for a caller that asked.
+    response_model_exclude_unset=True,
+    summary="Every collection",
+)
+def list_collections(session: SessionDep, with_summary: bool = False) -> Any:
+    """By name, regardless of case, each with how many games it holds.
+
+    `with_summary=true` adds each one's score line, the one `GET /collections/{id}` leads
+    with — for the Collections screen, which shows every collection's at once.
+    """
+    return {
+        "collections": collections_service.list_payloads(session, with_summary=with_summary)
+    }
 
 
 @router.post(

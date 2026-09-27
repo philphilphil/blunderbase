@@ -28,12 +28,13 @@ pflegt Repertoire-Varianten, reiht Analysen ein und berichtet über die Wartesch
 kann außerdem eine Partie oder eine Stellung auf das [Live](live.md)-Brett legen, damit
 ihr beide dasselbe seht.
 
-Auch deine [Sammlungen](games.md#collections) kennt er. `list_collections` nennt sie mit
+Auch deine [Sammlungen](collections.md) kennt er. `list_collections` nennt sie mit
 Partienzahl und Regel, `add_to_collection` und `remove_from_collection` legen Partien hinein
 und nehmen sie heraus, über den Namen der Sammlung oder ihre Nummer. `search_games`,
 `get_last_games`, `get_stats` und `opening_explorer` nehmen ebenfalls eine `collection`; die
 Frage „Wie läuft meine Ligasaison?“ beantwortet er dann nur aus den Partien dieser Sammlung.
-Wie die Seite der Sammlung zeigt `search_games` jede Partie darin, auch eine fremde, die du
+Wie die Liste, die die Karte der Sammlung öffnet, zeigt `search_games` jede Partie darin,
+auch eine fremde, die du
 von Hand hineingelegt hast; die übrigen bleiben bei deinen eigenen Partien darin, wie die
 Statistiken. `search_games`, `get_last_games` und `get_stats` nehmen außerdem `rated`, für
 nur gewertete oder nur ungewertete Partien. Eine Sammlung anlegen, umbenennen oder löschen kannst nur du, in der App.

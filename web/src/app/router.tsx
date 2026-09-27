@@ -11,6 +11,7 @@ import { useRuntimeCapabilities } from '@/lib/runtime/capabilities'
 
 import {
   AnalysisPage,
+  CollectionsPage,
   CorrespondenceGamePage,
   CorrespondencePage,
   CorrespondenceSettingsPage,
@@ -81,6 +82,7 @@ export const router = createBrowserRouter([
       { index: true, element: <DashboardPage /> },
       { path: 'games', element: <GamesPage /> },
       { path: 'games/:id', element: <GamePage /> },
+      { path: 'collections', element: <CollectionsPage /> },
       { path: 'explorer', element: <ExplorerPage /> },
       { path: 'repertoire', element: <RepertoirePage /> },
       // A leaf, not a destination: it is reached from the explorer's model-game list, so

@@ -299,7 +299,7 @@ describe('GamesTable collection chips', () => {
     // no media queries, so both are in the tree.
     const league = screen.getAllByRole('link', { name: /45-45 League/ })
     expect(league).toHaveLength(2)
-    expect(league[0]).toHaveAttribute('href', '/games?collection=3')
+    expect(league[0]).toHaveAttribute('href', '/games?collection=3&whose=all')
     expect(screen.getAllByRole('link', { name: /Tough losses/ })).toHaveLength(2)
     await userEvent.click(league[0]!)
     expect(onOpen).not.toHaveBeenCalled()

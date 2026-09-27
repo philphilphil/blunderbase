@@ -30,8 +30,8 @@ describe('collection colours', () => {
 })
 
 describe('collection paths', () => {
-  it('is the library filtered to it, and Stats scoped to it', () => {
-    expect(collectionPath(7)).toBe('/games?collection=7')
+  it('is the whole collection in the library, and Stats scoped to it', () => {
+    expect(collectionPath(7)).toBe('/games?collection=7&whose=all')
     expect(collectionStatsPath(7)).toBe('/stats?collection=7')
   })
 })

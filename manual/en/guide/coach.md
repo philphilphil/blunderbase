@@ -26,11 +26,12 @@ Lichess reference databases, reports statistics, writes and searches notes, keep
 repertoire lines, queues analysis and reports on the queue. It can also put a game or a
 position on the [Live](live.md) board so you both look at the same thing.
 
-It knows your [collections](games.md#collections). `list_collections` names them with their
+It knows your [collections](collections.md). `list_collections` names them with their
 counts and rules, and `add_to_collection` and `remove_from_collection` put games in and take
 them out, by the collection's name or its number. `search_games`, `get_last_games`,
 `get_stats` and `opening_explorer` each take a `collection` too, so "how is my league season
-going?" is answered from that collection's games alone. Like the collection's page,
+going?" is answered from that collection's games alone. Like the list a collection's card
+opens,
 `search_games` lists every game in it, a reference game you put in by hand too; the others
 keep to your own games in it, as Stats does. `search_games`, `get_last_games` and
 `get_stats` also take `rated`, for rated or casual games only. Making, renaming or deleting a collection is yours, in the app.

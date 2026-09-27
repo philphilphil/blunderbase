@@ -155,6 +155,9 @@ export function AppShell() {
       '3': '/explorer',
       '4': '/notes',
       '5': '/stats',
+      // After the five that were there first rather than beside Games, where the rail
+      // puts it: a number learned for Explorer or Stats keeps meaning what it meant.
+      '6': '/collections',
     }
     const onKeyDown = (event: KeyboardEvent) => {
       if (!(event.metaKey || event.ctrlKey) || event.altKey) return

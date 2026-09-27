@@ -62,6 +62,21 @@ export function GamesIcon(props: IconProps) {
   )
 }
 
+/**
+ * A card in front of another, the front one marked with a filled square: a set of games
+ * with its colour — the square a collection wears on every chip. Stacked cards rather than
+ * a folder, because a folder says a game lives in one place, and a game can be in several.
+ */
+export function CollectionsIcon(props: IconProps) {
+  return (
+    <Glyph {...props}>
+      <path d="M7 3h12a2 2 0 0 1 2 2v12" />
+      <rect x="3" y="7" width="14" height="14" rx="2" />
+      <rect x="6.5" y="10.5" width="4" height="4" rx="1" fill="currentColor" stroke="none" />
+    </Glyph>
+  )
+}
+
 /** A position branching into two continuations, growing rightwards from a filled root. */
 export function ExplorerIcon(props: IconProps) {
   return (

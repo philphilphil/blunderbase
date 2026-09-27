@@ -22,10 +22,12 @@ Reihenfolge.
   einrichten, Partien importieren.
 - [Übersicht](guide/dashboard.md) – Wertungsverläufe, die schlimmsten Momente, neueste
   Partien, die Analyse-Warteschlange, Trends.
-- [Partien](guide/games.md) – filtern, suchen, Filter speichern, Sammlungen, sortieren und
-  blättern, mehrere Partien auf einmal bearbeiten, löschen.
+- [Partien](guide/games.md) – filtern, suchen, Filter speichern, sortieren und blättern,
+  mehrere Partien auf einmal bearbeiten, löschen.
 - [Eine Partie analysieren](guide/game.md) – Brett, Bewertungsverlauf, Engine-Varianten, eigene
   Varianten, Zugbewertungen.
+- [Sammlungen](guide/collections.md) – deine Gruppen von Partien, ihre Bilanz und ihre
+  Regeln, Partien hineinlegen und herausnehmen.
 - [Explorer](guide/explorer.md) – dein eigener Eröffnungsbaum, die Lichess-Datenbanken,
   Musterpartien, das Repertoire.
 - [Statistiken](guide/stats.md) – welche Berichte es gibt, welche Partien zählen, Zeitraum

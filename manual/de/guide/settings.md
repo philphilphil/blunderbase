@@ -69,7 +69,7 @@ aktuellen Bildschirm gelten.
 | `⌘K` | Partien, Gegner, Eröffnungen und Notizen suchen |
 | `⇧E` | Jedes Engine-Urteil ausblenden – die Partie ohne Hilfe lesen |
 | `?` | Diese Liste |
-| `⌘1` … `⌘5` | Übersicht, Partien, Explorer, Notizen, Statistiken |
+| `⌘1` … `⌘6` | Übersicht, Partien, Explorer, Notizen, Statistiken, Sammlungen |
 | `⌘⇧I` | Importieren |
 | `Esc` | Schließen, was gerade offen ist |
 

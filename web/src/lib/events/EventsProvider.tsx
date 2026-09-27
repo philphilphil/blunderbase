@@ -18,6 +18,13 @@ import { onSessionRestored, reportSessionLost } from '@/lib/auth/session'
 import { applyCorrespondenceSnapshot } from './correspondenceSnapshots'
 import { dedupeKeys, invalidationsFor } from './invalidation'
 import {
+  collectionsFrameSubject,
+  isPrefixOrSame,
+  screenFrame,
+  setHeldFrameSink,
+  setRefreshSink,
+} from './ownWrites'
+import {
   parseEvent,
   type AnyEvent,
   type CorrespondenceSnapshotEvent,
@@ -70,9 +77,10 @@ const FLUSH_MS = 200
  * `analysis.progress` fires once per analysed ply — many times a second during a batch — so it
  * gets its own entry rather than joining `['analysis']`, which would need to cool every key
  * under it (`runs()`, `run()`, …) to avoid dragging a single game's own analysis along.
- * `collectionDetails()` is the other: a batch's `analysis.done` burst refreshes an open
- * collection page's score line, which the server computes uncached. `['collections']`
- * itself cools like the other roots, for an import whose rules fill several collections.
+ * `collectionOverview()` is the other: a batch's `analysis.done` burst refreshes the
+ * Collections screen's score lines, which fold every collection's games at once.
+ * `['collections']` itself cools like the other roots, for an import whose rules fill
+ * several collections.
  */
 const COOLDOWN_MS: Record<string, number> = {
   games: 3_000,
@@ -84,10 +92,13 @@ const COOLDOWN_MS: Record<string, number> = {
 }
 
 /** Cooldowns for specific keys that are not a whole-prefix root — see `queue()` above. */
-const EXACT_COOLDOWN_MS = new Map<string, number>([
-  [JSON.stringify(queryKeys.queue()), 1_000],
-  [JSON.stringify(queryKeys.collectionDetails()), 3_000],
-])
+const EXACT_COOLDOWN_KEYS: [QueryKey, number][] = [
+  [queryKeys.queue(), 1_000],
+  [queryKeys.collectionOverview(), 3_000],
+]
+const EXACT_COOLDOWN_MS = new Map(
+  EXACT_COOLDOWN_KEYS.map(([key, ms]) => [JSON.stringify(key), ms] as const),
+)
 
 function cooldownFor(key: QueryKey): number {
   const exact = EXACT_COOLDOWN_MS.get(JSON.stringify(key))
@@ -154,6 +165,25 @@ export function EventsProvider({
       deferred.current.clear()
     }
 
+    /**
+     * Hold a cooled key back behind a fetch of it that is still running, instead of
+     * invalidating it now: TanStack's default `cancelRefetch` would give that fetch up and send
+     * it again, and without an AbortSignal the server goes on computing the one given up on.
+     * Joining the running fetch is no answer either, since it began before whatever this
+     * invalidation is about. So the key is only marked stale — a query that mounts meanwhile
+     * still reads fresh — and stamped, and the trailing edge a cooldown from now refetches it
+     * once, or holds it again if that fetch is still going.
+     */
+    const holdBehindFetch = (key: QueryKey, now: number) => {
+      const serialized = JSON.stringify(key)
+      void queryClient.invalidateQueries({ queryKey: key, refetchType: 'none' })
+      lastFlushed.current.set(serialized, now)
+      deferred.current.set(serialized, key)
+    }
+
+    /** A fetch of `key`, or of anything under it, is in flight. */
+    const inFlight = (key: QueryKey) => queryClient.isFetching({ queryKey: key }) > 0
+
     const flush = () => {
       clearTimers()
       // What a cooldown held back is flushed with whatever has arrived since, so the two
@@ -171,6 +201,10 @@ export function EventsProvider({
             deferred.current.set(serialized, key)
             continue
           }
+          if (inFlight(key)) {
+            holdBehindFetch(key, now)
+            continue
+          }
           lastFlushed.current.set(serialized, now)
         }
         void queryClient.invalidateQueries({ queryKey: key })
@@ -182,6 +216,45 @@ export function EventsProvider({
       if (flushTimer.current !== null) return
       flushTimer.current = setTimeout(flush, FLUSH_MS)
     }
+
+    // A frame held back while this tab's own write was in flight, which turned out not to
+    // be that write's echo, comes back here and is flushed like any other.
+    const stopHeldFrames = setHeldFrameSink((keys) => {
+      if (closed) return
+      pending.current.push(...keys)
+      scheduleFlush()
+    })
+
+    // This tab's own write refreshing what it moved (`ownWrites.ts`), outside the 200ms
+    // batch because the person is waiting on it — but booked as the flush of those keys.
+    // Whatever was pending or held back under them is taken out, since the refresh starts
+    // after it arrived and reads it; and the keys, with any cooled key under them, are
+    // stamped as just flushed, so the next frame for them waits for the trailing edge
+    // rather than cancelling these refetches and sending them out again. A cooled key whose
+    // fetch is still running — the tab's previous write's, or a socket flush's — is not
+    // cancelled for this one either: it waits behind that fetch (`holdBehindFetch`), so three
+    // quick ticks in the Add to… checklist cost one refetch plus one trailing one, not three.
+    const stopRefreshes = setRefreshSink((keys) => {
+      const covered = (key: QueryKey) => keys.some((prefix) => isPrefixOrSame(prefix, key))
+      pending.current = pending.current.filter((key) => !covered(key))
+      for (const [serialized, key] of deferred.current) {
+        if (covered(key)) deferred.current.delete(serialized)
+      }
+      const now = Date.now()
+      for (const key of keys) {
+        const cooled = cooldownFor(key) > 0
+        if (cooled && inFlight(key)) {
+          holdBehindFetch(key, now)
+          continue
+        }
+        if (cooled) lastFlushed.current.set(JSON.stringify(key), now)
+        void queryClient.invalidateQueries({ queryKey: key })
+      }
+      for (const [key] of EXACT_COOLDOWN_KEYS) {
+        if (covered(key)) lastFlushed.current.set(JSON.stringify(key), now)
+      }
+      scheduleDeferred()
+    })
 
     /** The trailing edge: one timer, set for the first held key to come off cooldown. */
     const scheduleDeferred = () => {
@@ -250,7 +323,12 @@ export function EventsProvider({
           applyCorrespondenceSnapshot(queryClient, event as CorrespondenceSnapshotEvent)
         }
 
-        const keys = invalidationsFor(event)
+        // A collection write this tab made has already refreshed what it moved; its echo
+        // here would only cancel those refetches and start them again (`ownWrites.ts`).
+        const keys =
+          event.event === 'collections.changed'
+            ? screenFrame(event.event, invalidationsFor(event), collectionsFrameSubject(event))
+            : invalidationsFor(event)
         if (keys.length > 0) {
           pending.current.push(...keys)
           scheduleFlush()
@@ -299,6 +377,8 @@ export function EventsProvider({
     return () => {
       closed = true
       stopWaitingForSession()
+      stopHeldFrames()
+      stopRefreshes()
       if (retryTimer !== null) clearTimeout(retryTimer)
       stopFlushing()
       if (socket) {

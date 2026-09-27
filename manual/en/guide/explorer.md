@@ -9,7 +9,7 @@ it.
 
 The chips above the table narrow which of your games count: **speed** keeps only the time
 controls you leave on, and **played** keeps only games from the last 30 days, 90 days or
-year, counted back from today. Once you have a [collection](games.md#collections), **in**
+year, counted back from today. Once you have a [collection](collections.md), **in**
 keeps only the games in one of them, so a league season has an opening tree of its own; on
 **All games**, a collection's games are in the tree like every other. The tree, its book
 line and the games below all follow these, and the filter stays in the page's address, so a

@@ -3,8 +3,8 @@
  *
  * Two halves that never mix. The "Pages" group is client-side and answers instantly —
  * the workspace routes, the stats reports, the owner's saved filters and their collections
- * are all things this build (or the rail's own cache) already knows, so asking the backend where the Stats page is would only add
- * a frame of nothing. The other four groups are `GET /search`, which the backend holds
+ * are all things this build (or the app's own query cache) already knows, so asking the
+ * backend where the Stats page is would only add a frame of nothing. The other four groups are `GET /search`, which the backend holds
  * back until the query is two characters long.
  *
  * Everything a row can be is flattened into one list before it is drawn, because the
@@ -31,6 +31,7 @@ import { useLocation, useNavigate } from 'react-router-dom'
 // it does in the sidebar (`NavIcons`).
 import {
   AnalysisIcon,
+  CollectionsIcon,
   ComputeIcon,
   DashboardIcon,
   ExplorerIcon,
@@ -92,7 +93,7 @@ interface PaletteItem {
   icon: ComponentType<{ className?: string }>
   /**
    * A collection's colour key: the row leads with its square instead of the icon, the mark
-   * the collection wears in the rail and on every chip.
+   * the collection wears on its card and on every chip.
    */
   swatch?: string
   to: string
@@ -119,6 +120,12 @@ const PAGES: PageRoute[] = [
     to: '/',
   },
   { label: msg`Games`, hint: msg`the library`, icon: GamesIcon, to: '/games' },
+  {
+    label: msg`Collections`,
+    hint: msg`the groups you keep, and how each went`,
+    icon: CollectionsIcon,
+    to: '/collections',
+  },
   {
     label: msg`Explorer`,
     hint: msg`your games, the reference books and model games`,
@@ -264,8 +271,8 @@ function pageItems(
     })
   }
 
-  // After the saved cuts, as in the rail's fold, and found by what they are as well as by
-  // name — "collection" lists them all.
+  // After the saved cuts, since each opens the library with its chip set as a saved cut
+  // does, and found by what they are as well as by name — "collection" lists them all.
   const collectionLabel = i18n._(COLLECTION)
   for (const collection of collections) {
     if (!matches(query, collection.name, collectionLabel)) continue

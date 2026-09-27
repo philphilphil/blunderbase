@@ -67,7 +67,7 @@ are on.
 | `⌘K` | Search games, opponents, openings and notes |
 | `⇧E` | Hide every engine verdict — read the game unaided |
 | `?` | This list |
-| `⌘1` … `⌘5` | Dashboard, Games, Explorer, Notes, Stats |
+| `⌘1` … `⌘6` | Dashboard, Games, Explorer, Notes, Stats, Collections |
 | `⌘⇧I` | Import |
 | `Esc` | Close whatever is open |
 

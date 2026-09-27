@@ -25,8 +25,8 @@ Die Leiste oben nennt die Eröffnung, die Herkunft der Partie, ihre Bedenkzeit u
 Ausgang. Bei einer Lichess- oder Chess.com-Partie ist die Quelle dort ein Link, der die
 Partie auf der Seite in einem neuen Tab öffnet; zeigst du darauf, erscheint ein kleiner
 Pfeil. Auf dem Telefon ist derselbe Link der Pfeil neben der PGN-Schaltfläche.
-Steckt die Partie in einer [Sammlung](games.md#collections), steht auch deren Chip dort
-und führt zur Seite der Sammlung. Wie die übrigen Angaben der Leiste weichen die Chips, wenn
+Steckt die Partie in einer [Sammlung](collections.md), steht auch deren Chip dort
+und öffnet die Partienliste, auf diese Sammlung gefiltert. Wie die übrigen Angaben der Leiste weichen die Chips, wenn
 das Fenster zu schmal für sie wird.
 
 ## Was die Markierungen bedeuten { #what-the-badges-mean }
@@ -214,7 +214,7 @@ in der Spalte **Eröffnung**.
 ## Sammlungen { #collections }
 
 **Sammlungen …** hinter dem **⋯** unter dem Brett legt diese Partie in eine
-[Sammlung](games.md#collections) oder nimmt sie heraus. Es ist dieselbe Liste zum Abhaken wie
+[Sammlung](collections.md) oder nimmt sie heraus. Es ist dieselbe Liste zum Abhaken wie
 **Hinzufügen zu…** in der Partienliste, nur für diese eine Partie: Ein Haken nimmt sie in die
 Sammlung auf, ein entfernter Haken nimmt sie heraus. **+ Neue Sammlung …** legt eine an, die
 mit dieser Partie beginnt. Nimmst du eine Partie von Hand heraus, bleibt sie draußen, auch

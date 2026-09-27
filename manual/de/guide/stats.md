@@ -29,12 +29,13 @@ ein Bericht dünn, sieh unter **Analyse → Abdeckung** nach.
 Jahr oder alles), **Farbe**, **Bedenkzeit** und **Sammlung**. **vs. davor** stellt jede Zahl
 dem gleich langen Zeitraum davor gegenüber; bei „alles“ gibt es nichts zu vergleichen.
 
-**Sammlung** erscheint, sobald du eine [Sammlung](games.md#collections) angelegt hast. Es
+**Sammlung** erscheint, sobald du eine [Sammlung](collections.md) angelegt hast. Es
 steht auf **Alle Partien**, bis du eine wählst. Dann rechnet der ganze Bericht nur mit deinen
 Partien in dieser Sammlung – so bekommt eine Ligasaison ihre eigenen Statistiken. Eine
 fremde Partie, die du von Hand hineingelegt hast, zählt hier so wenig wie sonst in den
-Statistiken. Der Link **Statistiken** auf der Seite einer Sammlung öffnet den Bericht mit ihr
-schon gewählt, und die Wahl steht in der Adresse der Seite, auch wenn du in der Seitenleiste
+Statistiken. Der Link **Statistiken** auf der Karte einer Sammlung
+([Sammlungen](collections.md#open-a-collections-games)) öffnet den Bericht mit ihr schon
+gewählt, und die Wahl steht in der Adresse der Seite, auch wenn du in der Seitenleiste
 den Bericht wechselst. Ist keine Sammlung gewählt, zählen ihre Partien hier
 wie jede andere: Eine Sammlung grenzt die Statistiken ein, sie nimmt nie Partien aus ihnen
 heraus.

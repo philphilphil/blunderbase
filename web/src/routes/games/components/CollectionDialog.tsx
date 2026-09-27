@@ -2,10 +2,10 @@
  * Make a collection, or change one: its name, its colour, a line about it, and the rule
  * that fills it as games arrive.
  *
- * One dialog for three doors — "Make a collection" beside Save filter (a rule taken from
+ * One dialog for every door — "Make a collection" beside Save filter (a rule taken from
  * the filter that was open), "+ New collection from these N…" in the Add to… checklist
- * (games put in by hand), and Edit on the collection's page — so what a collection *is*
- * is explained in one place.
+ * (games put in by hand), and "New collection" and each card's Edit on the Collections
+ * screen — so what a collection *is* is explained in one place.
  *
  * The rule is the library's own filter vocabulary, as native fields rather than the
  * filter bar's popovers: it is a form someone fills in once, not a cut they flick
@@ -15,7 +15,7 @@
  * count in front of it. And taking a game out by hand sticks, since nothing re-runs the
  * rule behind the owner's back.
  *
- * Delete lives here rather than on the page because it is rare and final, and it asks
+ * Delete lives here rather than on the card because it is rare and final, and it asks
  * first, saying the part that reassures: the games stay.
  */
 import { Plural, Trans, useLingui } from '@lingui/react/macro'
@@ -74,7 +74,7 @@ export interface CollectionDialogProps {
   onClose: () => void
   /** The collection as the server answered, after a create or a save. */
   onSaved?: (collection: Collection) => void
-  /** After a delete, with the id that went — a page scoped to it has to leave. */
+  /** After a delete, with the id that went. */
   onDeleted?: (id: number) => void
 }
 

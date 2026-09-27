@@ -868,6 +868,7 @@ msgstr "Pages"
 #: src/components/shell/CommandPalette.tsx
 #: src/components/shell/SideNav.tsx
 #: src/lib/ui/shortcuts.ts
+#: src/routes/collections/CollectionsPage.tsx
 #: src/routes/correspondence/components/BookPane.tsx
 #: src/routes/explorer/components/MoveTreeTable.tsx
 #: src/routes/explorer/components/ReferenceMoveTable.tsx
@@ -915,6 +916,18 @@ msgstr "the library"
 #: src/components/shell/CommandPalette.tsx
 #: src/components/shell/SideNav.tsx
 #: src/lib/ui/shortcuts.ts
+#: src/routes/collections/CollectionsPage.tsx
+#: src/routes/game/components/GameCollectionsDialog.tsx
+msgid "Collections"
+msgstr "Collections"
+
+#: src/components/shell/CommandPalette.tsx
+msgid "the groups you keep, and how each went"
+msgstr "the groups you keep, and how each went"
+
+#: src/components/shell/CommandPalette.tsx
+#: src/components/shell/SideNav.tsx
+#: src/lib/ui/shortcuts.ts
 #: src/routes/explorer/ExplorerPage.tsx
 #: src/routes/game/GamePage.tsx
 #: src/routes/repertoire/RepertoirePage.tsx
@@ -928,7 +941,7 @@ msgstr "your games, the reference books and model games"
 #: src/components/shell/CommandPalette.tsx
 #: src/components/shell/SideNav.tsx
 #: src/lib/ui/shortcuts.ts
-#: src/routes/games/GamesPage.tsx
+#: src/routes/collections/CollectionsPage.tsx
 #: src/routes/stats/StatsPage.tsx
 msgid "Stats"
 msgstr "Stats"
@@ -1085,6 +1098,7 @@ msgid "Search games, opponents, openings, notes…"
 msgstr "Search games, opponents, openings, notes…"
 
 #: src/components/shell/CommandPalette.tsx
+#: src/routes/collections/CollectionsPage.tsx
 msgid "Results"
 msgstr "Results"
 
@@ -1277,20 +1291,6 @@ msgstr "Filters"
 #: src/components/shell/SideNav.tsx
 msgid "No saved filters yet"
 msgstr "No saved filters yet"
-
-#: src/components/shell/SideNav.tsx
-#: src/routes/games/components/CollectionDialog.tsx
-msgid "New collection"
-msgstr "New collection"
-
-#: src/components/shell/SideNav.tsx
-#: src/routes/game/components/GameCollectionsDialog.tsx
-msgid "Collections"
-msgstr "Collections"
-
-#: src/components/shell/SideNav.tsx
-msgid "No collections yet"
-msgstr "No collections yet"
 
 #: src/components/shell/SideNav.tsx
 #: src/routes/explorer/ExplorerPage.tsx
@@ -2459,6 +2459,130 @@ msgstr "that is not the password"
 #: src/routes/auth/password.ts
 msgid "the server answered {status}"
 msgstr "the server answered {status}"
+
+#: src/routes/collections/CollectionsPage.tsx
+msgid "Grid"
+msgstr "Grid"
+
+#: src/routes/collections/CollectionsPage.tsx
+msgid "A card per collection"
+msgstr "A card per collection"
+
+#: src/routes/collections/CollectionsPage.tsx
+msgid "Table"
+msgstr "Table"
+
+#: src/routes/collections/CollectionsPage.tsx
+msgid "A row per collection, to compare down a column"
+msgstr "A row per collection, to compare down a column"
+
+#: src/routes/collections/CollectionsPage.tsx
+#: src/routes/games/components/CollectionDialog.tsx
+msgid "New collection"
+msgstr "New collection"
+
+#: src/routes/collections/CollectionsPage.tsx
+msgid "How to show the collections"
+msgstr "How to show the collections"
+
+#: src/routes/collections/CollectionsPage.tsx
+msgid "Open the games in {collectionName}"
+msgstr "Open the games in {collectionName}"
+
+#: src/routes/collections/CollectionsPage.tsx
+msgid "No score: none of its games is one of yours with a known side."
+msgstr "No score: none of its games is one of yours with a known side."
+
+#: src/routes/collections/CollectionsPage.tsx
+msgid "No games in it yet."
+msgstr "No games in it yet."
+
+#: src/routes/collections/CollectionsPage.tsx
+msgid "{unscored, plural, one {# game in it is not scored: a reference game, or one of yours whose side is not known yet} other {# games in it are not scored: reference games, or yours whose side is not known yet}}"
+msgstr "{unscored, plural, one {# game in it is not scored: a reference game, or one of yours whose side is not known yet} other {# games in it are not scored: reference games, or yours whose side is not known yet}}"
+
+#: src/routes/collections/CollectionsPage.tsx
+msgid "{wins} won, {draws} drawn, {losses} lost"
+msgstr "{wins} won, {draws} drawn, {losses} lost"
+
+#: src/routes/collections/CollectionsPage.tsx
+msgid "No rule · added by hand"
+msgstr "No rule · added by hand"
+
+#: src/routes/collections/CollectionsPage.tsx
+msgid "· adds new imports"
+msgstr "· adds new imports"
+
+#: src/routes/collections/CollectionsPage.tsx
+#: src/routes/games/components/CollectionDialog.tsx
+msgid "Edit {collectionName}"
+msgstr "Edit {collectionName}"
+
+#: src/routes/collections/CollectionsPage.tsx
+msgctxt "button"
+msgid "Edit"
+msgstr "Edit"
+
+#: src/routes/collections/CollectionsPage.tsx
+msgid "Stats for {collectionName}"
+msgstr "Stats for {collectionName}"
+
+#: src/routes/collections/CollectionsPage.tsx
+msgid "Stats over this collection's games"
+msgstr "Stats over this collection's games"
+
+#: src/routes/collections/CollectionsPage.tsx
+msgid "{count, plural, one {# game} other {# games}}"
+msgstr "{count, plural, one {# game} other {# games}}"
+
+#: src/routes/collections/CollectionsPage.tsx
+msgid "Your score"
+msgstr "Your score"
+
+#: src/routes/collections/CollectionsPage.tsx
+msgid "Avg opponent"
+msgstr "Avg opponent"
+
+#: src/routes/collections/CollectionsPage.tsx
+#: src/routes/stats/cards/TimeOfDayCard.tsx
+msgid "Blunders / game"
+msgstr "Blunders / game"
+
+#: src/routes/collections/CollectionsPage.tsx
+msgid "Last played {lastPlayed}"
+msgstr "Last played {lastPlayed}"
+
+#: src/routes/collections/CollectionsPage.tsx
+msgid "Nothing played yet"
+msgstr "Nothing played yet"
+
+#: src/routes/collections/CollectionsPage.tsx
+#: src/routes/explorer/components/OwnFilters.tsx
+#: src/routes/games/filters.ts
+#: src/routes/stats/StatsPage.tsx
+msgid "Collection"
+msgstr "Collection"
+
+#: src/routes/collections/CollectionsPage.tsx
+#: src/routes/games/components/CollectionDialog.tsx
+msgid "Rule"
+msgstr "Rule"
+
+#: src/routes/collections/CollectionsPage.tsx
+msgid "Last played"
+msgstr "Last played"
+
+#: src/routes/collections/CollectionsPage.tsx
+msgid "No collections yet"
+msgstr "No collections yet"
+
+#: src/routes/collections/CollectionsPage.tsx
+msgid "A collection is a named, coloured group of games — a league season, the club’s over-the-board games, the losses to go back to. A game can be in several, and every one stays in the library."
+msgstr "A collection is a named, coloured group of games — a league season, the club’s over-the-board games, the losses to go back to. A game can be in several, and every one stays in the library."
+
+#: src/routes/collections/CollectionsPage.tsx
+msgid "Start one here, or from the games list: filter it to what the collection should hold and press Make a collection, or tick games and use Add to…."
+msgstr "Start one here, or from the games list: filter it to what the collection should hold and press Make a collection, or tick games and use Add to…."
 
 #. placeholder {0}: answer.created
 #. placeholder {1}: answer.queued
@@ -5106,13 +5230,6 @@ msgstr "Played within"
 msgid "in"
 msgstr "in"
 
-#: src/routes/explorer/components/OwnFilters.tsx
-#: src/routes/games/GamesPage.tsx
-#: src/routes/games/filters.ts
-#: src/routes/stats/StatsPage.tsx
-msgid "Collection"
-msgstr "Collection"
-
 #: src/routes/explorer/components/PositionNotes.tsx
 msgid "Your notes on this position"
 msgstr "Your notes on this position"
@@ -6020,27 +6137,6 @@ msgid "Could not take the games out — {0}"
 msgstr "Could not take the games out — {0}"
 
 #: src/routes/games/GamesPage.tsx
-msgid "Collection not found"
-msgstr "Collection not found"
-
-#: src/routes/games/GamesPage.tsx
-msgctxt "button"
-msgid "Edit"
-msgstr "Edit"
-
-#: src/routes/games/GamesPage.tsx
-msgid "Stats over this collection's games"
-msgstr "Stats over this collection's games"
-
-#: src/routes/games/GamesPage.tsx
-msgid "This collection is not there any more. <0>Show the whole library</0>"
-msgstr "This collection is not there any more. <0>Show the whole library</0>"
-
-#: src/routes/games/GamesPage.tsx
-msgid "Could not load the collection."
-msgstr "Could not load the collection."
-
-#: src/routes/games/GamesPage.tsx
 #: src/routes/notes/components/NoteFilterBar.tsx
 msgid "Clear {active}"
 msgstr "Clear {active}"
@@ -6056,55 +6152,6 @@ msgstr "Opponent, ECO, PGN text…"
 #: src/routes/games/GamesPage.tsx
 msgid "Made {name}"
 msgstr "Made {name}"
-
-#: src/routes/games/GamesPage.tsx
-msgid "{unscored, plural, one {# game in it is not scored: a reference game, or one of yours whose side is not known yet} other {# games in it are not scored: reference games, or yours whose side is not known yet}}"
-msgstr "{unscored, plural, one {# game in it is not scored: a reference game, or one of yours whose side is not known yet} other {# games in it are not scored: reference games, or yours whose side is not known yet}}"
-
-#: src/routes/games/GamesPage.tsx
-msgid "Your games: score <0>{points} / {games}</0>"
-msgstr "Your games: score <0>{points} / {games}</0>"
-
-#: src/routes/games/GamesPage.tsx
-msgid "{wins} won, {draws} drawn, {losses} lost"
-msgstr "{wins} won, {draws} drawn, {losses} lost"
-
-#: src/routes/games/GamesPage.tsx
-msgid "avg opponent <0>{opponent}</0>"
-msgstr "avg opponent <0>{opponent}</0>"
-
-#: src/routes/games/GamesPage.tsx
-msgid "blunders <0>{blunders}</0> / game"
-msgstr "blunders <0>{blunders}</0> / game"
-
-#: src/routes/games/GamesPage.tsx
-msgid "No score: none of its games is one of yours with a known side."
-msgstr "No score: none of its games is one of yours with a known side."
-
-#: src/routes/games/GamesPage.tsx
-msgid "No games in it yet."
-msgstr "No games in it yet."
-
-#: src/routes/games/GamesPage.tsx
-#: src/routes/games/components/CollectionDialog.tsx
-msgid "Rule"
-msgstr "Rule"
-
-#: src/routes/games/GamesPage.tsx
-msgid "· adds new imports"
-msgstr "· adds new imports"
-
-#: src/routes/games/GamesPage.tsx
-msgid "Nothing in this collection yet"
-msgstr "Nothing in this collection yet"
-
-#: src/routes/games/GamesPage.tsx
-msgid "Select games in the library and use Add to…, or give the collection a rule under Edit and it fills as new games arrive."
-msgstr "Select games in the library and use Add to…, or give the collection a rule under Edit and it fills as new games arrive."
-
-#: src/routes/games/GamesPage.tsx
-msgid "Go to all games"
-msgstr "Go to all games"
 
 #: src/routes/games/GamesPage.tsx
 msgid "Nothing matches these filters"
@@ -6145,10 +6192,6 @@ msgstr "Give it a name."
 #: src/routes/games/components/CollectionDialog.tsx
 msgid "Could not delete the collection."
 msgstr "Could not delete the collection."
-
-#: src/routes/games/components/CollectionDialog.tsx
-msgid "Edit {collectionName}"
-msgstr "Edit {collectionName}"
 
 #: src/routes/games/components/CollectionDialog.tsx
 msgid "A collection is a set of games. Changing its rule moves none of them."
@@ -6336,8 +6379,8 @@ msgid "In the collection"
 msgstr "In the collection"
 
 #: src/routes/games/components/FilterBar.tsx
-msgid "No collections yet. Select games and use Add to… under the table, or press + beside Collections in the sidebar."
-msgstr "No collections yet. Select games and use Add to… under the table, or press + beside Collections in the sidebar."
+msgid "No collections yet. Select games and use Add to… under the table, or start one on the Collections page."
+msgstr "No collections yet. Select games and use Add to… under the table, or start one on the Collections page."
 
 #: src/routes/games/components/FilterBar.tsx
 msgid "Keep the games this filter finds as a collection, and add new ones as they arrive"
@@ -7436,6 +7479,10 @@ msgid "Nothing to query yet? <0>Import some games</0> first — the coach only k
 msgstr "Nothing to query yet? <0>Import some games</0> first — the coach only knows what the database holds."
 
 #: src/routes/notes/NotesPage.tsx
+msgid "How to show the notes"
+msgstr "How to show the notes"
+
+#: src/routes/notes/NotesPage.tsx
 msgid "The notes could not be read."
 msgstr "The notes could not be read."
 
@@ -7474,10 +7521,6 @@ msgstr "List"
 #: src/routes/notes/NotesPage.tsx
 msgid "One line per note, with the game it was written on"
 msgstr "One line per note, with the game it was written on"
-
-#: src/routes/notes/NotesPage.tsx
-msgid "How to show the notes"
-msgstr "How to show the notes"
 
 #: src/routes/notes/NotesPage.tsx
 msgid "No note matches those filters. Clear one and try again."
@@ -8236,10 +8279,6 @@ msgstr "Bl/g"
 #: src/routes/stats/cards/TimeControlCard.tsx
 msgid "{wins}W · {draws}D · {losses}L"
 msgstr "{wins}W · {draws}D · {losses}L"
-
-#: src/routes/stats/cards/TimeOfDayCard.tsx
-msgid "Blunders / game"
-msgstr "Blunders / game"
 
 #: src/routes/stats/cards/TimeOfDayCard.tsx
 msgid "You are at your loosest around {loosest}:00 UTC ({loosestRate} blunders a game) and at your tightest around {tightest}:00 ({tightestRate})."

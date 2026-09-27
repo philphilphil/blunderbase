@@ -69,8 +69,10 @@ describe('invalidationsFor — analysis lifecycle', () => {
       expect(has(keys, queryKeys.games())).toBe(true)
       expect(has(keys, queryKeys.stats())).toBe(true)
       expect(has(keys, queryKeys.explorer())).toBe(true)
-      // A collection page's blunders per game is read from analysis; its counts are not.
-      expect(has(keys, queryKeys.collectionDetails())).toBe(true)
+      // The Collections cards' blunders per game is read from analysis; the plain list's
+      // counts, which every chip reads, are not.
+      expect(has(keys, queryKeys.collectionOverview())).toBe(true)
+      expect(has(keys, queryKeys.collectionList())).toBe(false)
       expect(has(keys, queryKeys.collections())).toBe(false)
     }
   })
@@ -315,18 +317,50 @@ describe('invalidationsFor — lichess connection', () => {
 })
 
 describe('invalidationsFor — collections', () => {
-  it('refreshes the collections, the games rows and every scope that can name one', () => {
+  const moved = [queryKeys.collections(), queryKeys.games(), queryKeys.stats(), queryKeys.explorer()]
+
+  it('refreshes the collections, the games rows and every scope when games moved', () => {
+    const keys = invalidationsFor({
+      event: 'collections.changed',
+      collection_id: 3,
+      membership: true,
+    })
+    expect(names(keys)).toEqual(names(moved))
+  })
+
+  it('refreshes only the collections when no game moved — a rename, a colour, a rule', () => {
+    const keys = invalidationsFor({
+      event: 'collections.changed',
+      collection_id: 3,
+      membership: false,
+    })
+    expect(names(keys)).toEqual(names([queryKeys.collections()]))
+    expect(has(keys, queryKeys.games())).toBe(false)
+    expect(has(keys, queryKeys.stats())).toBe(false)
+    expect(has(keys, queryKeys.explorer())).toBe(false)
+  })
+
+  it('reads a frame from a server that does not say as games having moved', () => {
     const keys = invalidationsFor({ event: 'collections.changed', collection_id: 3 })
-    expect(has(keys, queryKeys.collections())).toBe(true)
-    expect(has(keys, queryKeys.games())).toBe(true)
-    expect(has(keys, queryKeys.stats())).toBe(true)
-    expect(has(keys, queryKeys.explorer())).toBe(true)
+    expect(names(keys)).toEqual(names(moved))
   })
 
   it('treats a change about several collections the same way', () => {
-    const one = invalidationsFor({ event: 'collections.changed', collection_id: 3 })
-    const many = invalidationsFor({ event: 'collections.changed', collection_id: null })
+    const one = invalidationsFor({ event: 'collections.changed', collection_id: 3, membership: true })
+    const many = invalidationsFor({
+      event: 'collections.changed',
+      collection_id: null,
+      membership: true,
+    })
     expect(names(many)).toEqual(names(one))
+  })
+
+  it('parses the membership flag off the wire', () => {
+    const event = parseEvent(
+      JSON.stringify({ event: 'collections.changed', collection_id: 2, membership: false }),
+    )
+    expect(event).not.toBeNull()
+    expect(names(invalidationsFor(event as AnyEvent))).toEqual(names([queryKeys.collections()]))
   })
 
   it('leaves the collections out of an import frame, which the rule news arrives beside', () => {

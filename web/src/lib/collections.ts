@@ -40,7 +40,7 @@ export interface CollectionColorClasses {
   text: string
   /** A tinted chip: the colour at about a tenth for the fill, a third for the border. */
   chip: string
-  /** The colour solid — the rail's square, a swatch, a chip's dot. */
+  /** The colour solid — a swatch, a chip's dot. */
   fill: string
 }
 
@@ -98,9 +98,13 @@ export function collectionColorClasses(color: string | null | undefined): Collec
   return COLLECTION_COLOR_CLASSES[color as CollectionColor] ?? COLLECTION_COLOR_CLASSES.accent
 }
 
-/** A collection's page: the library, filtered to it. */
+/**
+ * A collection's games: the library with its Collection chip set. `whose=all` because what
+ * leads here — a card on the Collections screen, a chip on a row — counts every game in it,
+ * a reference game put in by hand included, and the list should hold what the count said.
+ */
 export function collectionPath(id: number): string {
-  return `/games?collection=${id}`
+  return `/games?collection=${id}&whose=all`
 }
 
 /** Stats, scoped to the collection. */

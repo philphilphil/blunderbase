@@ -61,10 +61,10 @@ describe('CollectionChips', () => {
   it('draws a game’s collections from its ids, skipping ids the list does not know', async () => {
     wrap(<CollectionChips ids={[2, 1, 99]} />)
     const league = await screen.findByRole('link', { name: '45-45 League' })
-    expect(league).toHaveAttribute('href', '/games?collection=1')
+    expect(league).toHaveAttribute('href', '/games?collection=1&whose=all')
     expect(screen.getByRole('link', { name: 'Tough losses' })).toHaveAttribute(
       'href',
-      '/games?collection=2',
+      '/games?collection=2&whose=all',
     )
     expect(screen.getAllByRole('link')).toHaveLength(2)
   })

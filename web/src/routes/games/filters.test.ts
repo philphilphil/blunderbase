@@ -48,27 +48,23 @@ describe('filtersFromParams', () => {
     expect(toGameQuery({ whose: 'others' })).toEqual({ whose: 'others' })
   })
 
-  it("reads a collection's page as every game in it unless it says otherwise", () => {
-    // The rail counts every game in a collection, so the page it links to lists them all;
-    // there `all` is the default and so the unspelled one, and `mine` is the narrowing.
+  it('treats a collection as one more filter, over the owner’s games unless it says otherwise', () => {
+    // No default of its own: `collection=7` is the owner's games in it, and a link that
+    // means every game in it spells `whose=all`, which survives as it would anywhere.
     expect(filtersFromParams(new URLSearchParams('collection=7'))).toEqual({ collection: 7 })
     expect(filtersFromParams(new URLSearchParams('collection=7&whose=all'))).toEqual({
       collection: 7,
+      whose: 'all',
     })
     expect(filtersFromParams(new URLSearchParams('collection=7&whose=mine'))).toEqual({
       collection: 7,
-      whose: 'mine',
     })
-    expect(toGameQuery({ collection: 7 })).toEqual({ collection: 7, whose: 'all' })
-    expect(toGameQuery({ collection: 7, whose: 'mine' })).toEqual({
-      collection: 7,
-      whose: 'mine',
-    })
-    expect(filterCount({ collection: 7, whose: 'mine' })).toBe(2)
-    // Leaving the collection leaves its default behind: the library is the owner's again.
-    expect(clearGroup({ collection: 7, whose: 'mine' }, 'collection')).toEqual({})
-    expect(prune({ whose: 'all' })).toEqual({ whose: 'all' })
-    expect(prune({ collection: 7, whose: 'all' })).toEqual({ collection: 7 })
+    expect(toGameQuery({ collection: 7 })).toEqual({ collection: 7 })
+    expect(toGameQuery({ collection: 7, whose: 'all' })).toEqual({ collection: 7, whose: 'all' })
+    expect(filterCount({ collection: 7, whose: 'all' })).toBe(2)
+    // Adding a collection and clearing it again leaves an explicit `whose` where it was.
+    expect(clearGroup({ collection: 7, whose: 'all' }, 'collection')).toEqual({ whose: 'all' })
+    expect(prune({ collection: 7, whose: 'all' })).toEqual({ collection: 7, whose: 'all' })
   })
 
   it('drops values the backend would reject rather than sending them', () => {
@@ -152,12 +148,7 @@ describe('collections and rated', () => {
   })
 
   it('passes both through to the API query', () => {
-    // With every game in the collection asked for, which is its page's default.
-    expect(toGameQuery({ collection: 7, rated: false })).toEqual({
-      collection: 7,
-      rated: false,
-      whose: 'all',
-    })
+    expect(toGameQuery({ collection: 7, rated: false })).toEqual({ collection: 7, rated: false })
   })
 
   it('reads rated or casual on the Time control chip, and clears it with the clock', () => {

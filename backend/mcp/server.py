@@ -316,7 +316,8 @@ def _register_query(server: MCPServer, coach: Coach) -> None:
             analyzed=analyzed,
             text=text,
             rated=args.flag(rated, "rated"),
-            # The web app's collection page opens on every game in it too (`filters.ts`).
+            # A collection's card in the web app opens every game in it too
+            # (`collectionPath`, web/src/lib/collections.ts).
             mine=args.whose(whose or ("all" if ref is not None else "mine")),
         )
         count = args.capped(limit, DEFAULT_SEARCH, MAX_SEARCH)

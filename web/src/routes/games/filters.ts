@@ -16,8 +16,8 @@ import { SOURCE_LABELS } from './format'
 
 export interface LibraryFilters {
   /**
-   * One collection's games (its id). First in the object so it is first in the URL, which
-   * is how a collection's page is spelled: `/games?collection=7&…`.
+   * One collection's games (its id). First in the object so it is first in the URL:
+   * `/games?collection=7&…` reads as that collection, narrowed.
    */
   collection?: number
   /** `YYYY-MM-DD`, inclusive. */
@@ -41,26 +41,16 @@ export interface LibraryFilters {
   // not know), never refused.
   text?: string
   /**
-   * Whose games: `mine` the owner's own, `others` the ones added from the reference books,
-   * `all` both. Absent is the default cut (`defaultWhose`), which is never spelled, because a
-   * URL should not spell the default: the owner's own in the library, and every game in it
-   * on a collection's page — a reference game put in a collection by hand is counted on the
-   * rail, so the page it links to lists it too.
+   * Whose games: `others` is the ones added from the reference books, `all` is both.
+   * Absent is the default cut, the owner's own — never spelled as `mine`, because a URL
+   * should not spell the default. It is the default with a collection set too: a collection
+   * is one more filter, and a link that means every game in one (a collection's card, a
+   * chip on a row) says `whose=all` itself.
    */
-  whose?: Whose
+  whose?: Exclude<Whose, 'mine'>
 }
 
-const WHOSE: readonly Whose[] = ['mine', 'others', 'all']
-
-/** What an absent `whose` means for these filters; see `LibraryFilters.whose`. */
-export function defaultWhose(filters: LibraryFilters): Whose {
-  return filters.collection === undefined ? 'mine' : 'all'
-}
-
-/** Whose games these filters are over, spelled or not. */
-export function effectiveWhose(filters: LibraryFilters): Whose {
-  return filters.whose ?? defaultWhose(filters)
-}
+const WHOSE: readonly Exclude<Whose, 'mine'>[] = ['others', 'all']
 
 const SOURCES: readonly Source[] = [
   'lichess',
@@ -146,20 +136,14 @@ export function paramsFromFilters(filters: LibraryFilters): URLSearchParams {
   return params
 }
 
-/**
- * Drop the keys that carry no value, so an empty filter set is `{}` and compares equal — and
- * a `whose` that says what its absence would, so the default is never spelled whichever way
- * the collection came or went.
- */
+/** Drop the keys that carry no value, so an empty filter set is `{}` and compares equal. */
 export function prune(filters: LibraryFilters): LibraryFilters {
   const cleaned: Record<string, unknown> = {}
   for (const [key, value] of Object.entries(filters)) {
     if (value === undefined || value === '') continue
     cleaned[key] = value
   }
-  const pruned = cleaned as LibraryFilters
-  if (pruned.whose !== undefined && pruned.whose === defaultWhose(pruned)) delete pruned.whose
-  return pruned
+  return cleaned as LibraryFilters
 }
 
 /** How many filters are set — the "N active" the clear-all control needs. */
@@ -168,16 +152,13 @@ export function filterCount(filters: LibraryFilters): number {
 }
 
 /**
- * The filters as the API takes them: `until` widened to the end of its day, and `whose`
- * spelled out when its default is not the API's (`mine`) — a collection's page asks for every
- * game in it. Everything else is passed straight through.
+ * The filters as the API takes them: `until` widened to the end of its day, everything
+ * else passed straight through.
  */
 export function toGameQuery(filters: LibraryFilters): GameFilters {
   const { until, ...rest } = prune(filters)
   const query: GameFilters = { ...rest }
   if (until) query.until = `${until}T23:59:59`
-  const whose = effectiveWhose(rest)
-  if (whose !== 'mine') query.whose = whose
   return query
 }
 

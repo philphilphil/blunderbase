@@ -1,8 +1,8 @@
 /**
  * The collections list as a name lookup, for the places that only hold a collection's id —
- * the filter bar's Collection chip, the Save filter suggestion, the collection page's title
- * before its own detail has landed. One list (`useCollections`, which the rail also reads),
- * so a rename shows everywhere at once.
+ * the filter bar's Collection chip, the Save filter suggestion, the receipt of "Remove from
+ * collection". One list (`useCollections`, which the chips on every row also read), so a
+ * rename shows everywhere at once.
  */
 import { useCallback } from 'react'
 

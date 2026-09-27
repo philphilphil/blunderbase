@@ -6,6 +6,9 @@ import { queryKeys } from '@/lib/api/keys'
 import { onSessionLost, reportSessionRestored } from '@/lib/auth/session'
 
 import { EventsProvider } from './EventsProvider'
+import { invalidationsFor } from './invalidation'
+import { ownWrite, resetOwnWrites } from './ownWrites'
+import type { AnyEvent } from './types'
 
 /** A socket that never connects on its own, so the test decides when `open` happens. */
 class FakeSocket {
@@ -220,5 +223,211 @@ describe('EventsProvider', () => {
     await act(() => vi.advanceTimersByTimeAsync(1_000))
 
     expect(FakeSocket.instances.length).toBeGreaterThan(1)
+  })
+})
+
+describe('EventsProvider — a collection write of this tab', () => {
+  /**
+   * The provider over a client the test holds, with one games query that counts. Each fetch
+   * takes `serverMs` to answer.
+   */
+  function renderGames(serverMs = 1_000) {
+    const client = new QueryClient({
+      defaultOptions: { queries: { retry: false, gcTime: 0, staleTime: 30_000 } },
+    })
+    const fetches = { started: 0, abandoned: 0 }
+    const queryFn = ({ signal }: { signal: AbortSignal }) => {
+      fetches.started += 1
+      signal.addEventListener('abort', () => {
+        fetches.abandoned += 1
+      })
+      return new Promise<string>((resolve) => setTimeout(() => resolve('rows'), serverMs))
+    }
+    function Games() {
+      const query = useQuery({ queryKey: queryKeys.gameCards({}), queryFn })
+      return <span>{query.data ?? 'loading'}</span>
+    }
+    vi.stubGlobal('WebSocket', FakeSocket)
+    render(
+      <QueryClientProvider client={client}>
+        <EventsProvider url="ws://events">
+          <Games />
+        </EventsProvider>
+      </QueryClientProvider>,
+    )
+    return { client, fetches, socket: () => FakeSocket.instances.at(-1)! }
+  }
+
+  const moved = { event: 'collections.changed', collection_id: 3, membership: true }
+  const refresh = () => ({
+    keys: invalidationsFor(moved as AnyEvent),
+    announced: true,
+    subject: { id: 3, membership: true },
+  })
+
+  afterEach(() => resetOwnWrites())
+
+  it('fetches the games once for its own write, and never gives that fetch up', async () => {
+    vi.useFakeTimers()
+    const { client, fetches, socket } = renderGames()
+    socket().open()
+    await act(() => vi.advanceTimersByTimeAsync(1_500))
+    expect(fetches.started).toBe(1)
+
+    await act(() => ownWrite(client, 'collections.changed', async () => ({}), refresh))
+    // The echo lands while the tab's own refetch is still in flight.
+    socket().receive(moved)
+    await act(() => vi.advanceTimersByTimeAsync(5_000))
+
+    expect(fetches).toEqual({ started: 2, abandoned: 0 })
+  })
+
+  it('does the same when the echo beats the answer to the tab', async () => {
+    vi.useFakeTimers()
+    const { client, fetches, socket } = renderGames()
+    socket().open()
+    await act(() => vi.advanceTimersByTimeAsync(1_500))
+    let answer!: () => void
+    const writing = ownWrite(
+      client,
+      'collections.changed',
+      () => new Promise<void>((resolve) => (answer = resolve)),
+      refresh,
+    )
+
+    socket().receive(moved)
+    await act(() => vi.advanceTimersByTimeAsync(300))
+    answer()
+    await act(() => writing)
+    await act(() => vi.advanceTimersByTimeAsync(5_000))
+
+    expect(fetches).toEqual({ started: 2, abandoned: 0 })
+  })
+
+  it('fetches the games once for a rule saved and then applied, whatever order the echoes take', async () => {
+    vi.useFakeTimers()
+    const { client, fetches, socket } = renderGames()
+    socket().open()
+    await act(() => vi.advanceTimersByTimeAsync(1_500))
+    const saved = { event: 'collections.changed', collection_id: 3, membership: false }
+    const saving = () => ({
+      keys: invalidationsFor(saved as AnyEvent),
+      announced: true,
+      subject: { id: 3, membership: false },
+    })
+
+    // The save answers before its frame; the apply starts at once and the save's frame
+    // lands while it is out. The apply's own frame follows its answer.
+    await act(() => ownWrite(client, 'collections.changed', async () => ({}), saving))
+    let answer!: () => void
+    const applying = ownWrite(
+      client,
+      'collections.changed',
+      () => new Promise<void>((resolve) => (answer = resolve)),
+      refresh,
+    )
+    socket().receive(saved)
+    await act(() => vi.advanceTimersByTimeAsync(100))
+    answer()
+    await act(() => applying)
+    socket().receive(moved)
+    await act(() => vi.advanceTimersByTimeAsync(10_000))
+
+    expect(fetches).toEqual({ started: 2, abandoned: 0 })
+  })
+
+  it('does not let an analysis batch cancel the refetch its own write started', async () => {
+    vi.useFakeTimers()
+    const { client, fetches, socket } = renderGames()
+    socket().open()
+    await act(() => vi.advanceTimersByTimeAsync(1_500))
+    const done = { event: 'analysis.done', game_id: 4, requested: false, status: 'done' }
+
+    // A batch is running: one `done` refetched the games, the next waits on the cooldown.
+    socket().receive({ ...done, run_id: 1 })
+    await act(() => vi.advanceTimersByTimeAsync(1_300))
+    socket().receive({ ...done, run_id: 2 })
+    await act(() => vi.advanceTimersByTimeAsync(1_200))
+    expect(fetches.started).toBe(2)
+
+    // The owner adds games to a collection while that trailing flush is still due, and
+    // another game finishes while the write's refetch is in flight.
+    await act(() => ownWrite(client, 'collections.changed', async () => ({}), refresh))
+    socket().receive({ ...done, run_id: 3 })
+    await act(() => vi.advanceTimersByTimeAsync(10_000))
+
+    // The write's refetch read what was held back; the later frame waited its turn behind it.
+    expect(fetches).toEqual({ started: 4, abandoned: 0 })
+  })
+
+  it('waits behind a games fetch already running instead of cancelling it, for two writes', async () => {
+    vi.useFakeTimers()
+    const { client, fetches, socket } = renderGames()
+    socket().open()
+    await act(() => vi.advanceTimersByTimeAsync(1_500))
+    expect(fetches.started).toBe(1)
+
+    // A sync's import flush has the games out on the wire when the owner ticks two
+    // collections in the Add to… checklist, one right after the other.
+    socket().receive({
+      event: 'analysis.done',
+      game_id: 4,
+      run_id: 1,
+      requested: false,
+      status: 'done',
+    })
+    await act(() => vi.advanceTimersByTimeAsync(300))
+    expect(fetches.started).toBe(2)
+    await act(() => ownWrite(client, 'collections.changed', async () => ({}), refresh))
+    await act(() => ownWrite(client, 'collections.changed', async () => ({}), refresh))
+    expect(fetches).toEqual({ started: 2, abandoned: 0 })
+
+    // The running fetch answers untouched, and both writes are read by one fetch after it.
+    await act(() => vi.advanceTimersByTimeAsync(10_000))
+    expect(fetches).toEqual({ started: 3, abandoned: 0 })
+  })
+
+  it('holds the trailing refetch back while a slow games fetch is still running', async () => {
+    vi.useFakeTimers()
+    const { client, fetches, socket } = renderGames(5_000)
+    socket().open()
+    await act(() => vi.advanceTimersByTimeAsync(5_500))
+    expect(fetches.started).toBe(1)
+
+    // The first tick refetches at once; the second waits behind that fetch, which on this
+    // server outlasts the cooldown, so the trailing edge has to wait again rather than give
+    // it up.
+    await act(() => ownWrite(client, 'collections.changed', async () => ({}), refresh))
+    await act(() => vi.advanceTimersByTimeAsync(100))
+    await act(() => ownWrite(client, 'collections.changed', async () => ({}), refresh))
+    await act(() => vi.advanceTimersByTimeAsync(4_000))
+    expect(fetches).toEqual({ started: 2, abandoned: 0 })
+
+    await act(() => vi.advanceTimersByTimeAsync(20_000))
+    expect(fetches).toEqual({ started: 3, abandoned: 0 })
+  })
+
+  it('still refreshes a tab that wrote nothing from the socket', async () => {
+    vi.useFakeTimers()
+    const { fetches, socket } = renderGames()
+    socket().open()
+    await act(() => vi.advanceTimersByTimeAsync(1_500))
+
+    socket().receive(moved)
+    await act(() => vi.advanceTimersByTimeAsync(5_000))
+
+    expect(fetches).toEqual({ started: 2, abandoned: 0 })
+  })
+
+  it('refreshes only the collections for a change that moved no game', async () => {
+    vi.useFakeTimers()
+    const { fetches, socket } = renderGames()
+    socket().open()
+    await act(() => vi.advanceTimersByTimeAsync(1_500))
+
+    socket().receive({ ...moved, membership: false })
+    await act(() => vi.advanceTimersByTimeAsync(5_000))
+
+    expect(fetches.started).toBe(1)
   })
 })

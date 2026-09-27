@@ -365,16 +365,24 @@ over the members), so the games list, Stats, search and the explorer's scope all
 a collection without knowing what one is. A rule is a subset of the same vocabulary
 (`collections.RULE_KEYS`) turned into `GameFilters(mine=True, …)`;
 `import_service.ingest_game` — the one function every route in stores through — matches a
-new game against every rule inside the game's own transaction. The import announces
+new game against every rule inside the game's own transaction — the rules read once per
+stream (`collections.RuleBook`, read again only when a write in the process changed one)
+and asked in one query per game, a column per rule. The import announces
 `collections.changed` once, after its last commit (`announce_collections`: once per sync
 stream or per single game, never per game of a stream), and `accounts.reconcile_games` asks
-the colour rules again about games whose side it has just learned. Every announcement —
-a hand edit, `apply_rule`, an import — drops the Stats cache first, and a Stats computation
-that was already running when it did publishes nothing (`stats._GENERATION`), so a
-collection's Stats is never answered from its old membership. Rules never re-run on their
-own, so a game taken out by hand stays out; `apply_rule` is the explicit catch-up. A page
-of games reads its memberships in one query (`collections.collections_of`), never one per
-row.
+the rules again about games whose side it has just learned — only the rules that stood, in
+their current form, when the game was imported (`Collection.rule_set_at`), so a rule
+written later never reaches an old game that way. The frame carries `membership`: whether
+games moved. Only a membership change drops Stats answers, and only the ones whose key names
+a collection (`stats.forget_collection_payloads`; every other key keeps serving, because a
+collection hides no game); a scoped computation already running publishes nothing
+(`stats._COLLECTION_GENERATION`), so a collection's Stats is never answered from its old
+membership. The tab that made a write refreshes once and drops the socket's echo of it
+(`web/src/lib/events/ownWrites.ts`), so the echo cannot cancel those refetches; the echo is
+known by its `collection_id` and `membership`, not by the query keys it names. Rules never
+re-run on their own, so a game taken out by hand stays out; `apply_rule` is the explicit
+catch-up. A page of games reads its memberships in one query
+(`collections.collections_of`), never one per row.
 
 ## Testing
 

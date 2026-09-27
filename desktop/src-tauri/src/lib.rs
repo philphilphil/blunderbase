@@ -423,6 +423,11 @@ fn build_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
                 .build(app)?,
         )
         .item(
+            &MenuItemBuilder::with_id("go-collections", "Collections")
+                .accelerator("CmdOrCtrl+6")
+                .build(app)?,
+        )
+        .item(
             &MenuItemBuilder::with_id("go-import", "Import")
                 .accelerator("CmdOrCtrl+Shift+I")
                 .build(app)?,
@@ -456,6 +461,7 @@ fn handle_menu<R: Runtime>(app: &AppHandle<R>, id: &str) {
         "go-explorer" => navigate(&window, "/explorer"),
         "go-notes" => navigate(&window, "/notes"),
         "go-stats" => navigate(&window, "/stats"),
+        "go-collections" => navigate(&window, "/collections"),
         "go-import" => navigate(&window, "/import"),
         _ => {}
     }

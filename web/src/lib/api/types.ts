@@ -708,7 +708,7 @@ export interface Collection extends Extra {
   created_at: string
 }
 
-/** The score line on a collection's page, always from the owner's side of the board. */
+/** The score line on a collection's card, always from the owner's side of the board. */
 export interface CollectionSummary extends Extra {
   games: number
   wins: number
@@ -721,12 +721,18 @@ export interface CollectionSummary extends Extra {
   last_played_at: string | null
 }
 
+/** A collection with its score line: one card on the Collections screen. */
 export interface CollectionDetail extends Collection {
   summary: CollectionSummary
 }
 
 export interface CollectionList {
   collections: Collection[]
+}
+
+/** `GET /collections?with_summary=true`: every collection with its score line. */
+export interface CollectionOverview {
+  collections: CollectionDetail[]
 }
 
 export interface CollectionCreate {

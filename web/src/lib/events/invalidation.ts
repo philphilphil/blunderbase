@@ -53,9 +53,10 @@ export function invalidationsFor(event: AnyEvent): QueryKey[] {
     case 'analysis.paused':
       return [queryKeys.queue()]
 
-    // New evals: classifications, eval curves, worst moments, explorer eval drops — and a
-    // collection page's "blunders / game", which is the one number in its header an
-    // analysis moves. Only the details: the rail's counts are membership, not analysis.
+    // New evals: classifications, eval curves, worst moments, explorer eval drops — and the
+    // Collections screen's "blunders / game", which is the one number on its cards an
+    // analysis moves. Only the overview: the plain list's counts are membership, not
+    // analysis, and every chip and name lookup reads that one.
     case 'analysis.done':
     case 'analysis.failed':
       return [
@@ -63,7 +64,7 @@ export function invalidationsFor(event: AnyEvent): QueryKey[] {
         queryKeys.games(),
         queryKeys.stats(),
         queryKeys.explorer(),
-        queryKeys.collectionDetails(),
+        queryKeys.collectionOverview(),
       ]
 
     // A note the coach wrote over MCP, or one written in another tab. Notes ride along in
@@ -146,14 +147,17 @@ export function invalidationsFor(event: AnyEvent): QueryKey[] {
         ? [queryKeys.lichess()]
         : [queryKeys.lichess(), queryKeys.reference()]
 
-    // A collection made, renamed or deleted, or games put in or taken out. The rail's
-    // counts and the collection page's score line are `['collections']`; every games row
+    // A collection made, renamed or deleted, or games put in or taken out. The counts and
+    // the Collections screen's score lines are `['collections']`; every games row
     // carries its memberships and a list can be filtered to one collection; Stats and the
-    // explorer can be scoped to one too. A rename moves nothing but the first of these, but
-    // the frame does not say which kind of change it was, and it is rare — a click, or an
-    // import whose games a rule matched.
+    // explorer can be scoped to one too. A change that moved no game — a rename, a colour,
+    // a rule edited but not applied — says so (`membership: false`) and touches the first
+    // of these alone: the others are the expensive reads, and none of their answers moved.
+    // A frame without the key is from a server that did not say, and is taken as moved.
     case 'collections.changed':
-      return [queryKeys.collections(), queryKeys.games(), queryKeys.stats(), queryKeys.explorer()]
+      return (event as { membership?: boolean }).membership === false
+        ? [queryKeys.collections()]
+        : [queryKeys.collections(), queryKeys.games(), queryKeys.stats(), queryKeys.explorer()]
 
     // Carried whole on the socket, and a keepalive is not news. `stream.snapshot` arrives
     // twice a second per open board — refetching on it would be a refetch loop, and

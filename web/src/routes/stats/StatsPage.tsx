@@ -109,7 +109,7 @@ function dimensionQuery(
 export function StatsPage() {
   const [params, setParams] = useSearchParams()
   const report = reportFrom(params)
-  // The one scope in the URL rather than in state: a collection's page links here with it
+  // The one scope in the URL rather than in state: a collection's card links here with it
   // (`collectionStatsPath`), and "Stats for the league" is worth a bookmark where "the
   // last 90 days, blitz" is not. Every card and the comparison read it through `filters`.
   const collections = useCollections()

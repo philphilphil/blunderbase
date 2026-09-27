@@ -2,9 +2,10 @@
  * Design 2b's filter bar: the free-text box and one chip per filter group. Every chip writes
  * straight into the page's `LibraryFilters`, which the page mirrors into the URL.
  *
- * Collection is one more chip rather than a control of its own: a collection's page is the
- * library under `?collection=`, so picking one here and clicking it in the rail land on the
- * same page, and every other chip narrows inside it the way it narrows the whole library.
+ * Collection is one more chip rather than a control of its own: the library under
+ * `?collection=` is the same list, narrowed, so picking one here and opening a card on the
+ * Collections screen land on the same table, and every other chip narrows inside it the way
+ * it narrows the whole library.
  */
 import type { I18n, MessageDescriptor } from '@lingui/core'
 import { msg } from '@lingui/core/macro'
@@ -23,7 +24,6 @@ import { Segmented } from '@/routes/stats/kit/states'
 
 import {
   clearGroup,
-  effectiveWhose,
   FILTER_GROUPS,
   FILTER_OPTIONS,
   filterCount,
@@ -82,9 +82,11 @@ export function FilterBar({ filters, onChange, trailing }: FilterBarProps) {
           narrows one cut of the library: it decides which library — the owner's own games
           (the default, and the only ones any statistic counts), the games added from the
           reference books, or both together. The same segmented control the explorer uses
-          for its source, since it answers the same kind of question. On a collection's page
-          it starts on All (`defaultWhose`); `prune` drops whichever value is the default. */}
-      <WhoseToggle value={effectiveWhose(filters)} onChange={(whose) => patch({ whose })} />
+          for its source, since it answers the same kind of question. */}
+      <WhoseToggle
+        value={filters.whose ?? 'mine'}
+        onChange={(whose) => patch({ whose: whose === 'mine' ? undefined : whose })}
+      />
 
       {FILTER_GROUPS.map((group) => (
         <FilterPopover
@@ -124,7 +126,7 @@ export function FilterBar({ filters, onChange, trailing }: FilterBarProps) {
  * The Collection chip's panel: one row per collection with its colour and its size, and a
  * click picks it — one at a time, since a game in two collections is found under either,
  * and "in this one and that one" is a cut nobody has asked for. Picking closes the panel,
- * because the page it lands on is a different page (the collection's own header comes up).
+ * as a pick that changes the whole table should: there is nothing left to set in it.
  */
 function CollectionPanel({
   value,
@@ -149,10 +151,10 @@ function CollectionPanel({
           <Trans>Could not load the collections.</Trans>
         </span>
       ) : rows.length === 0 ? (
-        <span className="text-[0.6875rem] leading-snug text-dim">
+        <span className="text-label text-dim">
           <Trans>
-            No collections yet. Select games and use Add to… under the table, or press + beside
-            Collections in the sidebar.
+            No collections yet. Select games and use Add to… under the table, or start one on
+            the Collections page.
           </Trans>
         </span>
       ) : (
@@ -193,9 +195,10 @@ function CollectionPanel({
  * games in it now, not only the next ones.
  *
  * Only there when the filter has something a rule can hold. With nothing rule-able set the
- * sidebar's + and a selection's Add to… are the doors, and a link that opened an empty form
- * here would read as "these games" when it meant none of them. Saving goes to the new
- * collection's page, which is where its games and its score line are.
+ * Collections screen's "New collection" and a selection's Add to… are the doors, and a link
+ * that opened an empty form here would read as "these games" when it meant none of them.
+ * Saving sets the Collection chip to the new collection, every game in it: the list is then
+ * what was just kept, which is the proof the owner wants of what the rule caught.
  */
 function MakeCollection({ filters }: { filters: LibraryFilters }) {
   const { t } = useLingui()

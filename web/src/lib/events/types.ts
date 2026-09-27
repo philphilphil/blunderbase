@@ -228,10 +228,16 @@ export type LiveUpdatedEvent = { event: 'live.updated' } & LiveState
  * A collection made, changed or deleted, or games put in or taken out — by hand, by an
  * MCP client, or by a rule while an import stored them. `collection_id` is null when the
  * change was about more than one (an import matching several rules).
+ *
+ * `membership` is whether games moved in or out: false for a change to the collection
+ * alone (made empty, renamed, recoloured, a rule edited but not applied), which moves
+ * nothing but the collections themselves. Optional because a server from before the key
+ * existed sends none, and that frame is read as a membership change — the safe answer.
  */
 export interface CollectionsChangedEvent {
   event: 'collections.changed'
   collection_id: number | null
+  membership?: boolean
 }
 
 /**

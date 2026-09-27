@@ -115,6 +115,7 @@ plugins:
             Dashboard: Übersicht
             Games: Partien
             Analysing a game: Eine Partie analysieren
+            Collections: Sammlungen
             Explorer: Explorer
             Statistics: Statistiken
             Notes: Notizen
@@ -136,7 +137,9 @@ plugins:
 # One chapter per entry in the app's rail, in the rail's order, so a reader looking at a
 # screen has one place to look it up. Getting started is the exception in front of them,
 # and the assistant and the settings come after, since both are reached from the account
-# menu rather than the rail. Engines is a rail entry written up under Operate.
+# menu rather than the rail. Engines is a rail entry written up under Operate. Analysing a
+# game is the screen a row of Games opens, not a rail entry, so it follows Games and comes
+# before Collections, the entry after Games.
 nav:
   - Overview: index.md
   - Guide:
@@ -144,6 +147,7 @@ nav:
       - Dashboard: guide/dashboard.md
       - Games: guide/games.md
       - Analysing a game: guide/game.md
+      - Collections: guide/collections.md
       - Explorer: guide/explorer.md
       - Statistics: guide/stats.md
       - Notes: guide/notes.md

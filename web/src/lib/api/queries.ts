@@ -9,10 +9,14 @@ import {
   useMutation,
   useQuery,
   useQueryClient,
+  type QueryClient,
+  type QueryKey,
   type UseMutationOptions,
   type UseQueryOptions,
 } from '@tanstack/react-query'
 import { useEffect, useState } from 'react'
+
+import { ownWrite } from '@/lib/events/ownWrites'
 
 import { ApiError, type Download } from './client'
 import * as api from './endpoints'
@@ -406,7 +410,8 @@ export function useDeleteGames(
         queryKeys.lines(),
         // Every deleted game is written into the record the Manage screen lists.
         queryKeys.library(),
-        // And leaves every collection it was in, whose counts are on the rail.
+        // And leaves every collection it was in, whose counts are on the Collections
+        // screen's cards and in the Collection filter.
         queryKeys.collections(),
       ]) {
         void client.invalidateQueries({ queryKey })
@@ -419,9 +424,10 @@ export function useDeleteGames(
 // --- collections ----------------------------------------------------------
 
 /**
- * Every collection, by name. The rail, the filter bar, the chips on every row and the
- * checklists all read this one query, so a chip is drawn from an id without a request of
- * its own.
+ * Every collection, by name. The Collection filter chip, the chips on every row and game
+ * header, the checklists and the command palette all read this one query, so a chip is
+ * drawn from an id without a request of its own. The Collections screen's cards read
+ * `useCollectionOverview` instead.
  */
 export function useCollections(options?: Options<Awaited<ReturnType<typeof api.listCollections>>>) {
   return useQuery({
@@ -431,15 +437,18 @@ export function useCollections(options?: Options<Awaited<ReturnType<typeof api.l
   })
 }
 
-/** One collection with its score line. `null` asks for nothing — no collection in view. */
-export function useCollection(
-  id: number | null | undefined,
-  options?: Options<Awaited<ReturnType<typeof api.getCollection>>>,
+/**
+ * Every collection with its score line, for the Collections screen's cards. Its own query
+ * under the collections root rather than a flag on `useCollections`: the plain list is read
+ * by every chip and name lookup and stays cheap, and this one asks the server to fold every
+ * collection's games — `collections.changed` still refreshes it, being under the same root.
+ */
+export function useCollectionOverview(
+  options?: Options<Awaited<ReturnType<typeof api.getCollectionOverview>>>,
 ) {
   return useQuery({
-    queryKey: queryKeys.collection(id ?? -1),
-    queryFn: () => api.getCollection(id as number),
-    enabled: typeof id === 'number',
+    queryKey: queryKeys.collectionOverview(),
+    queryFn: api.getCollectionOverview,
     ...options,
   })
 }
@@ -448,18 +457,41 @@ export function useCollection(
  * What a change to which games are in a collection makes stale: the collections (counts,
  * score lines), every games query (each row carries its memberships, and a page filtered to
  * the collection lists different games), and Stats and the explorer, which can be scoped
- * to one. The socket says the same with `collections.changed`; doing it here as well means
- * the tab that made the change does not wait for the frame.
+ * to one. The same four roots the socket's `collections.changed` names for a membership
+ * change, so a frame about another write that lands meanwhile is read by this refresh too.
  */
-function membershipMoved(client: ReturnType<typeof useQueryClient>) {
-  for (const queryKey of [
-    queryKeys.collections(),
-    queryKeys.games(),
-    queryKeys.stats(),
-    queryKeys.explorer(),
-  ]) {
-    void client.invalidateQueries({ queryKey })
-  }
+const MEMBERSHIP_MOVED: QueryKey[] = [
+  queryKeys.collections(),
+  queryKeys.games(),
+  queryKeys.stats(),
+  queryKeys.explorer(),
+]
+
+/** A change to the collection alone — its name, colour, description or rule. */
+const COLLECTION_ONLY: QueryKey[] = [queryKeys.collections()]
+
+/**
+ * One collection write from this tab: sent, then refreshed here once, with the socket's
+ * echo of it taken out (`lib/events/ownWrites.ts`) so it cannot cancel these refetches and
+ * send them again. `moved` reads the answer for which collection it was, whether games
+ * moved and whether the server announced the write at all — it announces a membership
+ * change only when one happened. The collection and the membership flag are what the echo
+ * will carry, which is how it is told from another write's frame. `guessed` says `games`
+ * is a guess the answer could not settle, so the echo may say either.
+ */
+function collectionsWrite<T>(
+  client: QueryClient,
+  write: () => Promise<T>,
+  moved: (result: T) => { id: number; games: boolean; announced: boolean; guessed?: boolean },
+): Promise<T> {
+  return ownWrite(client, 'collections.changed', write, (result) => {
+    const { id, games, announced, guessed } = moved(result)
+    return {
+      keys: games ? MEMBERSHIP_MOVED : COLLECTION_ONLY,
+      announced,
+      subject: { id, membership: guessed ? null : games },
+    }
+  })
 }
 
 /** Make one, with its first games — by hand (`game_ids`) or by its rule (`apply_to_existing`). */
@@ -468,12 +500,13 @@ export function useCreateCollection(
 ) {
   const client = useQueryClient()
   return useMutation({
-    mutationFn: (body: CollectionCreate) => api.createCollection(body),
+    mutationFn: (body: CollectionCreate) =>
+      collectionsWrite(
+        client,
+        () => api.createCollection(body),
+        (made) => ({ id: made.id, games: made.game_count > 0, announced: true }),
+      ),
     ...options,
-    onSuccess: (...args) => {
-      membershipMoved(client)
-      options?.onSuccess?.(...args)
-    },
   })
 }
 
@@ -487,25 +520,39 @@ export function useUpdateCollection(
   const client = useQueryClient()
   return useMutation({
     mutationFn: ({ id, body }: { id: number; body: CollectionUpdate }) =>
-      api.updateCollection(id, body),
+      collectionsWrite(
+        client,
+        () => api.updateCollection(id, body),
+        () => ({ id, games: false, announced: true }),
+      ),
     ...options,
-    onSuccess: (...args) => {
-      void client.invalidateQueries({ queryKey: queryKeys.collections() })
-      options?.onSuccess?.(...args)
-    },
   })
 }
 
-/** The games stay; every row that carried its chip, and every scope that named it, moves. */
+/**
+ * The games stay; every row that carried its chip, and every scope that named it, moves —
+ * unless it held no games, which the list already in hand says (and when it is not in hand,
+ * the answer is taken to be "it held some", which refreshes more rather than less).
+ */
 export function useDeleteCollection(options?: UseMutationOptions<void, Error, number>) {
   const client = useQueryClient()
   return useMutation({
-    mutationFn: (id: number) => api.deleteCollection(id),
-    ...options,
-    onSuccess: (...args) => {
-      membershipMoved(client)
-      options?.onSuccess?.(...args)
+    mutationFn: (id: number) => {
+      const listed = client
+        .getQueryData<Awaited<ReturnType<typeof api.listCollections>>>(queryKeys.collectionList())
+        ?.collections.find((row) => row.id === id)
+      return collectionsWrite(
+        client,
+        () => api.deleteCollection(id),
+        () => ({
+          id,
+          games: listed === undefined || listed.game_count > 0,
+          announced: true,
+          guessed: listed === undefined,
+        }),
+      )
     },
+    ...options,
   })
 }
 
@@ -519,12 +566,12 @@ export function useAddToCollection(
   const client = useQueryClient()
   return useMutation({
     mutationFn: ({ collectionId, gameIds }: { collectionId: number; gameIds: number[] }) =>
-      api.addToCollection(collectionId, gameIds),
+      collectionsWrite(
+        client,
+        () => api.addToCollection(collectionId, gameIds),
+        ({ added }) => ({ id: collectionId, games: added > 0, announced: added > 0 }),
+      ),
     ...options,
-    onSuccess: (...args) => {
-      membershipMoved(client)
-      options?.onSuccess?.(...args)
-    },
   })
 }
 
@@ -538,12 +585,12 @@ export function useRemoveFromCollection(
   const client = useQueryClient()
   return useMutation({
     mutationFn: ({ collectionId, gameIds }: { collectionId: number; gameIds: number[] }) =>
-      api.removeFromCollection(collectionId, gameIds),
+      collectionsWrite(
+        client,
+        () => api.removeFromCollection(collectionId, gameIds),
+        ({ removed }) => ({ id: collectionId, games: removed > 0, announced: removed > 0 }),
+      ),
     ...options,
-    onSuccess: (...args) => {
-      membershipMoved(client)
-      options?.onSuccess?.(...args)
-    },
   })
 }
 
@@ -553,12 +600,13 @@ export function useApplyCollectionRule(
 ) {
   const client = useQueryClient()
   return useMutation({
-    mutationFn: (id: number) => api.applyCollectionRule(id),
+    mutationFn: (id: number) =>
+      collectionsWrite(
+        client,
+        () => api.applyCollectionRule(id),
+        ({ added }) => ({ id, games: added > 0, announced: added > 0 }),
+      ),
     ...options,
-    onSuccess: (...args) => {
-      membershipMoved(client)
-      options?.onSuccess?.(...args)
-    },
   })
 }
 

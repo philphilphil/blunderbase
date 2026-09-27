@@ -32,7 +32,7 @@ import { formatResult, formatTimeControl } from '../gameModel'
  * and the one thing this line cannot afford is a second copy of something.
  *
  * The game's collections close the facts, as the same tinted chips the library's rows
- * carry, each a link to its collection's page. They are the owner's filing rather than a
+ * carry, each a link to the library filtered to it. They are the owner's filing rather than a
  * fact of the game, so they come after everything the game says about itself, and they are
  * the first of those facts to leave a narrow bar; a long list clips at a fixed width rather
  * than pushing the opening's name out.

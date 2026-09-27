@@ -254,11 +254,21 @@ def reconcile_games(session: Session, account: Account | None = None) -> Reconci
     # whose side was unknown then if the rule names a colour — nor at all for a game that
     # was somebody else's. Those are asked now, in the same commit, the way the import
     # would have asked had it known; every other rule already had its say and keeps it,
-    # so a game a hand took out of a collection stays out.
+    # so a game a hand took out of a collection stays out. And only the rules that stood,
+    # as they are now, when each game was imported (`as_imported`): a rule written since
+    # never saw the game arrive, and taking it in here would be reaching back into the
+    # library, which only the explicit `apply_rule` does.
+    rules = collections_service.RuleBook()
     joined = collections_service.assign_on_import(
-        session, sorted(set(recolored_games) - set(newly_owned)), colour_rules_only=True
+        session,
+        sorted(set(recolored_games) - set(newly_owned)),
+        rules=rules,
+        colour_rules_only=True,
+        as_imported=True,
     )
-    joined += collections_service.assign_on_import(session, newly_owned)
+    joined += collections_service.assign_on_import(
+        session, newly_owned, rules=rules, as_imported=True
+    )
     session.commit()
     # The rows went out as bulk statements, so whatever this Session had already loaded
     # still remembers the values from before; the next read of one comes off the database.
@@ -269,7 +279,9 @@ def reconcile_games(session: Session, account: Account | None = None) -> Reconci
         stats_service.reset_summaries_ready()
     touched = sorted(set(joined))
     if touched:
-        collections_service.notify_changed(touched[0] if len(touched) == 1 else None)
+        collections_service.notify_changed(
+            touched[0] if len(touched) == 1 else None, membership=True
+        )
     return filled
 
 

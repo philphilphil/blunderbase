@@ -97,11 +97,6 @@ function draw(at = '/games') {
   return client
 }
 
-/** The titlebar's last crumb, once it names the collection. */
-async function crumbNamed(name: string) {
-  return within(screen.getByTestId('crumbs')).findByText(name)
-}
-
 /** The rows, once the first page has answered. */
 async function loaded() {
   await screen.findByLabelText('Select game 11')
@@ -425,24 +420,11 @@ describe('GamesPage — collections', () => {
     game_count: 8,
     created_at: '2026-08-01T00:00:00Z',
   }
-  const SUMMARY = {
-    games: 8,
-    wins: 4,
-    draws: 3,
-    losses: 1,
-    points: 5.5,
-    avg_opponent_rating: 1724,
-    blunders_per_game: 0.625,
-    first_played_at: '2026-08-06T19:00:00Z',
-    last_played_at: '2026-09-24T19:00:00Z',
-  }
-
-  /** The library as before, plus one collection the page can be scoped to. */
+  /** The library as before, plus one collection the filter can be set to. */
   function stubCollections() {
     vi.mocked(fetch).mockImplementation(async (input: RequestInfo | URL, init?: RequestInit) => {
       const path = String(input).split('?')[0]!
       if (path.endsWith('/api/collections')) return json(200, { collections: [LEAGUE] })
-      if (path.endsWith('/api/collections/7')) return json(200, { ...LEAGUE, summary: SUMMARY })
       if (path.endsWith('/api/collections/7/games/remove') && init?.method === 'POST') {
         const body = JSON.parse(String(init.body)) as { game_ids: number[] }
         return json(200, { removed: body.game_ids.length, collection: LEAGUE })
@@ -460,53 +442,31 @@ describe('GamesPage — collections', () => {
     return new URL(last, 'http://localhost').searchParams
   }
 
-  it('makes the collection the page: its name, its record and its rule', async () => {
+  it('is the library with one more filter: no title, record or buttons of its own', async () => {
     stubCollections()
-    draw('/games?collection=7')
+    draw('/games?collection=7&whose=all')
     await loaded()
 
-    expect(await crumbNamed('45-45 League')).toBeInTheDocument()
+    // The chip names it once the list is in.
+    expect(await screen.findByRole('button', { name: /Collection:45-45 League/ })).toBeInTheDocument()
     expect(lastGamesQuery().get('collection')).toBe('7')
-    expect(await screen.findByText('Lichess 45+45 League, this season')).toBeInTheDocument()
-    expect(screen.getByText('5½ / 8')).toBeInTheDocument()
-    expect(screen.getByText('1724')).toBeInTheDocument()
-    expect(screen.getByText('0.63')).toBeInTheDocument()
-    expect(screen.getByText('45+45')).toBeInTheDocument()
-    expect(screen.getByText('rated')).toBeInTheDocument()
-    expect(screen.getByText(/adds new imports/)).toBeInTheDocument()
+    expect(lastGamesQuery().get('whose')).toBe('all')
+    const crumbs = within(screen.getByTestId('crumbs'))
+    expect(crumbs.getByText('Games')).toBeInTheDocument()
+    expect(crumbs.queryByText('45-45 League')).not.toBeInTheDocument()
     const titlebar = screen.getByTestId('titlebar')
-    expect(within(titlebar).getByRole('link', { name: 'Stats' })).toHaveAttribute(
-      'href',
-      '/stats?collection=7',
-    )
-    expect(within(titlebar).queryByRole('link', { name: 'Import' })).not.toBeInTheDocument()
+    expect(within(titlebar).getByRole('link', { name: 'Import' })).toBeInTheDocument()
+    expect(within(titlebar).queryByRole('button', { name: 'Edit' })).not.toBeInTheDocument()
+    expect(screen.queryByText(/Your games: score/)).not.toBeInTheDocument()
+    expect(screen.queryByText('Lichess 45+45 League, this season')).not.toBeInTheDocument()
   })
 
-  it('lists every game in the collection, and narrows to Mine only when asked', async () => {
+  it('reads a collection over the owner’s own games unless the link says otherwise', async () => {
     stubCollections()
-    const user = userEvent.setup()
     draw('/games?collection=7')
     await loaded()
 
-    // The rail counts every game in it, so the page asks for every game in it.
-    expect(lastGamesQuery().get('whose')).toBe('all')
-    const whose = screen.getByRole('group', { name: 'Whose games' })
-    expect(within(whose).getByRole('button', { name: 'All' })).toHaveAttribute(
-      'aria-pressed',
-      'true',
-    )
-    // And labels its score as the owner's, which is all it scores.
-    expect(await screen.findByText(/Your games: score/)).toBeInTheDocument()
-
-    await user.click(within(whose).getByRole('button', { name: 'Mine' }))
-    await waitFor(() => expect(lastGamesQuery().get('whose')).toBe('mine'))
-  })
-
-  it('leaves the plain library on the owner’s own games', async () => {
-    stubCollections()
-    draw('/games')
-    await loaded()
-
+    expect(lastGamesQuery().get('collection')).toBe('7')
     expect(lastGamesQuery().get('whose')).toBeNull()
     const whose = screen.getByRole('group', { name: 'Whose games' })
     expect(within(whose).getByRole('button', { name: 'Mine' })).toHaveAttribute(
@@ -515,45 +475,40 @@ describe('GamesPage — collections', () => {
     )
   })
 
-  it('says the collection is gone when it is deleted while its page is open', async () => {
-    stubCollections()
-    const client = draw('/games?collection=7')
-    await loaded()
-    expect(await screen.findByText('5½ / 8')).toBeInTheDocument()
-
-    // Deleted in another tab: the refetch its event triggers answers 404.
-    const answer = vi.mocked(fetch).getMockImplementation()!
-    vi.mocked(fetch).mockImplementation(async (input: RequestInfo | URL, init?: RequestInit) => {
-      if (String(input).split('?')[0]!.endsWith('/api/collections/7')) {
-        return json(404, { error: 'unknown_collection', detail: 'no collection with id 7' })
-      }
-      return answer(input, init)
-    })
-    await client.invalidateQueries({ queryKey: ['collections'] })
-
-    expect(await screen.findByText(/This collection is not there any more/)).toBeInTheDocument()
-    expect(screen.queryByText('5½ / 8')).not.toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Edit' })).toBeDisabled()
-  })
-
-  it('keeps the collection when the filters inside it are cleared', async () => {
+  it('clears the collection with every other filter', async () => {
     stubCollections()
     const user = userEvent.setup()
     draw('/games?collection=7&color=black')
     await loaded()
 
-    await user.click(screen.getByRole('button', { name: 'Clear 1' }))
+    await user.click(screen.getByRole('button', { name: 'Clear 2' }))
 
     await waitFor(() => expect(lastGamesQuery().get('color')).toBeNull())
-    expect(lastGamesQuery().get('collection')).toBe('7')
+    expect(lastGamesQuery().get('collection')).toBeNull()
   })
 
-  it('takes a selection out of the collection the page is', async () => {
+  it('keeps an explicit All when a collection is added and cleared again', async () => {
     stubCollections()
     const user = userEvent.setup()
-    draw('/games?collection=7')
+    draw('/games?whose=all')
     await loaded()
-    await crumbNamed('45-45 League')
+
+    await user.click(screen.getByRole('button', { name: /^Collection/ }))
+    await user.click(await screen.findByRole('button', { name: /45-45 League/ }))
+    await waitFor(() => expect(lastGamesQuery().get('collection')).toBe('7'))
+    expect(lastGamesQuery().get('whose')).toBe('all')
+
+    await user.click(screen.getByRole('button', { name: 'Clear Collection filter' }))
+    await waitFor(() => expect(lastGamesQuery().get('collection')).toBeNull())
+    expect(lastGamesQuery().get('whose')).toBe('all')
+  })
+
+  it('takes a selection out of the collection the filter is set to', async () => {
+    stubCollections()
+    const user = userEvent.setup()
+    draw('/games?collection=7&whose=all')
+    await loaded()
+    await screen.findByRole('button', { name: /Collection:45-45 League/ })
 
     await user.click(screen.getByLabelText('Select game 11'))
     await user.click(screen.getByRole('button', { name: 'Remove from collection' }))
@@ -562,7 +517,18 @@ describe('GamesPage — collections', () => {
     expect(postedTo('/api/collections/7/games/remove')).toEqual([{ game_ids: [11] }])
   })
 
-  it('scopes the library to a collection from the filter bar', async () => {
+  it('offers Remove from collection only with a collection set', async () => {
+    stubCollections()
+    const user = userEvent.setup()
+    draw()
+    await loaded()
+
+    await user.click(screen.getByLabelText('Select game 11'))
+    expect(screen.getByRole('button', { name: 'Add to…' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Remove from collection' })).not.toBeInTheDocument()
+  })
+
+  it('narrows the library to a collection from the filter bar', async () => {
     stubCollections()
     const user = userEvent.setup()
     draw()
@@ -572,8 +538,8 @@ describe('GamesPage — collections', () => {
     await user.click(await screen.findByRole('button', { name: /45-45 League/ }))
 
     await waitFor(() => expect(lastGamesQuery().get('collection')).toBe('7'))
-    expect(await crumbNamed('45-45 League')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /Collection:45-45 League/ })).toBeInTheDocument()
+    expect(within(screen.getByTestId('crumbs')).queryByText('45-45 League')).not.toBeInTheDocument()
   })
 
   it('filters on rated or casual under Time control', async () => {

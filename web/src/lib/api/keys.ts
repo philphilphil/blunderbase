@@ -52,14 +52,17 @@ export const queryKeys = {
   /**
    * The collections. Their own root rather than a corner of `['games']`: a rename or a new
    * colour moves no game row (rows carry ids only), and every import invalidates
-   * `['games']` — which would refetch the rail's counts for a sync that matched no rule.
+   * `['games']` — which would refetch every collection's count and score line for a sync
+   * that matched no rule.
    * Membership moving is announced as `collections.changed`, which takes both roots.
    */
   collections: (): QueryKey => ['collections'],
   collectionList: (): QueryKey => ['collections', 'list'],
-  /** Every collection's detail — the page header, whose score line reads analysis too. */
-  collectionDetails: (): QueryKey => ['collections', 'detail'],
-  collection: (id: number): QueryKey => ['collections', 'detail', id],
+  /**
+   * Every collection with its score line — the Collections screen. The one collections key
+   * an analysis moves (blunders per game), so `analysis.done` names it alone.
+   */
+  collectionOverview: (): QueryKey => ['collections', 'overview'],
 
   library: (): QueryKey => ['library'],
   backupEstimate: (): QueryKey => ['library', 'backup-estimate'],

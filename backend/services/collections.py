@@ -10,21 +10,27 @@ Games get in two ways. By hand (`add_games`, `added_by="manual"`), from a select
 or from the game page. And by a rule: a subset of the `/games` vocabulary (`RULE_KEYS`)
 that every game an import stores is matched against as it arrives (`assign_on_import`,
 `added_by="rule"`). A rule never re-runs over old games on its own — that is the explicit
-`apply_rule` — so a game the owner took out by hand stays out however many syncs follow.
+`apply_rule` — so a game the owner took out by hand stays out however many syncs follow,
+and a rule written today does not reach a game imported yesterday, not even when that game's
+side is only learned later (`Collection.rule_set_at`).
 
 Every write here commits and then announces itself on the service event hub as
-`collections.changed`, which is what refreshes the rail's counts and the chips on every
-open list. The stats cache is dropped with it, because a collection's Stats is a filter
-whose answer the change has just moved.
+`collections.changed`, which is what refreshes the Collections screen's cards and the chips
+on every open list. The frame says whether games moved (`membership`): only then are the stats
+answers scoped to a collection dropped, and only then does a screen refetch its games,
+Stats and explorer — a rename moves none of them.
 """
 
 from __future__ import annotations
 
 import logging
+import threading
 from collections.abc import Iterable, Mapping, Sequence
+from dataclasses import dataclass
+from datetime import datetime
 from typing import Any
 
-from sqlalchemy import delete, func, select
+from sqlalchemy import ColumnElement, and_, delete, exists, func, select
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -61,6 +67,12 @@ ID_CHUNK = 500
 
 # The difference between "leave it as it is" and "set it to nothing" in an update.
 UNSET: Any = object()
+
+# Moved by every write that can change a rule — a collection made, changed or deleted — so
+# a `RuleBook` an import stream is holding knows to read the rules again. Only ever
+# compared for equality; the lock is what keeps two writers from both landing on one value.
+_RULES_LOCK = threading.Lock()
+_rules_version = 0
 
 
 class CollectionError(ValueError):
@@ -152,6 +164,85 @@ def rule_filters(rule: Mapping[str, Any]) -> GameFilters:
     )
 
 
+@dataclass(frozen=True, slots=True)
+class _Rule:
+    """One collection's rule, read and turned into WHERE clauses once."""
+
+    collection_id: int
+    names_colour: bool
+    # When the rule took the form it has now (`Collection.rule_set_at`).
+    set_at: datetime
+    conditions: tuple[ColumnElement[bool], ...]
+
+
+class RuleBook:
+    """Every collection's rule, read once and held for as long as nothing rewrites one.
+
+    An import stream stores its games one transaction at a time, and asking the collections
+    table for its rules — and rebuilding each rule's filter — for every one of them is a few
+    thousand identical reads for a first sync. A stream builds one of these when it starts
+    and hands it to every game (`import_service.ingest_games`). `current` reads the rules
+    again when a write in this process has changed them since (`_rules_version`), so a rule
+    edited in the middle of a sync is heard at the next game, as it was when the rules were
+    read per game. A collection deleted meanwhile by another process is caught by the match
+    itself, which only answers for a collection that still exists.
+
+    Nothing is read until the first `current`, so a caller that turns out to have no games
+    to offer — most reconciles — costs no query for having made one.
+    """
+
+    __slots__ = ("_rules", "_version")
+
+    def __init__(self) -> None:
+        self._rules: tuple[_Rule, ...] = ()
+        # Never a real version, so the first `current` reads.
+        self._version = -1
+
+    def current(self, session: Session) -> tuple[_Rule, ...]:
+        if self._version != _rules_version:
+            self._load(session)
+        return self._rules
+
+    def _load(self, session: Session) -> None:
+        # Read before the rows: a write landing between the two leaves this book a version
+        # behind, and the next `current` reads again rather than keeping what it missed.
+        version = _rules_version
+        rows = session.execute(
+            select(Collection.id, Collection.rule, Collection.rule_set_at)
+            .where(Collection.rule.is_not(None))
+            .order_by(Collection.id)
+        ).all()
+        rules: list[_Rule] = []
+        for collection_id, rule, set_at in rows:
+            if not rule:
+                continue
+            # A stored rule this version cannot read is skipped and logged rather than
+            # allowed to fail an import: the game matters more than the grouping.
+            try:
+                conditions = tuple(game_conditions(rule_filters(rule)))
+            except (AttributeError, KeyError, TypeError, ValueError) as exc:
+                logger.warning(
+                    "collection %s has a rule that cannot be read: %s", collection_id, exc
+                )
+                continue
+            rules.append(
+                _Rule(
+                    collection_id=collection_id,
+                    names_colour=bool(rule.get("color")),
+                    set_at=set_at,
+                    conditions=conditions,
+                )
+            )
+        self._rules = tuple(rules)
+        self._version = version
+
+
+def _rules_changed() -> None:
+    global _rules_version
+    with _RULES_LOCK:
+        _rules_version += 1
+
+
 # --- reading --------------------------------------------------------------
 
 
@@ -213,16 +304,30 @@ def payload(session: Session, collection: Collection) -> dict[str, Any]:
     return collection_payload(collection, count)
 
 
-def list_payloads(session: Session) -> list[dict[str, Any]]:
+def list_payloads(session: Session, *, with_summary: bool = False) -> list[dict[str, Any]]:
+    """Every collection with its game count; with `with_summary`, each with its score line.
+
+    The plain list is what the chips, the Collection filter, the command palette and every
+    name lookup read, often, so it stays two cheap queries. The summary — the same one
+    `detail_payload` gives, for the Collections screen's cards — is asked for by the one
+    screen that shows it, and is computed for every collection at once
+    (`stats.collection_outcome_summaries`).
+    """
     counts = game_counts(session)
-    return [collection_payload(row, counts.get(row.id, 0)) for row in list_collections(session)]
+    rows = list_collections(session)
+    payloads = [collection_payload(row, counts.get(row.id, 0)) for row in rows]
+    if with_summary:
+        summaries = stats_service.collection_outcome_summaries(session, [row.id for row in rows])
+        for entry in payloads:
+            entry["summary"] = summaries[entry["id"]]
+    return payloads
 
 
 def detail_payload(session: Session, collection_id: int) -> dict[str, Any]:
-    """A collection with the score line its page leads with.
+    """A collection with the score line its card leads with.
 
-    `game_count` is every game in it, which is what the collection's page lists (it opens
-    on every game, not on the owner's alone). The summary is the owner's record over the
+    `game_count` is every game in it, which is what the collection's card opens (every
+    game, not the owner's alone). The summary is the owner's record over the
     same games, so it leaves out what has no owner side: a reference game put in by hand,
     and a game of theirs whose side is not known yet (`stats.outcome_summary`).
     """
@@ -282,12 +387,18 @@ def create_collection(
     )
     session.add(collection)
     _flush_name(session, collection.name)
+    added = 0
     if game_ids:
-        _insert_members(session, collection.id, _existing_games(session, game_ids), ADDED_MANUAL)
+        added += _insert_members(
+            session, collection.id, _existing_games(session, game_ids), ADDED_MANUAL
+        )
     if apply_to_existing and stored_rule is not None:
-        _insert_members(session, collection.id, _rule_matches(session, stored_rule), ADDED_RULE)
+        added += _insert_members(
+            session, collection.id, _rule_matches(session, stored_rule), ADDED_RULE
+        )
     session.commit()
-    notify_changed(collection.id)
+    _rules_changed()
+    notify_changed(collection.id, membership=added > 0)
     return collection
 
 
@@ -303,7 +414,13 @@ def update_collection(
     """Change what was named; `UNSET` leaves a field alone and `rule=None` clears the rule.
 
     Changing a rule changes nothing about the games already in the collection: a rule is
-    about imports still to come, and "apply to existing" is its own action.
+    about imports still to come, and "apply to existing" is its own action. A rule that
+    really changed restamps `rule_set_at`, so a game imported before the new form existed
+    is not taken in by it later either, when its side is learned; saving the same rule
+    again is no change and keeps the stamp.
+
+    No game moves, so the announcement says so (`membership=False`) and nothing scoped to
+    the collection has to be computed again.
     """
     collection = get_collection(session, collection_id)
     if name is not UNSET:
@@ -313,20 +430,29 @@ def update_collection(
     if description is not UNSET:
         collection.description = _valid_description(description)
     if rule is not UNSET:
-        collection.rule = normalize_rule(rule)
+        stored_rule = normalize_rule(rule)
+        if stored_rule != collection.rule:
+            collection.rule = stored_rule
+            collection.rule_set_at = utcnow()
     _flush_name(session, collection.name)
     session.commit()
-    notify_changed(collection.id)
+    _rules_changed()
+    notify_changed(collection.id, membership=False)
     return collection
 
 
 def delete_collection(session: Session, collection_id: int) -> None:
     """Forget the collection and its memberships. The games themselves are untouched."""
     collection = get_collection(session, collection_id)
-    session.execute(delete(GameCollection).where(GameCollection.collection_id == collection.id))
+    emptied = session.execute(
+        delete(GameCollection).where(GameCollection.collection_id == collection.id)
+    )
     session.delete(collection)
     session.commit()
-    notify_changed(int(collection_id))
+    _rules_changed()
+    # A filter naming a collection that is gone matches nothing, which is a change for a
+    # collection that held games and none for one that was empty.
+    notify_changed(int(collection_id), membership=bool(emptied.rowcount))
 
 
 def add_games(session: Session, collection_id: int, game_ids: Sequence[int]) -> int:
@@ -337,7 +463,7 @@ def add_games(session: Session, collection_id: int, game_ids: Sequence[int]) -> 
     )
     session.commit()
     if added:
-        notify_changed(collection.id)
+        notify_changed(collection.id, membership=True)
     return added
 
 
@@ -359,7 +485,7 @@ def remove_games(session: Session, collection_id: int, game_ids: Sequence[int]) 
         removed += int(result.rowcount or 0)
     session.commit()
     if removed:
-        notify_changed(collection.id)
+        notify_changed(collection.id, membership=True)
     return removed
 
 
@@ -377,12 +503,17 @@ def apply_rule(session: Session, collection_id: int) -> int:
     )
     session.commit()
     if added:
-        notify_changed(collection.id)
+        notify_changed(collection.id, membership=True)
     return added
 
 
 def assign_on_import(
-    session: Session, game_ids: Sequence[int], *, colour_rules_only: bool = False
+    session: Session,
+    game_ids: Sequence[int],
+    *,
+    rules: RuleBook | None = None,
+    colour_rules_only: bool = False,
+    as_imported: bool = False,
 ) -> list[int]:
     """Put freshly stored games into every collection whose rule they match.
 
@@ -391,49 +522,79 @@ def assign_on_import(
     anything — the caller does both once the game is committed (`notify_changed`).
     Answers the collections that took a game in, which is what the caller announces.
 
-    `colour_rules_only` is for a game whose side was learned after it was stored
-    (`accounts.reconcile_games`): only a rule that names a colour could not answer for it
-    then, and every other rule has had its say already.
+    `rules` is the stream's `RuleBook`, so a sync reads the rules once rather than once per
+    game; without one they are read here. Every rule is asked in one query per chunk of
+    games, a column each, rather than one query per rule.
 
-    A stored rule this version cannot read is skipped and logged rather than allowed to
-    fail an import: the game matters more than the grouping.
+    `colour_rules_only` and `as_imported` are for a game the import could not answer for
+    in full (`accounts.reconcile_games`). `colour_rules_only`: its side was unknown, so only
+    a rule that names a colour has not had its say. `as_imported`: a rule takes it only if
+    that rule already stood, in the form it has now, when the game was imported — this is
+    the import's answer given late, not a rule reaching back to games already in the
+    library, which only `apply_rule` does.
     """
     ids = _unique(game_ids)
     if not ids:
         return []
-    ruled = session.execute(
-        select(Collection.id, Collection.rule).where(Collection.rule.is_not(None))
-    ).all()
+    book = rules if rules is not None else RuleBook()
+    wanted = [rule for rule in book.current(session) if rule.names_colour or not colour_rules_only]
+    if not wanted:
+        return []
+    columns = [
+        _rule_matches_column(rule, as_imported=as_imported).label(f"rule_{index}")
+        for index, rule in enumerate(wanted)
+    ]
+    matched: list[list[int]] = [[] for _ in wanted]
+    for chunk in _chunks(ids):
+        for game_id, *answers in session.execute(
+            select(Game.id, *columns).where(Game.id.in_(chunk))
+        ):
+            for found, answer in zip(matched, answers, strict=True):
+                if answer:
+                    found.append(game_id)
     touched: list[int] = []
-    for collection_id, rule in ruled:
-        if not rule:
-            continue
-        if colour_rules_only and not (isinstance(rule, Mapping) and rule.get("color")):
-            continue
-        try:
-            filters = rule_filters(rule)
-        except (KeyError, TypeError, ValueError) as exc:
-            logger.warning("collection %s has a rule that cannot be read: %s", collection_id, exc)
-            continue
-        matched = list(
-            session.scalars(select(Game.id).where(Game.id.in_(ids), *game_conditions(filters)))
-        )
-        if _insert_members(session, collection_id, matched, ADDED_RULE):
-            touched.append(collection_id)
+    for rule, found in zip(wanted, matched, strict=True):
+        if _insert_members(session, rule.collection_id, found, ADDED_RULE):
+            touched.append(rule.collection_id)
     return touched
 
 
-def notify_changed(collection_id: int | None) -> None:
+def _rule_matches_column(rule: _Rule, *, as_imported: bool) -> ColumnElement[bool]:
+    """Whether a game meets `rule`, as a column: the rule's filter, and the rule still there.
+
+    The collection is asked for because a `RuleBook` can outlive it — a stream's book, and
+    a collection another process deleted meanwhile — and a membership naming a collection
+    that is gone is one the foreign key refuses, which would fail the game's import.
+    """
+    conditions: list[ColumnElement[bool]] = [
+        exists().where(Collection.id == rule.collection_id),
+        *rule.conditions,
+    ]
+    if as_imported:
+        conditions.append(Game.imported_at >= rule.set_at)
+    return and_(*conditions)
+
+
+def notify_changed(collection_id: int | None, *, membership: bool) -> None:
     """Tell every open screen that a collection or its membership changed.
 
-    None for a change that touched several at once. The stats cache goes first, so the
-    refetch the event triggers is answered from the new membership. Called once per write
-    that commits — a hand edit, `apply_rule`, or a whole import whose rules took games in
-    (`import_service.announce_collections`), never once per imported game, which is what
-    keeps a sync of a few hundred league games from being a refetch storm.
+    None for a change that touched several at once. `membership` says whether games moved
+    in or out — only then can a filter naming a collection answer differently, so only then
+    are those stats answers dropped, first, so the refetch the event triggers is answered
+    from the new membership. Every other cached answer keeps serving: a collection hides no
+    game. A change to the collection alone — a name, a colour, a rule not applied — is
+    `False`, and the screens refetch the collections and nothing else.
+
+    Called once per write that commits — a hand edit, `apply_rule`, or a whole import whose
+    rules took games in (`import_service.announce_collections`), never once per imported
+    game, which is what keeps a sync of a few hundred league games from being a refetch
+    storm.
     """
-    stats_service.forget_cached_payloads()
-    events_service.emit({"event": EVENT_CHANGED, "collection_id": collection_id})
+    if membership:
+        stats_service.forget_collection_payloads()
+    events_service.emit(
+        {"event": EVENT_CHANGED, "collection_id": collection_id, "membership": membership}
+    )
 
 
 # --- helpers ----------------------------------------------------------------

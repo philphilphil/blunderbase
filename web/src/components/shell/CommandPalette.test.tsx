@@ -176,10 +176,13 @@ describe('the ⌘K palette', () => {
     await user.clear(screen.getByRole('textbox', { name: 'Search everything' }))
     await user.keyboard('collection')
     expect(screen.getByRole('option', { name: /Tough losses/ })).toBeInTheDocument()
+    // And the screen that shows them all, first, as the rail lists it.
+    const options = screen.getAllByRole('option')
+    expect(options[0]).toHaveAccessibleName(/^Collections/)
 
     await user.clear(screen.getByRole('textbox', { name: 'Search everything' }))
     await user.keyboard('tough{Enter}')
-    expect(screen.getByTestId('where')).toHaveTextContent('/games?collection=7')
+    expect(screen.getByTestId('where')).toHaveTextContent('/games?collection=7&whose=all')
   })
 
   it('navigates to the page the highlight rests on', async () => {

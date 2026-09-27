@@ -12,6 +12,9 @@ export const MaiaSettingsPage = lazy(() =>
 export const CorrespondenceSettingsPage = lazy(() =>
   import('@/routes/analysis').then((route) => ({ default: route.CorrespondenceSettingsPage })),
 )
+export const CollectionsPage = lazy(() =>
+  import('@/routes/collections').then((route) => ({ default: route.CollectionsPage })),
+)
 export const CorrespondencePage = lazy(() =>
   import('@/routes/correspondence').then((route) => ({ default: route.CorrespondencePage })),
 )
@@ -74,6 +77,7 @@ export const StatsPage = lazy(() =>
 const CHUNKS: Record<string, () => Promise<unknown>> = {
   '': () => import('@/routes/dashboard'),
   games: () => import('@/routes/games'),
+  collections: () => import('@/routes/collections'),
   explorer: () => import('@/routes/explorer'),
   repertoire: () => import('@/routes/repertoire'),
   reference: () => import('@/routes/reference'),

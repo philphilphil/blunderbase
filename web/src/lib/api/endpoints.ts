@@ -21,10 +21,10 @@ import type {
   BatchAnalysisResponse,
   Collection,
   CollectionCreate,
-  CollectionDetail,
   CollectionGamesAdded,
   CollectionGamesRemoved,
   CollectionList,
+  CollectionOverview,
   CollectionUpdate,
   Color,
   ComparisonResponse,
@@ -283,8 +283,9 @@ export const preparedBackupUrl = (token: string) =>
 /** Every collection, by name (case-insensitive), each with its game count. */
 export const listCollections = () => http.get<CollectionList>('/collections')
 
-/** One collection with the owner's score over its games — the collection page's header. */
-export const getCollection = (id: number) => http.get<CollectionDetail>(`/collections/${id}`)
+/** Every collection with its score line too — the Collections screen's cards. */
+export const getCollectionOverview = () =>
+  http.get<CollectionOverview>('/collections', { query: { with_summary: true } })
 
 /**
  * A 409 `name_taken` for a name another collection already has, whatever its case; a 422

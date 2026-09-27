@@ -813,6 +813,11 @@ class Collection(Base):
     )
     description: Mapped[str | None] = mapped_column(Text)
     rule: Mapped[dict[str, Any] | None] = mapped_column(JSON(none_as_null=True))
+    # When `rule` took the form it has now: set with the collection and moved by every edit
+    # that really changes the rule. A game whose side is learned after it was imported is
+    # offered to the rules that stood when it arrived, and only those — a rule written
+    # since would be reaching back into the library, which is `apply_rule`'s job alone.
+    rule_set_at: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False, default=utcnow)
     created_at: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False, default=utcnow)
 
 

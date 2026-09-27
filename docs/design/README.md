@@ -10,12 +10,15 @@ directory are local snapshots pulled 2026-08-25.
   `prototypes/organize-collections.html`, chosen 2026-09-26 over
   `prototypes/organize-tags.html` and `prototypes/organize-folders.html`). A collection holds
   games rather than a query, a game can be in several, and it lives on the server, so it
-  reaches the phone and MCP where a saved filter never did. It gets a fold in the rail under
-  the saved filters, a tinted chip on the rows and in the game header (colour keys from the
-  token palette: `accent`, `good`, `otb`, `way-back`, `mistake`, `info`, `blunder`), an
-  **Add to…** checklist in the library's footer and behind the game page's ⋯ (half-ticked when
-  only part of the selection is in), and a page of its own that is just `/games?collection=…`
-  with a score line and the rule above the table. Games get in by hand or by a rule, and a
+  reaches the phone and MCP where a saved filter never did. It gets a tinted chip on the rows
+  and in the game header (colour keys from the token palette: `accent`, `good`, `otb`,
+  `way-back`, `mistake`, `info`, `blunder`) and an **Add to…** checklist in the library's
+  footer and behind the game page's ⋯ (half-ticked when only part of the selection is in).
+  Revised 2026-09-27: collections are their own rail entry after Games, `/collections`, a
+  grid of cards (colour, name, count, description, the owner's score line, the rule, last
+  played) that each open `/games?collection=…&whose=all`; on Games a collection is a plain
+  filter chip — no title, score line or Clear of its own — and the rail fold and the
+  "collection page" mode of the library are gone. Games get in by hand or by a rule, and a
   rule is a subset of the library's own filter vocabulary (plus `rated`, which the library
   gained for it) matched against new imports only, so taking a game out by hand sticks.
   **Set apart was deliberately not built.** The prototype's per-collection switch that hid a

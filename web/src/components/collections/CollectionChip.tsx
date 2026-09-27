@@ -85,7 +85,7 @@ export function CollectionChips({
 }: {
   ids: readonly number[] | null | undefined
   size?: 'sm' | 'md'
-  /** Each chip leads to its collection's page. */
+  /** Each chip leads to the library filtered to its collection (`collectionPath`). */
   link?: boolean
   className?: string
 }) {
@@ -109,7 +109,10 @@ export function CollectionChips({
   )
 }
 
-/** The collection's colour as a small solid square — the rail row, a checklist row, a header. */
+/**
+ * The collection's colour as a small solid square — a card on the Collections screen, a
+ * checklist row, the filter chip, a command palette entry.
+ */
 export function CollectionSwatch({
   color,
   className,

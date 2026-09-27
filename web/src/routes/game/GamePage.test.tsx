@@ -1887,11 +1887,11 @@ describe('the board’s controls', () => {
     renderPage()
     await screen.findByText('Scandinavian Defense')
 
-    // The chip is a link to the collection's page, in the header's facts.
+    // The chip is a link to the collection's games in the library, in the header's facts.
     const chip = await within(screen.getByTestId('game-header')).findByRole('link', {
       name: /45-45 League/,
     })
-    expect(chip).toHaveAttribute('href', '/games?collection=3')
+    expect(chip).toHaveAttribute('href', '/games?collection=3&whose=all')
     expect(
       within(screen.getByTestId('game-header')).queryByRole('link', { name: /Tough losses/ }),
     ).not.toBeInTheDocument()

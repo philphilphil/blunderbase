@@ -2572,12 +2572,8 @@ class CollectionResponse(Payload):
     created_at: datetime
 
 
-class CollectionList(BaseModel):
-    collections: list[CollectionResponse]
-
-
 class CollectionSummary(BaseModel):
-    """The score line a collection's page leads with, from the owner's side.
+    """The score line a collection's card leads with, from the owner's side.
 
     The same definitions Stats uses: `points` counts a draw as half, `blunders_per_game` is
     over the games with a finished analysis and null when none has one.
@@ -2596,6 +2592,16 @@ class CollectionSummary(BaseModel):
 
 class CollectionDetail(CollectionResponse):
     summary: CollectionSummary
+
+
+class CollectionListEntry(CollectionResponse):
+    """A `/collections` row: `summary` is there only when `with_summary=true` asked for it."""
+
+    summary: CollectionSummary | None = None
+
+
+class CollectionList(BaseModel):
+    collections: list[CollectionListEntry]
 
 
 class CollectionCreate(Input):

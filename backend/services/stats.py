@@ -9,11 +9,19 @@ from datetime import UTC, datetime, timedelta
 from enum import Enum
 from typing import Any, NamedTuple
 
-from sqlalchemy import Integer, and_, case, func, or_, select
+from sqlalchemy import ColumnElement, Integer, and_, case, func, or_, select
 from sqlalchemy.orm import Session, undefer
 
 from backend.db.enums import Classification, Color, EngineKind, RunStatus
-from backend.db.models import AnalysisRun, Engine, Game, GamePosition, MoveEval, Position
+from backend.db.models import (
+    AnalysisRun,
+    Engine,
+    Game,
+    GameCollection,
+    GamePosition,
+    MoveEval,
+    Position,
+)
 from backend.services import games as games_service
 from backend.services.games import (
     DRAW,
@@ -128,10 +136,18 @@ _CACHE: dict[tuple[Any, ...], tuple[float, Any]] = {}
 # `_CACHE_LOCK` — a slot appears and disappears in the same critical section that reads and
 # writes the entry beside it, so nobody ever sees a key with neither.
 _INFLIGHT: dict[tuple[Any, ...], Future[Any]] = {}
-# Bumped by `forget_cached_payloads`, under `_CACHE_LOCK`. A computation remembers the
-# generation it started in and publishes nothing if the cache has been forgotten since:
-# it read the library as it was before the write that forgot it.
+# Bumped under `_CACHE_LOCK`: `_GENERATION` by `reset_stats_cache`, which forgets every key,
+# and `_COLLECTION_GENERATION` by `forget_collection_payloads`, which forgets only the keys
+# scoped to a collection. A computation remembers the generation its key belongs to when it
+# started (`_generation_of`) and publishes nothing if that has moved since: it read the
+# library as it was before the write that forgot it.
 _GENERATION = 0
+_COLLECTION_GENERATION = 0
+# The first element of every key `_cache_key` builds out of a filter narrowed to a
+# collection, so a membership write can find exactly those keys and leave every other one
+# serving. Part of the key rather than a record beside it: the key is the only thing that
+# is always there, in the entry, in the in-flight slot and in the computation's hands.
+_COLLECTION_SCOPE = "collection-scoped"
 _COMPUTE_SLOTS = threading.Semaphore(STATS_CACHE_MAX_CONCURRENT_COMPUTES)
 
 # Whether every game with a primary run has a summary of that run, and when that was last
@@ -198,34 +214,45 @@ def reset_stats_cache() -> None:
     reset_summaries_ready()
 
 
-def forget_cached_payloads() -> None:
-    """Drop every cached answer, for a writer that changed which games a filter matches.
+def forget_collection_payloads() -> None:
+    """Drop the cached answers scoped to a collection, for a write that moved games in or out.
 
     The TTL is there to absorb an analysis batch's refetch storm, where ten seconds of lag
     is the price of not scanning; a person who has just put games into a collection and
     opens its Stats is not a storm, and should not be shown the collection as it was.
 
-    A computation already in flight read the library as it was, so it is let go rather than
-    waited on: it finishes and is handed to whoever was already waiting for it, but it is
-    not cached, and a caller arriving after this starts a computation of its own
-    (`_GENERATION`). The memo of whether the per-game summaries are complete is untouched,
-    because membership says nothing about analysis.
+    Only those keys. A collection never hides a game, so an answer about the whole library,
+    or about any filter that does not name a collection, is exactly as right after the
+    write as before it — and it keeps serving, stale-served and single-flight, rather than
+    every open dashboard's dozen keys going cold at once. That wholesale drop, repeated by
+    every membership click and every import a rule matched, is the stampede this cache
+    exists to prevent.
+
+    A computation of a scoped key already in flight read the library as it was, so it is
+    let go rather than waited on: it finishes and is handed to whoever was already waiting
+    for it, but it is not cached, and a caller arriving after this starts a computation of
+    its own (`_COLLECTION_GENERATION`). Every other computation carries on and publishes.
+    The memo of whether the per-game summaries are complete is untouched, because
+    membership says nothing about analysis.
     """
-    global _GENERATION
+    global _COLLECTION_GENERATION
     with _CACHE_LOCK:
-        _GENERATION += 1
-        _CACHE.clear()
-        _INFLIGHT.clear()
+        _COLLECTION_GENERATION += 1
+        for key in [key for key in _CACHE if _collection_scoped(key)]:
+            del _CACHE[key]
+        for key in [key for key in _INFLIGHT if _collection_scoped(key)]:
+            del _INFLIGHT[key]
 
 
 def outcome_summary(session: Session, scope: GameFilters) -> dict[str, Any]:
     """Games, score, opponents and blunders per game over one scope, from the owner's side.
 
-    The one-line summary a collection's page leads with. Built from the same game rows and
+    The one-line summary a collection's card leads with, one collection at a time — what
+    `GET /collections/{id}` answers; the screen asks for every card's at once
+    (`collection_outcome_summaries`, which is cached). Built from the same game rows and
     the same analysed counts every dimension reads, so "blunders per game" here is the
     number Stats shows for the same filter: owner blunders in each game's primary run,
-    averaged over the games that have one. Uncached — it is one page's header, asked once
-    per change (`collections.changed` comes once per write or per import, not per game).
+    averaged over the games that have one. Uncached: no screen of the app polls it.
 
     Only games with a side of the owner's count, as in every dimension: somebody else's game
     has no score for the owner, and neither has one of theirs whose side is not known yet
@@ -234,6 +261,73 @@ def outcome_summary(session: Session, scope: GameFilters) -> dict[str, Any]:
     """
     rows = _game_rows(session, scope)
     moves, blunders = _analysed_counts(session, scope, rows)
+    return _summary_of(rows, moves, blunders)
+
+
+def collection_outcome_summaries(
+    session: Session, collection_ids: Sequence[int]
+) -> dict[int, dict[str, Any]]:
+    """`outcome_summary` of each collection, for many collections at once.
+
+    What the Collections screen's cards lead with. Grouped rather than one `outcome_summary`
+    per collection: the game rows of every member game are read once — a game in three
+    collections is one row, not three — alongside the membership pairs, and each
+    collection's line is then folded out of the rows that are its members. That is two
+    queries, plus the two grouped eval counts a library that is not folded yet needs,
+    whatever the number of collections. The numbers are the ones `outcome_summary` gives
+    for `GameFilters(collection=id)`, which is what `GET /collections/{id}` answers.
+
+    Cached like every other stats answer, under a collection-scoped key so a membership
+    write (`forget_collection_payloads`) drops it and a rename or a recolour, which moves
+    no game, is answered from the cache. Every open Collections screen refetches this on
+    the same socket frame, and they join one computation rather than each scanning the
+    member games (and, before the folds are ready, their evals) on its own.
+    """
+    ids = tuple(sorted({int(collection_id) for collection_id in collection_ids}))
+    if not ids:
+        return {}
+
+    def compute() -> dict[int, dict[str, Any]]:
+        return _collection_outcome_summaries(session, ids)
+
+    key = (_COLLECTION_SCOPE, *_cache_key("collection_outcome_summaries", ids))
+    return _cached(key, compute)
+
+
+def _collection_outcome_summaries(
+    session: Session, ids: Sequence[int]
+) -> dict[int, dict[str, Any]]:
+    """The uncached fold behind `collection_outcome_summaries`, over ids that are sorted."""
+    # Which collections each member game is in, so the rows are walked once and each one
+    # dealt to its collections — not every row scanned once per collection.
+    memberships: dict[int, list[int]] = {}
+    pairs = session.execute(
+        select(GameCollection.game_id, GameCollection.collection_id).where(
+            GameCollection.collection_id.in_(ids)
+        )
+    )
+    for game_id, collection_id in pairs:
+        memberships.setdefault(game_id, []).append(collection_id)
+    scope = GameFilters()
+    in_any = Game.id.in_(
+        select(GameCollection.game_id).where(GameCollection.collection_id.in_(ids))
+    )
+    rows = _game_rows(session, scope, where=(in_any,))
+    moves, blunders = _analysed_counts(session, scope, rows, where=(in_any,))
+    members: dict[int, list[GameRow]] = {collection_id: [] for collection_id in ids}
+    for row in rows:
+        for collection_id in memberships.get(row.id, ()):
+            members[collection_id].append(row)
+    return {
+        collection_id: _summary_of(member_rows, moves, blunders)
+        for collection_id, member_rows in members.items()
+    }
+
+
+def _summary_of(
+    rows: Sequence[GameRow], moves: Mapping[int, int], blunders: Mapping[int, int]
+) -> dict[str, Any]:
+    """The score line over these game rows; the counts may cover more games than the rows."""
     wins = sum(1 for row in rows if row.outcome == WIN)
     draws = sum(1 for row in rows if row.outcome == DRAW)
     losses = sum(1 for row in rows if row.outcome == LOSS)
@@ -941,7 +1035,7 @@ def _cached(key: tuple[Any, ...], compute: Callable[[], Any]) -> Any:
         ours = ticket is None
         if ticket is None:
             ticket = _INFLIGHT[key] = Future()
-        generation = _GENERATION
+        generation = _generation_of(key)
     if ours:
         return _refresh(key, compute, ticket, generation)
     if entry is not None:
@@ -950,14 +1044,18 @@ def _cached(key: tuple[Any, ...], compute: Callable[[], Any]) -> Any:
 
 
 def _refresh(
-    key: tuple[Any, ...], compute: Callable[[], Any], ticket: Future[Any], generation: int
+    key: tuple[Any, ...],
+    compute: Callable[[], Any],
+    ticket: Future[Any],
+    generation: tuple[int, int],
 ) -> Any:
     """Run the one computation for `key`, publish it and free the slot.
 
     The caller has already claimed `key` by putting `ticket` in `_INFLIGHT`; this is the
-    claim being honoured, outside the lock. A computation that `forget_cached_payloads`
-    overtook (`generation` is no longer current) answers its own waiters and nobody else:
-    its slot may already belong to a newer computation, and its payload is the old library.
+    claim being honoured, outside the lock. A computation that `reset_stats_cache` or, for
+    a collection-scoped key, `forget_collection_payloads` overtook (`generation` is no
+    longer its key's current one) answers its own waiters and nobody else: its slot may
+    already belong to a newer computation, and its payload is the old library.
     """
     try:
         with _COMPUTE_SLOTS:
@@ -974,7 +1072,7 @@ def _refresh(
         # no computation — never a key with neither.
         if _INFLIGHT.get(key) is ticket:
             _INFLIGHT.pop(key)
-        if generation == _GENERATION:
+        if generation == _generation_of(key):
             # Re-inserted rather than assigned, so a refreshed entry goes to the back of the
             # queue and the cap drops what has genuinely been idle longest.
             _CACHE.pop(key, None)
@@ -986,8 +1084,41 @@ def _refresh(
 
 
 def _cache_key(name: str, *parts: Any) -> tuple[Any, ...]:
-    """The name of what was computed, and a stable reading of everything it was given."""
-    return (name, *(_hashable(part) for part in parts))
+    """The name of what was computed, and a stable reading of everything it was given.
+
+    A key built from a filter narrowed to a collection starts with `_COLLECTION_SCOPE`, so
+    `forget_collection_payloads` can tell it from the rest by looking at it.
+    """
+    key = (name, *(_hashable(part) for part in parts))
+    if any(_names_a_collection(part) for part in parts):
+        return (_COLLECTION_SCOPE, *key)
+    return key
+
+
+def _names_a_collection(value: Any) -> bool:
+    """Whether a key's part is, or holds, a `GameFilters` narrowed to one collection."""
+    if isinstance(value, GameFilters):
+        return value.collection is not None
+    if isinstance(value, Mapping):
+        return any(_names_a_collection(item) for item in value.values())
+    if isinstance(value, str | bytes):
+        return False
+    if isinstance(value, Sequence):
+        return any(_names_a_collection(item) for item in value)
+    return False
+
+
+def _collection_scoped(key: tuple[Any, ...]) -> bool:
+    return bool(key) and key[0] == _COLLECTION_SCOPE
+
+
+def _generation_of(key: tuple[Any, ...]) -> tuple[int, int]:
+    """What has to stay the same for a computation of `key` to publish; under the lock.
+
+    Every key moves with a whole reset; only a collection-scoped one moves with a
+    membership write, which is what lets every other computation finish and be kept.
+    """
+    return (_GENERATION, _COLLECTION_GENERATION if _collection_scoped(key) else 0)
 
 
 def _hashable(value: Any) -> Any:
@@ -1335,7 +1466,10 @@ def rebuild_stat_summaries(
     return rebuilt
 
 
-def _game_rows(session: Session, scope: GameFilters) -> list[GameRow]:
+def _game_rows(
+    session: Session, scope: GameFilters, *, where: Sequence[ColumnElement[bool]] = ()
+) -> list[GameRow]:
+    """The game rows of a scope; `where` narrows it by something `GameFilters` cannot say."""
     statement = (
         select(
             Game.id,
@@ -1350,7 +1484,7 @@ def _game_rows(session: Session, scope: GameFilters) -> list[GameRow]:
             Game.stat_owner_moves,
             Game.stat_blunders,
         )
-        .where(Game.owner_color.is_not(None), *game_conditions(scope))
+        .where(Game.owner_color.is_not(None), *game_conditions(scope), *where)
         .order_by(Game.played_at.asc().nulls_last(), Game.id.asc())
     )
     rows = []
@@ -1386,7 +1520,11 @@ def _game_rows(session: Session, scope: GameFilters) -> list[GameRow]:
 
 
 def _analysed_counts(
-    session: Session, scope: GameFilters, rows: Sequence[GameRow]
+    session: Session,
+    scope: GameFilters,
+    rows: Sequence[GameRow],
+    *,
+    where: Sequence[ColumnElement[bool]] = (),
 ) -> tuple[dict[int, int], dict[int, int]]:
     """Analysed owner moves and owner blunders per game: `(moves, blunders)`.
 
@@ -1399,13 +1537,18 @@ def _analysed_counts(
     therefore left out exactly as the group-by leaves it out.
     """
     if not _summaries_ready(session):
-        return _owner_move_counts(session, scope), _blunder_counts(session, scope)
+        return (
+            _owner_move_counts(session, scope, where=where),
+            _blunder_counts(session, scope, where=where),
+        )
     moves = {row.id: row.owner_moves for row in rows if row.owner_moves}
     blunders = {row.id: row.blunders or 0 for row in rows if row.owner_moves}
     return moves, blunders
 
 
-def _blunder_counts(session: Session, scope: GameFilters) -> dict[int, int]:
+def _blunder_counts(
+    session: Session, scope: GameFilters, *, where: Sequence[ColumnElement[bool]] = ()
+) -> dict[int, int]:
     """Owner blunders per game, over the runs stats read."""
     statement = (
         select(AnalysisRun.game_id, func.count(MoveEval.id))
@@ -1417,13 +1560,16 @@ def _blunder_counts(session: Session, scope: GameFilters) -> dict[int, int]:
             MoveEval.classification == Classification.BLUNDER,
             owner_move_condition(),
             *game_conditions(scope),
+            *where,
         )
         .group_by(AnalysisRun.game_id)
     )
     return {game_id: count for game_id, count in session.execute(statement)}
 
 
-def _owner_move_counts(session: Session, scope: GameFilters) -> dict[int, int]:
+def _owner_move_counts(
+    session: Session, scope: GameFilters, *, where: Sequence[ColumnElement[bool]] = ()
+) -> dict[int, int]:
     """Analysed owner moves per game, which is what a rate is per."""
     statement = (
         select(AnalysisRun.game_id, func.count(MoveEval.id))
@@ -1434,6 +1580,7 @@ def _owner_move_counts(session: Session, scope: GameFilters) -> dict[int, int]:
             AnalysisRun.id.in_(primary_runs()),
             owner_move_condition(),
             *game_conditions(scope),
+            *where,
         )
         .group_by(AnalysisRun.game_id)
     )
