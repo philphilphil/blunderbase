@@ -177,7 +177,11 @@ export function ShortcutsOverlayProvider({ children }: { children: ReactNode }) 
   )
 }
 
-/** The titlebar chip. Named beside the palette's, and the same size and weight. */
+/**
+ * The titlebar chip. Named beside the palette's, and the same height. A bare `?` read as
+ * "help" rather than "keys", so the chip is a keyboard; the key that opens it is in the
+ * title, where the palette's chip would otherwise have to spell it.
+ */
 export function ShortcutsButton({ className }: { className?: string }) {
   const shortcuts = useShortcutsOverlay()
   const { t } = useLingui()
@@ -188,11 +192,11 @@ export function ShortcutsButton({ className }: { className?: string }) {
       aria-label={t`Keyboard shortcuts`}
       title={t`Keyboard shortcuts (?)`}
       className={cn(
-        'flex flex-none items-center rounded-md border border-edge bg-elevated px-2.5 py-[0.3125rem] font-mono text-[0.6875rem] text-dim transition-colors hover:border-edge-hover hover:text-ink',
+        'flex flex-none items-center rounded-md border border-edge bg-elevated px-2 py-[0.3125rem] text-label text-soft transition-colors hover:border-edge-hover hover:text-ink',
         className,
       )}
     >
-      ?
+      <Keyboard className="size-4" aria-hidden />
     </button>
   )
 }
