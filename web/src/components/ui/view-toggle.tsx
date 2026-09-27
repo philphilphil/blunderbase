@@ -20,6 +20,10 @@ export interface ViewOption<V extends string> {
  * Radios in `aria` terms, because that is what they are: mutually exclusive ways of showing
  * one list, one of which is always on. Labels are hidden below `sm` — the icons carry it on
  * a phone, where the row is already tight.
+ *
+ * The chosen view lights the way every selected control does (`bg-selected text-ink`, the
+ * accent on its icon — docs/design/README.md, "One selected state"), and the others stay at
+ * `soft`, the floor for a control's idle text.
  */
 export function ViewToggle<V extends string>({
   views,
@@ -51,8 +55,8 @@ export function ViewToggle<V extends string>({
             title={i18n._(option.hint)}
             onClick={() => onChange(option.id)}
             className={cn(
-              'flex items-center gap-1.5 rounded-[0.3125rem] px-2 py-[0.1875rem] text-label transition-colors',
-              on ? 'bg-raised-2 text-ink' : 'text-dim hover:text-soft',
+              'flex items-center gap-1.5 rounded-sm px-2 py-[0.1875rem] text-label transition-colors',
+              on ? 'bg-selected text-ink [&_svg]:text-accent-teal' : 'text-soft hover:bg-raised hover:text-ink',
             )}
           >
             <option.icon className="size-3.5" aria-hidden />

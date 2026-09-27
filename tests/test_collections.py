@@ -323,13 +323,23 @@ def test_changing_a_rule_leaves_the_games_already_in(session: Session, owner: Ac
 # --- deleting games ---------------------------------------------------------------
 
 
-def test_deleting_games_takes_their_memberships(session: Session, owner: Account) -> None:
-    first, second = _sync(session, _game("aaaa0001"), _game("aaaa0002"))
+def test_deleting_games_takes_their_memberships(
+    session: Session, owner: Account, heard: list[dict[str, Any]]
+) -> None:
+    first, second, loose = _sync(session, _game("aaaa0001"), _game("aaaa0002"), _game("aaaa0003"))
     club = collections_service.create_collection(session, name="Club", game_ids=[first, second])
+    heard.clear()
 
     games_service.delete_games(session, [first])
 
     assert _members(session, club.id) == {second: "manual"}
+    # Games left a collection, so its cached summaries go and the screens hear of it.
+    assert _changed(heard) == [_moved(None)]
+
+    # A game in no collection moves nothing and says nothing.
+    heard.clear()
+    games_service.delete_games(session, [loose])
+    assert _changed(heard) == []
 
 
 def test_emptying_the_library_empties_every_collection_but_keeps_them(
@@ -696,6 +706,7 @@ def test_a_rule_rewritten_after_the_import_does_not_take_the_game_later(
         session, name="As white", rule={"color": "black"}
     )
     (game_id,) = _sync(session, _game("otbname1", white="otbname"))
+    _age(session, game_id, 60)
     # The import met the old form of the rule; this form never saw the game arrive.
     collections_service.update_collection(session, as_white.id, rule={"color": "white"})
     # Saving the same rule again changes nothing, the stamp included.
@@ -712,11 +723,16 @@ def test_a_reference_game_is_only_taken_by_the_rules_that_stood_when_it_arrived(
     session: Session, owner: Account
 ) -> None:
     older = collections_service.create_collection(session, name="League", rule=LEAGUE_RULE)
+    # Stood two hours before the game arrived, which then arrived an hour before the newer
+    # rule, so neither "before" is a race on the clock.
+    older.rule_set_at = older.rule_set_at - timedelta(minutes=120)
+    session.commit()
     job = ImportJob(source=Source.LICHESS, status=JobStatus.RUNNING)
     import_service.ingest_games(
         session, job, [_game("stranger", white="secondhandle")], analyze=False, presume_owner=False
     )
     game_id = session.scalars(select(Game.id).where(Game.source_id == "stranger")).one()
+    _age(session, game_id, 60)
     newer = collections_service.create_collection(
         session, name="Classical", rule={"speed": ["classical"]}
     )

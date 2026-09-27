@@ -125,8 +125,8 @@ export function GamesTable({
    * ↓. A field takes its own arrows, and a modifier makes them the browser's (⌘↑ is the top
    * of the document), so both are left alone. So is anything over the table — a popover
    * like Add to… or a modal like the collection dialog (`role="dialog"`, the convention
-   * `useBoardKeys` stands down for): their rows and swatches are walked with the same keys,
-   * and an arrow there that moved focus to a game behind them would have Enter open it.
+   * `useBoardKeys` stands down for): the dialog's colour swatches take the same keys, and
+   * an arrow in either that moved focus to a game behind them would have Enter open it.
    */
   useEffect(() => {
     function walk(event: KeyboardEvent) {

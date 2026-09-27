@@ -58,9 +58,16 @@ import { SOURCE_LABELS } from '../format'
 
 /** The backend's `collections.name` column is 40 characters wide. */
 export const COLLECTION_NAME_MAX = 40
+/**
+ * The rule's text fields, as wide as `CollectionRule` in `backend/api/schemas.py` lets
+ * them be: past that, Save would be refused with a message that names no field.
+ */
+const RULE_CLOCK_MAX = 32
+const RULE_ECO_MAX = 8
+const RULE_OPPONENT_MAX = 128
 
 const FIELD_CLASS =
-  'h-8 w-full rounded-md border border-input bg-elevated px-2 text-xs text-ink outline-none transition-colors focus-visible:border-accent-teal/50'
+  'h-8 w-full rounded-md border border-input bg-elevated px-2 text-data text-ink outline-none transition-colors focus-visible:border-accent-teal/50'
 
 export interface CollectionDialogProps {
   /** The collection to edit. Left out, the dialog makes a new one. */
@@ -186,6 +193,17 @@ export function CollectionDialog({
   const inside = editing ? (settledNow ? matchingInside.data?.total : undefined) : 0
   const matchCount =
     total === undefined || inside === undefined ? undefined : Math.max(0, total - inside)
+  // A count that failed says so, with a way to ask again, rather than counting for ever.
+  // The box and Save do not depend on it: the server adds what matches either way.
+  const countFailed =
+    settledNow && matchCount === undefined && (matching.isError || (editing && matchingInside.isError))
+  // The rule as the form started, spelled the way `rule` is, so a save that did not touch
+  // it can leave it out: a rename must not re-send a rule the owner never looked at, which
+  // would undo a change made meanwhile in another tab and restamp when the rule was set.
+  const startRuleKey = useMemo(
+    () => JSON.stringify(isRuleEmpty(startRule) ? null : ruleOf(draftOf(startRule))),
+    [startRule],
+  )
 
   function patchDraft(next: Partial<RuleDraft>) {
     setDraft((current) => ({ ...current, ...next }))
@@ -232,7 +250,7 @@ export function CollectionDialog({
             name: trimmed,
             color,
             description: description.trim() || null,
-            rule,
+            ...(JSON.stringify(rule) === startRuleKey ? {} : { rule }),
           },
         })
         if (withExisting) saved = (await applyRule.mutateAsync(collection.id)).collection
@@ -304,23 +322,44 @@ export function CollectionDialog({
             placeholder={t`45-45 League`}
           />
           {nameError ? (
-            <span id={`${nameId}-error`} className="text-[0.6875rem] text-blunder">
+            <span id={`${nameId}-error`} className="text-label text-blunder">
               {nameError}
             </span>
           ) : null}
         </Field>
 
         <div className="flex flex-col gap-1.5">
-          <span id={`${titleId}-colour`} className="text-[0.6875rem] font-medium text-soft">
+          <span id={`${titleId}-colour`} className="text-label font-medium text-soft">
             <Trans>Colour</Trans>
           </span>
-          <div role="radiogroup" aria-labelledby={`${titleId}-colour`} className="flex gap-2">
+          {/* A radio group the ARIA way: one tab stop, on the chosen colour, and the arrow
+              keys move the choice along the row. */}
+          <div
+            role="radiogroup"
+            aria-labelledby={`${titleId}-colour`}
+            className="flex gap-2"
+            onKeyDown={(event) => {
+              const step =
+                event.key === 'ArrowRight' || event.key === 'ArrowDown'
+                  ? 1
+                  : event.key === 'ArrowLeft' || event.key === 'ArrowUp'
+                    ? -1
+                    : 0
+              if (!step) return
+              event.preventDefault()
+              const count = COLLECTION_COLORS.length
+              const at = (COLLECTION_COLORS.indexOf(color) + step + count) % count
+              setColor(COLLECTION_COLORS[at])
+              event.currentTarget.querySelectorAll<HTMLElement>('[role="radio"]')[at]?.focus()
+            }}
+          >
             {COLLECTION_COLORS.map((key) => (
               <button
                 key={key}
                 type="button"
                 role="radio"
                 aria-checked={color === key}
+                tabIndex={color === key ? 0 : -1}
                 aria-label={i18n._(COLLECTION_COLOR_NAMES[key])}
                 title={i18n._(COLLECTION_COLOR_NAMES[key])}
                 onClick={() => setColor(key)}
@@ -343,16 +382,16 @@ export function CollectionDialog({
             value={description}
             onChange={(event) => setDescription(event.target.value)}
             placeholder={t`What these games have in common`}
-            className="w-full resize-y rounded-md border border-input bg-elevated px-2.5 py-1.5 text-xs text-ink outline-none transition-colors placeholder:text-faint focus-visible:border-accent-teal/50"
+            className="w-full resize-y rounded-md border border-input bg-elevated px-2.5 py-1.5 text-data text-ink outline-none transition-colors placeholder:text-faint focus-visible:border-accent-teal/50"
           />
         </Field>
 
         <div className="flex flex-col gap-1.5">
-          <span className="text-[0.6875rem] font-medium text-soft">
+          <span className="text-label font-medium text-soft">
             <Trans>Rule</Trans>
           </span>
           <div className="flex flex-col gap-3 rounded-md border border-edge bg-raised/40 px-3 py-2.5">
-            <label className="flex cursor-pointer items-center gap-2 text-[0.75rem] text-ink">
+            <label className="flex cursor-pointer items-center gap-2 text-data text-ink">
               <button
                 type="button"
                 role="switch"
@@ -379,16 +418,32 @@ export function CollectionDialog({
 
             {ruleOn ? (
               rule === null ? (
-                <span className="text-[0.6875rem] text-dim">
+                <span className="text-label text-dim">
                   <Trans>Pick at least one thing a game must match, or switch the rule off.</Trans>
                 </span>
+              ) : countFailed ? (
+                <span className="flex items-center gap-2 text-label text-dim">
+                  <Trans>Could not count the games you already have.</Trans>
+                  <Button
+                    type="button"
+                    variant="link"
+                    size="xs"
+                    className="px-0"
+                    onClick={() => {
+                      void matching.refetch()
+                      if (editing) void matchingInside.refetch()
+                    }}
+                  >
+                    <Trans>Try again</Trans>
+                  </Button>
+                </span>
               ) : matchCount === undefined ? (
-                <span className="flex items-center gap-1.5 text-[0.6875rem] text-dim">
+                <span className="flex items-center gap-1.5 text-label text-dim">
                   <Loader2 className="size-3 animate-spin" aria-hidden />
                   <Trans>Counting the games you already have…</Trans>
                 </span>
               ) : matchCount === 0 ? (
-                <span className="text-[0.6875rem] text-dim">
+                <span className="text-label text-dim">
                   {editing && (total ?? 0) > 0 ? (
                     <Trans>Every game you already have that matches is in it.</Trans>
                   ) : (
@@ -396,7 +451,7 @@ export function CollectionDialog({
                   )}
                 </span>
               ) : (
-                <label className="flex cursor-pointer items-center gap-2 text-[0.6875rem] text-dim">
+                <label className="flex cursor-pointer items-center gap-2 text-label text-dim">
                   <input
                     type="checkbox"
                     checked={addExisting}
@@ -422,7 +477,7 @@ export function CollectionDialog({
               )
             ) : null}
           </div>
-          <span className="text-[0.6875rem] leading-snug text-dim">
+          <span className="text-label leading-snug text-dim">
             <Trans>
               A rule only looks at games as they arrive (sync, the live stream, PGN). Taking a
               game out by hand sticks.
@@ -431,14 +486,14 @@ export function CollectionDialog({
         </div>
 
         {error ? (
-          <p className="rounded-md border border-blunder/28 bg-blunder/5 px-2.5 py-2 text-[0.75rem] text-blunder">
+          <p role="alert" className="bb-error text-data">
             {error}
           </p>
         ) : null}
 
         {confirmingDelete && editing ? (
           <div className="flex flex-col gap-2.5 rounded-md border border-blunder/28 bg-blunder/5 px-3 py-2.5">
-            <p className="flex items-start gap-2 text-[0.75rem] leading-[1.6] text-ink">
+            <p className="flex items-start gap-2 text-data leading-[1.6] text-ink">
               <TriangleAlert className="mt-0.5 size-3.5 flex-none text-blunder" aria-hidden />
               <Trans>
                 Delete {collectionName}? Its games stay in your library, in every other
@@ -525,6 +580,7 @@ function RuleFields({
         <Input
           id={`${ids}-clock`}
           value={draft.time_control}
+          maxLength={RULE_CLOCK_MAX}
           onChange={(event) => onPatch({ time_control: event.target.value })}
           placeholder="2700+45"
           title={t`Seconds, then the increment: 2700+45 is 45 minutes plus 45 seconds a move`}
@@ -533,7 +589,7 @@ function RuleFields({
       </Field>
 
       <div role="group" aria-labelledby={`${ids}-speed`} className="col-span-full flex flex-col gap-1.5">
-        <span id={`${ids}-speed`} className="text-[0.6875rem] font-medium text-soft">
+        <span id={`${ids}-speed`} className="text-label font-medium text-soft">
           {/* Its own context: beside the exact clock, German needs a second word for speed. */}
           <Trans context="collection rule field">Speed</Trans>
         </span>
@@ -579,6 +635,7 @@ function RuleFields({
         <Input
           id={`${ids}-opponent`}
           value={draft.opponent}
+          maxLength={RULE_OPPONENT_MAX}
           onChange={(event) => onPatch({ opponent: event.target.value })}
           placeholder={t`Part of a name`}
         />
@@ -588,6 +645,7 @@ function RuleFields({
         <Input
           id={`${ids}-eco`}
           value={draft.eco}
+          maxLength={RULE_ECO_MAX}
           onChange={(event) => onPatch({ eco: event.target.value.toUpperCase() })}
           placeholder={t`B22, or just C6`}
           className="font-mono"

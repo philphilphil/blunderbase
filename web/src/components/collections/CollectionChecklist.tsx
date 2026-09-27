@@ -53,15 +53,21 @@ export function CollectionChecklist({
   const [settled, setSettled] = useState<Map<number, MembershipState>>(() => new Map())
   const [busy, setBusy] = useState<number | null>(null)
 
-  // Drop what a click settled as soon as the games' own ids say something new — they are
-  // the truth, and the local answer only covers the gap until they arrive.
+  // Drop what a click settled once the games' own ids agree with it — they are the truth,
+  // and the local answer only covers the gap until they arrive. Only the rows they confirm:
+  // a second tick made while the first one's refetch was out lands after it, and the ids
+  // that refetch brings back do not know about it yet, so clearing every row then would
+  // flip the second box back until its own refetch came in.
   const signature = games
     .map((game) => `${game.id}:${[...(game.collections ?? [])].sort((a, b) => a - b).join(',')}`)
     .join('|')
   const [seen, setSeen] = useState(signature)
   if (seen !== signature) {
     setSeen(signature)
-    setSettled(new Map())
+    setSettled(
+      (current) =>
+        new Map([...current].filter(([id, state]) => membershipOf(games, id).state !== state)),
+    )
   }
 
   const ids = games.map((game) => game.id)
@@ -99,8 +105,8 @@ export function CollectionChecklist({
   const anyPartial = states.some((row) => row.state === 'some')
 
   return (
-    <div className={cn('flex min-w-[13.75rem] flex-col text-[0.75rem] text-soft', className)}>
-      <span className="px-[0.4375rem] pt-[0.3125rem] pb-1 text-[0.625rem] tracking-[.1em] text-faint uppercase">
+    <div className={cn('flex min-w-[13.75rem] flex-col text-data text-soft', className)}>
+      <span className="px-[0.4375rem] pt-[0.3125rem] pb-1 text-meta tracking-[0.06em] text-dim-2 uppercase">
         <Plural value={count} one="This game is in" other="# games in" />
       </span>
 
@@ -132,7 +138,7 @@ export function CollectionChecklist({
                 <TickBox state={state} busy={busy === collection.id} />
                 <CollectionSwatch color={collection.color} />
                 <span className="min-w-0 truncate">{collection.name}</span>
-                <span className="ml-auto pl-3.5 font-mono text-[0.65625rem] text-faint">
+                <span className="ml-auto pl-3.5 text-meta tabular text-dim-2">
                   {state === 'some' && inCount !== null ? (
                     <Trans>
                       {inCount} of {count}
@@ -165,7 +171,7 @@ export function CollectionChecklist({
         </>
       ) : null}
 
-      <p className="px-[0.4375rem] pt-[0.1875rem] pb-1 text-[0.6875rem] leading-snug whitespace-normal text-faint">
+      <p className="px-[0.4375rem] pt-[0.1875rem] pb-1 text-label leading-snug whitespace-normal text-dim">
         {anyPartial ? (
           <Plural
             value={count}

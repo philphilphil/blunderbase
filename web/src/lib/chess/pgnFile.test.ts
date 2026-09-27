@@ -36,6 +36,12 @@ describe('decodePgn', () => {
     expect(decodePgn(bytes)).toBe(TEXT)
     expect(decodePgn(bytes.buffer)).toBe(TEXT)
   })
+
+  it('falls back line by line, so a UTF-8 file with one Windows-1252 game keeps its UTF-8', () => {
+    const other = TEXT.replace('Müller', 'Jürgen')
+    const bytes = Uint8Array.from([...new TextEncoder().encode(TEXT), ...cp1252(other)])
+    expect(decodePgn(bytes)).toBe(TEXT + other)
+  })
 })
 
 describe('readPgnFile', () => {

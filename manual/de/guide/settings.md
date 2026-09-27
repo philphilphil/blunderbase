@@ -54,8 +54,9 @@ Bedienelement gerade nicht auf dem Bildschirm ist, werden ausgelassen.
 ## Die Befehlspalette { #the-command-palette }
 
 ⌘K öffnet die Befehlspalette. Ohne Eingabe listet sie die Seiten; ab zwei Zeichen findet
-sie auch Partien, Gegner, Eröffnungen und Notizen, deine gespeicherten Filter und die
-Statistik-Berichte. `↵` öffnet den markierten Eintrag.
+sie auch Partien, Gegner, Eröffnungen und Notizen, deine gespeicherten Filter, deine
+Sammlungen und die Statistik-Berichte. Wer „Sammlung“ tippt, bekommt alle Sammlungen
+aufgelistet. `↵` öffnet den markierten Eintrag.
 
 ## Alle Tastenkürzel { #every-keyboard-shortcut }
 
@@ -119,6 +120,7 @@ aktuellen Bildschirm gelten.
 | `Pos1` `Ende` | Erste und letzte Zeile |
 | `↵` | Die Partie unter dem Cursor öffnen |
 | `/` | In der Liste suchen |
+| `Esc` | Das Suchfeld verlassen; der Suchtext bleibt stehen |
 
 ### Im Explorer eine Variante entlanggehen { #walking-a-line-in-the-explorer }
 

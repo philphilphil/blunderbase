@@ -547,7 +547,7 @@ def find_positions(
             {
                 "game": game_summary(game),
                 "ply": occurrence.ply,
-                "move_number": occurrence.ply // 2 + 1,
+                "move_number": (occurrence.ply + game.ply_offset) // 2 + 1,
                 "move_uci": occurrence.move_uci,
                 "move_san": occurrence.move_san,
                 "win_loss": occurrence.win_loss,

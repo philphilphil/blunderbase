@@ -118,6 +118,34 @@ describe('CollectionChecklist', () => {
     await waitFor(() => expect(tough).toHaveAttribute('aria-checked', 'false'))
   })
 
+  it('keeps a second tick while the first one is the only one the games know of yet', async () => {
+    const user = userEvent.setup()
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    const view = (games: ChecklistGame[]) => (
+      <QueryClientProvider client={client}>
+        <MemoryRouter>
+          <CollectionChecklist games={games} />
+        </MemoryRouter>
+      </QueryClientProvider>
+    )
+    const { rerender } = render(view([{ id: 4, collections: [] }]))
+    const league = await screen.findByRole('checkbox', { name: /45-45 League/ })
+    const club = screen.getByRole('checkbox', { name: /Club · OTB/ })
+    await user.click(league)
+    await waitFor(() => expect(league).not.toBeDisabled())
+    await user.click(club)
+    await waitFor(() => expect(writes).toEqual(['add 1 [4]', 'add 2 [4]']))
+
+    // The refetch the first tick started comes back knowing only the first collection.
+    rerender(view([{ id: 4, collections: [1] }]))
+    expect(league).toHaveAttribute('aria-checked', 'true')
+    expect(club).toHaveAttribute('aria-checked', 'true')
+
+    // And once the ids know both, they are what the boxes show.
+    rerender(view([{ id: 4, collections: [1, 2] }]))
+    expect(club).toHaveAttribute('aria-checked', 'true')
+  })
+
   it('keeps the box as it was when the write fails', async () => {
     failWrites = true
     const user = userEvent.setup()

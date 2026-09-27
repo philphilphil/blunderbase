@@ -698,7 +698,8 @@ def note_move(note: Note) -> dict[str, Any] | None:
     """
     line = note.line
     if line is not None:
-        return _line_move(line.base_ply, line_sans(line), note.ply)
+        game = note.game or line.game
+        return _line_move(line.base_ply, line_sans(line), note.ply, game.ply_offset)
     if note.game is None:
         return None
     return move_context(note.game, note.ply)
@@ -716,7 +717,7 @@ def move_context(game: Game, ply: int | None) -> dict[str, Any] | None:
     sans = game.moves_san or []
     if index >= len(sans):
         return None
-    return _move_label(int(ply), sans[index])
+    return _move_label(int(ply), sans[index], shift=game.ply_offset)
 
 
 # --- internals -------------------------------------------------------------
@@ -746,9 +747,13 @@ def _payload(session: Session, note: Note, reach: dict[int, dict[str, int]]) -> 
     }
 
 
-def _move_label(ply: int, san: str, *, on_line: bool = False) -> dict[str, Any]:
-    """One half-move as a label. `ply` is the count *after* it, so the move is at `ply - 1`."""
-    index = int(ply) - 1
+def _move_label(ply: int, san: str, *, on_line: bool = False, shift: int = 0) -> dict[str, Any]:
+    """One half-move as a label. `ply` is the count *after* it, so the move is at `ply - 1`.
+
+    `shift` is the game's `ply_offset`: a game set up with Black to move, or from move 20,
+    is numbered from its own start, the way the game view numbers it.
+    """
+    index = int(ply) - 1 + shift
     number = index // 2 + 1
     white = index % 2 == 0
     return {
@@ -923,28 +928,32 @@ def _markdown_note(note: Note, game: Game) -> list[str]:
     line = note.line
     sans = line_sans(line) if line is not None else []
     if line is not None and sans:
-        label = _line_label(line.base_ply, sans, note.ply)
+        label = _line_label(line.base_ply, sans, note.ply, game.ply_offset)
     else:
         context = move_context(game, note.ply)
         label = context["label"] if context is not None else None
     head = f"**{label}** — " if label else ""
     rows = [f"- {head}{note.text}{_markdown_meta(note)}"]
     if sans and line is not None:
-        rows.append(f"  - line: {_san_line(line.base_ply, sans)}")
+        rows.append(f"  - line: {_san_line(line.base_ply, sans, game.ply_offset)}")
     return rows
 
 
-def _line_move(base_ply: int, sans: Sequence[str], ply: int | None) -> dict[str, Any] | None:
+def _line_move(
+    base_ply: int, sans: Sequence[str], ply: int | None, shift: int = 0
+) -> dict[str, Any] | None:
     """The move inside a variation a note is filed under, defaulting to the line's tip."""
     offset = (ply if ply is not None else base_ply + len(sans)) - base_ply
     if offset <= 0 or offset > len(sans):
         return None
-    return _move_label(base_ply + offset, sans[offset - 1], on_line=True)
+    return _move_label(base_ply + offset, sans[offset - 1], on_line=True, shift=shift)
 
 
-def _line_label(base_ply: int, sans: Sequence[str], ply: int | None) -> str | None:
+def _line_label(
+    base_ply: int, sans: Sequence[str], ply: int | None, shift: int = 0
+) -> str | None:
     """The same move, spelled the way a person writes it — what the Markdown export prints."""
-    move = _line_move(base_ply, sans, ply)
+    move = _line_move(base_ply, sans, ply, shift)
     return move["label"] if move is not None else None
 
 
@@ -957,11 +966,11 @@ def _markdown_meta(note: Note) -> str:
     return "  _(" + " · ".join(parts) + ")_"
 
 
-def _san_line(base_ply: int, sans: Sequence[str]) -> str:
+def _san_line(base_ply: int, sans: Sequence[str], shift: int = 0) -> str:
     """A variation as it is written down: "12... Nc6 13. Bb5 a6"."""
     out: list[str] = []
     for offset, san in enumerate(sans):
-        index = base_ply + offset
+        index = base_ply + offset + shift
         number = index // 2 + 1
         if index % 2 == 0:
             out.append(f"{number}. {san}")

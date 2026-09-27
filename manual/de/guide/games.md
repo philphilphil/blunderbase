@@ -31,11 +31,12 @@ Seite; bei ihnen steht nur der Name.
 ### Nach Sammlung filtern { #filter-by-collection }
 
 **Sammlung** grenzt die Liste auf eine [Sammlung](collections.md) ein, wie jeder andere Chip
-auch: Die übrigen Chips grenzen innerhalb davon weiter ein, **Leeren** nimmt sie mit dem Rest
-weg, und sie bleibt bei deinen eigenen Partien, solange der Schalter links nicht auf
-**Fremde** oder **Alle** steht. Eine Karte auf der Seite [Sammlungen](collections.md#open-a-collections-games) oder
-der Chip einer Sammlung in einer Zeile öffnet die Liste genau so, mit **Alle**; dann steht
-jede Partie der Sammlung darin.
+auch: Die übrigen Chips grenzen innerhalb davon weiter ein, und **Leeren** nimmt sie mit dem
+Rest weg. Wer eine Sammlung wählt, stellt damit den Schalter links auf **Alle**: Dann steht
+jede Partie der Sammlung in der Liste, so viele, wie neben ihrem Namen stehen. Mit **Meine**
+bleiben nur die eigenen übrig. Eine Karte auf der Seite
+[Sammlungen](collections.md#open-a-collections-games) oder der Chip einer Sammlung in einer
+Zeile öffnet die Liste genauso.
 
 ## In der Tabelle suchen { #search-the-table }
 

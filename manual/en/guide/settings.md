@@ -52,8 +52,9 @@ skipped.
 ## The command palette
 
 ⌘K opens the command palette. With nothing typed it lists the pages; type two characters
-and it also finds games, opponents, openings and notes, your saved filters and the
-statistics reports. `↵` opens what is highlighted.
+and it also finds games, opponents, openings and notes, your saved filters, your
+collections and the statistics reports. Typing "collection" lists every collection. `↵`
+opens what is highlighted.
 
 ## Every keyboard shortcut
 
@@ -117,6 +118,7 @@ are on.
 | `Home` `End` | The first and the last row |
 | `↵` | Open the game under the cursor |
 | `/` | Search the library |
+| `Esc` | Leave the search box, keeping what was typed |
 
 ### Walking a line in the explorer
 

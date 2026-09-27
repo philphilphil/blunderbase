@@ -1931,6 +1931,10 @@ msgid "Search the library"
 msgstr "Die Bibliothek durchsuchen"
 
 #: src/lib/ui/shortcuts.ts
+msgid "Leave the search box, keeping what was typed"
+msgstr "Das Suchfeld verlassen; der Suchtext bleibt stehen"
+
+#: src/lib/ui/shortcuts.ts
 msgid "Walking a line"
 msgstr "Eine Variante abgehen"
 
@@ -1957,6 +1961,7 @@ msgstr "Die Abdeckung konnte nicht gelesen werden."
 #: src/routes/engines/MachinesPage.tsx
 #: src/routes/explorer/ExplorerPage.tsx
 #: src/routes/game/components/PracticeBar.tsx
+#: src/routes/games/components/CollectionDialog.tsx
 #: src/routes/games/components/GamesTable.tsx
 #: src/routes/repertoire/RepertoirePage.tsx
 #: src/routes/stats/kit/states.tsx
@@ -6234,6 +6239,10 @@ msgstr "Neue passende Partien aufnehmen"
 #: src/routes/games/components/CollectionDialog.tsx
 msgid "Pick at least one thing a game must match, or switch the rule off."
 msgstr "Wähle mindestens eine Bedingung, die eine Partie erfüllen muss, oder schalte die Regel aus."
+
+#: src/routes/games/components/CollectionDialog.tsx
+msgid "Could not count the games you already have."
+msgstr "Die vorhandenen Partien ließen sich nicht zählen."
 
 #: src/routes/games/components/CollectionDialog.tsx
 msgid "Counting the games you already have…"

@@ -105,10 +105,10 @@ function RunRow({
           <Button
             type="button"
             variant="ghost"
-            size="xs"
+            size="sm"
             onClick={onRetry}
             disabled={retrying || run.gameId === null}
-            className="-my-1 text-accent-teal hover:text-accent-link"
+            className="-my-1.5 text-accent-teal hover:text-accent-link"
           >
             {retrying ? t`queued` : t`retry`}
           </Button>

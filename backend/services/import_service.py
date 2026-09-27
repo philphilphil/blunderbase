@@ -671,6 +671,8 @@ def ingest_game(
         ply_count=len(parsed.moves_uci),
         import_job_id=job.id,
     )
+    # From the PGN, which is where `build_card` and the game view read the start from too.
+    game.ply_offset = games_service.ply_offset(games_service.start_fen(game))
     session.add(game)
     session.flush()
 

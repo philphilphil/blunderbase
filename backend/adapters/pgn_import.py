@@ -13,7 +13,7 @@ import re
 from collections.abc import Iterator
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, TextIO
+from typing import TYPE_CHECKING, Any, BinaryIO, TextIO, cast
 
 import chess
 import chess.pgn
@@ -54,9 +54,12 @@ CHESSCOM_ID = re.compile(r"chess\.com/game/(?:live|daily)/(\d+)")
 # Latin-1, and ChessBase and most older exports write Windows-1252. Read as UTF-8 with
 # errors replaced, "Müller" is stored as "M�ller" for good — it never matches the
 # owner's account or the same game from another source again. So a file is read as strict
-# UTF-8 (a BOM is dropped) when every byte of it is valid UTF-8, and as Windows-1252
-# otherwise: a Latin-1 file is almost never valid UTF-8 by accident, and valid UTF-8 is
-# never worth second-guessing. The browser reads a file it uploads the same way
+# UTF-8 (a BOM is dropped) when every byte of it is valid UTF-8, and otherwise line by
+# line: a line that is valid UTF-8 stays UTF-8 and only the others are read as
+# Windows-1252. A Latin-1 line is almost never valid UTF-8 by accident, and valid UTF-8 is
+# never worth second-guessing; deciding per file would turn every "Müller" of a UTF-8
+# archive with one ChessBase game appended (`cat a.pgn b.pgn`) into "MÃ¼ller", and the
+# names are part of a game's dedup hash. The browser reads a file it uploads the same way
 # (`web/src/lib/chess/pgnFile.ts`).
 UTF8 = "utf-8-sig"
 CP1252 = "cp1252"
@@ -77,15 +80,50 @@ def _c1_controls(error: UnicodeError) -> tuple[str, int]:
 codecs.register_error(CP1252_ERRORS, _c1_controls)
 
 
+def _decode_line(line: bytes) -> str:
+    """One line of a file that is not UTF-8 throughout: UTF-8 if it can be, else Windows-1252."""
+    try:
+        return line.decode("utf-8")
+    except UnicodeDecodeError:
+        return line.decode(CP1252, errors=CP1252_ERRORS)
+
+
 def decode_pgn(raw: bytes) -> str:
-    """A PGN's text: strict UTF-8 when the bytes are UTF-8, Windows-1252 otherwise."""
+    """A PGN's text: strict UTF-8 when the bytes are UTF-8, else decided line by line."""
     try:
         return raw.decode(UTF8)
     except UnicodeDecodeError:
         # A UTF-8 file with one stray Windows-1252 game in it still starts with the BOM;
         # read as Windows-1252 it would be "ï»¿" in front of the first tag, which then no
         # longer parses as one and costs that game its headers.
-        return raw.removeprefix(codecs.BOM_UTF8).decode(CP1252, errors=CP1252_ERRORS)
+        lines = raw.removeprefix(codecs.BOM_UTF8).split(b"\n")
+        return "\n".join(_decode_line(line) for line in lines)
+
+
+class _LineDecoded(io.TextIOBase):
+    """A binary file read as text one line at a time, each line decoded by `_decode_line`.
+
+    Only what `chess.pgn.read_game` asks of a stream: `readline`, iteration and `read`.
+    """
+
+    def __init__(self, binary: BinaryIO) -> None:
+        self._binary = binary
+        # Past a BOM, for the same reason `decode_pgn` drops it before the fallback.
+        if binary.read(len(codecs.BOM_UTF8)) != codecs.BOM_UTF8:
+            binary.seek(0)
+
+    def readable(self) -> bool:
+        return True
+
+    def readline(self, size: int | None = -1) -> str:
+        return _decode_line(self._binary.readline())
+
+    def read(self, size: int | None = -1) -> str:
+        return "".join(iter(self.readline, ""))
+
+    def close(self) -> None:
+        self._binary.close()
+        super().close()
 
 
 def open_pgn(path: str | Path) -> TextIO:
@@ -96,21 +134,14 @@ def open_pgn(path: str | Path) -> TextIO:
     """
     file = Path(path).expanduser()
     decoder = codecs.getincrementaldecoder(UTF8)()
-    encoding = UTF8
     with file.open("rb") as stream:
         try:
             while chunk := stream.read(CHUNK):
                 decoder.decode(chunk)
             decoder.decode(b"", final=True)
         except UnicodeDecodeError:
-            encoding = CP1252
-    if encoding == UTF8:
-        return file.open("r", encoding=UTF8)
-    # Past a BOM, for the same reason `decode_pgn` drops it before the fallback.
-    binary = file.open("rb")
-    if binary.read(len(codecs.BOM_UTF8)) != codecs.BOM_UTF8:
-        binary.seek(0)
-    return io.TextIOWrapper(binary, encoding=CP1252, errors=CP1252_ERRORS)
+            return cast("TextIO", _LineDecoded(file.open("rb")))
+    return file.open("r", encoding=UTF8)
 
 
 def run(

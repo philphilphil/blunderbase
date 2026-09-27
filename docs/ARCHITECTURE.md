@@ -217,12 +217,16 @@ A crash writes `failed` with the engine's stderr and buys one retry (`attempts` 
 
 `games`, `explorer`, `stats` and `notes` are read-mostly and share four decisions.
 
-**"You" is `Game.owner_color`, and a ply's parity is who moved.** White moves on even
-plies, so an owner move is `owner_color == white AND ply % 2 = 0` (or the mirror);
+**"You" is `Game.owner_color`, and a ply's parity is who moved.** Ply `p` is White's
+move when `p + Game.ply_offset` is even, so an owner move is
+`owner_color == white AND (ply + ply_offset) % 2 = 0` (or the mirror);
 `games.owner_move_condition()` is that clause and every blunder count in `stats` uses it.
 A game whose owner is unknown contributes every ply, because there is no "you" to filter
-by. The assumption underneath is that ply 0 is White's — true for standard and 960, wrong
-only for a from-position fragment that starts with Black to move.
+by. `ply_offset` is `games.ply_offset(start_fen)`, written when the game is stored: zero
+for standard and 960, odd for a game set up with Black to move, and it also shifts move
+numbers for a game that starts past move 1. The FEN in the PGN is the source; the column
+is the copy SQL can read per row. Python paths that already hold the game number from it
+too (`_move_row`, `build_card`, note labels, worst moments, the explorer's occurrences).
 
 **One filter vocabulary.** `games.GameFilters` is the only place a search predicate is
 spelled, and `games.game_conditions(filters)` turns it into WHERE clauses that drop into a

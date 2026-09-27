@@ -1931,6 +1931,10 @@ msgid "Search the library"
 msgstr "Search the library"
 
 #: src/lib/ui/shortcuts.ts
+msgid "Leave the search box, keeping what was typed"
+msgstr "Leave the search box, keeping what was typed"
+
+#: src/lib/ui/shortcuts.ts
 msgid "Walking a line"
 msgstr "Walking a line"
 
@@ -1957,6 +1961,7 @@ msgstr "The coverage could not be read."
 #: src/routes/engines/MachinesPage.tsx
 #: src/routes/explorer/ExplorerPage.tsx
 #: src/routes/game/components/PracticeBar.tsx
+#: src/routes/games/components/CollectionDialog.tsx
 #: src/routes/games/components/GamesTable.tsx
 #: src/routes/repertoire/RepertoirePage.tsx
 #: src/routes/stats/kit/states.tsx
@@ -6234,6 +6239,10 @@ msgstr "Add new games that match"
 #: src/routes/games/components/CollectionDialog.tsx
 msgid "Pick at least one thing a game must match, or switch the rule off."
 msgstr "Pick at least one thing a game must match, or switch the rule off."
+
+#: src/routes/games/components/CollectionDialog.tsx
+msgid "Could not count the games you already have."
+msgstr "Could not count the games you already have."
 
 #: src/routes/games/components/CollectionDialog.tsx
 msgid "Counting the games you already have…"

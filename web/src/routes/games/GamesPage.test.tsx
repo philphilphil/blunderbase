@@ -448,6 +448,24 @@ describe('GamesPage — the keyboard, and the run it hands on', () => {
     expect(box).toHaveValue('')
   })
 
+  it('leaves / alone while a modal is open over the table', async () => {
+    const user = userEvent.setup()
+    draw()
+    await loaded()
+
+    const modal = document.createElement('div')
+    modal.setAttribute('role', 'dialog')
+    modal.setAttribute('aria-modal', 'true')
+    const swatch = document.createElement('button')
+    modal.append(swatch)
+    document.body.append(modal)
+    swatch.focus()
+    await user.keyboard('/')
+
+    expect(document.activeElement).toBe(swatch)
+    modal.remove()
+  })
+
   it('leaves the search box on Esc, keeping what was typed', async () => {
     const user = userEvent.setup()
     draw()

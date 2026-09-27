@@ -44,7 +44,7 @@ export const LIST_COLUMNS =
   'md:grid-cols-[4.5rem_minmax(0,1fr)_10rem_minmax(0,11rem)_2.75rem_1.25rem] ' +
   'xl:grid-cols-[4.5rem_minmax(0,1fr)_10rem_minmax(0,11rem)_2.75rem_4.5rem_minmax(0,9rem)_1.25rem]'
 
-const HEAD = 'font-mono text-[0.625rem] tracking-[0.08em] text-faint uppercase'
+const HEAD = 'text-meta tracking-[0.06em] text-dim-2 uppercase'
 
 /**
  * The column names, once over the whole list. Nothing to align below `md`, so nothing drawn.
@@ -104,6 +104,14 @@ export function NoteRow({
 }: NoteRowProps) {
   const { t, i18n } = useLingui()
   const [open, setOpen] = useState(highlighted)
+  // And opens when a link names it later, too: ⌘K or a row's ↗ on a note with no game goes
+  // to `/notes?note=12` without remounting the rows, so the first render is not the only
+  // time a row can become the one asked for.
+  const [wasHighlighted, setWasHighlighted] = useState(highlighted)
+  if (highlighted !== wasHighlighted) {
+    setWasHighlighted(highlighted)
+    if (highlighted) setOpen(true)
+  }
 
   const scope = scopeOf(note)
   const move = originLabel(note)
@@ -116,12 +124,12 @@ export function NoteRow({
       <div
         className={cn(
           LIST_COLUMNS,
-          'flex flex-wrap items-center gap-x-2 gap-y-0.5 px-3 py-1.5 text-[0.71875rem] transition-colors hover:bg-raised/60',
+          'flex flex-wrap items-center gap-x-2 gap-y-0.5 px-3 py-1.5 text-data transition-colors hover:bg-raised',
           open && 'bg-raised/40',
         )}
       >
         <span
-          className="font-mono text-[0.625rem] text-dim-2 max-md:order-last max-md:ml-auto"
+          className="font-mono text-meta text-dim-2 max-md:order-last max-md:ml-auto"
           title={t`written ${when}`}
         >
           {relative(note.created_at)}
@@ -146,7 +154,7 @@ export function NoteRow({
             {i18n._(SCOPE_BADGES[scope])}
           </Badge>
           {move ? (
-            <span className="truncate font-mono text-[0.6875rem] tabular text-soft-2">{move}</span>
+            <span className="truncate font-mono text-label tabular text-soft-2">{move}</span>
           ) : null}
         </span>
 
@@ -171,7 +179,7 @@ export function NoteRow({
             <span className="text-faint max-md:hidden">—</span>
           )}
           {typeof game?.opponent_rating === 'number' ? (
-            <span className="flex-none font-mono text-[0.625rem] tabular text-dim-2">
+            <span className="flex-none font-mono text-meta tabular text-dim-2">
               {game.opponent_rating}
             </span>
           ) : null}
@@ -186,7 +194,7 @@ export function NoteRow({
           {game ? formatResult(game.result) : '—'}
         </span>
 
-        <span className="font-mono text-[0.6875rem] tabular text-dim max-xl:hidden">
+        <span className="font-mono text-label tabular text-dim max-xl:hidden">
           {game ? formatGameDate(game.date) : '—'}
         </span>
 
@@ -198,7 +206,7 @@ export function NoteRow({
               onClick={() => onTagClick?.(tag)}
               disabled={!onTagClick}
               title={onTagClick ? t`Show only notes tagged ${tag}` : undefined}
-              className="flex-none rounded-sm border border-edge bg-elevated px-1.5 py-px text-[0.625rem] text-soft transition-colors enabled:hover:border-accent-teal/40 enabled:hover:text-accent-teal"
+              className="flex-none rounded-sm border border-edge bg-elevated px-1.5 py-px text-meta text-soft transition-colors enabled:hover:bg-raised enabled:hover:text-ink"
             >
               {tag}
             </button>

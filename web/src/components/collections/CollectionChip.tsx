@@ -37,7 +37,7 @@ export function CollectionChip({
   const { t } = useLingui()
   const classes = cn(
     'inline-flex max-w-full min-w-0 items-center gap-1 rounded-sm border whitespace-nowrap',
-    size === 'sm' ? 'px-1.5 text-[0.65625rem] leading-[1.0625rem]' : 'px-2 py-px text-[0.71875rem]',
+    size === 'sm' ? 'px-1.5 text-label' : 'px-2 py-px text-data',
     collectionColorClasses(collection.color).chip,
     to && 'hover:brightness-125',
     className,

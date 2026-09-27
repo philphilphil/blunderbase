@@ -288,10 +288,10 @@ export function StatsPage() {
               setCollection(event.target.value === '' ? null : Number(event.target.value))
             }
             className={cn(
-              'h-[1.625rem] max-w-[14rem] rounded-md border bg-elevated px-1.5 text-[0.6875rem] outline-none transition-colors focus-visible:border-accent-teal/50',
+              'h-[1.625rem] max-w-[14rem] rounded-md border bg-elevated px-1.5 text-label outline-none transition-colors focus-visible:border-accent-teal/50',
               inCollection
                 ? 'border-accent-teal/30 text-ink'
-                : 'border-edge text-dim hover:text-ink',
+                : 'border-edge text-soft hover:text-ink',
             )}
           >
             <option value="">{t`All games`}</option>

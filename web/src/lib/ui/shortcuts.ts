@@ -428,6 +428,7 @@ export const SHORTCUT_GROUPS: ShortcutGroup[] = [
       { keys: ['Home', 'End'], label: msg`The first and the last row` },
       { keys: ['↵'], label: msg`Open the game under the cursor` },
       { keys: ['/'], label: msg`Search the library` },
+      { keys: ['Esc'], label: msg`Leave the search box, keeping what was typed` },
     ],
   },
   {

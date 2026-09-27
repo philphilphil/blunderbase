@@ -180,7 +180,7 @@ export function NoteItem({
               onClick={() => onTagClick?.(tag)}
               disabled={!onTagClick}
               title={onTagClick ? t`Show only notes tagged ${tag}` : undefined}
-              className="rounded-sm border border-edge bg-elevated px-1.5 py-px text-[0.625rem] text-soft transition-colors enabled:hover:border-accent-teal/40 enabled:hover:text-accent-teal"
+              className="rounded-sm border border-edge bg-elevated px-1.5 py-px text-meta text-soft transition-colors enabled:hover:bg-raised enabled:hover:text-ink"
             >
               {tag}
             </button>

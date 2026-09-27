@@ -391,6 +391,13 @@ class Game(Base):
     # carries no clock information.
     clocks: Mapped[list[float | None] | None] = mapped_column(JSON)
     ply_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    # `services.games.ply_offset` of the game's start FEN, written when the game is stored:
+    # ply `p` is White's move when `(p + ply_offset)` is even. The FEN in the PGN is the
+    # source; this copy is for SQL, where "the owner's moves" (`owner_move_condition`) has
+    # to be answered per row without parsing a PGN. Zero for a game from the initial array.
+    ply_offset: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=0, server_default="0"
+    )
 
     # The analysis half of the game's card — the eval curve, the worst moments, whether a
     # run somebody asked for reached it — as `services.games` builds it. Written in the
@@ -805,10 +812,17 @@ class Collection(Base):
     .COLORS`), so a theme change recolours every collection with it. `name` is unique
     case-insensitively, which the service enforces; the constraint here is the exact-case
     backstop.
+
+    AUTOINCREMENT, so an id is never handed out twice: a rule book another process loaded
+    (a CLI sync) and a bookmarked `/games?collection=` both hold ids, and a deleted
+    collection's id reused by a new one would file games into, or show, the wrong group.
     """
 
     __tablename__ = "collections"
-    __table_args__ = (UniqueConstraint("name", name="uq_collections_name"),)
+    __table_args__ = (
+        UniqueConstraint("name", name="uq_collections_name"),
+        {"sqlite_autoincrement": True},
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     name: Mapped[str] = mapped_column(String(40), nullable=False)

@@ -285,9 +285,11 @@ def delete_games(session: Session, game_ids: Sequence[int]) -> Deleted:
     dozen of those. So the runs are collected through the searches of the nodes about to
     go, while those rows are still there to be read.
     """
+    from backend.services import collections as collections_service
     from backend.services import explorer as explorer_service
 
     deleted = Deleted()
+    memberships = 0
     ids = _unique_ids(game_ids)
     if not ids:
         return deleted
@@ -314,12 +316,16 @@ def delete_games(session: Session, game_ids: Sequence[int]) -> Deleted:
         deleted.runs += _deleted(session, delete(AnalysisRun).where(AnalysisRun.id.in_(of_these)))
         deleted.notes += _deleted(session, delete(Note).where(Note.game_id.in_(present)))
         deleted.lines += _deleted(session, delete(Line).where(Line.game_id.in_(present)))
-        _deleted(
+        memberships += _deleted(
             session, delete(GameCollection).where(GameCollection.game_id.in_(present))
         )
         _deleted(session, delete(GamePosition).where(GamePosition.game_id.in_(present)))
         deleted.games += _deleted(session, delete(Game).where(Game.id.in_(present)))
     session.commit()
+    # Games left collections: their cached summaries would still score them, and other
+    # open screens would keep the old counts.
+    if memberships:
+        collections_service.notify_changed(None, membership=True)
     # A bulk delete does not tell the identity map what it took, so a caller that goes on
     # using this Session — a CLI, a test, anything that is not one request — would keep
     # reading the games, notes and lines it has just deleted out of memory. A request-scoped
@@ -526,6 +532,7 @@ def delete_all_games(session: Session) -> Wiped:
     # Imported here rather than at the top because `services.explorer` imports this module:
     # the explorer is built on what a game and an outcome mean, and this is the one write
     # that has to reach back the other way.
+    from backend.services import collections as collections_service
     from backend.services import explorer as explorer_service
 
     wiped = Wiped()
@@ -548,12 +555,14 @@ def delete_all_games(session: Session) -> Wiped:
     # Every membership names a game too. The collections themselves stay, rules and all:
     # they are the owner's configuration, and a rule is exactly what refills one when the
     # library is imported again.
-    _deleted(session, delete(GameCollection))
+    memberships = _deleted(session, delete(GameCollection))
     # Every `game_positions` row names a game, and every game is going.
     _deleted(session, delete(GamePosition))
     wiped.games = _deleted(session, delete(Game))
     wiped.import_jobs = _deleted(session, delete(ImportJob))
     session.commit()
+    if memberships:
+        collections_service.notify_changed(None, membership=True)
     return wiped
 
 
@@ -646,14 +655,17 @@ def outcome_condition(outcome: str) -> ColumnElement[bool]:
 def owner_move_condition() -> ColumnElement[bool]:
     """The plies of `move_evals` that are the owner's own moves.
 
-    White moves on even plies. A game whose owner is unknown contributes every ply, which
-    is the only honest answer when there is no "you" to filter by — unless the game is
-    known not to be theirs at all (a reference game kept for study), which contributes
+    White moves on the plies where `ply + Game.ply_offset` is even — the same numbering
+    `_mover` gives the game view and the card, so a game set up with Black to move counts
+    Black's moves as Black's here too. A game whose owner is unknown contributes every ply,
+    which is the only honest answer when there is no "you" to filter by — unless the game
+    is known not to be theirs at all (a reference game kept for study), which contributes
     none: there the honest answer is that nothing in it was their move.
     """
+    parity = (MoveEval.ply + Game.ply_offset) % 2
     return or_(
-        and_(Game.owner_color == Color.WHITE, MoveEval.ply % 2 == 0),
-        and_(Game.owner_color == Color.BLACK, MoveEval.ply % 2 == 1),
+        and_(Game.owner_color == Color.WHITE, parity == 0),
+        and_(Game.owner_color == Color.BLACK, parity == 1),
         and_(Game.owner_color.is_(None), Game.is_owner_game.is_(True)),
     )
 
@@ -1769,9 +1781,12 @@ def _has_classification(classification: Classification) -> ColumnElement[bool]:
     """An owner move of this class in the game's primary run, the one Stats read.
 
     Only that run, not any finished one: a blunder in a shallow import pass that a deeper
-    requested run has since called a mistake is not a blunder any more, and neither is one
-    in a run over a ply window or a Maia fill. Matching every done run kept such a game
-    under "has blunders" while Stats counted none in it and its card said "mistake".
+    requested run has since called a mistake is not a blunder any more. Matching every done
+    run kept such a game under "has blunders" while Stats counted none in it and its card
+    said "mistake". A run over a ply window ("analyse from here") is not a primary run, so
+    what it says about its window shows on the card and the game page, which merge every
+    run, but is counted neither by Stats nor by this filter — the two agree with each other,
+    which is the promise the library's filter makes.
     Correlated on the game, so each row costs an index lookup, not a pass over every run.
     """
     from backend.services import stats as stats_service

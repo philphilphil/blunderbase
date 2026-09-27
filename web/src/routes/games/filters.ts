@@ -45,7 +45,7 @@ export interface LibraryFilters {
    * Absent is the default cut, the owner's own — never spelled as `mine`, because a URL
    * should not spell the default. It is the default with a collection set too: a collection
    * is one more filter, and a link that means every game in one (a collection's card, a
-   * chip on a row) says `whose=all` itself.
+   * chip on a row, a pick in the filter bar's Collection chip) says `whose=all` itself.
    */
   whose?: Exclude<Whose, 'mine'>
 }

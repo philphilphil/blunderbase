@@ -741,7 +741,7 @@ def _moment_of(game: Game, entry: Mapping[str, Any], run_id: int) -> dict[str, A
     return {
         "game": game_summary(game),
         "ply": entry["ply"],
-        "move_number": entry["ply"] // 2 + 1,
+        "move_number": (entry["ply"] + game.ply_offset) // 2 + 1,
         "san": entry["san"],
         "uci": entry["uci"],
         "classification": entry["classification"],

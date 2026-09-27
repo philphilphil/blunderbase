@@ -101,7 +101,14 @@ export function FilterBar({ filters, onChange, trailing }: FilterBarProps) {
               <CollectionPanel
                 value={filters.collection}
                 onChange={(collection) => {
-                  patch({ collection })
+                  // The panel counts every game in a collection, reference games too, so a
+                  // pick shows all of them, as a collection's own links do; a Whose the
+                  // owner set by hand is kept.
+                  patch(
+                    collection === undefined
+                      ? { collection }
+                      : { collection, whose: filters.whose ?? 'all' },
+                  )
                   close()
                 }}
               />
@@ -143,11 +150,11 @@ function CollectionPanel({
         <Trans>In the collection</Trans>
       </PopoverLabel>
       {collections.isPending ? (
-        <span className="text-[0.71875rem] text-dim">
+        <span className="text-data text-dim">
           <Trans>Loading collections…</Trans>
         </span>
       ) : collections.isError ? (
-        <span className="text-[0.71875rem] text-blunder">
+        <span className="text-data text-blunder">
           <Trans>Could not load the collections.</Trans>
         </span>
       ) : rows.length === 0 ? (
@@ -162,22 +169,20 @@ function CollectionPanel({
           {rows.map((collection) => {
             const selected = value === collection.id
             return (
-              <button
+              <Button
                 key={collection.id}
-                type="button"
+                variant="ghost"
+                size="sm"
                 aria-pressed={selected}
                 onClick={() => onChange(selected ? undefined : collection.id)}
-                className={cn(
-                  'flex items-center gap-2 rounded-sm px-1.5 py-1 text-left text-[0.71875rem] transition-colors',
-                  selected ? 'bg-accent-teal/10 text-accent-teal' : 'text-soft hover:bg-raised hover:text-ink',
-                )}
+                className="justify-start gap-2 px-1.5 font-normal"
               >
                 <CollectionSwatch color={collection.color} />
                 <span className="min-w-0 truncate">{collection.name}</span>
-                <span className="ml-auto pl-3 font-mono text-[0.65625rem] text-faint">
+                <span className="ml-auto pl-3 font-mono text-meta text-dim-2">
                   {formatCount(collection.game_count)}
                 </span>
-              </button>
+              </Button>
             )
           })}
         </div>
@@ -208,14 +213,15 @@ function MakeCollection({ filters }: { filters: LibraryFilters }) {
   if (!rule && !open) return null
   return (
     <>
-      <button
-        type="button"
+      <Button
+        variant="link"
+        size="xs"
         title={t`Keep the games this filter finds as a collection, and add new ones as they arrive`}
         onClick={() => setOpen(true)}
-        className="px-1 text-label text-accent-teal transition-colors hover:text-accent-link"
+        className="px-1"
       >
         <Trans>Make a collection</Trans>
-      </button>
+      </Button>
       {open ? (
         <CollectionDialog
           initialRule={rule}

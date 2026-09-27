@@ -770,3 +770,78 @@ def test_games_no_source_named_are_named_once_from_the_book(settings: Settings) 
             text("SELECT eco, opening_name FROM games WHERE id = :id"), {"id": game_id}
         ).one()
     assert tuple(row) == ("C00", "French Defense")
+
+
+def test_a_game_set_up_from_a_position_gets_its_offset_and_loses_its_wrong_folds(
+    settings: Settings,
+) -> None:
+    """0034: the offset is read off the FEN; only an odd one clears the stat fold, and only
+    a one-sided Maia run (kept on what are now the opponent's plies) loses its policies."""
+    upgrade_to_head(settings)
+    config = alembic_config(settings)
+    command.downgrade(config, "0033_start_position_cards")
+
+    black_first = '[FEN "rnbqkbnr/pppp1ppp/8/4p3/4P3/5N2/PPPP1PPP/RNBQKB1R b KQkq - 1 2"]'
+    move_thirty = '[FEN "8/8/8/8/8/8/8/K1k5 w - - 0 30"]'
+    engine = get_engine(settings)
+    with engine.begin() as connection:
+        for pgn in (black_first, move_thirty, '[Event "Plain"]'):
+            connection.execute(
+                text(
+                    "INSERT INTO games (source, dedup_hash, white_name, black_name, result, "
+                    "variant, pgn, moves_uci, moves_san, ply_count, imported_at, "
+                    "stat_summary, stat_owner_moves) VALUES ('pgn', 'h', 'a', 'b', '*', "
+                    "'standard', :pgn, '[]', '[]', 0, :now, '{}', 3)"
+                ),
+                {"pgn": pgn, "now": "2026-09-01 12:00:00"},
+            )
+        # Game 1: run 1 kept one side's policies, run 2 both sides'.
+        for _ in range(2):
+            connection.execute(
+                text(
+                    "INSERT INTO analysis_runs (game_id, tier, status, multipv, priority, "
+                    "maia, maia_only, attempts, created_at) "
+                    "VALUES (1, 'quick', 'done', 1, 0, 1, 0, 1, :now)"
+                ),
+                {"now": "2026-09-01 12:00:00"},
+            )
+        connection.execute(
+            text(
+                "INSERT INTO move_evals (run_id, ply, maia_policy) VALUES "
+                "(1, 1, :policy), (1, 3, :policy), (2, 0, :policy), (2, 1, :policy)"
+            ),
+            {"policy": '{"1700": []}'},
+        )
+        connection.execute(
+            text(
+                "INSERT INTO collections (name, color, created_at, rule_set_at) VALUES "
+                "('a', 'accent', :now, :now), ('b', 'accent', :now, :now)"
+            ),
+            {"now": "2026-09-01 12:00:00"},
+        )
+
+    command.upgrade(config, "head")
+
+    with engine.begin() as connection:
+        games = connection.execute(
+            text("SELECT id, ply_offset, stat_summary, stat_owner_moves FROM games ORDER BY id")
+        ).all()
+        policies = connection.execute(
+            text("SELECT run_id, ply FROM move_evals WHERE maia_policy IS NOT NULL ORDER BY id")
+        ).all()
+        connection.execute(text("DELETE FROM collections WHERE id = 2"))
+        connection.execute(
+            text(
+                "INSERT INTO collections (name, color, created_at, rule_set_at) "
+                "VALUES ('c', 'accent', :now, :now)"
+            ),
+            {"now": "2026-09-01 12:00:00"},
+        )
+        ids = connection.execute(text("SELECT id, name FROM collections ORDER BY id")).all()
+    assert games == [(1, 3, None, None), (2, 58, "{}", 3), (3, 0, "{}", 3)]
+    assert policies == [(2, 0), (2, 1)]
+    # The ids survive the rebuild, and a deleted collection's id is not handed out again.
+    assert ids == [(1, "a"), (3, "c")]
+
+    command.downgrade(config, "0033_start_position_cards")
+    assert "ply_offset" not in _columns(engine, "games")

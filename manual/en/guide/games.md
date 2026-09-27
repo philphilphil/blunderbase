@@ -30,10 +30,11 @@ no page anywhere, and their source is just a name.
 ### Filter by collection
 
 **Collection** narrows the list to one [collection](collections.md) like any other chip
-does: the other chips narrow inside it, **Clear** drops it with the rest, and it keeps to
-your own games unless the control at the left says **Others** or **All**. A card on the
-[Collections](collections.md#open-a-collections-games) screen, or a collection's chip on a
-row, opens the list this way with **All** set, so it holds every game in the collection.
+does: the other chips narrow inside it, and **Clear** drops it with the rest. Picking a
+collection sets the control at the left to **All**, so the list holds every game in it and
+matches the count beside its name; set it back to **Mine** for only your own games in it.
+A card on the [Collections](collections.md#open-a-collections-games) screen, or a
+collection's chip on a row, opens the list the same way.
 
 ## Search the table
 

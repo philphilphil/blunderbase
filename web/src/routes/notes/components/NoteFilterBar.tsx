@@ -9,6 +9,7 @@
 import type { I18n, MessageDescriptor } from '@lingui/core'
 import { Trans, useLingui } from '@lingui/react/macro'
 
+import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { cn } from '@/lib/utils'
 import { useNoteTags } from '@/lib/api/queries'
@@ -73,7 +74,7 @@ export function NoteFilterBar({ filters, onChange, className }: NoteFilterBarPro
         placeholder={t`Search what you wrote…`}
         value={filters.text ?? ''}
         onCommit={(value) => patch({ text: value || undefined })}
-        className="h-7 w-[16rem] text-[0.71875rem] max-md:w-full"
+        className="h-7 w-[16rem] text-data max-md:w-full"
       />
 
       {NOTE_FILTER_GROUPS.map((group) => (
@@ -89,13 +90,9 @@ export function NoteFilterBar({ filters, onChange, className }: NoteFilterBarPro
       ))}
 
       {active > 0 ? (
-        <button
-          type="button"
-          onClick={() => onChange({})}
-          className="px-1 text-[0.71875rem] text-accent-teal transition-colors hover:text-accent-link"
-        >
+        <Button variant="link" size="xs" onClick={() => onChange({})} className="px-1">
           <Trans>Clear {active}</Trans>
-        </button>
+        </Button>
       ) : null}
     </div>
   )
@@ -129,7 +126,7 @@ function GroupPanel({
             onChange={(scope) => patch({ scope })}
             labels={resolve(i18n, SCOPE_LABELS)}
           />
-          <span className="text-[0.6875rem] leading-snug text-dim">
+          <span className="text-label leading-snug text-dim">
             <Trans>
               A variation note is pinned to a line off a game; a loose note is pinned to
               nothing at all.
@@ -149,9 +146,9 @@ function GroupPanel({
             placeholder={t`Part of a name`}
             value={filters.opponent ?? ''}
             onCommit={(value) => patch({ opponent: value || undefined })}
-            className="h-7 text-[0.71875rem]"
+            className="h-7 text-data"
           />
-          <span className="text-[0.6875rem] leading-snug text-dim">
+          <span className="text-label leading-snug text-dim">
             <Trans>
               Only notes written on a game, and a model game matches either player.
             </Trans>
@@ -186,7 +183,7 @@ function GroupPanel({
             onChange={(source) => patch({ source })}
             labels={resolve(i18n, SOURCE_LABELS)}
           />
-          <span className="text-[0.6875rem] leading-snug text-dim">
+          <span className="text-label leading-snug text-dim">
             <Trans>
               In the app by you, by your assistant over MCP, or grabbed off the live board.
             </Trans>
@@ -210,9 +207,9 @@ function GroupPanel({
               const parsed = Number(event.target.value)
               patch({ game_id: Number.isInteger(parsed) && parsed > 0 ? parsed : undefined })
             }}
-            className="h-7 font-mono text-[0.71875rem]"
+            className="h-7 font-mono text-data"
           />
-          <span className="text-[0.6875rem] leading-snug text-dim">
+          <span className="text-label leading-snug text-dim">
             <Trans>
               Usually arrived at by following a note into its game and back — the id is the
               one in the game's address.
@@ -233,7 +230,7 @@ function GroupPanel({
               aria-label={t`Written from`}
               value={filters.since ?? ''}
               onChange={(event) => patch({ since: event.target.value || undefined })}
-              className="h-7 text-[0.71875rem]"
+              className="h-7 text-data"
             />
             <span className="text-faint">→</span>
             <Input
@@ -241,19 +238,20 @@ function GroupPanel({
               aria-label={t`Written until`}
               value={filters.until ?? ''}
               onChange={(event) => patch({ until: event.target.value || undefined })}
-              className="h-7 text-[0.71875rem]"
+              className="h-7 text-data"
             />
           </div>
           <div className="flex gap-1">
             {DATE_PRESETS.map((preset) => (
-              <button
+              <Button
                 key={preset.label}
-                type="button"
+                variant="secondary"
+                size="xs"
                 onClick={() => patch({ since: isoDay(preset.days), until: undefined })}
-                className="flex-1 rounded-sm border border-edge bg-raised px-2 py-1 text-[0.71875rem] text-soft hover:border-edge-hover hover:text-ink"
+                className="flex-1"
               >
                 {preset.label}
-              </button>
+              </Button>
             ))}
           </div>
         </>
@@ -293,7 +291,7 @@ function TagPanel({
         <Trans>Carrying every tag</Trans>
       </PopoverLabel>
       {rows.length === 0 ? (
-        <span className="text-[0.6875rem] text-dim">
+        <span className="text-label text-dim">
           {tags.isPending ? t`Reading the tags…` : t`Nothing is tagged yet.`}
         </span>
       ) : (
@@ -301,18 +299,17 @@ function TagPanel({
           {rows.map((row) => {
             const on = chosen.includes(row.tag)
             return (
-              <button
+              <Button
                 key={row.tag}
-                type="button"
+                variant="ghost"
+                size="sm"
                 aria-pressed={on}
                 onClick={() => onChange(toggleTag(filters, row.tag))}
-                className={`flex items-center gap-2 rounded-sm px-1.5 py-1 text-[0.71875rem] transition-colors ${
-                  on ? 'bg-accent-teal/10 text-accent-teal' : 'text-soft hover:bg-raised hover:text-ink'
-                }`}
+                className="justify-start gap-2 px-1.5 font-normal"
               >
                 <span className="flex-1 truncate text-left">{row.tag}</span>
-                <span className="font-mono text-[0.625rem] tabular text-dim-2">{row.notes}</span>
-              </button>
+                <span className="font-mono text-meta tabular text-dim-2">{row.notes}</span>
+              </Button>
             )
           })}
         </div>

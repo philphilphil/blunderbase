@@ -1,5 +1,5 @@
 import { QueryClient } from '@tanstack/react-query'
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -234,6 +234,22 @@ describe('NotesPage', () => {
     await user.click(toggle)
     expect(toggle).toHaveAttribute('aria-expanded', 'true')
     expect(screen.getByRole('button', { name: 'Rewrite this note' })).toBeInTheDocument()
+  })
+
+  it('opens a row already on screen when a link names its note', async () => {
+    const user = userEvent.setup()
+    window.localStorage.setItem(NOTE_VIEW_KEY, 'list')
+    resetNoteView()
+    draw()
+    await screen.findByText('Loose thought about rook endings.')
+
+    // A loose note's ↗ goes to `/notes?note=2`: same page, same rows, nothing remounts.
+    const row = document.querySelector<HTMLElement>('[data-note-row="2"]')!
+    const toggle = within(row).getByRole('button', { name: /Loose thought/ })
+    expect(toggle).toHaveAttribute('aria-expanded', 'false')
+    await user.click(within(row).getByRole('link', { name: 'Open where this note was written' }))
+
+    await waitFor(() => expect(toggle).toHaveAttribute('aria-expanded', 'true'))
   })
 
   it('re-asks for one opponent when a name in the list is clicked', async () => {

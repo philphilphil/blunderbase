@@ -13,12 +13,14 @@ from pathlib import Path
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from backend.db.enums import Platform, Source
+from backend.db.enums import Classification, Platform, Source
 from backend.db.models import Account, Game
 from backend.mcp import payloads
 from backend.services import games as games_service
 from backend.services import notes
+from backend.services.games import GameFilters
 from backend.services.import_service import run_import
+from tests.test_query_services import analyse
 
 OWNER = "owner"
 
@@ -125,6 +127,39 @@ def test_the_assistant_sees_where_a_game_starts(session: Session, tmp_path: Path
     game = _library(session, tmp_path)["Set up"]
     summary = games_service.game_summary(game)
     assert payloads.game_row(summary)["start_fen"] == BLACK_TO_MOVE
+
+
+def test_the_offset_is_stored_on_the_game_when_it_is_imported(
+    session: Session, tmp_path: Path
+) -> None:
+    library = _library(session, tmp_path)
+    assert library["Set up"].ply_offset == 3
+    assert library["Fischer random"].ply_offset == 0
+    assert library["Plain"].ply_offset == 0
+
+
+def test_has_blunders_counts_the_owners_moves_of_a_game_set_up_with_black_to_move(
+    session: Session, tmp_path: Path
+) -> None:
+    """The owner is Black and Black moves first, so ply 1 (Bb5) is the opponent's."""
+    game = _library(session, tmp_path)["Set up"]
+    blunders = GameFilters(has_blunders=True)
+
+    analyse(session, game, [{"ply": 1, "classification": Classification.BLUNDER}])
+    assert games_service.search_games(session, blunders) == []
+
+    analyse(session, game, [{"ply": 0, "classification": Classification.BLUNDER}], priority=5)
+    assert [found.id for found in games_service.search_games(session, blunders)] == [game.id]
+
+
+def test_a_note_on_a_game_set_up_with_black_to_move_is_labelled_from_its_start(
+    session: Session, tmp_path: Path
+) -> None:
+    game = _library(session, tmp_path)["Set up"]
+    # Ply 1 is the position after Black's first move, 2... Nc6.
+    move = notes.move_context(game, 1)
+    assert move is not None
+    assert (move["label"], move["color"]) == ("2... Nc6", "black")
 
 
 def test_ply_offset_reads_side_to_move_and_move_number() -> None:

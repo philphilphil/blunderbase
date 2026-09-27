@@ -158,6 +158,11 @@ export function GamesPage() {
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key !== '/' || event.metaKey || event.ctrlKey || event.altKey) return
       if (isTyping(event.target)) return
+      // Not from inside a popover or a dialog, nor while a modal is open: the box sits
+      // behind it, and what is typed next would re-filter the table under the dialog. The
+      // table's arrow keys stand down the same way (`GamesTable`).
+      if (event.target instanceof Element && event.target.closest('[role="dialog"]')) return
+      if (document.querySelector('[aria-modal="true"]')) return
       // Or the slash lands in the box along with the intention to type in it.
       event.preventDefault()
       document.getElementById(SEARCH_ID)?.focus()

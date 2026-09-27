@@ -200,6 +200,25 @@ def test_decode_pgn_drops_a_bom_before_the_windows_1252_fallback() -> None:
     assert game.white_name == "Müller, Hans"
 
 
+# A UTF-8 archive with one ChessBase game appended (`cat a.pgn b.pgn`): the one stray
+# Windows-1252 line must not turn every UTF-8 name before it into "MÃ¼ller".
+MIXED = ACCENTED.encode("utf-8") + b"\n" + ACCENTED.replace("Müller", "Jürgen").encode("cp1252")
+
+
+def test_decode_pgn_falls_back_line_by_line_in_a_mixed_file() -> None:
+    text = pgn_import.decode_pgn(MIXED)
+    assert "Müller, Hans" in text
+    assert "Jürgen, Hans" in text
+    assert "Ã" not in text
+
+
+def test_a_mixed_file_keeps_the_names_of_both_charsets(tmp_path: Path) -> None:
+    path = tmp_path / "mixed.pgn"
+    path.write_bytes(codecs.BOM_UTF8 + MIXED)
+    names = [item.white_name for item in _games(path) if isinstance(item, ParsedGame)]
+    assert names == ["Müller, Hans", "Jürgen, Hans"]
+
+
 def test_decode_pgn_reads_strict_utf8_and_falls_back_to_windows_1252() -> None:
     assert pgn_import.decode_pgn(ACCENTED.encode("cp1252")) == ACCENTED
     assert pgn_import.decode_pgn(ACCENTED.encode("utf-8")) == ACCENTED

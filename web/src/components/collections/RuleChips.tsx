@@ -26,7 +26,7 @@ export function RuleChips({
       {parts.map((part) => (
         <span
           key={part}
-          className="rounded-sm border border-edge bg-raised px-1.5 font-mono text-[0.65625rem] leading-[1.0625rem] text-soft"
+          className="rounded-sm border border-edge bg-raised px-1.5 text-label text-soft"
         >
           {part}
         </span>

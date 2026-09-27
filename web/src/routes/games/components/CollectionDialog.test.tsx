@@ -34,6 +34,8 @@ let matching: number
 let inside: number
 /** Whether the count never answers, as on a busy server. */
 let countHangs: boolean
+/** Whether the count fails, as when the server is restarting. */
+let countFails: boolean
 let nameTaken: boolean
 
 beforeEach(() => {
@@ -42,6 +44,7 @@ beforeEach(() => {
   matching = 8
   inside = 0
   countHangs = false
+  countFails = false
   nameTaken = false
   vi.stubGlobal(
     'fetch',
@@ -52,6 +55,7 @@ beforeEach(() => {
       if (url.pathname === '/api/games') {
         counts.push(url.searchParams)
         if (countHangs) return new Promise<Response>(() => {})
+        if (countFails) return json(503, { error: 'unavailable', detail: 'restarting' })
         const total = url.searchParams.has('collection') ? inside : matching
         return json(200, { games: [], total, limit: 1, offset: 0 })
       }
@@ -268,5 +272,55 @@ describe('CollectionDialog — editing one', () => {
   it('offers no delete while making one', () => {
     draw()
     expect(screen.queryByRole('button', { name: 'Delete…' })).toBeNull()
+  })
+
+  it('leaves the rule out of a save that did not change it', async () => {
+    const user = userEvent.setup()
+    const { onClose } = draw({ collection: LEAGUE })
+    await user.clear(screen.getByLabelText('Name'))
+    await user.type(screen.getByLabelText('Name'), 'League')
+    await user.click(screen.getByRole('button', { name: 'Save' }))
+    await waitFor(() => expect(onClose).toHaveBeenCalled())
+    // A rename must not re-send, and so restamp or undo, a rule nobody touched.
+    expect(writes).toEqual([
+      {
+        call: 'PATCH /api/collections/7',
+        body: { name: 'League', color: 'accent', description: 'Lichess 45+45 league rounds' },
+      },
+    ])
+  })
+
+  it('says a count that failed failed, and counts again when asked', async () => {
+    countFails = true
+    const user = userEvent.setup()
+    draw({ collection: LEAGUE })
+    expect(await screen.findByText('Could not count the games you already have.')).toBeInTheDocument()
+    expect(screen.queryByText(/Counting the games/)).toBeNull()
+
+    countFails = false
+    await user.click(screen.getByRole('button', { name: 'Try again' }))
+    expect(
+      await screen.findByRole('checkbox', {
+        name: 'Also add the 8 games that match and are not in it yet',
+      }),
+    ).toBeInTheDocument()
+  })
+})
+
+describe('CollectionDialog — the colours', () => {
+  it('are one tab stop, walked with the arrow keys', async () => {
+    const user = userEvent.setup()
+    draw()
+    const radios = screen.getAllByRole('radio')
+    expect(radios.filter((radio) => radio.tabIndex === 0)).toHaveLength(1)
+
+    radios[0].focus()
+    await user.keyboard('{ArrowRight}')
+    expect(radios[1]).toBeChecked()
+    expect(document.activeElement).toBe(radios[1])
+
+    await user.keyboard('{ArrowLeft}{ArrowLeft}')
+    // Round the end of the row.
+    expect(radios[radios.length - 1]).toBeChecked()
   })
 })
