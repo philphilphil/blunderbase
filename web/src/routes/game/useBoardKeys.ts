@@ -17,6 +17,8 @@ export interface BoardKeyHandlers {
   nextFlagged: () => void
   previousFlagged: () => void
   flip: () => void
+  /** The game's next move, leaving an analysis line first if the board is in one. */
+  nextGameMove?: () => void
   toggleHints?: () => void
   /** The live search on the position the board is showing. */
   toggleEngine?: () => void
@@ -43,7 +45,6 @@ export interface BoardKeyHandlers {
   graphTime?: () => void
   /** The Book tab over the notes. */
   bookTab?: () => void
-  autoplay?: () => void
   previousGame?: () => void
   nextGame?: () => void
 }
@@ -71,13 +72,13 @@ const CONTROLS = 'button, a[href], [role="button"], [role="checkbox"], [role="sw
  * Enter and Space press whatever the *keyboard* is on, and that has to keep working.
  *
  * They are the only two keys here the browser already spends on the focused control, so
- * somebody who tabbed to "Flip" and pressed Space must flip the board rather than start the
- * game playing through.
+ * somebody who tabbed to "Flip" and pressed Space must flip the board rather than play the
+ * engine's move.
  *
  * The trap is that "has focus" is not the same question. Clicking a button leaves it
  * focused without making it what the keyboard is aimed at, and this page is made of buttons
  * — every move in the list is one. Guarding on focus alone meant clicking a move (the most
- * ordinary gesture on the screen) quietly swallowed the next ↵, and pressing it again just
+ * ordinary gesture on the screen) quietly swallowed the next Space, and pressing it again just
  * re-pressed that move: the shortcut worked, or did nothing, according to whether the
  * reader had touched the mouse.
  *
@@ -163,6 +164,8 @@ function run(action: BoardAction, keys: BoardKeyHandlers): boolean {
     case 'step-forward':
       keys.step(1)
       return true
+    case 'next-game-move':
+      return call(keys.nextGameMove)
     case 'seek-start':
       keys.seekStart()
       return true
@@ -214,8 +217,6 @@ function run(action: BoardAction, keys: BoardKeyHandlers): boolean {
       return call(keys.graphTime)
     case 'book-tab':
       return call(keys.bookTab)
-    case 'autoplay':
-      return call(keys.autoplay)
     case 'previous-game':
       return call(keys.previousGame)
     case 'next-game':

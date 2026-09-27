@@ -77,11 +77,11 @@ are on.
 | Key | Does |
 |---|---|
 | `←` `→` | One move back, one move on |
+| `↵` | The game's next move, leaving any line |
 | `↑` `,` | The previous flagged move |
 | `↓` `.` | The next flagged move |
 | `⇧←` `⇧→` | Five moves back, five moves on |
 | `Home` `End` | The starting position, the last move |
-| `Space` | Play the game through |
 | `[` `]` | Previous and next game in your games list |
 
 ### Analysing a game: the board
@@ -95,7 +95,7 @@ are on.
 | `V` | The evaluation graph |
 | `T` | The move-time graph |
 | `B` | Your book for this position |
-| `↵` | Play the engine's move onto the board |
+| `Space` | Play the engine's move onto the board |
 | `M` | Type a move — `Nf3`, `exd5`, `O-O` — instead of dragging it |
 | `S` | Board settings |
 | `Esc` | Back to the game |

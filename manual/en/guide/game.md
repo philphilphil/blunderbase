@@ -3,7 +3,10 @@
 ## Move through the game
 
 ← and → step a move, ↑ and ↓ jump to the previous and next flagged move, Home and End go
-to the ends, and Space plays the game through. `F` flips the board, `[` and `]` open the
+to the ends, and Space plays the engine's best move onto the board — the live engine's
+while it is on, otherwise the analysis's. ↵ plays the game's next move; inside a line it
+leaves the line first, so Space, Space, ↵ reads the engine's idea and carries on with the
+game. `F` flips the board, `[` and `]` open the
 previous and next game in your list. The full list is under [Settings](settings.md).
 
 The controls sit around the board rather than under it. The row with your opponent's name,
@@ -144,7 +147,7 @@ going — the dot on the **Live** tab keeps pulsing until you stop it.
 
 On the **Live** tab the engine's name and the line count in the title are pickers: click
 the name to choose which engine searches, the count to choose how many lines it shows.
-`↵` plays its move onto the board. Once you leave the game line the pane goes to **Live**
+Space plays its move onto the board. Once you leave the game line the pane goes to **Live**
 by itself while a search is running, since the stored pass never looked at the position
 you are in.
 

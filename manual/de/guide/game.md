@@ -3,8 +3,11 @@
 ## Durch die Partie gehen { #move-through-the-game }
 
 ← und → gehen einen Zug vor oder zurück, ↑ und ↓ springen zum vorigen und nächsten
-markierten Zug, Pos1 und Ende an Anfang und Ende, die Leertaste spielt die Partie ab. `F`
-dreht das Brett, `[` und `]` öffnen die vorige und die nächste Partie deiner Liste. Die
+markierten Zug, Pos1 und Ende an Anfang und Ende. Die Leertaste setzt den besten Zug der
+Engine aufs Brett – den der laufenden Engine, wenn sie an ist, sonst den der Analyse. ↵
+spielt den nächsten Zug der Partie und verlässt dafür eine Variante, in der du gerade stehst:
+Leertaste, Leertaste, ↵ – erst die Idee der Engine nachspielen, dann mit der Partie weiter.
+`F` dreht das Brett, `[` und `]` öffnen die vorige und die nächste Partie deiner Liste. Die
 vollständige Tastenliste steht unter [Einstellungen](settings.md).
 
 Die Bedienelemente stehen rund um das Brett statt darunter. Die Zeile mit dem Namen deines
@@ -154,7 +157,7 @@ Engine weiterrechnet – der Punkt auf dem Reiter **Live** pulsiert, bis du sie 
 
 Auf dem Reiter **Live** sind der Name der Engine und die Variantenzahl in der Titelzeile
 Auswahlfelder: Klick auf den Namen, um die Engine zu wählen, auf die Zahl, um
-einzustellen, wie viele Varianten sie zeigt. `↵` spielt ihren besten Zug aufs Brett.
+einzustellen, wie viele Varianten sie zeigt. Die Leertaste spielt ihren besten Zug aufs Brett.
 Sobald du die Partie verlässt, wechselt das Feld von selbst auf **Live**, solange eine
 Suche läuft – die gespeicherte Analyse hat die Stellung, in der du jetzt stehst, nie
 gesehen.

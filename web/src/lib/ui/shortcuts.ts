@@ -71,6 +71,7 @@ export function commitsOnEnter(event: {
 export type BoardAction =
   | 'step-back'
   | 'step-forward'
+  | 'next-game-move'
   | 'seek-start'
   | 'seek-end'
   | 'next-flagged'
@@ -93,7 +94,6 @@ export type BoardAction =
   | 'graph-eval'
   | 'graph-time'
   | 'book-tab'
-  | 'autoplay'
   | 'previous-game'
   | 'next-game'
 
@@ -175,6 +175,16 @@ export const BOARD_SHORTCUTS: BoardShortcut[] = [
     keys: ['→'],
     label: msg`One move on`,
   },
+  // → walks whatever the board is on, a line included; ↵ always means the game. Off a line
+  // the two are the same key, and inside one ↵ is the way back that also moves on, so
+  // Space-Space-↵ reads the engine's idea and then carries on with the game.
+  {
+    section: MOVING,
+    action: 'next-game-move',
+    press: ['Enter'],
+    keys: ['↵'],
+    label: msg`The game’s next move, leaving any line`,
+  },
   {
     section: MOVING,
     action: 'previous-flagged',
@@ -216,13 +226,6 @@ export const BOARD_SHORTCUTS: BoardShortcut[] = [
     press: ['End'],
     keys: ['End'],
     label: msg`The last move`,
-  },
-  {
-    section: MOVING,
-    action: 'autoplay',
-    press: [' '],
-    keys: ['Space'],
-    label: msg`Play the game through`,
   },
   {
     section: MOVING,
@@ -293,11 +296,13 @@ export const BOARD_SHORTCUTS: BoardShortcut[] = [
     keys: ['B'],
     label: msg`Your book for this position`,
   },
+  // Space: it is the biggest key under the hand, and walking the engine's line move by move
+  // is what a review does far more often than anything else here.
   {
     section: BOARD,
     action: 'play-best',
-    press: ['Enter'],
-    keys: ['↵'],
+    press: [' '],
+    keys: ['Space'],
     label: msg`Play the engine’s move onto the board`,
   },
   // `M` as on Lichess, where the same key opens the same box: a reader who plays there has

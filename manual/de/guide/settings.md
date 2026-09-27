@@ -79,11 +79,11 @@ aktuellen Bildschirm gelten.
 | Taste | Wirkung |
 |---|---|
 | `←` `→` | Ein Zug zurück, ein Zug vor |
+| `↵` | Der nächste Zug der Partie, auch aus einer Variante heraus |
 | `↑` `,` | Der vorige markierte Zug |
 | `↓` `.` | Der nächste markierte Zug |
 | `⇧←` `⇧→` | Fünf Züge zurück, fünf Züge vor |
 | `Pos1` `Ende` | Die Ausgangsstellung, der letzte Zug |
-| `Leertaste` | Die Partie abspielen |
 | `[` `]` | Vorige und nächste Partie deiner Liste |
 
 ### Eine Partie analysieren: das Brett { #analysing-a-game-the-board }
@@ -97,7 +97,7 @@ aktuellen Bildschirm gelten.
 | `V` | Der Bewertungsverlauf |
 | `T` | Die Bedenkzeit je Zug |
 | `B` | Dein Buch zu dieser Stellung |
-| `↵` | Den Zug der Engine aufs Brett spielen |
+| `Leertaste` | Den Zug der Engine aufs Brett spielen |
 | `M` | Einen Zug tippen – `Sf3`, `exd5`, `O-O` – statt ihn zu ziehen |
 | `S` | Bretteinstellungen |
 | `Esc` | Zurück zur Partie |

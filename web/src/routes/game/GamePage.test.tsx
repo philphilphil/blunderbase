@@ -710,33 +710,48 @@ describe('GamePage', () => {
     expect(screen.getByText('ply 0 / 4')).toBeInTheDocument()
   })
 
-  it('plays the game through on space, and stops on the next key', async () => {
+  it('plays the engine’s move onto the board with space', async () => {
     const user = userEvent.setup()
     renderPage()
     await screen.findByText('Scandinavian Defense')
 
-    // Real timers: the page books one 800ms timeout per ply, and a fake clock here has to
-    // be advanced past a `userEvent` that is itself waiting on one — two clocks pretending
-    // to be one. Waiting for the first step is what this is about anyway.
+    // The fixture's top line at the starting position is 1.e4, so Space walks it — which is
+    // leaving the game line, and the page says so.
     await user.keyboard(' ')
-    expect(await screen.findByText('ply 1 / 4', {}, { timeout: 3_000 })).toBeInTheDocument()
-
-    // Taking hold of the cursor stops it: the two are the same control.
-    await user.keyboard('{ArrowLeft}')
-    expect(screen.getByText('ply 0 / 4')).toBeInTheDocument()
-    await new Promise((resolve) => setTimeout(resolve, 1_200))
-    expect(screen.getByText('ply 0 / 4')).toBeInTheDocument()
+    expect(await screen.findByText('Back to game')).toBeInTheDocument()
   })
 
-  it('plays the engine’s move onto the board with enter', async () => {
+  it('keeps walking the engine’s line when space is pressed again inside it', async () => {
     const user = userEvent.setup()
     renderPage()
     await screen.findByText('Scandinavian Defense')
 
-    // The fixture's top line at the starting position is 1.e4, so ↵ walks it — which is
-    // leaving the game line, and the page says so.
+    // The top line at the start is 1.e4 e5: two presses stand two moves into it, so it takes
+    // three steps back to leave the line (to its head, then off it). After a single press,
+    // two would already have left it.
+    await user.keyboard('  ')
+    await user.keyboard('{ArrowLeft}{ArrowLeft}')
+    expect(screen.getByText('Back to game')).toBeInTheDocument()
+    await user.keyboard('{ArrowLeft}')
+    expect(screen.queryByText('Back to game')).not.toBeInTheDocument()
+  })
+
+  it('plays the game’s next move with enter, leaving an engine line first', async () => {
+    const user = userEvent.setup()
+    renderPage()
+    await screen.findByText('Scandinavian Defense')
+
+    // Off a line it is →.
     await user.keyboard('{Enter}')
+    expect(screen.getByText('ply 1 / 4')).toBeInTheDocument()
+
+    // In one, it goes back to the game and on by a move, rather than along the line.
+    await user.keyboard('{ArrowLeft}')
+    await user.keyboard(' ')
     expect(await screen.findByText('Back to game')).toBeInTheDocument()
+    await user.keyboard('{Enter}')
+    expect(screen.queryByText('Back to game')).not.toBeInTheDocument()
+    expect(screen.getByText('ply 1 / 4')).toBeInTheDocument()
   })
 
   it('still plays it after a click has left focus on a button', async () => {
@@ -745,7 +760,7 @@ describe('GamePage', () => {
     await screen.findByText('Scandinavian Defense')
 
     // Every move in the list is a button, and clicking one leaves it focused. That must not
-    // swallow the next ↵ — it is how the shortcut came to work only sometimes.
+    // swallow the next Space — it is how the shortcut came to work only sometimes.
     // Scoped to the table: the engine panels draw their PV moves as buttons too.
     // The name carries the classification badge's glyph too, hence the pattern.
     const move = within(screen.getByTestId('move-list')).getByRole('button', { name: /e4/ })
@@ -753,22 +768,22 @@ describe('GamePage', () => {
     expect(screen.getByText('ply 1 / 4')).toBeInTheDocument()
     expect(document.activeElement).toBe(move)
 
-    await user.keyboard('{Enter}')
+    await user.keyboard(' ')
     expect(await screen.findByText('Back to game')).toBeInTheDocument()
   })
 
-  it('leaves enter to a button the keyboard is actually on', async () => {
+  it('leaves space to a button the keyboard is actually on', async () => {
     const user = userEvent.setup()
     renderPage()
     await screen.findByText('Scandinavian Defense')
 
-    // Tabbed to rather than clicked, so the reader is driving from the keyboard and ↵ is
-    // that button's: the board stays on the game rather than walking the engine's line.
+    // Tabbed to rather than clicked, so the reader is driving from the keyboard and Space
+    // is that button's: the board stays on the game rather than walking the engine's line.
     const flip = screen.getByRole('button', { name: 'Flip the board' })
     flip.focus()
     await user.tab()
     flip.focus()
-    await user.keyboard('{Enter}')
+    await user.keyboard(' ')
     expect(screen.queryByText('Back to game')).not.toBeInTheDocument()
   })
 

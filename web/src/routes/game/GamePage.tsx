@@ -229,15 +229,6 @@ function writeMovesWidth(width: number | null): void {
  * therefore describes `moves[cursor + 1]`, the move about to happen, which is how a review
  * actually reads: you sit in the position and look at what is coming.
  */
-/**
- * How long one ply of "play the game through" stands on screen.
- *
- * Under a second, because this is for re-watching a game already read rather than for
- * reading one: fast enough that a twenty-move opening goes past in fifteen seconds, slow
- * enough that a capture registers before the next move lands on it.
- */
-const AUTOPLAY_MS = 800
-
 export function GamePage() {
   const { t } = useLingui()
   const { id } = useParams<{ id: string }>()
@@ -350,8 +341,6 @@ export function GameStudio({ game: from }: { game: StudioGame }) {
   const [notesTab, setNotesTab] = useState<NotesTrackTab>('notes')
 
   const [cursor, setCursor] = useState(-1)
-  /** Whether the game is playing itself through, a ply at a time (Space). */
-  const [playing, setPlaying] = useState(false)
   const [flipped, setFlipped] = useState(false)
   const [hints, setHints] = useState(true)
   // The typed-move box under the board: open or not, and a counter `M` bumps so that
@@ -1468,7 +1457,7 @@ export function GameStudio({ game: from }: { game: StudioGame }) {
   /**
    * What the last search said, or nothing at all while the engine is hidden. The session is
    * closed above, but a session that has been closed still remembers its final snapshot —
-   * and that snapshot is what feeds the board's arrow, the eval bar and ↵. Read through this
+   * and that snapshot is what feeds the board's arrow, the eval bar and Space. Read through this
    * rather than off `stream` directly, so there is one place the mode is applied and not
    * three that have to agree.
    */
@@ -1477,7 +1466,7 @@ export function GameStudio({ game: from }: { game: StudioGame }) {
   /**
    * Every line on offer for the position the board is standing on, best first, in UCI.
    *
-   * One list, because three different gestures ask the same question — ↵ plays the first of
+   * One list, because three different gestures ask the same question — Space plays the first of
    * them, a drag is checked against all of them, and the arrow points along the first — and
    * they must not disagree about who is speaking for this position. The live search wins
    * while one is running on exactly this FEN; short of that the stored run's lines speak,
@@ -1597,17 +1586,26 @@ export function GameStudio({ game: from }: { game: StudioGame }) {
     boardWin === null && (stream.phase === 'opening' || stream.phase === 'running')
 
   /**
-   * Walk the engine's own move here onto the board — ↵.
+   * Walk the engine's own move here onto the board — Space.
    *
-   * The same call a click on a line's first move makes (`playLine`), reading the panel that
-   * is actually speaking for the position on the board. That is the rule `boardEngineBest`
-   * already follows for the arrow, and the key must not point somewhere else than the arrow
-   * does — which is why both read `boardPvs`.
+   * The same call a click on a line's first move makes (`playLine`), and the same order of
+   * who speaks that the arrow keeps (`boardEngineBest`), so the key never plays something
+   * other than what the board points at: a live search on exactly this position, then the
+   * stored line the board is walking (`alongLine`), then the stored run on the game line.
+   *
+   * Pressed again and again it has to keep going. Inside a line the stored run is silent
+   * past its own PV, and the live search needs a moment to answer each new position, so
+   * with nobody speaking yet the key walks on along the line already on the board — which
+   * is the engine's line it came in by. Only with nothing ahead either does it do nothing.
    */
   const playEngineBest = useCallback(() => {
-    const pv = boardPvs[0]
-    if (pv && pv.length > 0) playLine(pv, 0)
-  }, [boardPvs, playLine])
+    const pv = boardPvs[0] ?? alongLine?.rows[0]?.pv
+    if (pv && pv.length > 0) {
+      playLine(pv, 0)
+      return
+    }
+    if (analysis && exploring && analysis.cursor < analysis.moves.length) step(1)
+  }, [alongLine, analysis, boardPvs, exploring, playLine, step])
 
   /**
    * A move dragged on the board.
@@ -1661,8 +1659,7 @@ export function GameStudio({ game: from }: { game: StudioGame }) {
 
   /**
    * Start practising from the board as it stands. A line walked past the board is cut at
-   * it (and kept), the live search is switched off — it would be the answer — and the game
-   * stops playing itself through.
+   * it (and kept), and the live search is switched off — it would be the answer.
    */
   const beginPractice = useCallback(
     (setup: PracticeSetup) => {
@@ -1673,7 +1670,6 @@ export function GameStudio({ game: from }: { game: StudioGame }) {
       setHoverMove(null)
       setPreview(null)
       setBranch({ base: analysis.base, moves: analysis.moves.slice(0, from), cursor: from })
-      setPlaying(false)
       setLiveSearch(false)
       startPractice(setup, analysis.base, from)
     },
@@ -1690,26 +1686,6 @@ export function GameStudio({ game: from }: { game: StudioGame }) {
     const yours = analysis.board.turn === practiceGame.side && !practice.thinking
     return yours ? analysis : { ...analysis, dests: new Map() }
   }, [analysis, practiceGame, practice.thinking])
-
-  /*
-   * Playing the game through, a ply at a time.
-   *
-   * A `setTimeout` per ply rather than one interval: the cursor is React state, so each
-   * step re-runs this effect anyway, and a timeout that is booked *after* the last step
-   * landed cannot pile up behind a slow render the way an interval can. Stopping at the
-   * last move rather than looping — the end of the game is the end of it.
-   */
-  useEffect(() => {
-    if (!playing || cursor >= plyCount - 1) return
-    const timer = setTimeout(() => {
-      // Stopped by the step that lands on the last move rather than by the render that
-      // notices it has: the flag goes down inside the timeout, which keeps this effect from
-      // setting state as it runs and re-rendering the page for it.
-      if (cursor + 1 >= plyCount - 1) setPlaying(false)
-      seek(cursor + 1)
-    }, AUTOPLAY_MS)
-    return () => clearTimeout(timer)
-  }, [playing, cursor, plyCount, seek])
 
   /**
    * The run of games the library was showing when this one was opened — `[` and `]`.
@@ -1735,28 +1711,17 @@ export function GameStudio({ game: from }: { game: StudioGame }) {
 
   useBoardKeys(
     {
-      // Taking hold of the cursor by hand stops the game playing itself: the two are the
-      // same control, and a reader stepping back through a move while it plays forwards
-      // would be fighting the page.
-      step: (delta) => {
-        setPlaying(false)
-        step(delta)
-      },
-      seekStart: () => {
-        setPlaying(false)
-        seek(-1)
-      },
-      seekEnd: () => {
-        setPlaying(false)
-        seek(plyCount - 1)
-      },
+      step,
+      // `cursor` is the game's, and does not move while a line is walked, so one seek past
+      // it both leaves the line (kept, as every exit keeps it) and plays the game on.
+      nextGameMove: () => seek(cursor + 1),
+      seekStart: () => seek(-1),
+      seekEnd: () => seek(plyCount - 1),
       // Both land one ply short of the flagged move — see the memos the buttons share.
       nextFlagged: () => {
-        setPlaying(false)
         if (nextFlagged !== null) seek(nextFlagged)
       },
       previousFlagged: () => {
-        setPlaying(false)
         if (previousFlagged !== null) seek(previousFlagged)
       },
       flip: () => setFlipped((value) => !value),
@@ -1803,9 +1768,6 @@ export function GameStudio({ game: from }: { game: StudioGame }) {
       graphEval: mobile || quiet ? undefined : () => setGraphTab('eval'),
       graphTime: mobile || quiet || times.length === 0 ? undefined : () => setGraphTab('time'),
       bookTab: mobile ? undefined : () => setNotesTab('book'),
-      // At the end of the game there is nothing to play through, so Space starts nothing —
-      // the same as the ⏭ beside it being spent.
-      autoplay: () => setPlaying((was) => !was && cursor < plyCount - 1),
       previousGame: trail?.previous != null ? () => goToGame(-1, trail.previous) : undefined,
       nextGame: trail?.next != null ? () => goToGame(1, trail.next) : undefined,
     },
@@ -2005,8 +1967,6 @@ export function GameStudio({ game: from }: { game: StudioGame }) {
       nextFlagged={nextFlagged}
       previousFlagged={previousFlagged}
       onStep={stepFromBoard}
-      onToggleAutoplay={() => setPlaying((was) => !was)}
-      playing={playing}
       finishedRun={best}
       activeRun={analysisRequest.activeRun}
       progress={analysisRequest.progress}

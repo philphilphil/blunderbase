@@ -9,8 +9,6 @@ import {
   FlipVertical2,
   Keyboard,
   Lightbulb,
-  Pause,
-  Play,
   StickyNote,
   Undo2,
 } from 'lucide-react'
@@ -154,12 +152,6 @@ export interface BoardPanelProps {
   nextFlagged?: number | null
   previousFlagged?: number | null
   /**
-   * Play the game through from where it stands, and stop it again. Left out where there is
-   * nothing to play — the explorer's stand-in board — and the cell is then not drawn.
-   */
-  onToggleAutoplay?: () => void
-  playing?: boolean
-  /**
    * One move forwards or back from wherever the board stands. Inside an analysis line that
    * is a step along the line rather than along the game, which the page decides — the wheel
    * only says which way. Without it, a step is a plain seek.
@@ -272,8 +264,6 @@ export function BoardPanel({
   nextFlagged,
   previousFlagged,
   onStep,
-  onToggleAutoplay,
-  playing = false,
   finishedRun,
   activeRun,
   progress,
@@ -808,25 +798,6 @@ export function BoardPanel({
             >
               ⏭
             </TransportButton>
-            {/* Last in the group rather than beside ▶: the four cells before it are where
-                the hand already goes, and inserting a fifth among them would move all of
-                them for the sake of a control that is pressed once a game. */}
-            {onToggleAutoplay ? (
-              <TransportButton
-                label={playing ? t`Stop playing through` : t`Play the game through`}
-                hint="Space"
-                // Spent at the end of the game, like the ⏭ beside it: there is nothing left
-                // to play through. Disabled rather than gone, so the group keeps its shape.
-                disabled={!playing && cursor >= plyCount - 1}
-                onClick={onToggleAutoplay}
-              >
-                {playing ? (
-                  <Pause className="size-3.5 text-accent-teal" aria-hidden />
-                ) : (
-                  <Play className="size-3.5" aria-hidden />
-                )}
-              </TransportButton>
-            ) : null}
           </div>
 
           {/*

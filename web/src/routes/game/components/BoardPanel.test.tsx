@@ -561,13 +561,12 @@ describe('BoardPanel transport row', () => {
   })
 
   it('keeps every transport cell’s accessible name, and its key in the tooltip only', () => {
-    renderPanel({ onToggleAutoplay: vi.fn(), nextFlagged: 2, previousFlagged: 0, cursor: 1 })
+    renderPanel({ nextFlagged: 2, previousFlagged: 0, cursor: 1 })
     for (const [name, key] of [
       ['First', 'Home'],
       ['Previous', '←'],
       ['Next', '→'],
       ['Last', 'End'],
-      ['Play the game through', 'Space'],
       ['Previous flagged move', '↑'],
       ['Next flagged move', '↓'],
     ] as const) {
