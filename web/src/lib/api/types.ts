@@ -267,6 +267,18 @@ export interface GameSummary extends Extra {
   increment?: number | null
   rated?: boolean | null
   variant?: string | null
+  /**
+   * The FEN the game starts from — a chess960 array, a game set up from a position. Absent
+   * for a game from the initial array. `gameModel.buildGameLine` replays from it and
+   * `gameModel.plyOffset` numbers the moves from its side to move and move number.
+   */
+  start_fen?: string | null
+  /**
+   * The game is replayed as chess960 — by its variant, or by castling rights only a chess960
+   * start can have (`services.games.is_chess960`). Absent for a standard game. `gameStart`
+   * reads it so castling is spelled and offered the way the backend stored it.
+   */
+  chess960?: boolean | null
   eco?: string | null
   opening?: string | null
   termination?: string | null
@@ -1416,7 +1428,8 @@ export interface StatsResponse extends Extra {
 export interface StatsDashboardResponse extends Extra {
   anchor: string
   since?: string | null
-  until: string
+  /** Null on all time, so a game with no date stays in it. */
+  until?: string | null
   dimensions: Record<string, StatsResponse>
 }
 

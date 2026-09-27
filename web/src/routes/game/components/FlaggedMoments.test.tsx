@@ -3,6 +3,8 @@ import { describe, expect, it, vi } from 'vitest'
 
 import type { MoveRow } from '@/lib/api/types'
 
+import { PlyOffsetContext } from '../plyNumbering'
+
 import { FlaggedMoments } from './FlaggedMoments'
 
 function move(ply: number, san: string, extra: Partial<MoveRow> = {}): MoveRow {
@@ -60,5 +62,23 @@ describe('FlaggedMoments', () => {
 
     expect(screen.getByText('Nothing flagged in this game.')).toBeInTheDocument()
     expect(screen.queryByRole('button')).not.toBeInTheDocument()
+  })
+})
+
+describe('FlaggedMoments in a game set up with Black to move', () => {
+  it('numbers the moments from the game’s own start, not from ply parity', () => {
+    // After 1.e4 e5 2.Nf3 the game starts: ply 0 is Black's move 2, ply 1 White's move 3.
+    const moves: MoveRow[] = [
+      { ply: 0, move_number: 2, color: 'black', san: 'Qf6', classification: 'mistake' },
+      { ply: 1, move_number: 3, color: 'white', san: 'Nc3', classification: 'blunder' },
+    ]
+    render(
+      <PlyOffsetContext value={3}>
+        <FlaggedMoments moves={moves} cursor={-1} onSelect={vi.fn()} />
+      </PlyOffsetContext>,
+    )
+    const rows = screen.getAllByRole('button')
+    expect(rows[0]).toHaveTextContent('2…Qf6')
+    expect(rows[1]).toHaveTextContent('3.Nc3')
   })
 })

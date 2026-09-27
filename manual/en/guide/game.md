@@ -26,6 +26,11 @@ A game that is in a [collection](collections.md) carries that collection's chip 
 too, and the chip opens the games list filtered to that collection. Like the bar's other items, the chips give
 way when the window is too narrow for them.
 
+A chess960 game, or one that was set up from a position, starts the board from that
+position, and its moves are numbered from it: a game that begins with Black to move on move
+12 opens on `12…`. The PGN button writes the start position into the export (`SetUp` and
+`FEN`), so another program reads the game back the same way.
+
 ## What the badges mean
 
 The move column marks a move `??`, `?`, `?!` or `!` and tints the flagged rows. The

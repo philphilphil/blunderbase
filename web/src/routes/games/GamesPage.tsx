@@ -6,9 +6,13 @@
  * would fight with.
  *
  * Filters live in the URL (`/games?color=black&outcome=loss`), so a filtered library is a
- * link — the opening explorer and the dashboard both point into it that way. The page and
- * its size do not: which slice you are reading is not what a link to a filtered library is
- * about, and the size is a preference the reader keeps (`./paging`).
+ * link — the opening explorer and the dashboard both point into it that way. The sort and
+ * the page ride along (`?order=…&direction=…&page=3`), because opening a game unmounts this
+ * screen and Back has to land on the page and order the row was found in; state held here
+ * would come back as page 1, newest first. Every write replaces the history entry rather
+ * than pushing one, so paging through the library does not fill Back with pages, and none
+ * of them spells a default. The size stays out: it is a preference the reader keeps
+ * (`./paging`), not part of what a link is about.
  *
  * It is always the whole library. A collection is one of its filters and nothing more — the
  * Collection chip, over the owner's games unless the link says `whose=all`, and cleared by
@@ -50,12 +54,14 @@ import {
 import { rememberTrail } from './gameTrail'
 import {
   FALLBACK_FIT_ROWS,
+  pageFromParams,
   readPageSize,
   resolvePageSize,
+  writePageParam,
   writePageSize,
   type PageSizeChoice,
 } from './paging'
-import { DEFAULT_SORT, type Sort } from './sorting'
+import { DEFAULT_SORT, sortFromParams, writeSortParams, type Sort } from './sorting'
 import { useCollectionNames } from './useCollectionNames'
 import { useGameLibrary } from './useGameLibrary'
 
@@ -74,11 +80,11 @@ export function GamesPage() {
   const [params, setParams] = useSearchParams()
 
   const filters = useMemo(() => filtersFromParams(params), [params])
-  const [sort, setSort] = useState<Sort>(DEFAULT_SORT)
+  const sort = useMemo(() => sortFromParams(params), [params])
+  const page = pageFromParams(params)
   const [selected, setSelected] = useState<Set<number>>(() => new Set())
   const [message, setMessage] = useState<string | null>(null)
   const [analysing, setAnalysing] = useState<Set<number>>(() => new Set())
-  const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState<PageSizeChoice>(readPageSize)
   // How many rows the table last measured room for. Only "Fit" spends it, but it is
   // measured either way so the option can say what choosing it would mean.
@@ -139,11 +145,13 @@ export function GamesPage() {
           },
           offset: (Math.max(page, 1) - 1) * rowsPerPage + at,
           gameId: id,
+          // The address itself too, for the game screen's "Library" crumb to go back to.
+          library: { search: params.toString(), rowsPerPage },
         })
       }
       navigate(`/games/${id}`)
     },
-    [rows, filters, readSort, page, rowsPerPage, navigate],
+    [rows, filters, readSort, page, rowsPerPage, params, navigate],
   )
 
   useEffect(() => {
@@ -158,26 +166,45 @@ export function GamesPage() {
     return () => document.removeEventListener('keydown', onKeyDown)
   }, [])
 
-  const setFilters = useCallback(
-    (next: LibraryFilters) => {
-      setParams(paramsFromFilters(prune(next)), { replace: true })
+  /**
+   * Rewrite the library's address — filters, sort and page — in place. What `next` leaves
+   * out is kept from the address, except the page: anything that changes what the first
+   * page holds starts again at it, because reading page 7 of one filter says nothing about
+   * where to stand in another. Built from the address it replaces rather than from this
+   * render's values, so two writes in one tick do not undo each other.
+   */
+  const writeView = useCallback(
+    (next: { filters?: LibraryFilters; sort?: Sort; page?: number }) => {
+      setParams(
+        (current) => {
+          const written = paramsFromFilters(prune(next.filters ?? filtersFromParams(current)))
+          writeSortParams(written, next.sort ?? sortFromParams(current))
+          writePageParam(written, next.page ?? 1)
+          return written
+        },
+        { replace: true },
+      )
     },
     [setParams],
   )
+  const setFilters = useCallback(
+    (next: LibraryFilters) => writeView({ filters: next }),
+    [writeView],
+  )
+  const setSort = useCallback((next: Sort) => writeView({ sort: next }), [writeView])
+  const setPage = useCallback((next: number) => writeView({ page: next }), [writeView])
 
-  // Anything that changes what the first page holds starts again at it: reading page 7 of
-  // one filter says nothing about where to stand in another. Adjusted during the render
-  // that notices rather than in an effect — React re-runs this render before it commits
-  // anything, so the table is never painted showing page 7 of a library that has three.
-  const queryKey = `${params.toString()}|${readSort.key}|${readSort.direction}|${rowsPerPage}`
-  const [lastQueryKey, setLastQueryKey] = useState(queryKey)
-  if (lastQueryKey !== queryKey) {
-    setLastQueryKey(queryKey)
-    setPage(1)
-  }
-  // The same, for a library that shrank under the reader — a delete, an import — and left
-  // the page past the end of it, which would be an empty table over a full library.
-  if (page > library.pageCount) setPage(library.pageCount)
+  // A library that shrank under the reader — a delete, an import — can leave the page past
+  // the end of it, which would be an empty table over a full library. Only once this very
+  // query has answered: before that the page count is a placeholder of one, and an address
+  // arriving at page 3 (Back from a game) would be sent to the first before it ever loaded.
+  // Nor does the table measuring a new "Fit" row count move the page — that happens on
+  // every mount, and would throw the page Back returned to away again.
+  const pastEnd = library.isSuccess && !library.isPlaceholderData && page > library.pageCount
+  const lastPage = library.pageCount
+  useEffect(() => {
+    if (pastEnd) setPage(lastPage)
+  }, [pastEnd, lastPage, setPage])
 
   // A row that a filter change or a page turn took off the table can no longer be acted
   // on. The raw selection is kept (going back brings it back) but everything the page
@@ -418,6 +445,9 @@ export function GamesPage() {
         onPageSizeChange={(size) => {
           setPageSize(size)
           writePageSize(size)
+          // A new size re-cuts every page, so the number on screen no longer names the
+          // rows that were on it: start again at the first.
+          setPage(1)
         }}
         rowsPerPage={rowsPerPage}
         fitRows={fitRows}

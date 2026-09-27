@@ -7,7 +7,7 @@ import { formatWinLoss } from '@/lib/chess/evaluation'
 import { useNotation } from '@/lib/chess/notationPrefs'
 import { cn } from '@/lib/utils'
 
-import { plyLabel } from '../gameModel'
+import { usePlyLabel } from '../plyNumbering'
 
 /**
  * Every move the engine flagged, as a list: what it was, what it cost, and a tap to stand
@@ -40,6 +40,7 @@ export function FlaggedMoments({
   className?: string
 }) {
   const notate = useNotation()
+  const plyLabel = usePlyLabel()
   const flagged = moves.filter((move) => isFlagged(move.classification))
 
   if (flagged.length === 0) {

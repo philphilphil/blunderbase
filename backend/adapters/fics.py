@@ -33,8 +33,8 @@ from backend.services.import_service import (
     ImportResult,
     ParsedGame,
     ProgressHook,
+    account_cursor,
     ingest_games,
-    latest_cursor,
 )
 
 if TYPE_CHECKING:
@@ -146,15 +146,26 @@ def run(
         raise ValueError("a FICS import needs a valid FICS username (1-17 characters)")
 
     job.message = name
-    account = accounts.register_account(session, Platform.FICS, name)
-    job.account_id = account.id
-    session.commit()
     index = AccountIndex.load(session)
+
+    def confirm() -> None:
+        # The account a sync was asked for is the owner's, and it has to exist before the
+        # first game is stored: `owner_color` is read off the accounts on the way in.
+        job.account_id = accounts.register_account(session, Platform.FICS, name).id
+        session.commit()
+        index.entries = AccountIndex.load(session).entries
+
+    # The games database answers a name it has never seen with an empty archive, not an
+    # error, so the only proof a player exists is a game of theirs. A known account is
+    # confirmed up front; a new one when its first game arrives, so a mistyped name leaves
+    # no owner account behind for the schedule to sync for ever.
+    if accounts.find_account(session, Platform.FICS, name) is not None:
+        confirm()
 
     end = today or datetime.now(UTC).date()
     resume = cursor if cursor is not None else since
     if resume is None:
-        resume = latest_cursor(session, Source.FICS, account.id)
+        resume = account_cursor(session, Source.FICS, name)
     start = read_cursor(resume)
     if start > end:
         start = end
@@ -164,19 +175,20 @@ def run(
     owned = client is None
     http = client if client is not None else httpx.Client(timeout=TIMEOUT, headers=headers)
     try:
+        games = stream_games(
+            http,
+            name,
+            start=start,
+            end=end,
+            max_games=max_games,
+            state=state,
+            headers=headers,
+            sleep=sleep,
+        )
         result = ingest_games(
             session,
             job,
-            stream_games(
-                http,
-                name,
-                start=start,
-                end=end,
-                max_games=max_games,
-                state=state,
-                headers=headers,
-                sleep=sleep,
-            ),
+            games if job.account_id is not None else _confirming(games, confirm),
             progress=progress,
             accounts=index,
             analyze=analyze,
@@ -192,6 +204,18 @@ def run(
     # last settled day, so that the part of the archive it never got through is revisited.
     result.cursor = (end if state.complete else state.reached).isoformat()
     return result
+
+
+def _confirming(
+    items: Iterator[ParsedGame | ImportFailure], confirm: Callable[[], None]
+) -> Iterator[ParsedGame | ImportFailure]:
+    """The stream as it is, with `confirm` run once, just before its first item."""
+    confirmed = False
+    for item in items:
+        if not confirmed:
+            confirm()
+            confirmed = True
+        yield item
 
 
 def read_cursor(value: Any) -> date:
@@ -607,12 +631,10 @@ def _decode_archive(payload: bytes) -> str | None:
                 ]
                 if not names:
                     raise FicsArchiveError("FICS archive contains no PGN file")
-                return "\n\n".join(
-                    archive.read(name).decode("utf-8-sig", errors="replace") for name in names
-                )
+                return "\n\n".join(pgn_import.decode_pgn(archive.read(name)) for name in names)
         except zipfile.BadZipFile as exc:
             raise FicsArchiveError("FICS returned a corrupt ZIP archive") from exc
-    text = payload.decode("utf-8-sig", errors="replace")
+    text = pgn_import.decode_pgn(payload)
     if text.lstrip().startswith("["):
         return text
     return None

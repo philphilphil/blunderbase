@@ -3,7 +3,13 @@ import { renderHook, waitFor } from '@testing-library/react'
 import { createElement, type ReactNode } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { advanceTrail, rememberTrail, resetTrail, useGameTrail } from './gameTrail'
+import {
+  advanceTrail,
+  rememberTrail,
+  resetTrail,
+  useGameTrail,
+  useLibraryAddress,
+} from './gameTrail'
 
 /** The library, in the order the table put it in. The stub serves windows of this. */
 const LIBRARY = [11, 12, 13, 14, 15]
@@ -104,5 +110,42 @@ describe('the game trail', () => {
     const result = await at(14)
 
     await waitFor(() => expect(result.current).toEqual({ previous: null, next: null }))
+  })
+})
+
+describe('the library address', () => {
+  function address(id: number | null) {
+    return renderHook(() => useLibraryAddress(id)).result
+  }
+
+  it('is the bare library for a game not opened from it', () => {
+    expect(address(14).current).toBe('/games')
+    rememberTrail({ query: {}, offset: 2, gameId: 13 })
+    // A run without an address (or about another game) still leads to the bare library.
+    expect(address(13).current).toBe('/games')
+    expect(address(77).current).toBe('/games')
+  })
+
+  it('goes back to the filters, sort and page the game was opened from', () => {
+    rememberTrail({
+      query: {},
+      offset: 27,
+      gameId: 13,
+      library: { search: 'color=black&order=black&page=2', rowsPerPage: 25 },
+    })
+    expect(address(13).current).toBe('/games?color=black&order=black&page=2')
+  })
+
+  it('follows the reader onto the page the run has stepped to', () => {
+    rememberTrail({
+      query: {},
+      offset: 24,
+      gameId: 13,
+      library: { search: 'color=black', rowsPerPage: 25 },
+    })
+    expect(address(13).current).toBe('/games?color=black')
+    // `]` off the end of the first page: the crumb now names the second.
+    advanceTrail(1, 14)
+    expect(address(14).current).toBe('/games?color=black&page=2')
   })
 })

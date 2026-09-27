@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import dataclasses
 import logging
 from datetime import timedelta
 from typing import Any
@@ -9,7 +10,7 @@ from typing import Any
 import pytest
 from sqlalchemy import event as sa_event
 from sqlalchemy import select, text
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, sessionmaker
 
 from backend.adapters.maia import PolicyMove
 from backend.adapters.pool import EngineSpec
@@ -390,6 +391,20 @@ def test_maia_is_asked_about_the_owners_own_moves_when_both_sides_is_off(
     assert analysis.build_plan(session, run).maia_plies() == [1, 3, 5]
 
 
+def test_the_owners_plies_follow_a_set_up_start_with_black_to_move(
+    session: Session,
+) -> None:
+    """Ply 0 of a game set up with Black to move is Black's, so White owns the odd plies."""
+    app_settings.set_value(session, app_settings.MAIA_BOTH_SIDES, 0)
+    plan = _plan(session)
+    black_first = dataclasses.replace(
+        plan, initial_fen="4k3/8/8/8/8/8/4P3/4K3 b - -", owner_color=Color.WHITE
+    )
+
+    assert black_first.maia_plies() == [1, 3, 5]
+    assert dataclasses.replace(black_first, owner_color=Color.BLACK).maia_plies() == [0, 2, 4]
+
+
 def test_a_game_with_no_owner_is_asked_about_both_sides_either_way(session: Session) -> None:
     """There is no colour to filter on, so the filter is not a way to ask for nothing."""
     _engine(session)
@@ -619,6 +634,50 @@ def test_a_pass_adds_its_levels_to_the_ones_a_row_already_carries(session: Sessi
     assert rows[0].maia_policy["1100"][0]["uci"] == "d2d4"
 
 
+class _DyingMaia(_FakeMaia):
+    """Answers for the first `answers` plies, then falls over the way a crashed lc0 does."""
+
+    def __init__(self, answers: int) -> None:
+        super().__init__()
+        self._left = answers
+
+    def policy_at(
+        self, board: Any, ratings: Any, *, multipv: int | None = None
+    ) -> dict[str, list[PolicyMove]]:
+        if self._left == 0:
+            raise RuntimeError("lc0 exited")
+        self._left -= 1
+        return super().policy_at(board, ratings, multipv=multipv)
+
+
+def test_a_maia_that_dies_partway_leaves_no_policy_on_any_row(session: Session) -> None:
+    """Half a game of policies would settle the level (`_settled_maia_levels` reads one row)
+    and the fill would never ask for the plies Maia did not reach."""
+    app_settings.set_maia_elos(session, [1900])
+    plan = _plan(session)
+    rows = _rows(plan)
+    rows[1].maia_policy = {"1100": [{"uci": "e7e5", "rank": 1}]}
+
+    with pytest.raises(RuntimeError):
+        analysis.apply_maia(plan, rows, _DyingMaia(answers=3))  # type: ignore[arg-type]
+
+    assert [row.ply for row in rows if row.maia_policy] == [1]
+    assert sorted(rows[1].maia_policy) == ["1100"], "what a row carried before is untouched"
+
+
+def test_policies_of_a_run_whose_maia_pass_fell_over_settle_nothing(session: Session) -> None:
+    """What a runner older than the all-or-nothing pass may still store: the plies it reached,
+    on a run noted as skipped. The level is not there for the whole game, so it is missing."""
+    _engine(session)
+    _maia(session)
+    game = _game(session)
+    partial = _analysed(session, game, ("1500",))
+    analysis.note_run(session, partial, "human-move predictions skipped: lc0 crashed")
+    app_settings.set_maia_elos(session, [1500])
+
+    assert analysis.maia_fill_status(session)["missing_games"] == 1
+
+
 def test_the_rows_of_a_maia_only_pass_carry_no_evaluation(session: Session) -> None:
     plan = _plan(session)
     rows = analysis.policy_rows(plan)
@@ -769,6 +828,61 @@ def test_a_finished_fill_settles_the_level_it_went_looking_for(session: Session)
 
     assert analysis.maia_fill_status(session)["missing_games"] == 0
     assert analysis.queue_maia_fill(session)["queued"] == 0
+
+
+def test_a_fill_whose_maia_pass_was_skipped_settles_nothing(session: Session) -> None:
+    """A done fill with a note on it is how a failed Maia pass used to be recorded (and what
+    an older runner still reports): its levels were never asked, so they are still missing."""
+    _engine(session)
+    _maia(session)
+    game = _game(session)
+    _analysed(session, game, ("1500",))
+    skipped = _analysed(session, game, (), maia_only=True, elos=[1900])
+    analysis.note_run(session, skipped, "human-move predictions skipped: lc0 crashed")
+    app_settings.set_maia_elos(session, [1500, 1900])
+
+    assert analysis.maia_fill_status(session)["missing_games"] == 1
+
+
+def test_a_fill_whose_maia_pass_did_not_happen_fails_rather_than_finishing(
+    session: Session,
+) -> None:
+    """A fill is nothing but its Maia pass. Done without one would settle its levels and the
+    button would never ask for them again; failing puts it through the ordinary retry."""
+    _engine(session)
+    _maia(session)
+    game = _game(session)
+    _analysed(session, game, ("1500",))
+    app_settings.set_maia_elos(session, [1500, 1900])
+    analysis.queue_maia_fill(session)
+    fill = analysis.claim_next_run(session)
+    assert fill is not None and fill.maia_only
+
+    status = analysis.finish_run(
+        session, fill, [], "human-move predictions skipped: lc0 crashed", stderr="boom"
+    )
+
+    assert status is RunStatus.QUEUED, "the first failure is retried"
+    assert (fill.error, fill.stderr) == ("human-move predictions skipped: lc0 crashed", "boom")
+    fill = analysis.claim_next_run(session)
+    assert fill is not None
+    analysis.finish_run(session, fill, [], "human-move predictions skipped: lc0 crashed")
+    assert fill.status is RunStatus.FAILED
+    assert analysis.maia_fill_status(session)["missing_games"] == 1
+
+
+def test_a_full_run_whose_maia_pass_was_skipped_still_finishes(session: Session) -> None:
+    """Its evaluations never depended on Maia: degraded, noted, and done."""
+    _engine(session)
+    game = _game(session)
+    analysis.request_analysis(session, game_id=game.id)
+    run = analysis.claim_next_run(session)
+    assert run is not None and not run.maia_only
+
+    status = analysis.finish_run(session, run, [], "human-move predictions skipped: gone")
+
+    assert status is RunStatus.DONE
+    assert run.error == "human-move predictions skipped: gone"
 
 
 def test_a_full_run_that_stored_no_policy_is_still_a_fill(session: Session) -> None:
@@ -2014,6 +2128,54 @@ def test_a_run_that_has_spent_its_retry_is_not_requeued_forever(session: Session
 
 def test_nothing_running_means_nothing_to_collect(session: Session) -> None:
     assert analysis.requeue_stale_runs(session) == []
+
+
+def test_a_sweep_leaves_the_runs_it_was_told_to(session: Session) -> None:
+    """The worker set's periodic sweep excludes its own runs and the gateway's."""
+    engine = _engine(session)
+    game = _game(session)
+    analysis.request_analysis(session, game_id=game.id)
+    run = analysis.claim_next_run(session)
+    assert run is not None
+    _went_quiet(session, run)
+
+    assert analysis.requeue_stale_runs(session, exclude_run_ids=[run.id]) == []
+    assert analysis.requeue_stale_runs(session, exclude_engine_ids=[engine.id]) == []
+    assert run.status is RunStatus.RUNNING
+    assert [swept.id for swept in analysis.requeue_stale_runs(session)] == [run.id]
+
+
+def test_a_second_sweep_does_not_requeue_a_run_claimed_since_the_first(
+    session: Session, sessions: sessionmaker[Session], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Two sweepers (the gateway's and the worker set's) can read the same stale row. The
+    one that writes second must not put back a run a worker has claimed in between — that
+    would be two processes searching the same game."""
+    _engine(session)
+    game = _game(session)
+    analysis.request_analysis(session, game_id=game.id)
+    run = analysis.claim_next_run(session)
+    assert run is not None
+    _went_quiet(session, run)
+    browser_engine_ids = engines_service.browser_engine_ids
+
+    def the_other_sweeper_gets_there_first(inner: Session) -> set[int]:
+        # Between this sweep's read and its write: the other one collects the run, and a
+        # worker claims it again.
+        monkeypatch.setattr(engines_service, "browser_engine_ids", browser_engine_ids)
+        with sessions() as other:
+            assert len(analysis.requeue_stale_runs(other)) == 1
+            assert analysis.claim_next_run(other) is not None
+        return browser_engine_ids(inner)
+
+    monkeypatch.setattr(
+        engines_service, "browser_engine_ids", the_other_sweeper_gets_there_first
+    )
+
+    assert analysis.requeue_stale_runs(session) == []
+    session.refresh(run)
+    assert run.status is RunStatus.RUNNING
+    assert run.attempts == 2
 
 
 def _browser_engine(session: Session, name: str = "wasm-sf") -> Engine:

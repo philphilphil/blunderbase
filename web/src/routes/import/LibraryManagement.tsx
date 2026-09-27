@@ -34,7 +34,10 @@ function fileSize(bytes: number): string {
 export function LibraryManagement() {
   const { t } = useLingui()
   const { locale } = useLocale()
-  const games = useGames({ limit: 1 })
+  // `whose: 'all'`, not the default `mine`: the reset empties the whole library, reference
+  // games included, and the number on the card and in the confirmation is a promise about
+  // what the button will take.
+  const games = useGames({ limit: 1, whose: 'all' })
   const [asking, setAsking] = useState(false)
   const [deleted, setDeleted] = useState<GamesDeleted | null>(null)
   const exporting = useExportLibrary({ onSuccess: (download) => saveDownload(download) })

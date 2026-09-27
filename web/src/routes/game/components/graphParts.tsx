@@ -5,7 +5,7 @@ import { GLYPHS, glyphFor } from '@/lib/chess/classification'
 import type { EvalGraphMarks } from '@/lib/ui/evalGraphPrefs'
 import { scalePx } from '@/lib/ui/scale'
 
-import { barLayout, sideOf } from '../gameModel'
+import { barLayout, pointSide, type Side } from '../gameModel'
 import { EDGE_BLACK, EDGE_WHITE, FILL_BLACK, FILL_WHITE, GRAPH_BG } from './graphTokens'
 
 /**
@@ -30,6 +30,8 @@ export interface PlotPoint {
   ply: number
   value: number
   classification: Classification | null
+  /** Who played the move — a set-up game's ply 0 can be Black's; parity where absent. */
+  side?: Side
 }
 
 /**
@@ -156,7 +158,7 @@ export function PlotMarks({
       {points.map((point) => {
         const glyph = markFor(point.classification)
         if (!glyph) return null
-        if (only && sideOf(point.ply) !== only) return null
+        if (only && pointSide(point) !== only) return null
         const x = xScale(point.ply)
         const y = yScale(point.value)
         if (x === undefined || y === undefined) return null

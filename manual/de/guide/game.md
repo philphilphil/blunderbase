@@ -29,6 +29,12 @@ Steckt die Partie in einer [Sammlung](collections.md), steht auch deren Chip dor
 und öffnet die Partienliste, auf diese Sammlung gefiltert. Wie die übrigen Angaben der Leiste weichen die Chips, wenn
 das Fenster zu schmal für sie wird.
 
+Eine Chess960-Partie oder eine, die aus einer aufgebauten Stellung begann, beginnt auch auf
+dem Brett in dieser Stellung, und ihre Züge werden von dort an gezählt: Ist in der
+Ausgangsstellung Schwarz am Zug, und zwar im 12. Zug, beginnt die Zugliste mit `12…`. Die
+PGN-Schaltfläche schreibt die Ausgangsstellung mit in den Export (`SetUp` und `FEN`), damit
+ein anderes Programm die Partie genauso wieder einliest.
+
 ## Was die Markierungen bedeuten { #what-the-badges-mean }
 
 Die Zugspalte kennzeichnet Züge mit `??`, `?`, `?!` oder `!` und färbt die betroffenen

@@ -28,6 +28,7 @@ from backend.db.base import Base
 from backend.db.enums import Classification, EngineKind, EngineRole, Platform, RunStatus
 from backend.db.models import Account, AnalysisRun, Engine, Game, MoveEval
 from backend.db.session import create_db_engine
+from backend.db.types import utcnow
 from backend.services import analysis, app_settings, import_service
 from backend.services import engines as engines_service
 from backend.services import games as games_service
@@ -509,11 +510,11 @@ async def test_a_worker_survives_an_error_no_run_path_expects(
     stored = analysis.complete_run
     calls: list[int] = []
 
-    def once(session: Session, run: AnalysisRun, evals: Any) -> None:
+    def once(session: Session, run: AnalysisRun, evals: Any, **kwargs: Any) -> None:
         calls.append(run.id)
         if len(calls) == 1:
             raise RuntimeError("database is locked")
-        stored(session, run, evals)
+        stored(session, run, evals, **kwargs)
 
     monkeypatch.setattr(analysis, "complete_run", once)
 
@@ -541,14 +542,14 @@ async def test_a_pool_checkout_failure_retries_the_write_without_spending_an_att
     stored = analysis.complete_run
     calls = 0
 
-    def once(session: Session, run: AnalysisRun, evals: Any) -> None:
+    def once(session: Session, run: AnalysisRun, evals: Any, **kwargs: Any) -> None:
         nonlocal calls
         calls += 1
         if calls == 1:
             raise PoolTimeoutError(
                 "QueuePool limit of size 10 overflow 50 reached, connection timed out"
             )
-        stored(session, run, evals)
+        stored(session, run, evals, **kwargs)
 
     monkeypatch.setattr(analysis, "complete_run", once)
 
@@ -782,6 +783,70 @@ async def test_a_stranded_run_that_has_spent_its_retries_is_failed_on_restart(
     assert run.error == analysis.STALE_RUN_MESSAGE
 
 
+@pytest.mark.slow
+async def test_a_run_orphaned_too_recently_to_look_dead_at_start_is_collected_later(
+    db: sessionmaker[Session],
+    settings: Settings,
+    tmp_path: Path,
+    fixtures_dir: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The desktop shell kills its backend on quit. Reopened inside the stale window, the
+    dead process's runs still look alive to the sweep at start, and with no runner gateway
+    nothing else would ever collect them: they sat `running` for the whole session."""
+    monkeypatch.setattr(analysis_queue, "HEARTBEAT_SECONDS", 0.02)
+    monkeypatch.setattr(analysis_queue, "SWEEP_SECONDS", 0.05)
+    monkeypatch.setattr(analysis, "STALE_AFTER_SECONDS", 1.0)
+    _register(db, tmp_path, go=QUICK_REPLIES)
+    _import_game(db, fixtures_dir)
+    with db() as session:
+        orphan = session.scalars(select(AnalysisRun)).one()
+        orphan.status = RunStatus.RUNNING
+        orphan.attempts = 1
+        # Beaten a moment before the process died.
+        orphan.heartbeat_at = utcnow()
+        session.commit()
+        orphan_id = orphan.id
+
+    workers = AnalysisWorkers(settings=settings, sessions=db, stop_grace=0.05)
+    await workers.start()
+    try:
+        with db() as session:
+            assert analysis.require_run(session, orphan_id).status is RunStatus.RUNNING, (
+                "the start-up sweep should not have seen it as dead yet"
+            )
+        finished = await _wait_until(lambda run: run.status is RunStatus.DONE, db, orphan_id)
+    finally:
+        await workers.stop()
+
+    assert finished, "the run a dead process left was never collected"
+
+
+@pytest.mark.slow
+async def test_the_periodic_sweep_leaves_a_long_run_of_its_own_alone(
+    db: sessionmaker[Session],
+    settings: Settings,
+    tmp_path: Path,
+    fixtures_dir: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A search longer than the stale window is beaten throughout; the sweep never takes it."""
+    monkeypatch.setattr(analysis_queue, "HEARTBEAT_SECONDS", 0.02)
+    monkeypatch.setattr(analysis_queue, "SWEEP_SECONDS", 0.02)
+    monkeypatch.setattr(analysis, "STALE_AFTER_SECONDS", 0.3)
+    _register(db, tmp_path, go=[{**NEUTRAL_REPLY, "delay": 1.5}], go_default=NEUTRAL_REPLY)
+    _import_game(db, fixtures_dir)
+
+    await _drain(settings, db)
+
+    with db() as session:
+        run = session.scalars(select(AnalysisRun)).one()
+
+    assert run.status is RunStatus.DONE
+    assert run.attempts == 1, "the sweep took the run off the worker searching it"
+    assert run.error is None
+
+
 # --- Maia -----------------------------------------------------------------
 
 
@@ -994,6 +1059,63 @@ async def test_a_maia_that_will_not_answer_degrades_instead_of_failing_the_run(
     assert len(rows) == 6
     assert all(row.maia_policy is None for row in rows)
     assert "human-move predictions skipped" in (run.error or "")
+
+
+async def test_a_maia_that_dies_partway_keeps_the_evaluations_and_no_policy(
+    db: sessionmaker[Session], settings: Settings, tmp_path: Path, fixtures_dir: Path
+) -> None:
+    """Three plies answered, then lc0 dies. The plies it reached must not keep a policy:
+    one row with a level is what counts the level as settled for the whole game, and
+    "fill in missing levels" would never ask for the other three."""
+    _register(db, tmp_path, go=QUICK_REPLIES)
+    _register(
+        db,
+        tmp_path,
+        kind=EngineKind.MAIA,
+        name="Maia",
+        go=_maia_script()[:3],
+        go_default={"crash": True},
+    )
+    _import_game(db, fixtures_dir)
+
+    await _drain(settings, db)
+
+    with db() as session:
+        run = session.scalars(select(AnalysisRun).where(AnalysisRun.maia_only.is_(False))).one()
+        rows = analysis.get_move_evals(session, run.id)
+        missing = analysis.maia_fill_status(session)["missing_games"]
+
+    assert run.status is RunStatus.DONE
+    assert "human-move predictions skipped" in (run.error or "")
+    assert [row.ply for row in rows] == [0, 1, 2, 3, 4, 5], "the search is still stored"
+    assert all(row.maia_policy is None for row in rows)
+    assert missing == 1
+
+
+async def test_a_fill_whose_maia_will_not_answer_fails_and_can_be_filled_again(
+    db: sessionmaker[Session], settings: Settings, tmp_path: Path, fixtures_dir: Path
+) -> None:
+    """A fill is nothing but its Maia pass. Marked done without one, its levels would count
+    as asked for and "fill in missing levels" would never try them again."""
+    _register(db, tmp_path, go=QUICK_REPLIES)
+    _register(db, tmp_path, kind=EngineKind.MAIA, name="Maia", go_default={"crash": True})
+    _import_game(db, fixtures_dir)
+    await _drain(settings, db)
+    with db() as session:
+        assert analysis.queue_maia_fill(session)["queued"] == 1
+
+    await _drain(settings, db)
+
+    with db() as session:
+        fill = session.scalars(select(AnalysisRun).where(AnalysisRun.maia_only.is_(True))).one()
+        full = session.scalars(select(AnalysisRun).where(AnalysisRun.maia_only.is_(False))).one()
+        missing = analysis.maia_fill_status(session)["missing_games"]
+
+    assert fill.status is RunStatus.FAILED
+    assert fill.attempts == analysis.MAX_ATTEMPTS, "it went through the ordinary retry"
+    assert "human-move predictions skipped" in (fill.error or "")
+    assert full.status is RunStatus.DONE, "the full pass it adds to is untouched"
+    assert missing == 1
 
 
 async def test_no_maia_engine_is_not_an_error(

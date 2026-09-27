@@ -94,4 +94,22 @@ describe('PgnDropOverlay', () => {
     await waitFor(() => expect(uploadUrls()).toHaveLength(1))
     expect(uploadUrls()[0]).not.toContain('mine')
   })
+
+  it('uploads a Windows-1252 file with its names intact', async () => {
+    const text = '[White "Müller"]\n[Black "Pérez"]\n\n1. e4 e5 1-0\n'
+    // ChessBase's charset: one byte per character, which `File.text()` would read as U+FFFD.
+    const bytes = Uint8Array.from(text, (char) => char.charCodeAt(0))
+    renderOverlay()
+    fireEvent.drop(window, {
+      dataTransfer: { files: [new File([bytes as BlobPart], 'chessbase.pgn')], types: ['Files'] },
+    })
+    await screen.findByText('Whose games are these?')
+    await userEvent.click(screen.getByRole('button', { name: 'Import' }))
+
+    await waitFor(() => expect(uploadUrls()).toHaveLength(1))
+    const call = vi
+      .mocked(fetch)
+      .mock.calls.find(([input]) => String(input).startsWith('/api/import/pgn/upload'))
+    expect(call?.[1]?.body).toBe(text)
+  })
 })

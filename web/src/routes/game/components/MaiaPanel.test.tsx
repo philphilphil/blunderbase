@@ -1,17 +1,22 @@
 import { fireEvent, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { MemoryRouter } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { Providers } from '@/app/Providers'
+import type { StreamSessionApi, StreamSnapshot } from '@/lib/analysis'
 import type { GameRunSummary } from '@/lib/api/types'
 import { resetLinePreviewPrefs, setLinePreviewPrefs } from '@/lib/board/linePreviewPrefs'
 
-import type {
-  EngineLineView,
-  HumanMoveView,
-  MaiaComparisonColumn,
-  MaiaLevelOption,
+import {
+  plyOffset,
+  type EngineLineView,
+  type HumanMoveView,
+  type MaiaComparisonColumn,
+  type MaiaLevelOption,
 } from '../gameModel'
-import { MaiaPanel } from './MaiaPanel'
+import { PlyOffsetContext } from '../plyNumbering'
+import { MaiaPanel, type EnginePaneSearch } from './MaiaPanel'
 
 /** The run the engine column speaks for, and what it spent getting there. */
 const RUN: GameRunSummary = {
@@ -653,5 +658,69 @@ describe('MaiaPanel engine line preview', () => {
     // A row with no moves has no line to preview and no ply to point at.
     await userEvent.hover(screen.getByText('+0.40').closest('div')!)
     expect(onHoverLine).not.toHaveBeenCalled()
+  })
+})
+
+describe('MaiaPanel in a game set up from a position', () => {
+  /** After 1.e4 e5 2.Nf3: Black to move at move 2, so the game's ply 0 is `2…`. */
+  const SET_UP = 'rnbqkbnr/pppp1ppp/8/4p3/4P3/5N2/PPPP1PPP/RNBQKB1R b KQkq - 1 2'
+
+  function liveSearch(): EnginePaneSearch {
+    const snapshot: StreamSnapshot = {
+      sessionId: 'str_1',
+      seq: 1,
+      engineId: 1,
+      engine: 'stockfish',
+      runnerId: null,
+      fen: SET_UP,
+      multipv: 1,
+      depth: 20,
+      nodes: 1_000,
+      nps: 1_000,
+      timeMs: 1_000,
+      lines: [{ multipv: 1, cp: 30, mate: null, pv: ['b8c6', 'f1b5'] }],
+      at: '2026-08-26T10:00:10+00:00',
+    }
+    const stream = {
+      enabled: true,
+      setEnabled: vi.fn(),
+      phase: 'running',
+      session: null,
+      snapshot,
+      error: null,
+      note: null,
+      offer: null,
+      engines: [],
+      engineId: null,
+      setEngineId: vi.fn(),
+      multipv: 1,
+      setMultipv: vi.fn(),
+      resume: vi.fn(),
+      dismissOffer: vi.fn(),
+    } as StreamSessionApi
+    return { stream, tab: 'live', onTabChange: vi.fn() }
+  }
+
+  it('numbers the live lines from the game’s own start, as the move list does', () => {
+    // The Live tab's controls ask the engine setup, which wants the app's query client.
+    render(
+      <Providers>
+        <MemoryRouter>
+          <PlyOffsetContext value={plyOffset(SET_UP)}>
+            <MaiaPanel
+              rating="1700"
+              human={HUMAN}
+              engine={ENGINE}
+              run={RUN}
+              ply={0}
+              fen={SET_UP}
+              search={liveSearch()}
+            />
+          </PlyOffsetContext>
+        </MemoryRouter>
+      </Providers>,
+    )
+    // Counted from ply 0 as White's first move, this read `1.Nc6 Bb5`.
+    expect(screen.getByTestId('maia-panel')).toHaveTextContent('2…Nc6 3.Bb5')
   })
 })

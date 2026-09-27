@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from typing import Any
@@ -17,7 +18,12 @@ from backend.api.app import create_app
 from backend.config import Settings
 from backend.db.migrate import upgrade_to_head
 from backend.db.session import get_sessionmaker
-from backend.mcp.http import BearerGuard, TransportDisabledError, create_http_app
+from backend.mcp.http import (
+    BearerGuard,
+    TransportDisabledError,
+    create_http_app,
+    transport_security,
+)
 from backend.services import auth as auth_service
 from backend.services import mcp_keys as mcp_keys_service
 
@@ -330,8 +336,6 @@ def test_the_transport_is_mounted_when_a_key_is_configured(settings: Settings) -
     settings.mcp_bearer_key = KEY
     settings.analysis_workers = False
     app = create_app(settings)
-    # The bind host is the loopback default here, so the SDK's DNS-rebinding protection
-    # is on and the client has to say the same thing uvicorn would be told.
     with TestClient(app, base_url=BASE_URL) as client:
         assert app.state.mcp is not None
         assert client.post("/mcp", json=INITIALIZE, headers=MCP_HEADERS).status_code == 401
@@ -340,6 +344,115 @@ def test_the_transport_is_mounted_when_a_key_is_configured(settings: Settings) -
         )
     assert response.status_code == 200
     assert '"blunderbase"' in response.text
+
+
+@pytest.mark.parametrize(
+    ("public_url", "host"),
+    [
+        ("https://blunderbase.example.com/", "blunderbase.example.com"),
+        ("https://blunderbase.example.com/", "blunderbase.example.com:443"),
+        # The default port spelled out still names the port-less Host and Origin clients send.
+        ("https://blunderbase.example.com:443/", "blunderbase.example.com"),
+        ("https://blunderbase.example.com:443/", "blunderbase.example.com:443"),
+    ],
+)
+def test_the_public_hostname_reaches_mcp_on_a_loopback_bind(
+    settings: Settings, public_url: str, host: str
+) -> None:
+    """A source checkout on the default 127.0.0.1 behind a local proxy: the Host the
+    client sends is the proxy's name, which BLUNDERBASE_PUBLIC_URL says is this server."""
+    settings.mcp_bearer_key = KEY
+    settings.analysis_workers = False
+    settings.public_url = public_url
+    assert settings.host == "127.0.0.1"
+    app = create_app(settings)
+    with TestClient(app, base_url=BASE_URL) as client:
+        response = client.post(
+            "/mcp",
+            json=INITIALIZE,
+            headers={
+                **MCP_HEADERS,
+                "host": host,
+                "origin": "https://blunderbase.example.com",
+                "authorization": f"Bearer {KEY}",
+            },
+        )
+    assert response.status_code == 200, response.text
+    assert '"blunderbase"' in response.text
+
+
+def test_the_allow_list_follows_the_public_urls_port(settings: Settings) -> None:
+    """A default port in the URL adds the bare name; any other port stays exact."""
+    settings.public_url = "http://bb.example.com:80"
+    allowed = transport_security(settings)
+    assert allowed is not None
+    assert {"bb.example.com:80", "bb.example.com"} <= set(allowed.allowed_hosts)
+    assert {"http://bb.example.com:80", "http://bb.example.com"} <= set(allowed.allowed_origins)
+
+    settings.public_url = "https://bb.example.com:8443/"
+    allowed = transport_security(settings)
+    assert allowed is not None
+    assert "bb.example.com:8443" in allowed.allowed_hosts
+    assert "bb.example.com" not in allowed.allowed_hosts
+    assert "https://bb.example.com" not in allowed.allowed_origins
+
+    settings.public_url = "https://bb.example.com:notaport/"
+    allowed = transport_security(settings)
+    assert allowed is not None
+    assert not any("bb.example.com" in host for host in allowed.allowed_hosts)
+
+
+def test_a_loopback_bind_still_refuses_a_stranger_hostname(settings: Settings) -> None:
+    """The DNS-rebinding check stays on: a name that is neither loopback nor the public
+    URL is refused before the protocol, key or no key."""
+    settings.mcp_bearer_key = KEY
+    settings.analysis_workers = False
+    settings.public_url = "https://blunderbase.example.com"
+    app = create_app(settings)
+    with TestClient(app, base_url=BASE_URL) as client:
+        response = client.post(
+            "/mcp",
+            json=INITIALIZE,
+            headers={**MCP_HEADERS, "host": "evil.example", "authorization": f"Bearer {KEY}"},
+        )
+    assert response.status_code == 421
+
+
+def test_a_wildcard_bind_takes_any_hostname(settings: Settings) -> None:
+    """`serve --host 0.0.0.0` / BLUNDERBASE_HOST=0.0.0.0 is reached by whatever name or
+    LAN address the network gives it; the bearer key is the door."""
+    settings.mcp_bearer_key = KEY
+    settings.analysis_workers = False
+    settings.host = "0.0.0.0"
+    app = create_app(settings)
+    with TestClient(app, base_url=BASE_URL) as client:
+        response = client.post(
+            "/mcp",
+            json=INITIALIZE,
+            headers={
+                **MCP_HEADERS,
+                "host": "192.168.1.20:8765",
+                "authorization": f"Bearer {KEY}",
+            },
+        )
+    assert response.status_code == 200, response.text
+
+
+def test_serve_hands_its_host_flag_to_the_app(
+    settings: Settings, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The flag used to change only uvicorn's bind; the app kept the loopback default."""
+    import uvicorn
+
+    from backend import cli
+
+    # Set first so monkeypatch restores whatever the command writes over it.
+    monkeypatch.setenv("BLUNDERBASE_HOST", "127.0.0.1")
+    monkeypatch.setattr(uvicorn, "run", lambda *args, **kwargs: None)
+    args = cli.build_parser(settings).parse_args(["serve", "--host", "0.0.0.0"])
+    assert cli.command_serve(args, settings) == 0
+    assert settings.host == "0.0.0.0"
+    assert os.environ["BLUNDERBASE_HOST"] == "0.0.0.0"
 
 
 def test_the_transport_is_mounted_for_a_password_with_no_key_configured(

@@ -15,12 +15,12 @@ import { useEvalGraphPrefs } from '@/lib/ui/evalGraphPrefs'
 import { scaleMargin, scalePx } from '@/lib/ui/scale'
 
 import {
-  plyLabel,
   type CurvePoint,
   type GameAnalysisSummary,
   type MoveTimePoint,
   type PlayerAnalysisSummary,
 } from '../gameModel'
+import { usePlyLabel } from '../plyNumbering'
 import { PlotBars, PlotMarks, type PlotPoint } from './graphParts'
 import { FILL_BLACK, FILL_WHITE } from './graphTokens'
 import { MoveTimePlot, TimeTallies } from './MoveTimeGraph'
@@ -162,7 +162,13 @@ export function EvalGraph({
   // The columns and the marks read one shape off the curve: the ply, how far from the
   // axis, and what the move was filed as.
   const plotPoints = useMemo<PlotPoint[]>(
-    () => points.map((p) => ({ ply: p.ply, value: p.win, classification: p.classification })),
+    () =>
+      points.map((p) => ({
+        ply: p.ply,
+        value: p.win,
+        classification: p.classification,
+        side: p.side,
+      })),
     [points],
   )
   // The shape this browser reads the balance in. Bars unless the reader asked for the
@@ -453,6 +459,7 @@ const TALLY_LAYOUT: readonly TallyField[] = ['blunder', 'inaccuracy', 'mistake']
  * crossings carry no move and are skipped rather than drawn as an empty box.
  */
 function CurveReadout({ payload }: { payload?: { payload?: SeriesPoint }[] }) {
+  const plyLabel = usePlyLabel()
   const point = payload?.[0]?.payload
   if (!point || !Number.isInteger(point.ply)) return null
   return (

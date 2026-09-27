@@ -411,7 +411,9 @@ def welcome(**changes: Any) -> dict[str, Any]:
     return {**frame, **changes}
 
 
-def dispatch(run_id: int, token: str, *, engine: str = "sf-remote") -> dict[str, Any]:
+def dispatch(
+    run_id: int, token: str, *, engine: str = "sf-remote", **plan_changes: Any
+) -> dict[str, Any]:
     plan = analysis.RunPlan(
         run_id=run_id,
         game_id=None,
@@ -427,6 +429,7 @@ def dispatch(run_id: int, token: str, *, engine: str = "sf-remote") -> dict[str,
         depth=None,
         multipv=1,
         thresholds=analysis.Thresholds(inaccuracy=10.0, mistake=20.0, blunder=30.0),
+        **plan_changes,
     )
     return protocol.run_dispatch(
         run_id=run_id,
@@ -499,6 +502,24 @@ async def test_a_run_is_computed_and_answered_with_its_evaluations(tmp_path: Pat
     assert answer["evals"][0]["best_move_uci"] == "e2e4"
     # Progress doubles as the run's heartbeat, so it goes out before the answer does.
     assert socket.of_type(protocol.RUN_PROGRESS)
+
+
+async def test_a_fill_with_no_maia_to_ask_is_failed_rather_than_answered(tmp_path: Path) -> None:
+    """A fill is nothing but its Maia pass. Answered as done, the server would count its
+    levels as asked for and "fill in missing levels" would never try them again."""
+    sockets = Sockets()
+    client = scripted_client(tmp_path, sockets)
+
+    async with running(client):
+        socket = await sockets.latest(0)
+        await socket.wait_for(protocol.HELLO)
+        socket.push(welcome())
+        socket.push(dispatch(12, "9f3c1a", maia_only=True, maia_elos=(1500,)))
+        failure = await socket.wait_for(protocol.RUN_FAILED)
+
+    assert failure["run_id"] == 12
+    assert failure["retry"] is True
+    assert not socket.of_type(protocol.RUN_COMPLETE)
 
 
 async def test_a_run_for_an_engine_this_machine_does_not_have_is_failed_by_name(

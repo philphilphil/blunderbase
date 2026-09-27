@@ -11,6 +11,8 @@
  */
 import type { GameSummary, MoveRow } from '@/lib/api/types'
 
+import { moveNumberOf, plyOffset, sideOf } from './gameModel'
+
 const UNKNOWN = '?'
 /** The export format wraps movetext at 80 columns. */
 const WRAP = 80
@@ -41,12 +43,20 @@ export function pgnDate(played: string | null | undefined): string {
   return `${value.getFullYear()}.${pad(value.getMonth() + 1)}.${pad(value.getDate())}`
 }
 
-/** `1. e4 d5 2. exd5 Qxd5`, wrapped the way the export format wraps it. */
-export function pgnMovetext(moves: MoveRow[], result: string): string {
+/**
+ * `1. e4 d5 2. exd5 Qxd5`, wrapped the way the export format wraps it. `offset` is the
+ * game's `plyOffset`: a game set up with Black to move opens on `12...`, as the standard
+ * writes a movetext that starts on Black's move.
+ */
+export function pgnMovetext(moves: MoveRow[], result: string, offset = 0): string {
   const tokens: string[] = []
+  let first = true
   for (const move of moves) {
     if (!move.san) continue
-    if (move.ply % 2 === 0) tokens.push(`${Math.floor(move.ply / 2) + 1}.`)
+    const number = moveNumberOf(move.ply, offset)
+    if (sideOf(move.ply, offset) === 'white') tokens.push(`${number}.`)
+    else if (first) tokens.push(`${number}...`)
+    first = false
     tokens.push(move.san)
   }
   tokens.push(result)
@@ -90,7 +100,11 @@ export function buildPgn(game: GameSummary, moves: MoveRow[]): string {
     tag('TimeControl', game.time_control),
     tag('Termination', game.termination),
     game.variant && game.variant !== 'standard' ? tag('Variant', game.variant) : null,
+    // A game that does not start from the initial array cannot be read back without its
+    // start: `SetUp` says there is one, `FEN` says what it is.
+    game.start_fen ? tag('SetUp', '1') : null,
+    game.start_fen ? tag('FEN', game.start_fen) : null,
   ].filter((entry): entry is string => entry !== null)
 
-  return `${lines.join('\n')}\n\n${pgnMovetext(moves, result)}\n`
+  return `${lines.join('\n')}\n\n${pgnMovetext(moves, result, plyOffset(game.start_fen))}\n`
 }

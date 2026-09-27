@@ -20,9 +20,9 @@ import { chessgroundDests } from 'chessops/compat'
 import { makeFen } from 'chessops/fen'
 import { makeSanAndPlay } from 'chessops/san'
 import type { NormalMove, Role, SquareName } from 'chessops/types'
-import { makeUci, parseUci } from 'chessops/util'
+import { parseUci } from 'chessops/util'
 
-import { sameMove, type GameLine, type PlyPosition } from './gameModel'
+import { sameMove, uciOf, type GameLine, type PlyPosition } from './gameModel'
 
 export interface AnalysisLine {
   /** The number of game plies the line branches from — an index into `GameLine.positions`. */
@@ -42,6 +42,8 @@ export interface AnalysisLine {
   dests: Map<SquareName, SquareName[]>
   /** The position itself, for extending the line. */
   board: Chess
+  /** The game is chess960, so castling stays king-takes-rook (`GameLine.chess960`). */
+  chess960: boolean
 }
 
 /**
@@ -70,8 +72,11 @@ export function buildAnalysisLine(
     if (!parsed) break
     const move = normalizeMove(replay, parsed)
     if (!replay.isLegal(move)) break
+    // Spelled before it is played: whether it is a castle is a question about the position
+    // it leaves. Standard UCI (`e1g1`) outside chess960, because that is what the engine's
+    // lines, the backend and MCP store, and the walk is matched against them move by move.
+    moves.push(uciOf(replay, move, line.chess960))
     sans.push(makeSanAndPlay(replay, move))
-    moves.push(makeUci(move))
   }
 
   const at = Math.max(0, Math.min(moves.length, cursor ?? moves.length))
@@ -95,8 +100,9 @@ export function buildAnalysisLine(
     },
     ply: base + at,
     lastMove: at > 0 ? moves[at - 1]! : null,
-    dests: chessgroundDests(board),
+    dests: chessgroundDests(board, { chess960: line.chess960 }),
     board,
+    chess960: line.chess960,
   }
 }
 
@@ -123,7 +129,10 @@ export function withBoardMove(
     (dest.endsWith('8') || dest.endsWith('1'))
   const move: NormalMove = promotes ? { ...plain, promotion: promotion ?? 'queen' } : plain
   if (!analysis.board.isLegal(move)) return null
-  return [...analysis.moves.slice(0, analysis.cursor), makeUci(move)]
+  // A king dropped on its own rook and a king dragged two squares are the same castle, and
+  // both come out as the engine spells it (`uciOf`).
+  const uci = uciOf(analysis.board, normalizeMove(analysis.board, move), analysis.chess960)
+  return [...analysis.moves.slice(0, analysis.cursor), uci]
 }
 
 /**

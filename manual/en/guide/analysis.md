@@ -54,7 +54,9 @@ Win% before the move minus win% after it. The default thresholds:
 finishing it would cost. **Backfill** queues the import pass over every game that has no
 pass yet; a game that already has one is skipped. On a large library and a slow server that
 is a long wait, which is what the estimate on the card is for. **Fill missing levels** does
-the same for Maia. **Clear the queue** empties it, and **Failed runs** lists what to retry;
+the same for Maia. A fill whose Maia does not answer is retried once and then listed under
+**Failed runs**, and its levels still count as missing, so the next fill asks again.
+**Clear the queue** empties it, and **Failed runs** lists what to retry;
 a retry runs again with the engine, limit, moves and lines it failed with.
 
 ## How much work does a pass do?

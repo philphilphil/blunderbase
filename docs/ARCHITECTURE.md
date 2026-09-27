@@ -483,7 +483,10 @@ that teaches something is a comparison: what a 1500 plays here beside what a 190
 here. The levels are the deployment's and never vary by game or by player, which is what
 makes two games comparable: a move Maia's answer changed between them is the play
 changing, not the question. No Maia engine, or a Maia that will not answer, degrades: the
-evaluation is still worth having, and the reason is recorded on the run.
+evaluation is still worth having, and the reason is recorded on the run. A `maia_only` fill
+is the exception (`analysis.finish_run`): it is nothing but its Maia pass, so a skipped one
+fails it through the ordinary retry rather than finishing it, because a finished fill
+settles the levels it asked for and the fill would never ask for them again.
 
 **The second pass is not part of what a run is.** It costs 40-70% of a node-budget pass —
 375 ms a ply against Stockfish's ~480 at 250k nodes — and a second search over the same
@@ -523,7 +526,12 @@ never one another live worker set is still searching, which is what makes
 `blunderbase analyze` safe to run while the server is up. A run that has already spent its
 retry is failed instead, so a pass that takes the engine down with it cannot survive
 restarts forever. A graceful shutdown hands its run back with the attempt refunded: the
-pass was taken away from it, it did not fail.
+pass was taken away from it, it did not fail. The sweep also runs every `SWEEP_SECONDS`
+from the heartbeat loop, leaving out the set's own runs and remote engines' (the runner
+gateway sweeps those): a process killed and replaced inside the stale window — the desktop
+shell quitting and reopening — leaves rows the sweep at start still sees as alive. Each run
+is taken back by a guarded UPDATE (still running, still quiet), so two sweepers reading the
+same row cannot requeue a run claimed again in between.
 
 **Events.** `analysis.subscribe(hook)` receives every lifecycle transition as a plain
 dict: `analysis.queued` / `.running` / `.progress` / `.done` / `.failed`, each carrying
@@ -790,10 +798,17 @@ form, so the API needs no form-parsing dependency.
 run can stop with everything before it committed and nothing after it begun. The row is
 marked `cancelled` when the loop notices, not when the request returns, and the run keeps
 no cursor: an adapter that advances its own as the stream yields has named a game the run
-stopped short of storing, and resuming from it would step over that game for good. Lichess
-is the one that does not — `ingest_games` calls its `settled` hook per item, so its cursor
-only ever names a game the database answered for, and a game a held write lock kept out
-leaves the cursor behind it rather than losing the game to the next `since`. Every reader of a cursor asks for a `done` job, so the next run starts where the
+stopped short of storing, and resuming from it would step over that game for good. Lichess,
+chess.com and FICS all do not — `ingest_games` calls their `settled` hook per item, so a
+cursor only ever names a game the database answered for, and a game a held write lock kept
+out leaves the cursor behind it rather than losing the game to the next `since`. Lichess's
+export filters on when a game began, so a correspondence game finishing after a newer one
+sits behind the cursor for good; a Lichess sync therefore writes the IDs of the games it saw
+still running onto its job (`import_jobs.unfinished`, `lichess.Unfinished`), and the next
+one fetches those by ID, keeping any the database did not take. A sync from a cursor also
+lists the account's running games without `since`, which is how one begun behind the
+cursor is found when nothing remembered it. The cursor itself is never held back for a
+running game: that would re-read every game since it began on each sync while it runs. Every reader of a cursor asks for a `done` job, so the next run starts where the
 last finished one did and deduplicates its way back. The set is memory in the serve
 process, because an import is a thread in that same process — a signal that outlived it
 would have nothing left to signal — which is also why a `blunderbase import` running in its

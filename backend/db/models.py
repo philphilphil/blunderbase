@@ -236,6 +236,10 @@ class ImportJob(Base):
     # Whatever the source needs to resume: a Lichess `since` millisecond stamp, a
     # chess.com archive month. Opaque to everything but the adapter that wrote it.
     cursor: Mapped[str | None] = mapped_column(String(128))
+    # Games the source listed as not over yet, which the next sync asks for by ID: a
+    # Lichess correspondence game can end long after the cursor has moved past its start.
+    # Null for a source that has none to remember, or a job from before there were any.
+    unfinished: Mapped[list[str] | None] = mapped_column(JSON)
     created_at: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False, default=utcnow)
     started_at: Mapped[datetime | None] = mapped_column(UtcDateTime)
     finished_at: Mapped[datetime | None] = mapped_column(UtcDateTime)

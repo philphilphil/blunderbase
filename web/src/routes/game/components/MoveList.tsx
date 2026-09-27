@@ -10,7 +10,8 @@ import { formatScore, formatWinLoss, type Score } from '@/lib/chess/evaluation'
 import { useNotation } from '@/lib/chess/notationPrefs'
 import { cn } from '@/lib/utils'
 
-import { formatRemaining, plyLabel, type MovePair } from '../gameModel'
+import { formatRemaining, moveNumberOf, type MovePair } from '../gameModel'
+import { usePlyLabel, usePlyNumbering, usePlyOffset } from '../plyNumbering'
 import { PANE_COUNT, TAB, TAB_ON, TAB_ROW } from './paneTabs'
 
 /**
@@ -190,7 +191,8 @@ export function MoveList({
   const scroller = useRef<HTMLDivElement>(null)
   const activeRow = useRef<HTMLDivElement>(null)
 
-  const cursorMove = cursor < 0 ? 0 : Math.floor(cursor / 2) + 1
+  const offset = usePlyOffset()
+  const cursorMove = cursor < 0 ? 0 : moveNumberOf(cursor, offset)
   // Stepping into the folded part of the game opens it rather than stranding the cursor.
   const cursorInFold =
     collapsedThrough !== null && cursor >= 0 && cursorMove <= collapsedThrough
@@ -216,7 +218,7 @@ export function MoveList({
     const lineId = entry.lineId ?? null
     const walking = entry.cursor !== null
     lines.push({
-      anchor: anchorOf(entry.base),
+      anchor: anchorOf(entry.base, offset),
       node: (
         <Variation
           key={id !== null ? `kept-${id}` : lineId !== null ? `line-${lineId}` : 'active'}
@@ -521,6 +523,7 @@ function MoveCell({
 }) {
   const { t } = useLingui()
   const notate = useNotation()
+  const plyLabel = usePlyLabel()
   if (!move?.san) return <span className="min-w-0 flex-1 px-1" />
   const san = notate(move.san)
   const glyph = glyphFor(move.classification)
@@ -588,8 +591,8 @@ function NoteMark() {
 }
 
 /** The move a line hangs off — the one that produced the position it left from. */
-function anchorOf(base: number): number | null {
-  return base > 0 ? Math.floor((base - 1) / 2) + 1 : null
+function anchorOf(base: number, offset: number): number | null {
+  return base > 0 ? moveNumberOf(base - 1, offset) : null
 }
 
 /**
@@ -619,6 +622,8 @@ function Variation({
 }) {
   const { t } = useLingui()
   const notate = useNotation()
+  const plyLabel = usePlyLabel()
+  const numbering = usePlyNumbering()
   const cursor = variation.cursor ?? 0
   const lineId = variation.lineId ?? null
   const pinnedThrough = variation.pinnedThrough ?? 0
@@ -659,10 +664,10 @@ function Variation({
               : t`${moveLabel} — analysis`
           return (
             <span key={`${index}-${san}`} className="inline-flex items-baseline gap-1">
-              {ply % 2 === 0 || index === 0 ? (
+              {numbering.side(ply) === 'white' || index === 0 ? (
                 <span className={cn('tabular', quiet ? 'text-faint' : 'text-dim-2')}>
-                  {Math.floor(ply / 2) + 1}
-                  {ply % 2 === 0 ? '.' : '…'}
+                  {numbering.moveNumber(ply)}
+                  {numbering.side(ply) === 'white' ? '.' : '…'}
                 </span>
               ) : null}
               <button
@@ -765,6 +770,7 @@ function PinButton({
 /** The italic aside under a flagged move: which move, the swing it cost, and what beat it. */
 function Annotation({ annotation }: { annotation: MoveAnnotation }) {
   const notate = useNotation()
+  const plyLabel = usePlyLabel()
   const glyph = glyphFor(annotation.classification)
   const color = glyph ? GLYPHS[glyph].color : 'var(--bb-blunder)'
   const winLoss = formatWinLoss(annotation.winLoss)

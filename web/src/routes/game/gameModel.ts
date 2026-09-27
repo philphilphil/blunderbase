@@ -12,14 +12,17 @@
  *   White's. Engine lines are therefore shown as they arrive.
  *
  * A game carries no FEN per ply either, so the move list is replayed once with chessops
- * to get a position for every ply.
+ * to get a position for every ply — from `GameSummary.start_fen` where the game was set up
+ * (chess960, a "from position" game), which also shifts who moves at a ply and its move
+ * number (`plyOffset`). Nothing here may assume ply 0 is White's.
  */
 import { i18n, type MessageDescriptor } from '@lingui/core'
 import { msg, t } from '@lingui/core/macro'
-import { Chess, normalizeMove } from 'chessops/chess'
-import { makeFen } from 'chessops/fen'
+import { castlingSide, Chess, normalizeMove } from 'chessops/chess'
+import { makeFen, parseFen } from 'chessops/fen'
 import { makeSanAndPlay } from 'chessops/san'
-import { parseUci } from 'chessops/util'
+import type { Move } from 'chessops/types'
+import { kingCastlesTo, makeUci, parseUci } from 'chessops/util'
 
 import type {
   Classification,
@@ -70,11 +73,87 @@ export interface GameLine {
   boards: Chess[]
   /** How many plies replayed cleanly. Below `moves.length` only for a broken move list. */
   playable: number
+  /** The numbering shift of the game's start position — see `plyOffset`. 0 for most games. */
+  offset: number
+  /** Castling is spelled king-takes-rook, as a chess960 game stores it — see `uciOf`. */
+  chess960: boolean
 }
 
-/** The side that plays a ply. Ply 0 is White's first move (`backend/services/games.py`). */
-export function sideOf(ply: number): Side {
-  return ply % 2 === 0 ? 'white' : 'black'
+/** Where a game starts: `GameSummary.start_fen` and whether it is chess960. */
+export interface GameStart {
+  fen?: string | null
+  chess960?: boolean
+}
+
+/** The variant names the importers file chess960 under (`import_service.CHESS960_VARIANTS`). */
+const CHESS960_VARIANTS = new Set(['chess960', 'fischerandom', 'fischerrandom'])
+
+/**
+ * The start of a game as `buildGameLine` wants it, off the game's summary.
+ *
+ * `chess960` is the backend's call (`GameSummary.chess960`), made the way it replays the
+ * game: a "from position" start with a rook off its corner is chess960 by its castling
+ * rights, whatever the variant says, and its castles are stored king-takes-rook. The variant
+ * name is only the fallback for a summary that does not carry the flag.
+ */
+export function gameStart(
+  game:
+    | { start_fen?: string | null; variant?: string | null; chess960?: boolean | null }
+    | null
+    | undefined,
+): GameStart {
+  return {
+    fen: game?.start_fen ?? null,
+    chess960:
+      (game?.chess960 ?? false) || CHESS960_VARIANTS.has((game?.variant ?? '').toLowerCase()),
+  }
+}
+
+/**
+ * How far a game's numbering is shifted from "ply 0 is White's first move": 1 for a game
+ * set up with Black to move, `2 * (n - 1)` more for one set up at move `n`. Ply `p` is then
+ * White's when `p + offset` is even, and is move `(p + offset) / 2 + 1` — the same rule
+ * `backend/services/games.py:ply_offset` numbers the move rows by.
+ */
+export function plyOffset(fen: string | null | undefined): number {
+  if (!fen) return 0
+  const fields = fen.trim().split(/\s+/)
+  const black = fields[1]?.toLowerCase() === 'b'
+  const parsed = Number.parseInt(fields[5] ?? '', 10)
+  const fullmove = Number.isFinite(parsed) && parsed > 0 ? parsed : 1
+  return 2 * (fullmove - 1) + (black ? 1 : 0)
+}
+
+/**
+ * The side that plays a ply. Ply 0 is White's first move (`backend/services/games.py`) in a
+ * game from the initial array; `offset` (`plyOffset`) shifts that for a set-up start.
+ */
+export function sideOf(ply: number, offset = 0): Side {
+  return (ply + offset) % 2 === 0 ? 'white' : 'black'
+}
+
+/**
+ * The side that played a move row. The backend numbers each row from the game's own start
+ * position, so its `color` is the authority; the parity is only the fallback for a row
+ * built without one.
+ */
+export function moverOf(move: Pick<MoveRow, 'ply' | 'color'>): Side {
+  return move.color === 'white' || move.color === 'black' ? move.color : sideOf(move.ply)
+}
+
+/**
+ * A move as UCI in the spelling the engine, the backend and MCP use: `e1g1` for castling in
+ * a standard game, king-takes-rook (`e1h1`) in chess960. chessops holds every castle as
+ * king-takes-rook internally, so a normalized move has to be spelled out again here —
+ * otherwise a clicked O-O is `e1h1` and never matches the engine's `e1g1` line.
+ * `pos` is the position the move is played *from*.
+ */
+export function uciOf(pos: Chess, move: Move, chess960: boolean): string {
+  if (!chess960 && 'from' in move) {
+    const side = castlingSide(pos, move)
+    if (side) return makeUci({ from: move.from, to: kingCastlesTo(pos.turn, side) })
+  }
+  return makeUci(move)
 }
 
 /**
@@ -93,17 +172,52 @@ export function openingAt(
   return found
 }
 
+/**
+ * The `plyOffset` a list of move rows was numbered with, read back off its first row — for
+ * the helpers that are handed the rows and not the game (`notesModel`). 0 where the rows do
+ * not say, which is the initial array.
+ */
+export function movesOffset(moves: readonly Pick<MoveRow, 'ply' | 'color' | 'move_number'>[]): number {
+  const first = moves[0]
+  if (!first || !first.move_number) return 0
+  if (first.color !== 'white' && first.color !== 'black') return 0
+  const shift = 2 * (first.move_number - 1) + (first.color === 'black' ? 1 : 0) - first.ply
+  return shift >= 0 ? shift : 0
+}
+
+/** The move number ply `ply` belongs to, from a start shifted by `offset` (`plyOffset`). */
+export function moveNumberOf(ply: number, offset = 0): number {
+  return Math.floor((ply + offset) / 2) + 1
+}
+
 /** `46` -> `24.`, `47` -> `24…` — the move-list number column. */
-export function plyLabel(ply: number): string {
-  return `${Math.floor(ply / 2) + 1}${ply % 2 === 0 ? '.' : '…'}`
+export function plyLabel(ply: number, offset = 0): string {
+  return `${moveNumberOf(ply, offset)}${sideOf(ply, offset) === 'white' ? '.' : '…'}`
+}
+
+/**
+ * The position a game starts from: its set-up FEN, or the initial array. A FEN chessops
+ * will not read falls back to the initial array rather than blanking the board.
+ */
+function startBoard(fen: string | null | undefined): Chess {
+  if (!fen) return Chess.default()
+  const setup = parseFen(fen)
+  if (setup.isErr) return Chess.default()
+  const position = Chess.fromSetup(setup.value)
+  return position.isErr ? Chess.default() : position.value
 }
 
 /**
  * Replay the game once. A move that will not parse stops the replay rather than throwing:
  * a half-replayed game still shows its opening, and `playable` says where it stopped.
+ *
+ * `start` is where the game begins — a chess960 array or a set-up position replays from its
+ * own FEN, never from the initial array, which is what froze such a board a few moves in.
  */
-export function buildGameLine(moves: MoveRow[]): GameLine {
-  const board = Chess.default()
+export function buildGameLine(moves: MoveRow[], start: GameStart = {}): GameLine {
+  const board = startBoard(start.fen)
+  const offset = plyOffset(start.fen ? makeFen(board.toSetup()) : null)
+  const chess960 = start.chess960 ?? false
   const positions: PlyPosition[] = [snapshot(board)]
   const boards: Chess[] = [board.clone()]
 
@@ -120,7 +234,7 @@ export function buildGameLine(moves: MoveRow[]): GameLine {
     boards.push(board.clone())
     playable += 1
   }
-  return { positions, boards, playable }
+  return { positions, boards, playable, offset, chess960 }
 }
 
 function snapshot(board: Chess): PlyPosition {
@@ -146,13 +260,16 @@ export function sanVariation(line: GameLine, index: number, pv: string[], limit 
   return sans
 }
 
-/** `24…Rfe8 25.b3 h6 26.a4` — a variation numbered from the ply it starts on. */
-export function formatVariation(startPly: number, sans: string[]): string {
+/**
+ * `24…Rfe8 25.b3 h6 26.a4` — a variation numbered from the ply it starts on. `shift` is the
+ * game's `plyOffset`, so a game set up with Black to move numbers its lines from there.
+ */
+export function formatVariation(startPly: number, sans: string[], shift = 0): string {
   return sans
     .map((san, offset) => {
       const ply = startPly + offset
-      if (ply % 2 === 0) return `${Math.floor(ply / 2) + 1}.${san}`
-      return offset === 0 ? `${Math.floor(ply / 2) + 1}…${san}` : san
+      if (sideOf(ply, shift) === 'white') return `${moveNumberOf(ply, shift)}.${san}`
+      return offset === 0 ? `${moveNumberOf(ply, shift)}…${san}` : san
     })
     .join(' ')
 }
@@ -219,20 +336,20 @@ export function toWhite(score: Score, side: Side): Score {
 export function scoreBefore(move: MoveRow | undefined | null): Score | null {
   if (!move) return null
   if (move.eval_before_cp === undefined && move.eval_before_mate === undefined) return null
-  return toWhite({ cp: move.eval_before_cp, mate: move.eval_before_mate }, sideOf(move.ply))
+  return toWhite({ cp: move.eval_before_cp, mate: move.eval_before_mate }, moverOf(move))
 }
 
 /** The White-relative score of the position a move led to. */
 export function scoreAfter(move: MoveRow | undefined | null): Score | null {
   if (!move) return null
   if (move.eval_after_cp === undefined && move.eval_after_mate === undefined) return null
-  return toWhite({ cp: move.eval_after_cp, mate: move.eval_after_mate }, sideOf(move.ply))
+  return toWhite({ cp: move.eval_after_cp, mate: move.eval_after_mate }, moverOf(move))
 }
 
 /** White's win percentage in the position after `move`, 0..100. */
 export function whiteWinAfter(move: MoveRow | undefined | null): number | null {
   if (!move || move.win_after === null || move.win_after === undefined) return null
-  return sideOf(move.ply) === 'white' ? move.win_after : 100 - move.win_after
+  return moverOf(move) === 'white' ? move.win_after : 100 - move.win_after
 }
 
 /** The White-relative score of the position `move` produced, or null where none was stored. */
@@ -240,7 +357,7 @@ export function whiteScoreAfter(move: MoveRow | undefined | null): Score | null 
   if (!move) return null
   const { eval_after_cp: cp, eval_after_mate: mate } = move
   if ((cp === null || cp === undefined) && (mate === null || mate === undefined)) return null
-  return toWhite({ cp, mate }, sideOf(move.ply))
+  return toWhite({ cp, mate }, moverOf(move))
 }
 
 /** The same for the position it was played *from* — the curve's opening point. */
@@ -248,13 +365,13 @@ export function whiteScoreBefore(move: MoveRow | undefined | null): Score | null
   if (!move) return null
   const { eval_before_cp: cp, eval_before_mate: mate } = move
   if ((cp === null || cp === undefined) && (mate === null || mate === undefined)) return null
-  return toWhite({ cp, mate }, sideOf(move.ply))
+  return toWhite({ cp, mate }, moverOf(move))
 }
 
 /** White's win percentage in the position `move` was played from, 0..100. */
 export function whiteWinBefore(move: MoveRow | undefined | null): number | null {
   if (!move || move.win_before === null || move.win_before === undefined) return null
-  return sideOf(move.ply) === 'white' ? move.win_before : 100 - move.win_before
+  return moverOf(move) === 'white' ? move.win_before : 100 - move.win_before
 }
 
 /**
@@ -301,7 +418,7 @@ export function gameAnalysisSummary(moves: readonly MoveRow[]): GameAnalysisSumm
   }
 
   for (const move of moves) {
-    const row = totals[sideOf(move.ply)]
+    const row = totals[moverOf(move)]
     if (
       move.classification === 'inaccuracy' ||
       move.classification === 'mistake' ||
@@ -351,6 +468,8 @@ export interface CurvePoint {
   score: Score | null
   /** Only set where the move that produced this point was flagged. */
   classification: Classification | null
+  /** Who played the move — absent on the starting point, which no move produced. */
+  side?: Side
 }
 
 /**
@@ -378,6 +497,7 @@ export function evalCurve(moves: MoveRow[]): CurvePoint[] {
       san: move.san ?? null,
       score: whiteScoreAfter(move),
       classification: isFlagged(move.classification) ? (move.classification ?? null) : null,
+      side: moverOf(move),
     })
   }
   return points
@@ -401,6 +521,13 @@ export interface MoveTimePoint {
   timed: boolean
   san: string | null
   classification: Classification | null
+  /** Who played the move (`moverOf`); a point built without it falls back to ply parity. */
+  side?: Side
+}
+
+/** The side a graph point belongs to: its own `side`, else the parity of its ply. */
+export function pointSide(point: { ply: number; side?: Side }): Side {
+  return point.side ?? sideOf(point.ply)
 }
 
 /** The clock as numbers — what `moveTimes` needs of the game. */
@@ -443,6 +570,7 @@ export function moveTimes(moves: MoveRow[], game: ClockedGame): MoveTimePoint[] 
       timed: !first,
       san: move.san ?? null,
       classification: isFlagged(move.classification) ? (move.classification ?? null) : null,
+      side: moverOf(move),
     })
   }
   return points
@@ -483,7 +611,7 @@ export function moveTimeSummary(
   side: Side,
   flagged: Side | null = null,
 ): MoveTimeSummary | null {
-  const own = points.filter((point) => sideOf(point.ply) === side)
+  const own = points.filter((point) => pointSide(point) === side)
   if (own.length === 0) return null
   let total = 0
   let timed = 0
@@ -628,7 +756,7 @@ export function pairMoves(moves: MoveRow[]): MovePair[] {
       pair = { moveNumber }
       pairs.set(moveNumber, pair)
     }
-    if (sideOf(move.ply) === 'white') pair.white = move
+    if (moverOf(move) === 'white') pair.white = move
     else pair.black = move
   }
   return [...pairs.values()].sort((left, right) => left.moveNumber - right.moveNumber)
@@ -673,6 +801,7 @@ export const COLLAPSE_CONTEXT_MOVES = 2
 export function collapsedThroughMove(
   moves: MoveRow[],
   notedPlies: readonly number[] = [],
+  offset = 0,
 ): number | null {
   const flagged = firstFlaggedPly(moves)
   const firstNoted = notedPlies.length > 0 ? Math.min(...notedPlies) : null
@@ -680,7 +809,7 @@ export function collapsedThroughMove(
     flagged === null ? firstNoted : firstNoted === null ? flagged : Math.min(flagged, firstNoted)
   if (anchor === null) return null
 
-  const anchorMove = Math.floor(anchor / 2) + 1
+  const anchorMove = moveNumberOf(anchor, offset)
   const through = anchorMove - 1 - COLLAPSE_CONTEXT_MOVES
   return through >= MIN_COLLAPSED_MOVES ? through : null
 }
@@ -731,7 +860,7 @@ export function engineLines(
     rows.push({
       multipv: candidate.multipv ?? rows.length + 1,
       score: { cp: candidate.cp, mate: candidate.mate },
-      text: formatVariation(ply, sans),
+      text: formatVariation(ply, sans, line.offset),
       sans,
       // A PV whose tail the position rejects is truncated to what actually replayed, so a
       // click on the last SAN can never play a move that is not there.
@@ -749,7 +878,7 @@ export function engineLines(
     rows.push({
       multipv: rows.length + 1,
       score: after ?? { cp: null, mate: null },
-      text: formatVariation(ply, sans),
+      text: formatVariation(ply, sans, line.offset),
       sans,
       pv: sans.length > 0 ? [played] : [],
       firstUci: played,
@@ -767,7 +896,16 @@ function candidateMoves(candidate: EngineLine): string[] {
 
 /** Two UCI moves, promotion suffix and all, naming the same move. */
 export function sameMove(left: string, right: string): boolean {
-  return left.slice(0, 4) === right.slice(0, 4)
+  if (left.slice(0, 4) !== right.slice(0, 4)) return false
+  // A promotion is the square pair *and* the piece: `e7e8n` is not the engine's `e7e8q`. A
+  // bare pair is only ever a promotion to a queen where it is one at all — a drag, or a move
+  // spelled without the suffix — so a missing piece reads as `q`; on a move that is no
+  // promotion both sides are bare and compare equal.
+  const piece = (uci: string) => uci.slice(4, 5).toLowerCase()
+  const leftPiece = piece(left)
+  const rightPiece = piece(right)
+  if (leftPiece === rightPiece) return true
+  return (leftPiece || 'q') === (rightPiece || 'q')
 }
 
 // --- Maia -----------------------------------------------------------------
@@ -1042,7 +1180,7 @@ export function humanMoves(
   if (!level) return []
   const top = lines.find((row) => row.multipv === 1) ?? lines[0] ?? null
   const playedUci = played?.uci ?? null
-  const mover: Side = played ? sideOf(played.ply) : 'white'
+  const mover: Side = played ? moverOf(played) : 'white'
   const bestWin = top ? winPercent(toWhite(top.score, mover)) : null
 
   return level.moves.map((move) => {

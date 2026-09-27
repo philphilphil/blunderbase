@@ -29,6 +29,8 @@ import * as api from '@/lib/api/endpoints'
 import type { GameQuery } from '@/lib/api/endpoints'
 import { queryKeys } from '@/lib/api/keys'
 
+import { writePageParam } from './paging'
+
 interface Trail {
   /** The table's filters and sort — everything but the paging. */
   query: GameQuery
@@ -36,7 +38,15 @@ interface Trail {
   offset: number
   /** Which game the offset is about, so a game reached another way inherits nothing. */
   gameId: number
+  /**
+   * The library's own address as the table was showing it (`location.search`) and how many
+   * rows its pages held, so the game screen's "Library" crumb can go back to that table
+   * rather than to an unfiltered first page. Left out, the crumb is plain `/games`.
+   */
+  library?: { search: string; rowsPerPage: number }
 }
+
+const LIBRARY = '/games'
 
 let trail: Trail | null = null
 const listeners = new Set<() => void>()
@@ -70,6 +80,27 @@ export function resetTrail(): void {
 function subscribe(listener: () => void) {
   listeners.add(listener)
   return () => listeners.delete(listener)
+}
+
+/**
+ * Where the game screen's "Library" crumb leads: the table this game was opened from —
+ * its filters, sort and page — or the bare library for a game reached any other way.
+ *
+ * The page is worked out from where the reader now stands in the run rather than copied
+ * from the address, so a reader who stepped with `]` off the end of page 2 goes back to
+ * page 3, where the game they are on is.
+ */
+export function useLibraryAddress(gameId: number | null): string {
+  const read = useCallback(() => trail, [])
+  const here = useSyncExternalStore(subscribe, read, read)
+  if (here === null || gameId === null || here.gameId !== gameId || !here.library) {
+    return LIBRARY
+  }
+  const { search, rowsPerPage } = here.library
+  const params = new URLSearchParams(search)
+  if (rowsPerPage > 0) writePageParam(params, Math.floor(here.offset / rowsPerPage) + 1)
+  const query = params.toString()
+  return query ? `${LIBRARY}?${query}` : LIBRARY
 }
 
 export interface TrailPosition {

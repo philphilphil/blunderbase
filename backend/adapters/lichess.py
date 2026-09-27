@@ -14,8 +14,9 @@ from __future__ import annotations
 import json
 import time
 from collections.abc import Callable, Collection, Iterable, Iterator
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import UTC, datetime
+from itertools import chain
 from typing import TYPE_CHECKING, Any
 
 import chess
@@ -23,7 +24,7 @@ import chess.pgn
 import httpx
 
 from backend.adapters import is_full_archive
-from backend.db.enums import JobStatus, Platform, Result, Source, Speed
+from backend.db.enums import Platform, Result, Source, Speed
 from backend.services import accounts
 from backend.services.import_service import (
     CHESS960_VARIANTS,
@@ -32,8 +33,9 @@ from backend.services.import_service import (
     ImportResult,
     ParsedGame,
     ProgressHook,
+    account_cursor,
     ingest_games,
-    list_jobs,
+    latest_unfinished,
 )
 
 if TYPE_CHECKING:
@@ -42,6 +44,9 @@ if TYPE_CHECKING:
     from backend.db.models import ImportJob
 
 GAMES_API = "https://lichess.org/api/games/user/{player}"
+# Named games by their IDs, in the same ndjson shape as the account export; up to 300 a call.
+GAMES_BY_ID_API = "https://lichess.org/api/games/export/_ids"
+MAX_IDS_PER_CALL = 300
 USER_AGENT = "Blunderbase/0.1"
 HEADERS = {"accept": "application/x-ndjson", "user-agent": USER_AGENT}
 TIMEOUT = httpx.Timeout(connect=10.0, read=120.0, write=120.0, pool=120.0)
@@ -62,11 +67,9 @@ VARIANT_NAMES = {"fromposition": "from position"}
 SPEEDS: dict[str, Speed] = {speed.value: speed for speed in Speed} | {"ultrabullet": Speed.BULLET}
 
 DRAWN_STATUSES = frozenset({"draw", "stalemate"})
-
-# How far back the cursor lookup reads. A sync writes one job, so this is "the last two
-# hundred syncs of any source", which is far more than a resume ever needs.
-CURSOR_LOOKBACK = 200
-
+# What the export calls a game that is still being played: a correspondence game that has
+# not ended, or a live one caught mid-game.
+RUNNING_STATUSES = frozenset({"created", "started"})
 
 
 class LichessError(RuntimeError):
@@ -92,6 +95,12 @@ class Cursor:
     only a `since=all` resync would ever find it missing. It never moves backwards, and an
     empty sync hands back the stamp it started from, so the newest job always carries the
     newest cursor.
+
+    It is not held back by a game still being played. The export filters on `createdAt`,
+    so a correspondence game begun before a blitz game that is stored, and finished after
+    it, sits behind a stamp that has moved past the blitz game. Holding the stamp at such a
+    game would have every sync re-read weeks of blitz for as long as it runs; `Unfinished`
+    remembers it by ID instead.
     """
 
     latest: int = 0
@@ -105,6 +114,39 @@ class Cursor:
     @property
     def value(self) -> str | None:
         return str(self.latest) if self.latest else None
+
+
+@dataclass(slots=True)
+class Unfinished:
+    """The games the next sync asks for by ID, because the cursor may already be past them.
+
+    Every game an export listed as still being played goes in `running` — the export is
+    asked for running games too, and they are never stored, because a stored game with no
+    result is one that dedup then keeps from ever being completed. The next sync fetches
+    them by ID (`/api/games/export/_ids`), stores those that have ended, and hands the rest
+    on again; a sync that starts from a cursor also asks for the account's running games on
+    their own, however old, so one begun before the cursor is found even when nothing
+    remembered it.
+
+    A game fetched by ID leaves the list once the storing side has answered for it, the way
+    the cursor moves: one the database was too busy to take (or a filtered sync passed
+    over) is `returned` without being `answered`, and is asked for again next time. A game
+    Lichess no longer returns at all — an aborted game it deleted — simply drops out.
+    """
+
+    running: set[str] = field(default_factory=set)
+    returned: set[str] = field(default_factory=set)
+    answered: set[str] = field(default_factory=set)
+
+    def settled(self, item: ParsedGame | ImportFailure) -> None:
+        if isinstance(item, ParsedGame):
+            self.answered.add(item.source_id)
+        elif item.ref.startswith(f"{Source.LICHESS}:"):
+            self.answered.add(item.ref.split(":", 1)[1])
+
+    @property
+    def value(self) -> list[str]:
+        return sorted(self.running | (self.returned - self.answered))
 
 
 def run(
@@ -121,6 +163,7 @@ def run(
     analyze: bool = True,
     client: httpx.Client | None = None,
     sleep: Callable[[float], None] = time.sleep,
+    game_ids: Collection[str] | None = None,
     **options: Any,
 ) -> ImportResult:
     """Sync one Lichess account: everything played since the last successful sync.
@@ -129,20 +172,32 @@ def run(
     `all` to walk the whole archive again. Nothing is filtered out unless the caller asks
     for it with `speeds` or `rated`, because a database wants every game. `analyze=False`
     lands the games without queueing the automatic analysis pass.
+
+    `game_ids` names games known to have just finished — the live import's `gameFinish`
+    frames. They join the games the last sync left `Unfinished`: whichever of them the
+    export did not carry is fetched by its ID after it, in the same job, and none of those
+    moves the cursor.
     """
     player = (username or "").strip()
     if not player:
         raise ValueError("a lichess import needs the username whose games to sync")
 
     job.message = player
-    # The account a sync was asked for is the owner's, and it has to exist before the
-    # first game is stored: `owner_color` is read off the accounts as they are on the way
-    # in, and a game stored without one is a game with no side of its own.
-    job.account_id = accounts.register_account(session, Platform.LICHESS, player).id
-    index = AccountIndex.load(session)
-
+    # An account the owner already has is this job's from the start, so a sync that fails
+    # before Lichess answers — an outage, a rate limit, a closed account — is still a sync
+    # of it, and the schedule retries it on its interval rather than on every tick.
+    known = accounts.find_account(session, Platform.LICHESS, player)
+    if known is not None and known.is_owner:
+        job.account_id = known.id
+        session.commit()
+    remembered = (
+        latest_unfinished(session, Source.LICHESS, job.account_id)
+        if job.account_id is not None
+        else None
+    )
     since_ms = resolve_since(session, player, since)
     cursor = Cursor(since_ms or 0)
+    unfinished = Unfinished()
     owned = client is None
     http = client if client is not None else httpx.Client(timeout=TIMEOUT, headers=HEADERS)
     try:
@@ -156,7 +211,48 @@ def run(
             token=token,
             sleep=sleep,
         )
-        games = parse_stream(lines, speeds=speeds)
+        # The request goes out here, before a new account is written: a mistyped name is a
+        # 404 and has to fail the job without leaving an account behind that the schedule
+        # would sync for ever. Any other answer says Lichess has such a player.
+        try:
+            first = next(lines, None)
+        except UnknownPlayerError:
+            accounts.forget_unconfirmed(session, Platform.LICHESS, player)
+            raise
+        # The account a sync was asked for is the owner's, and it has to exist before the
+        # first game is stored: `owner_color` is read off the accounts as they are on the
+        # way in, and a game stored without one is a game with no side of its own.
+        job.account_id = accounts.register_account(session, Platform.LICHESS, player).id
+        index = AccountIndex.load(session)
+
+        exported: set[str] = set()
+        streamed = chain([first] if first is not None else [], lines)
+        games = chain(
+            parse_stream(streamed, speeds=speeds, running=unfinished.running.add, seen=exported),
+            _behind_the_cursor(
+                http,
+                player,
+                [*(remembered or ()), *(game_ids or ())],
+                exported,
+                unfinished,
+                # A walk of the whole archive, unfiltered and uncapped, has listed every
+                # running game already; anything narrower has not.
+                list_running=(
+                    since_ms is not None
+                    or bool(speeds)
+                    or rated is not None
+                    or max_games is not None
+                ),
+                speeds=speeds,
+                token=token,
+                sleep=sleep,
+            ),
+        )
+
+        def settled(item: ParsedGame | ImportFailure) -> None:
+            cursor.settled(item)
+            unfinished.settled(item)
+
         result = ingest_games(
             session,
             job,
@@ -164,7 +260,7 @@ def run(
             progress=progress,
             accounts=index,
             analyze=analyze,
-            settled=cursor.settled,
+            settled=settled,
             sleep=sleep,
         )
     finally:
@@ -175,6 +271,9 @@ def run(
     # would skip every game this one filtered out, permanently. Only a sync that asked
     # for the whole archive moves the account's cursor.
     result.cursor = None if (speeds or rated is not None) else cursor.value
+    # Its unfinished list is whole all the same: the running games are listed unfiltered,
+    # and a remembered game it filtered out is handed on unanswered.
+    result.unfinished = unfinished.value
     return result
 
 
@@ -195,12 +294,18 @@ def fetch_lines(
     handed, so stopping early — a `max_games` cap, a dropped connection — costs a later
     sync nothing. A 429 is retried after the delay Lichess asks for; once the first line
     has been read there is no retry, because half a stream cannot be replayed.
+
+    Running games are asked for as well (`ongoing`). They are not stored — `parse_stream`
+    passes them over — but they are remembered (`Unfinished`), because a long game that
+    finishes after a newer one is behind the cursor by then and this export never lists it
+    again.
     """
     params: dict[str, Any] = {
         "moves": "true",
         "clocks": "true",
         "opening": "true",
         "sort": "dateAsc",
+        "ongoing": "true",
     }
     if since_ms is not None:
         params["since"] = since_ms
@@ -210,13 +315,93 @@ def fetch_lines(
         params["perfType"] = ",".join(sorted(speeds))
     if rated is not None:
         params["rated"] = "true" if rated else "false"
+
+    missing = UnknownPlayerError(f"lichess has no player called {player!r}")
+    yield from _lines(
+        client,
+        "GET",
+        GAMES_API.format(player=player),
+        params=params,
+        token=token,
+        sleep=sleep,
+        not_found=missing,
+    )
+
+
+def fetch_running(
+    client: httpx.Client,
+    player: str,
+    *,
+    token: str | None = None,
+    sleep: Callable[[float], None] = time.sleep,
+) -> Iterator[str]:
+    """Only the games the account is still playing, however long ago they began.
+
+    `finished=false` drops every played-out game and there is no `since`, so this is a
+    short answer even for a large archive: a correspondence player's open games.
+    """
+    params = {"moves": "false", "ongoing": "true", "finished": "false"}
+    missing = UnknownPlayerError(f"lichess has no player called {player!r}")
+    yield from _lines(
+        client,
+        "GET",
+        GAMES_API.format(player=player),
+        params=params,
+        token=token,
+        sleep=sleep,
+        not_found=missing,
+    )
+
+
+def fetch_games_by_id(
+    client: httpx.Client,
+    game_ids: Collection[str],
+    *,
+    token: str | None = None,
+    sleep: Callable[[float], None] = time.sleep,
+) -> Iterator[str]:
+    """Named games in the export's own ndjson shape, however old they are.
+
+    What a sync asks for when a game it remembered running, or one the live import saw
+    end, may have finished: the account export filters on when a game began, and a game
+    that began before the stored cursor is not in it.
+    """
+    ids = list(dict.fromkeys(game_id.strip() for game_id in game_ids if game_id.strip()))
+    params = {"moves": "true", "clocks": "true", "opening": "true"}
+    for offset in range(0, len(ids), MAX_IDS_PER_CALL):
+        batch = ids[offset : offset + MAX_IDS_PER_CALL]
+        yield from _lines(
+            client,
+            "POST",
+            GAMES_BY_ID_API,
+            params=params,
+            content=",".join(batch),
+            token=token,
+            sleep=sleep,
+        )
+
+
+def _lines(
+    client: httpx.Client,
+    method: str,
+    url: str,
+    *,
+    params: dict[str, Any],
+    content: str | None = None,
+    token: str | None = None,
+    sleep: Callable[[float], None] = time.sleep,
+    not_found: LichessError | None = None,
+) -> Iterator[str]:
+    """One streamed ndjson request, retried while Lichess answers 429."""
     headers = dict(HEADERS)
     if token:
         headers["authorization"] = f"Bearer {token}"
-
-    url = GAMES_API.format(player=player)
+    if content is not None:
+        headers["content-type"] = "text/plain"
     for attempt in range(1, MAX_ATTEMPTS + 1):
-        with client.stream("GET", url, params=params, headers=headers) as response:
+        with client.stream(
+            method, url, params=params, headers=headers, content=content
+        ) as response:
             if response.status_code == httpx.codes.TOO_MANY_REQUESTS:
                 response.read()
                 if attempt == MAX_ATTEMPTS:
@@ -225,9 +410,9 @@ def fetch_lines(
                     )
                 sleep(retry_delay(response.headers))
                 continue
-            if response.status_code == httpx.codes.NOT_FOUND:
+            if response.status_code == httpx.codes.NOT_FOUND and not_found is not None:
                 response.read()
-                raise UnknownPlayerError(f"lichess has no player called {player!r}")
+                raise not_found
             if response.status_code >= httpx.codes.BAD_REQUEST:
                 response.read()
                 response.raise_for_status()
@@ -251,6 +436,8 @@ def parse_stream(
     lines: Iterable[str],
     *,
     speeds: Collection[str] | None = None,
+    running: Callable[[str], None] | None = None,
+    seen: set[str] | None = None,
 ) -> Iterator[ParsedGame | ImportFailure]:
     """Every game an export stream holds; one `ImportFailure` per game that could not be read.
 
@@ -260,6 +447,11 @@ def parse_stream(
     Every item carries the `createdAt` it was exported under as its cursor. That is a stamp
     the storing side may resume past *once it has settled this game*, and not before, which
     is why it travels with the game instead of being written into a cursor here.
+
+    A game still being played is not yielded at all: storing it would store a game with no
+    result that dedup then keeps from ever being completed. Its ID goes to `running`
+    instead, for a later sync to ask for by ID. `seen` collects the ID of every played-out
+    game the stream named.
     """
     for index, line in enumerate(lines, start=1):
         try:
@@ -273,6 +465,12 @@ def parse_stream(
 
         marker = _marker(payload)
         ref = f"{Source.LICHESS}:{payload['id']}"
+        if payload.get("status") in RUNNING_STATUSES:
+            if running is not None:
+                running(str(payload["id"]))
+            continue
+        if seen is not None:
+            seen.add(str(payload["id"]))
         if speeds and payload.get("speed") not in speeds:
             continue
         variant = _variant(payload)
@@ -283,6 +481,51 @@ def parse_stream(
             yield parse_game(payload, variant=variant)
         except Exception as exc:
             yield ImportFailure(ref=ref, error=f"{type(exc).__name__}: {exc}", cursor=marker)
+
+
+def _behind_the_cursor(
+    client: httpx.Client,
+    player: str,
+    game_ids: Collection[str],
+    exported: set[str],
+    unfinished: Unfinished,
+    *,
+    list_running: bool,
+    speeds: Collection[str] | None,
+    token: str | None,
+    sleep: Callable[[float], None],
+) -> Iterator[ParsedGame | ImportFailure]:
+    """The games the cursor may already be past: remembered running, or just seen to end.
+
+    Read lazily, after the export: only then is it known which of them the export already
+    handed over, and which it listed as still running. The account's running games are
+    listed on their own first (`fetch_running`) when the export may not have reached them
+    all, which is also how a game begun before the cursor is found with nothing having
+    remembered it. What is left is fetched by ID; a game that turns out to be running still
+    goes back into `unfinished`. None of them moves the cursor — a game fetched this way
+    can sit anywhere in the account's history, and the cursor is a statement about
+    everything before it.
+    """
+    if list_running:
+        # Only the listing matters: a finished game in this answer is the export's to store.
+        for _ in parse_stream(
+            fetch_running(client, player, token=token, sleep=sleep),
+            running=unfinished.running.add,
+        ):
+            pass
+    wanted = [
+        game_id
+        for game_id in dict.fromkeys(game_ids)
+        if game_id not in exported and game_id not in unfinished.running
+    ]
+    if not wanted:
+        return
+    fetched = fetch_games_by_id(client, wanted, token=token, sleep=sleep)
+    for item in parse_stream(
+        fetched, speeds=speeds, running=unfinished.running.add, seen=unfinished.returned
+    ):
+        item.cursor = None
+        yield item
 
 
 def parse_game(payload: dict[str, Any], *, variant: str | None = None) -> ParsedGame:
@@ -468,20 +711,11 @@ def parse_since(value: str | int | datetime) -> int | None:
 def stored_cursor(session: Session, player: str) -> str | None:
     """The cursor of the last finished sync of this account.
 
-    Scoped by account name and not only by source: two Lichess accounts in one database
-    have two archives, and resuming one from the other's stamp would silently skip
-    everything before it. The name lives in the job's message, which is where this adapter
-    puts it on the way in.
+    Scoped by account and not only by source: two Lichess accounts in one database have
+    two archives, and resuming one from the other's stamp would silently skip everything
+    before it. A sync job names its account, however long ago the account last synced.
     """
-    key = player.strip().casefold()
-    for job in list_jobs(session, Source.LICHESS, limit=CURSOR_LOOKBACK):
-        if (
-            job.status == JobStatus.DONE
-            and job.cursor
-            and (job.message or "").strip().casefold() == key
-        ):
-            return job.cursor
-    return None
+    return account_cursor(session, Source.LICHESS, player)
 
 
 def _player(payload: dict[str, Any], color: str) -> tuple[str, int | None, int | None]:

@@ -51,7 +51,7 @@ interface Answer {
 const EMPTY: Answer = { games: [], opponents: [], openings: [], notes: [] }
 
 /** The palette as it is really mounted: around the titlebar that raises it. */
-function draw(data: Answer = EMPTY, collections: unknown[] = []) {
+function draw(data: Answer = EMPTY, collections: unknown[] = [], path = '/games') {
   useSearch.mockReturnValue({ data, isFetching: false })
   useCollections.mockReturnValue({ data: { collections }, isPending: false })
   useProfile.mockReturnValue({ data: undefined, isPending: true })
@@ -61,7 +61,7 @@ function draw(data: Answer = EMPTY, collections: unknown[] = []) {
   return render(
     <TooltipProvider>
       <ThemeProvider>
-        <MemoryRouter initialEntries={['/games']}>
+        <MemoryRouter initialEntries={[path]}>
         <PageChromeProvider>
           <CommandPaletteProvider>
             <Where />
@@ -195,5 +195,22 @@ describe('the ⌘K palette', () => {
 
     expect(screen.getByTestId('where')).toHaveTextContent('/compute/engines')
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  })
+
+  it('keeps the library’s sort when it opens a saved filter from the library', async () => {
+    const user = userEvent.setup()
+    draw(EMPTY, [], '/games?order=black&direction=desc&page=4')
+
+    await user.keyboard('{Meta>}k{/Meta}')
+    await user.keyboard('losses as')
+    await user.keyboard('{Enter}')
+
+    const where = new URL(screen.getByTestId('where').textContent!, 'http://localhost')
+    expect(where.pathname).toBe('/games')
+    expect(where.searchParams.get('outcome')).toBe('loss')
+    expect(where.searchParams.get('order')).toBe('black')
+    expect(where.searchParams.get('direction')).toBe('desc')
+    // A new cut starts at its first page.
+    expect(where.searchParams.has('page')).toBe(false)
   })
 })

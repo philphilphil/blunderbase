@@ -4,12 +4,15 @@ use std::{
     net::{TcpListener, TcpStream},
     path::{Path, PathBuf},
     process::{Child, Command, Stdio},
-    sync::Mutex,
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Mutex, PoisonError,
+    },
     time::Duration,
 };
 
 use tauri::{
-    menu::{AboutMetadataBuilder, Menu, MenuBuilder, MenuItemBuilder, SubmenuBuilder},
+    menu::{AboutMetadataBuilder, Menu, MenuBuilder, MenuItem, MenuItemBuilder, SubmenuBuilder},
     webview::NewWindowResponse,
     window::{ProgressBarState, ProgressBarStatus},
     AppHandle, Manager, RunEvent, Runtime, Url, WebviewUrl, WebviewWindow, WebviewWindowBuilder,
@@ -17,6 +20,7 @@ use tauri::{
 use tauri_plugin_dialog::{DialogExt, MessageDialogKind};
 use tauri_plugin_notification::NotificationExt;
 use tauri_plugin_opener::OpenerExt;
+use tauri_plugin_window_state::StateFlags;
 
 #[derive(serde::Deserialize)]
 struct NotificationRequest {
@@ -40,6 +44,18 @@ const BACKEND_READY_DELAY: Duration = Duration::from_millis(100);
 const MANUAL_WINDOW: &str = "manual";
 
 struct BackendChild(Mutex<Option<Child>>);
+
+/// Set once quitting has begun, and never cleared: from then on the process is on its way
+/// out, however long its backend takes to follow. Everything that would bring a window back
+/// — the Dock's Reopen, a second launch through the single-instance plugin, the backend
+/// turning healthy — checks it first, because a window shown now belongs to a process that
+/// is about to exit and would vanish under the person's hand.
+struct ShuttingDown(AtomicBool);
+
+fn shutting_down<R: Runtime>(app: &AppHandle<R>) -> bool {
+    app.try_state::<ShuttingDown>()
+        .is_some_and(|state| state.0.load(Ordering::SeqCst))
+}
 
 fn feedback_token() -> String {
     format!(
@@ -380,7 +396,11 @@ fn build_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
         .hide_others()
         .show_all()
         .separator()
-        .quit()
+        // Our own item, not the predefined one: on macOS that sends `terminate:`, which
+        // reaches the app only as the unpreventable `RunEvent::Exit`, so the backend
+        // could only be waited for with the main thread blocked. `app.exit` goes through
+        // `ExitRequested`, which `begin_shutdown` can hold open off the main thread.
+        .item(&quit_item(app)?)
         .build()?;
     let edit_menu = SubmenuBuilder::new(app, "Edit")
         .undo()
@@ -445,7 +465,26 @@ fn build_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
         .build()
 }
 
+/// Cmd+Q only on macOS, where the predefined item it replaces had it. On Windows and Linux
+/// that item carried no shortcut, and a new Ctrl+Q there would quit from a stray keypress.
+fn quit_item<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<MenuItem<R>> {
+    let item = MenuItemBuilder::with_id("quit", "Quit Blunderbase");
+    let item = if cfg!(target_os = "macos") {
+        item.accelerator("CmdOrCtrl+Q")
+    } else {
+        item
+    };
+    item.build(app)
+}
+
 fn handle_menu<R: Runtime>(app: &AppHandle<R>, id: &str) {
+    if id == "quit" {
+        // A second Quit while the backend is still stopping lands in `ExitRequested` with
+        // no child left to wait for, so it exits at once: the impatient way out. The
+        // backend has its SIGTERM already and finishes its shutdown on its own.
+        app.exit(0);
+        return;
+    }
     let Some(window) = app.get_webview_window("main") else {
         return;
     };
@@ -467,23 +506,125 @@ fn handle_menu<R: Runtime>(app: &AppHandle<R>, id: &str) {
     }
 }
 
-fn stop_backend<R: Runtime>(handle: &AppHandle<R>) {
-    if let Some(mut child) = handle.state::<BackendChild>().0.lock().unwrap().take() {
-        let _ = child.kill();
-        let _ = child.wait();
+/// How long a quit waits for the backend to stop on its own: the worker set's own five
+/// seconds with room to spare. Spent on a background thread with the windows hidden.
+const BACKEND_STOP_GRACE: Duration = Duration::from_secs(8);
+
+/// The wait where the main thread has to hold it (`stop_backend_now`). Short, because
+/// nothing can be drawn meanwhile; a backend that needs longer is killed, and the runs it
+/// held are collected by the backend's periodic stale sweep instead.
+const BACKEND_EXIT_GRACE: Duration = Duration::from_secs(2);
+
+fn take_backend<R: Runtime>(app: &AppHandle<R>) -> Option<Child> {
+    let state = app.try_state::<BackendChild>()?;
+    let mut slot = state.0.lock().unwrap_or_else(PoisonError::into_inner);
+    slot.take()
+}
+
+fn hide_windows<R: Runtime>(app: &AppHandle<R>) {
+    for window in app.webview_windows().values() {
+        let _ = window.hide();
     }
+}
+
+/// Quitting, without holding the main thread while the backend shuts down.
+///
+/// A killed backend cannot hand its running analysis back to the queue, so it is asked
+/// with a SIGTERM first, and uvicorn's shutdown requeues what it held. With a run in flight
+/// that takes the worker set's full five seconds. Waited for on the main thread, the app
+/// sat frozen for them and looked hung; so the windows go at once, the wait happens on a
+/// thread, and that thread calls `exit` again when the backend is gone — which lands back
+/// here with no child left, and is let through. Returns whether there was a backend to
+/// wait for, which is when the caller has to hold the exit open.
+fn begin_shutdown<R: Runtime>(app: &AppHandle<R>) -> bool {
+    if let Some(state) = app.try_state::<ShuttingDown>() {
+        state.0.store(true, Ordering::SeqCst);
+    }
+    let Some(child) = take_backend(app) else {
+        return false;
+    };
+    hide_windows(app);
+    let app = app.clone();
+    std::thread::spawn(move || {
+        stop_child(child, BACKEND_STOP_GRACE);
+        app.exit(0);
+    });
+    true
+}
+
+/// The exit nobody can hold open. On macOS the Dock's Quit, logging out and shutting down
+/// arrive as `terminate:`, which tao turns into `RunEvent::Exit` with no chance to prevent
+/// it: the process ends when this returns, so a background wait would be cut off. The
+/// backend still gets its SIGTERM and a short wait here, then is killed.
+fn stop_backend_now<R: Runtime>(app: &AppHandle<R>) {
+    if let Some(state) = app.try_state::<ShuttingDown>() {
+        state.0.store(true, Ordering::SeqCst);
+    }
+    let Some(child) = take_backend(app) else {
+        return;
+    };
+    hide_windows(app);
+    stop_child(child, BACKEND_EXIT_GRACE);
+}
+
+fn stop_child(mut child: Child, grace: Duration) {
+    if !ask_backend_to_stop(&mut child, grace) {
+        let _ = child.kill();
+    }
+    let _ = child.wait();
+}
+
+/// SIGTERM, then wait up to `grace` for the process to go. False if it had to be left
+/// running, and the caller kills it.
+#[cfg(unix)]
+fn ask_backend_to_stop(child: &mut Child, grace: Duration) -> bool {
+    let Ok(pid) = libc::pid_t::try_from(child.id()) else {
+        return false;
+    };
+    // SAFETY: `pid` is our own child, which has not been waited on, so it cannot have
+    // been reused for another process.
+    if unsafe { libc::kill(pid, libc::SIGTERM) } != 0 {
+        return false;
+    }
+    let deadline = std::time::Instant::now() + grace;
+    while std::time::Instant::now() < deadline {
+        match child.try_wait() {
+            Ok(Some(_)) => return true,
+            Ok(None) => std::thread::sleep(Duration::from_millis(50)),
+            Err(_) => return false,
+        }
+    }
+    false
+}
+
+/// Windows has no SIGTERM: the backend is killed at once, and the backend's periodic
+/// stale sweep collects the runs it held on the next start.
+#[cfg(not(unix))]
+fn ask_backend_to_stop(_child: &mut Child, _grace: Duration) -> bool {
+    false
 }
 
 pub fn run() {
     let builder = tauri::Builder::default()
+        .manage(ShuttingDown(AtomicBool::new(false)))
         .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+            if shutting_down(app) {
+                return;
+            }
             if let Some(window) = app.get_webview_window("main") {
                 let _ = window.show();
                 let _ = window.unminimize();
                 let _ = window.set_focus();
             }
         }))
-        .plugin(tauri_plugin_window_state::Builder::default().build())
+        // Visibility is left out: a quit hides the windows before the plugin's exit-time
+        // save, which would record every quit as hidden. The window shows when the backend
+        // is ready (the thread in `setup`), on every launch alike.
+        .plugin(
+            tauri_plugin_window_state::Builder::default()
+                .with_state_flags(StateFlags::all() - StateFlags::VISIBLE)
+                .build(),
+        )
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_opener::init())
@@ -544,6 +685,11 @@ pub fn run() {
             let app_handle = app.handle().clone();
             std::thread::spawn(move || {
                 for _ in 0..BACKEND_READY_ATTEMPTS {
+                    if shutting_down(&app_handle) {
+                        // Quit before the backend came up: showing the window now would
+                        // put it back in front of a process that is leaving.
+                        return;
+                    }
                     if backend_is_ready(port) {
                         let url = format!(
                             "http://127.0.0.1:{port}/#bb-native={feedback_port}:{feedback_token}"
@@ -579,7 +725,12 @@ pub fn run() {
         .expect("failed to build Blunderbase desktop application");
 
     app.run(|handle, event| match event {
-        RunEvent::Exit | RunEvent::ExitRequested { .. } => stop_backend(handle),
+        RunEvent::ExitRequested { api, .. } => {
+            if begin_shutdown(handle) {
+                api.prevent_exit();
+            }
+        }
+        RunEvent::Exit => stop_backend_now(handle),
         #[cfg(target_os = "macos")]
         RunEvent::WindowEvent {
             label,
@@ -592,7 +743,7 @@ pub fn run() {
             }
         }
         #[cfg(target_os = "macos")]
-        RunEvent::Reopen { .. } => {
+        RunEvent::Reopen { .. } if !shutting_down(handle) => {
             if let Some(window) = handle.get_webview_window("main") {
                 let _ = window.show();
                 let _ = window.set_focus();

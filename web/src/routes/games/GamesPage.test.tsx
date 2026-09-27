@@ -1,15 +1,16 @@
 import { QueryClient } from '@tanstack/react-query'
 import { render, renderHook, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { MemoryRouter } from 'react-router-dom'
+import { MemoryRouter, Route, Routes, useLocation, useNavigate } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { Providers } from '@/app/Providers'
 import type { BatchAnalysisResponse, GameCard } from '@/lib/api/types'
 import { ChromeActions, ChromeCrumbs } from '@/test/chrome'
 
-import { resetTrail, useGameTrail } from './gameTrail'
+import { resetTrail, useGameTrail, useLibraryAddress } from './gameTrail'
 import { GamesPage } from './GamesPage'
+import { PAGE_SIZE_KEY } from './paging'
 
 class FakeSocket {
   onopen: (() => void) | null = null
@@ -362,6 +363,75 @@ describe('GamesPage — paging and ordering', () => {
     await waitFor(() => expect(lastGamesQuery().get('order')).toBe('black'))
     expect(lastGamesQuery().get('direction')).toBe('asc')
   })
+
+  /** The library under a real route table, with a game screen that only has a Back button. */
+  function drawRoutes() {
+    // The size an earlier test chose is kept in storage; these read at the default "Fit".
+    window.localStorage.removeItem(PAGE_SIZE_KEY)
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    function GameStub() {
+      const navigate = useNavigate()
+      return (
+        <button type="button" onClick={() => navigate(-1)}>
+          back
+        </button>
+      )
+    }
+    function Where() {
+      return <output data-testid="where">{useLocation().search}</output>
+    }
+    render(
+      <Providers client={client}>
+        <MemoryRouter initialEntries={['/games']}>
+          <Routes>
+            <Route path="/games" element={<GamesPage />} />
+            <Route path="/games/:id" element={<GameStub />} />
+          </Routes>
+          <Where />
+        </MemoryRouter>
+      </Providers>,
+    )
+  }
+
+  it('comes back from a game to the page and sort it was opened from', async () => {
+    stubPages()
+    const user = userEvent.setup()
+    drawRoutes()
+    await screen.findByLabelText('Select game 1')
+
+    await user.click(screen.getByRole('button', { name: 'Black' }))
+    await user.click(screen.getByLabelText('Next page'))
+    await waitFor(() => expect(screen.getByTestId('where')).toHaveTextContent('?order=black&page=2'))
+    await screen.findByLabelText('Select game 26')
+
+    await user.click(screen.getByLabelText('Select game 27').closest<HTMLElement>('[role="row"]')!)
+    await user.click(await screen.findByRole('button', { name: 'back' }))
+
+    await screen.findByLabelText('Select game 26')
+    expect(screen.getByText('26–50 of 120')).toBeInTheDocument()
+    expect(lastGamesQuery().get('order')).toBe('black')
+    expect(lastGamesQuery().get('offset')).toBe('25')
+  })
+
+  it('starts a new filter at the first page, keeping the sort, and never spells a default', async () => {
+    stubPages()
+    const user = userEvent.setup()
+    drawRoutes()
+    await screen.findByLabelText('Select game 1')
+    expect(screen.getByTestId('where')).toHaveTextContent(/^$/)
+
+    await user.click(screen.getByRole('button', { name: 'Black' }))
+    await user.click(screen.getByLabelText('Next page'))
+    await screen.findByLabelText('Select game 26')
+
+    await user.type(screen.getByLabelText('Search games'), 'berlin{Enter}')
+
+    await waitFor(() =>
+      expect(screen.getByTestId('where')).toHaveTextContent('?q=berlin&order=black'),
+    )
+    await waitFor(() => expect(lastGamesQuery().get('offset')).toBe('0'))
+    expect(lastGamesQuery().get('order')).toBe('black')
+  })
 })
 
 describe('GamesPage — the keyboard, and the run it hands on', () => {
@@ -407,6 +477,22 @@ describe('GamesPage — the keyboard, and the run it hands on', () => {
       wrapper: ({ children }) => <Providers client={client}>{children}</Providers>,
     })
     await waitFor(() => expect(result.current).toEqual({ previous: 11, next: 13 }))
+  })
+
+  it('hands over its own address, for the game screen’s Library crumb', async () => {
+    resetTrail()
+    const user = userEvent.setup()
+    draw('/games?color=black&order=black&direction=desc')
+    await loaded()
+
+    await user.click(screen.getByRole('row', { name: /opponent-12/ }))
+
+    const { result } = renderHook(() => useLibraryAddress(12))
+    const back = new URL(result.current, 'http://localhost')
+    expect(back.pathname).toBe('/games')
+    expect(back.searchParams.get('color')).toBe('black')
+    expect(back.searchParams.get('order')).toBe('black')
+    expect(back.searchParams.get('direction')).toBe('desc')
   })
 })
 

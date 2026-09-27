@@ -290,6 +290,7 @@ dependencies = [
 name = "blunderbase-desktop"
 version = "1.8.2"
 dependencies = [
+ "libc",
  "rand",
  "serde",
  "serde_json",

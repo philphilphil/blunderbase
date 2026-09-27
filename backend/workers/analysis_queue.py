@@ -68,6 +68,9 @@ IDLE_CHECK_SECONDS = 0.02
 # How often the runs this set is executing are marked alive. Several beats fit inside
 # `analysis.STALE_AFTER_SECONDS`, so a slow beat is not mistaken for a dead process.
 HEARTBEAT_SECONDS = 10.0
+# How often the running set looks for runs a dead process left `running` (`_beat`). Half
+# the staleness window, so an orphan waits at most a minute and a half to be collected.
+SWEEP_SECONDS = analysis.STALE_AFTER_SECONDS / 2
 # SQLite has one writer. One queue database thread is therefore both the fastest useful
 # write concurrency and a hard ceiling on how many connections local analysis can take
 # from HTTP, imports, MCP and remote runners. Engine work remains as parallel as before.
@@ -354,20 +357,40 @@ class AnalysisWorkers:
             await asyncio.wait_for(self._wake.wait(), self.poll_seconds)
 
     async def _beat(self) -> None:
-        """Mark the claimed runs alive, so no other worker set collects them as stale."""
+        """Mark the claimed runs alive, and collect the ones a dead process left behind.
+
+        The collecting is here as well as in `start()` because the one at start cannot see a
+        run whose process died less than `analysis.STALE_AFTER_SECONDS` ago: its heartbeat
+        still looks fresh. The desktop shell kills its backend on quit, so quit-and-reopen
+        inside a minute used to leave those runs `running` for the whole session — on a
+        deployment with no runner gateway, whose sweep is the only other one. What this set
+        holds itself is never collected: it is beaten here first and excluded besides.
+        """
+        loop = asyncio.get_running_loop()
+        next_sweep = loop.time() + SWEEP_SECONDS
         while True:
             await asyncio.sleep(HEARTBEAT_SECONDS)
             run_ids = sorted(self._inflight)
-            if not run_ids:
+            if run_ids:
+                try:
+                    gone = await self._db(self._touch, run_ids)
+                except Exception:
+                    logger.exception("could not mark runs %s alive", run_ids)
+                else:
+                    # Cancelled by a process that could not reach this one (`cancel`).
+                    for run_id in gone:
+                        self.cancel(run_id)
+            if loop.time() < next_sweep:
                 continue
+            next_sweep = loop.time() + SWEEP_SECONDS
             try:
-                gone = await self._db(self._touch, run_ids)
+                collected = await self._db(self._sweep, sorted(self._inflight))
             except Exception:
-                logger.exception("could not mark runs %s alive", run_ids)
+                logger.exception("could not collect abandoned analysis runs")
                 continue
-            # Cancelled by a process that could not reach this one (`cancel`).
-            for run_id in gone:
-                self.cancel(run_id)
+            if collected:
+                logger.info("collected %s abandoned analysis run(s)", collected)
+                self._wake.set()
 
     async def _release(self, run_id: int, error: str) -> None:
         """Hand a run back after its worker fell over, so the row does not stay `running`.
@@ -404,8 +427,10 @@ class AnalysisWorkers:
             await self._db(self._fail, run_id, _message(exc), None, True)
             return
 
-        note = await self._add_maia(context, evals)
-        await self._db(self._finish, run_id, evals, note)
+        skipped = await self._add_maia(context, evals)
+        note = None if skipped is None else f"human-move predictions skipped: {skipped.error}"
+        stderr = None if skipped is None else skipped.stderr
+        await self._db(self._finish, run_id, evals, note, stderr)
 
     async def _analyse(self, context: RunContext) -> list[MoveEval]:
         plan = context.plan
@@ -425,8 +450,12 @@ class AnalysisWorkers:
 
         return await self._with_engine(context.spec, work)
 
-    async def _add_maia(self, context: RunContext, evals: list[MoveEval]) -> str | None:
-        """Run the human-policy pass. A Maia that will not answer degrades, never fails."""
+    async def _add_maia(self, context: RunContext, evals: list[MoveEval]) -> EngineFailure | None:
+        """Run the human-policy pass. Returns why it did not happen, or None.
+
+        A Maia that will not answer degrades a full run and never fails it; a fill, which is
+        nothing but this pass, fails instead — `analysis.finish_run` decides which.
+        """
         # A run queued without one is not a degraded run and has nothing to note: no engine
         # is started and no slot is taken, which is the saving the flag exists for.
         if not context.plan.maia or context.maia_spec is None or not evals:
@@ -441,9 +470,9 @@ class AnalysisWorkers:
         try:
             await self._with_engine(context.maia_spec, work)
         except EngineFailure as failure:
-            return f"human-move predictions skipped: {failure.error}"
+            return failure
         except Exception as exc:
-            return f"human-move predictions skipped: {_message(exc)}"
+            return EngineFailure(_message(exc))
         return None
 
     async def _with_engine(self, spec: EngineSpec, work: Any) -> Any:
@@ -524,6 +553,21 @@ class AnalysisWorkers:
         with self.sessions() as session:
             return len(analysis.requeue_stale_runs(session))
 
+    def _sweep(self, holding: list[int]) -> int:
+        """The periodic collection: everything stale but this set's own runs and remote ones.
+
+        Remote runs are left to the runner gateway's sweep, which also tells the runner
+        holding one to stop; collecting one here would requeue it behind the gateway's back.
+        """
+        with self.sessions() as session:
+            return len(
+                analysis.requeue_stale_runs(
+                    session,
+                    exclude_engine_ids=engines_service.remote_engine_ids(session),
+                    exclude_run_ids=holding,
+                )
+            )
+
     def _outstanding(self) -> int:
         with self.sessions() as session:
             counts = analysis.queue_depth(session)
@@ -594,15 +638,15 @@ class AnalysisWorkers:
                 maia_spec=None if maia is None else engines_service.spec_for(maia),
             )
 
-    def _finish(self, run_id: int, evals: list[MoveEval], note: str | None) -> None:
+    def _finish(
+        self, run_id: int, evals: list[MoveEval], note: str | None, stderr: str | None
+    ) -> None:
         with self.sessions() as session:
             run = analysis.get_run(session, run_id)
             if run is None:
                 # Cancelled in the moment between the search ending and this write.
                 return
-            analysis.complete_run(session, run, evals)
-            if note is not None:
-                analysis.note_run(session, run, note)
+            analysis.finish_run(session, run, evals, note, stderr=stderr)
 
     def _fail(self, run_id: int, error: str, stderr: str | None, retry: bool) -> None:
         with self.sessions() as session:

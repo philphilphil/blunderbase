@@ -11,6 +11,21 @@ services:
     volumes:
       # The database, uploaded PGNs and any engine binary downloaded from the UI.
       - blunderbase-data:/data
+    # Behind that proxy, trust it — and only it — for X-Forwarded-For, or every visitor
+    # shares one sign-in limit and a stranger's guesses lock you out too. A proxy on the
+    # host reaches the container from this network's gateway, pinned below so it cannot
+    # move. Only once the port above is bound to 127.0.0.1: published on every interface,
+    # outside visitors arrive from that gateway too and would be trusted. Never "*": that
+    # believes whatever address a client writes into the header.
+    # environment:
+    #   FORWARDED_ALLOW_IPS: 10.87.65.1
+
+# networks:
+#   default:
+#     ipam:
+#       config:
+#         - subnet: 10.87.65.0/24
+#           gateway: 10.87.65.1
 
 volumes:
   blunderbase-data:

@@ -27,13 +27,13 @@ import { useNotation } from '@/lib/chess/notationPrefs'
 import { cn } from '@/lib/utils'
 
 import {
-  plyLabel,
   type EngineLineView,
   type HumanMoveView,
   type MaiaComparisonColumn,
   type MaiaLevelOption,
   type MaiaMove,
 } from '../gameModel'
+import { usePlyLabel, usePlyNumbering, usePlyOffset } from '../plyNumbering'
 
 /** The human column's own colour — the purple `docs/design/README.md` gives Maia. */
 const MAIA_HUE = 'var(--bb-brilliant)'
@@ -258,6 +258,10 @@ export function MaiaPanel({
 
   const prefs = useLinePreviewPrefs()
   const notate = useNotation()
+  // The live rows and the peek caption are shared components that number from ply 0 as
+  // White's first move; a game set up from a position (Black to move, move 30) is shifted
+  // by its offset, so they are handed the ply counted the way the move list counts it.
+  const numberedPly = ply + usePlyOffset()
   // Which engine row the pointer is in. The preview's own position comes back from the
   // surface, but the wheel and the peek board need to know where the pointer *is* right now.
   const [hovered, setHovered] = useState<string | null>(null)
@@ -318,7 +322,7 @@ export function MaiaPanel({
     ply: previewLine === hovered ? (previewPly ?? null) : null,
   }
   const peek = peekReplay ? peekFen(peekReplay, prefs, peekState) : null
-  const peekLabel = peekReplay ? peekCaption(peekReplay, prefs, peekState, ply, notate) : null
+  const peekLabel = peekReplay ? peekCaption(peekReplay, prefs, peekState, numberedPly, notate) : null
 
   return (
     <div
@@ -529,7 +533,7 @@ export function MaiaPanel({
               <LiveSearchLines
                 stream={search.stream}
                 fen={fen ?? null}
-                ply={ply}
+                ply={numberedPly}
                 orientation={orientation}
                 onHoverMove={onHoverMove}
                 onHoverLine={onHoverLine}
@@ -1111,6 +1115,7 @@ function EngineRow({
   onHovered?: (id: string, over: boolean) => void
   onPlayLine?: (ucis: string[], index: number) => void
 }) {
+  const plyLabel = usePlyLabel()
   const verdict = line.played && isFlagged(line.classification) ? glyphStyle(line.classification) : null
   // A row whose PV never replayed has no line to preview and no ply to point at — the
   // appended "played" row of a position the engine could not walk. It reports nothing
@@ -1255,11 +1260,13 @@ function Rollout({
 
 /** `12.` for White; Black gets a number only where the line starts on it. */
 function PlyNumber({ ply, first }: { ply: number; first: boolean }) {
-  if (ply % 2 === 1 && !first) return null
+  const numbering = usePlyNumbering()
+  const white = numbering.side(ply) === 'white'
+  if (!white && !first) return null
   return (
     <span className="font-mono text-meta text-dim-2">
-      {Math.floor(ply / 2) + 1}
-      {ply % 2 === 0 ? '.' : '…'}
+      {numbering.moveNumber(ply)}
+      {white ? '.' : '…'}
     </span>
   )
 }

@@ -24,6 +24,7 @@ import { SourceBadge } from '@/components/badges/SourceBadge'
 import { WhoseGamesToggle } from '@/components/import/WhoseGamesToggle'
 import { Button } from '@/components/ui/button'
 import { useUploadPgn } from '@/lib/api/queries'
+import { readPgnFile } from '@/lib/chess/pgnFile'
 import { cn } from '@/lib/utils'
 
 import { JobProgress, progressChrome } from './JobProgress'
@@ -74,7 +75,7 @@ export function PgnCard({
   async function send() {
     if (files.length === 0) return
     try {
-      const texts = await Promise.all(files.map((file) => file.text()))
+      const texts = await Promise.all(files.map(readPgnFile))
       const pgn = texts.join('\n\n')
       if (!pgn.trim()) {
         setReadError(t`that file carried no PGN`)

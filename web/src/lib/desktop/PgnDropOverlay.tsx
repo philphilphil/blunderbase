@@ -6,6 +6,7 @@ import { useEffect, useRef, useState } from 'react'
 import { WhoseGamesToggle } from '@/components/import/WhoseGamesToggle'
 import { Button } from '@/components/ui/button'
 import { useUploadPgn } from '@/lib/api/queries'
+import { readPgnFile } from '@/lib/chess/pgnFile'
 import { toast } from '@/lib/toast'
 
 function pgnFiles(list: FileList | null): File[] {
@@ -85,7 +86,7 @@ export function PgnDropOverlay() {
 
   function send(files: File[]) {
     setAsking(null)
-    void Promise.all(files.map((file) => file.text()))
+    void Promise.all(files.map(readPgnFile))
       .then((texts) => {
         const pgn = texts.join('\n\n')
         // Read by the reader, not by a log: this message is what the toast below shows.

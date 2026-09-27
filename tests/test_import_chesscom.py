@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import sqlite3
 from collections.abc import Callable, Iterator
 from pathlib import Path
 from typing import Any
@@ -8,6 +9,7 @@ from typing import Any
 import httpx
 import pytest
 from sqlalchemy import func, select
+from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session
 
 from backend.adapters import chesscom
@@ -292,6 +294,90 @@ def test_a_limit_stops_inside_a_month_and_the_cursor_resumes_there(
     assert (second.games_seen, second.games_imported, second.games_failed) == (4, 2, 2)
     assert second.cursor == f"{FEBRUARY}|3"
     assert _count(session, Game) == 4
+
+
+def test_a_game_the_database_would_not_take_keeps_the_cursor_behind_it(
+    session: Session, sync: Callable[..., Any], api: FakeApi, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The cursor moves over games the library answered for, not over games it was handed.
+    A write lock held past the retries is no answer: a cursor past that game would skip it
+    on every later sync; one behind it costs the next sync a duplicate it skips."""
+    stored = import_service.ingest_game
+
+    def busy(session_: Session, job_: Any, parsed: Any, *args: Any, **options: Any) -> Any:
+        if parsed.source_id == "222222222":
+            raise OperationalError(
+                "INSERT INTO games", {}, sqlite3.OperationalError("database is locked")
+            )
+        return stored(session_, job_, parsed, *args, **options)
+
+    monkeypatch.setattr(import_service, "ingest_game", busy)
+    monkeypatch.setattr(import_service, "DB_RETRY_ATTEMPTS", 1)
+
+    first = sync(session)
+
+    assert first.status is JobStatus.DONE
+    assert "database is locked" in str(first.errors)
+    assert first.cursor == f"{JANUARY}|1"
+
+    monkeypatch.undo()
+    api.requests.clear()
+    second = sync(session)
+
+    assert api.urls == [ARCHIVES, JANUARY, FEBRUARY]
+    assert _game(session, "222222222") is not None
+    assert second.cursor == f"{FEBRUARY}|3"
+
+
+def test_a_mistyped_name_leaves_no_account_behind(
+    session: Session, sync: Callable[..., Any], api: FakeApi
+) -> None:
+    """An owner account is what the schedule syncs; one for a name chess.com does not know
+    would be synced, and fail, for ever."""
+    api.site.pop(ARCHIVES)
+
+    job = sync(session)
+
+    assert job.status is JobStatus.FAILED
+    assert _count(session, Account) == 0
+
+
+def test_an_account_a_mistyped_name_left_behind_goes_at_the_next_not_found(
+    session: Session, sync: Callable[..., Any], api: FakeApi
+) -> None:
+    _owner(session)
+    api.site.pop(ARCHIVES)
+
+    sync(session)
+
+    assert _count(session, Account) == 0
+
+
+def test_a_sync_that_fails_before_chesscom_answers_is_still_the_accounts(
+    session: Session, sync: Callable[..., Any], api: FakeApi
+) -> None:
+    """The schedule finds an account's last sync by the account it names. A failed sync
+    that named none would leave the last good one as the newest, and the account would be
+    due again on every tick for as long as chess.com is down — or for good, once it has
+    closed the account."""
+    from datetime import timedelta
+
+    from backend.services.auto_sync import due_syncs
+
+    good = sync(session)
+    good.created_at = good.started_at = good.started_at - timedelta(hours=2)
+    session.commit()
+    account_id = session.scalars(select(Account.id)).one()
+
+    api.queue(ARCHIVES, httpx.Response(500, text="down"))
+    down = sync(session)
+    api.site.pop(ARCHIVES)
+    closed = sync(session)
+
+    assert (down.status, closed.status) == (JobStatus.FAILED, JobStatus.FAILED)
+    assert (down.account_id, closed.account_id) == (account_id, account_id)
+    assert _count(session, Account) == 1
+    assert due_syncs(session, 60, closed.created_at + timedelta(minutes=1)) == []
 
 
 def test_a_sync_can_store_its_games_without_queueing_a_pass(

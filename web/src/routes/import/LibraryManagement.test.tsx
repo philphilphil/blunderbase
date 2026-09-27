@@ -56,7 +56,12 @@ beforeEach(() => {
     if (path.endsWith('/api/games/delete-all')) {
       return json({ games: 6, runs: 4, notes: 1, import_jobs: 2 })
     }
-    if (path.endsWith('/api/games')) return json({ games: [], total: 6, limit: 1, offset: 0 })
+    if (path.endsWith('/api/games')) {
+      // Four of the owner's games and two added from the reference books: the reset takes
+      // all six, so only a count over `whose=all` says six.
+      const whose = new URLSearchParams(String(input).split('?')[1] ?? '').get('whose')
+      return json({ games: [], total: whose === 'all' ? 6 : 4, limit: 1, offset: 0 })
+    }
     return json({})
   }))
 })
@@ -78,6 +83,19 @@ describe('LibraryManagement', () => {
 
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
     expect(screen.getByRole('status')).toHaveTextContent('Deleted 6 games, 4 analysis runs and 1 note.')
+  })
+
+  it('counts every game the reset deletes, reference games included', async () => {
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    render(<Providers client={client}><LibraryManagement /></Providers>)
+
+    expect(await screen.findByText('Delete 6 games and everything attached to them.')).toBeInTheDocument()
+    expect(fetch).toHaveBeenCalledWith(
+      expect.stringContaining('whose=all'),
+      expect.anything(),
+    )
+    await userEvent.click(screen.getByRole('button', { name: /reset imported library/i }))
+    expect(screen.getByRole('dialog')).toHaveTextContent(/6 games/)
   })
 
   it('uses the destructive confirmation without asking desktop users for a password', async () => {

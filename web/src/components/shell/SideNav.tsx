@@ -65,6 +65,7 @@ import { useLocale } from '@/lib/i18n/I18nProvider'
 import { REPO_URL } from '@/lib/links'
 import { manualUrl } from '@/lib/manual'
 import { paramsFromFilters, toGameQuery } from '@/routes/games/filters'
+import { carrySort, showsCut } from '@/routes/games/libraryLinks'
 import {
   filterLabel,
   removeSavedFilter,
@@ -431,16 +432,16 @@ function SavedFilterRow({
   const name = filterLabel(i18n, { id, label, filters, dotClass, builtin })
   const params = paramsFromFilters(filters)
   const count = useGames({ ...toGameQuery(filters), limit: 1 })
-  const current = new URLSearchParams(search)
-  // Active only when the library is showing exactly this cut and nothing else.
-  const active =
-    [...params].every(([key, value]) => current.get(key) === value) &&
-    [...current.keys()].length === [...params.keys()].length
+  // Active only when the library is showing exactly this cut and nothing else — however it
+  // is sorted and whichever page it is on, since those are how it is read, not which games.
+  const active = showsCut(params, search)
 
   return (
     <div className="group/saved relative">
       <DotRow
-        to={`/games?${params.toString()}`}
+        // Only shown on the library itself, so the order the reader chose goes with them to
+        // the next cut rather than falling back to newest first (`libraryLinks`).
+        to={carrySort(`/games?${params.toString()}`, '/games', search)}
         active={active}
         dotClass={dotClass}
         trailing={count.data === undefined ? '' : count.data.total.toLocaleString()}

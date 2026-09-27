@@ -719,11 +719,84 @@ def start_board(game: Game) -> Any:
 
     The PGN is the one place a game's starting position is written down — there is no
     column for it — so it is the one place this asks.
+
+    A chess960 game gets a chess960 board — by its variant, or by castling rights only a
+    chess960 start can have — the same way the importer replayed it, so its moves parse in
+    the king-takes-rook spelling they were stored in.
     """
     import chess
 
+    from backend.services.import_service import CHESS960_VARIANTS
+
     fen = pgn_headers(game).get("FEN")
-    return chess.Board(fen) if fen else chess.Board()
+    chess960 = (game.variant or "").lower() in CHESS960_VARIANTS
+    board = chess.Board(fen, chess960=chess960) if fen else chess.Board(chess960=chess960)
+    board.chess960 = board.chess960 or board.has_chess960_castling_rights()
+    return board
+
+
+# The PGN's `FEN` tag, read without parsing the game: `game_summary` runs over every row of
+# a list, and a full parse per row is exactly what a list cannot afford.
+_FEN_HEADER = re.compile(r'^\s*\[FEN\s+"([^"]*)"\s*\]', re.MULTILINE)
+STANDARD_START_FEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
+
+
+def start_fen(game: Game) -> str | None:
+    """The FEN a game starts from, or None for a game from the initial array.
+
+    A chess960 game, a game set up from a position (an OTB fragment, a Lichess "from
+    position" game, a correspondence game started from a FEN) is replayed, numbered and
+    exported from here; a PGN that spells out the standard start is a standard game.
+    """
+    match = _FEN_HEADER.search(game.pgn or "")
+    if match is None:
+        return None
+    fen = " ".join(match.group(1).split())
+    if not fen or fen == STANDARD_START_FEN:
+        return None
+    return fen
+
+
+def ply_offset(fen: str | None) -> int:
+    """How far the numbering of a game from `fen` is shifted from ply 0 being White's move 1.
+
+    Ply `p` of the game is White's move when `(p + offset)` is even, and it is move number
+    `(p + offset) // 2 + 1`. Zero for the initial array; one for a game where Black moves
+    first; `2 * (n - 1)` more for a start at move `n`.
+    """
+    if not fen:
+        return 0
+    fields = fen.split()
+    black = len(fields) > 1 and fields[1].lower() == "b"
+    try:
+        fullmove = max(int(fields[5]), 1) if len(fields) > 5 else 1
+    except ValueError:
+        fullmove = 1
+    return 2 * (fullmove - 1) + (1 if black else 0)
+
+
+def is_chess960(game: Game) -> bool:
+    """Whether a game is replayed as chess960, decided the way `start_board` decides it.
+
+    By its variant, or by a start whose castling rights only a chess960 array can have — a
+    Lichess "from position" game set up with a rook off its corner is standard by name and
+    chess960 by its moves. The board, the move spelling (king-takes-rook) and the web's
+    replay all have to agree on this, so it is said once, here, and sent with the summary.
+    A start FEN that will not parse is not chess960: `start_board` would fail on it anyway.
+    """
+    import chess
+
+    from backend.services.import_service import CHESS960_VARIANTS
+
+    if (game.variant or "").lower() in CHESS960_VARIANTS:
+        return True
+    fen = start_fen(game)
+    if fen is None:
+        return False
+    try:
+        return chess.Board(fen).has_chess960_castling_rights()
+    except ValueError:
+        return False
 
 
 def board_now(game: Game) -> Any:
@@ -980,8 +1053,9 @@ def get_game_detail(
     evals, maia = merge_run_evals(session, runs, ply_range=ply_range)
 
     start, end = _ply_bounds(game, ply_range)
+    offset = ply_offset(start_fen(game))
     moves = [
-        _move_row(game, ply, evals.get(ply), maia.get(ply))
+        _move_row(game, ply, evals.get(ply), maia.get(ply), offset)
         for ply in range(start, min(end, game.ply_count - 1) + 1)
     ]
 
@@ -1300,17 +1374,18 @@ def build_card(session: Session, game: Game, *, worst: int = CARD_WORST_MOMENTS)
         for ply in sorted(evals)
         if evals[ply].win_after is not None
     ]
+    offset = ply_offset(start_fen(game))
     owned = (
         row
         for row in evals.values()
-        if row.win_loss is not None and _is_owner_ply(game, row.ply)
+        if row.win_loss is not None and _is_owner_ply(game, row.ply, offset)
     )
     ranked = sorted(owned, key=lambda row: row.win_loss or 0.0, reverse=True)
     return {
         "analyzed": bool(runs),
         "requested": any(run.priority > 0 for run in runs),
         "eval_curve": curve,
-        "worst_moments": [_moment_row(game, row) for row in ranked[:worst]],
+        "worst_moments": [_moment_row(game, row, offset) for row in ranked[:worst]],
     }
 
 
@@ -1460,6 +1535,8 @@ def game_summary(game: Game, *, collections: Sequence[int] | None = None) -> dic
             "increment": game.increment,
             "rated": game.rated,
             "variant": game.variant if game.variant != "standard" else None,
+            "start_fen": start_fen(game),
+            "chess960": True if is_chess960(game) else None,
             "eco": game.eco,
             "opening": game.opening_name,
             "termination": game.termination,
@@ -1689,12 +1766,20 @@ def get_player_profile(
 
 
 def _has_classification(classification: Classification) -> ColumnElement[bool]:
+    """An owner move of this class in the game's primary run, the one Stats read.
+
+    Only that run, not any finished one: a blunder in a shallow import pass that a deeper
+    requested run has since called a mistake is not a blunder any more, and neither is one
+    in a run over a ply window or a Maia fill. Matching every done run kept such a game
+    under "has blunders" while Stats counted none in it and its card said "mistake".
+    Correlated on the game, so each row costs an index lookup, not a pass over every run.
+    """
+    from backend.services import stats as stats_service
+
     return exists(
         select(MoveEval.id)
-        .join(AnalysisRun, MoveEval.run_id == AnalysisRun.id)
         .where(
-            AnalysisRun.game_id == Game.id,
-            AnalysisRun.status == RunStatus.DONE,
+            MoveEval.run_id == stats_service.primary_runs(Game.id).correlate(Game),
             MoveEval.classification == classification,
             owner_move_condition(),
         )
@@ -1757,26 +1842,35 @@ def _ply_bounds(game: Game, ply_range: tuple[int, int] | None) -> tuple[int, int
     return max(start, 0), max(end, 0)
 
 
-def _is_owner_ply(game: Game, ply: int) -> bool:
+def _mover(ply: int, offset: int = 0) -> Color:
+    """Who plays ply `ply` of a game whose numbering is shifted by `offset` (`ply_offset`)."""
+    return Color.WHITE if (ply + offset) % 2 == 0 else Color.BLACK
+
+
+def _is_owner_ply(game: Game, ply: int, offset: int = 0) -> bool:
     if game.owner_color is None:
         return True
-    return (ply % 2 == 0) == (game.owner_color == Color.WHITE)
+    return _mover(ply, offset) == game.owner_color
 
 
 def _move_row(
-    game: Game, ply: int, row: MoveEval | None, maia: dict[str, Any] | None
+    game: Game,
+    ply: int,
+    row: MoveEval | None,
+    maia: dict[str, Any] | None,
+    offset: int = 0,
 ) -> dict[str, Any]:
     san = game.moves_san[ply] if ply < len(game.moves_san) else None
     uci = game.moves_uci[ply] if ply < len(game.moves_uci) else None
     clocks = game.clocks or []
     move: dict[str, Any] = {
         "ply": ply,
-        "move_number": ply // 2 + 1,
-        "color": str(Color.WHITE if ply % 2 == 0 else Color.BLACK),
+        "move_number": (ply + offset) // 2 + 1,
+        "color": str(_mover(ply, offset)),
         "san": san,
         "uci": uci,
         "clock": clocks[ply] if ply < len(clocks) else None,
-        "by_owner": _is_owner_ply(game, ply) if game.owner_color is not None else None,
+        "by_owner": _is_owner_ply(game, ply, offset) if game.owner_color is not None else None,
     }
     if row is not None:
         move.update(
@@ -1799,12 +1893,12 @@ def _move_row(
     return _compact(move)
 
 
-def _moment_row(game: Game, row: MoveEval) -> dict[str, Any]:
+def _moment_row(game: Game, row: MoveEval, offset: int = 0) -> dict[str, Any]:
     san = game.moves_san[row.ply] if row.ply < len(game.moves_san) else row.move_san
     return _compact(
         {
             "ply": row.ply,
-            "move_number": row.ply // 2 + 1,
+            "move_number": (row.ply + offset) // 2 + 1,
             "san": san,
             "uci": row.move_uci,
             "win_loss": row.win_loss,

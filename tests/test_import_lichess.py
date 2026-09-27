@@ -3,6 +3,7 @@ from __future__ import annotations
 import io
 import json
 import sqlite3
+from datetime import timedelta
 from pathlib import Path
 from typing import Any
 
@@ -68,6 +69,17 @@ def _locked() -> OperationalError:
 
 def sync(session: Session, player: str = PLAYER, **options: Any) -> ImportJob:
     return run_import(session, Source.LICHESS, username=player, sleep=Sleeper(), **options)
+
+
+def listing(*payloads: dict[str, Any]) -> respx.Route:
+    """The running-games-only export a sync from a cursor asks for; register it first.
+
+    respx tries routes in the order they were added, and this one only differs from the
+    account export by its query, so it has to come before a route that takes any query.
+    """
+    return respx.get(EXPORT, params={"finished": "false"}).mock(
+        return_value=httpx.Response(200, text=ndjson(*payloads))
+    )
 
 
 def games(session: Session) -> list[Game]:
@@ -167,6 +179,7 @@ def test_the_first_sync_asks_for_the_whole_archive_oldest_first(
 
 @respx.mock
 def test_a_second_sync_starts_from_the_stored_cursor(session: Session, archive: str) -> None:
+    listing()
     route = respx.get(EXPORT).mock(
         side_effect=[httpx.Response(200, text=archive), httpx.Response(200, text="")]
     )
@@ -197,6 +210,7 @@ def test_a_cursor_belongs_to_the_account_it_was_read_for(session: Session, archi
 
 @respx.mock
 def test_an_explicit_since_overrides_the_stored_cursor(session: Session, archive: str) -> None:
+    listing()
     route = respx.get(EXPORT).mock(
         side_effect=[httpx.Response(200, text=archive), httpx.Response(200, text="")]
     )
@@ -331,6 +345,194 @@ def test_a_filtered_sync_leaves_the_accounts_cursor_alone(session: Session, arch
     assert "since" not in route.calls[1].request.url.params
 
 
+def _running(records: list[dict[str, Any]], source_id: str, created_at: int) -> dict[str, Any]:
+    """A fixture game as the export lists one still being played."""
+    playing = {**_stamped(records, source_id, created_at), "status": "started"}
+    del playing["winner"]
+    return playing
+
+
+@respx.mock
+def test_a_game_still_being_played_is_remembered_and_fetched_by_id_once_it_ends(
+    session: Session, records: list[dict[str, Any]]
+) -> None:
+    """The export filters on `createdAt`. A correspondence game begun before a blitz game
+    that is already stored, and finished after it, sits behind a cursor that moved past the
+    blitz game — and no later export would ever list it. The running game is not stored;
+    its ID is remembered, the cursor moves on as usual, and the next sync fetches the game
+    by that ID once it has ended."""
+    early = _stamped(records, "zzEarly", 1786000000000)
+    late = _stamped(records, "zzLate", 1786000009000)
+    playing = _running(records, "zzCorres", 1786000005000)
+    ended = _stamped(records, "zzCorres", 1786000005000)
+    running = listing()
+    route = respx.get(EXPORT).mock(
+        side_effect=[
+            httpx.Response(200, text=ndjson(early, playing, late)),
+            httpx.Response(200, text=""),
+            httpx.Response(200, text=""),
+        ]
+    )
+    by_id = respx.post(lichess.GAMES_BY_ID_API).mock(
+        return_value=httpx.Response(200, text=ndjson(ended))
+    )
+
+    first = sync(session)
+
+    assert route.calls[0].request.url.params["ongoing"] == "true"
+    assert [game.source_id for game in games(session)] == ["zzEarly", "zzLate"]
+    assert (first.games_seen, first.games_failed) == (2, 0)
+    # Not held at the running game: a correspondence game can run for months, and every
+    # sync meanwhile would read everything since it began again.
+    assert first.cursor == "1786000009000"
+    assert first.unfinished == ["zzCorres"]
+    # The whole archive was walked, so there was nothing else to list or fetch.
+    assert (running.call_count, by_id.call_count) == (0, 0)
+
+    second = sync(session)
+
+    assert route.calls[1].request.url.params["since"] == "1786000009000"
+    assert by_id.calls[0].request.content == b"zzCorres"
+    assert (second.games_imported, second.games_skipped) == (1, 0)
+    assert second.cursor == "1786000009000"
+    assert second.unfinished == []
+    assert [game.source_id for game in games(session)] == ["zzEarly", "zzLate", "zzCorres"]
+
+    sync(session)
+
+    assert by_id.call_count == 1, "a game that was stored is not asked for again"
+
+
+@respx.mock
+def test_a_running_game_begun_before_the_cursor_is_found_by_listing_running_games(
+    session: Session, records: list[dict[str, Any]]
+) -> None:
+    """An install whose cursor passed a correspondence game before syncs remembered running
+    games: the export from the cursor never lists that game. A sync from a cursor asks for
+    the account's running games on their own as well, however old."""
+    account = Account(platform="lichess", username=PLAYER, is_owner=True)
+    session.add(account)
+    session.flush()
+    session.add(
+        ImportJob(
+            source=Source.LICHESS,
+            account_id=account.id,
+            status=JobStatus.DONE,
+            cursor="1786000009000",
+            message=PLAYER,
+        )
+    )
+    session.commit()
+    running = respx.get(EXPORT, params={"finished": "false"}).mock(
+        side_effect=[
+            httpx.Response(200, text=ndjson(_running(records, "zzOld", 1785000000000))),
+            httpx.Response(200, text=""),
+        ]
+    )
+    respx.get(EXPORT).mock(return_value=httpx.Response(200, text=""))
+    by_id = respx.post(lichess.GAMES_BY_ID_API).mock(
+        return_value=httpx.Response(200, text=ndjson(_stamped(records, "zzOld", 1785000000000)))
+    )
+
+    first = sync(session)
+
+    assert running.calls[0].request.url.params["ongoing"] == "true"
+    assert "since" not in running.calls[0].request.url.params
+    assert first.unfinished == ["zzOld"]
+    assert by_id.call_count == 0, "a game the listing shows running is not fetched"
+
+    second = sync(session)
+
+    assert second.games_imported == 1
+    assert second.unfinished == []
+    assert [game.source_id for game in games(session)] == ["zzOld"]
+
+
+@respx.mock
+def test_a_remembered_game_the_database_would_not_take_is_remembered_again(
+    session: Session, records: list[dict[str, Any]], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    listing()
+    respx.get(EXPORT).mock(
+        side_effect=[
+            httpx.Response(200, text=ndjson(_running(records, "zzCorres", 1786000005000))),
+            httpx.Response(200, text=""),
+        ]
+    )
+    respx.post(lichess.GAMES_BY_ID_API).mock(
+        return_value=httpx.Response(200, text=ndjson(_stamped(records, "zzCorres", 1786000005000)))
+    )
+    sync(session)
+
+    def busy(*args: Any, **options: Any) -> Any:
+        raise _locked()
+
+    monkeypatch.setattr(import_service, "ingest_game", busy)
+    job = sync(session)
+
+    assert job.games_failed == 1
+    assert job.unfinished == ["zzCorres"]
+
+
+@respx.mock
+def test_a_finished_game_behind_the_cursor_is_fetched_by_its_id(
+    session: Session, records: list[dict[str, Any]]
+) -> None:
+    """What the live import hands over when a game ends: its ID. A game the export no
+    longer carries — it began before the stored cursor — is fetched by that ID, in the
+    same job, and moves the cursor nowhere."""
+    newer = _stamped(records, "zzNewer", 1786000009000)
+    older = _stamped(records, "zzOlder", 1786000001000)
+    respx.get(EXPORT).mock(return_value=httpx.Response(200, text=ndjson(newer)))
+    by_id = respx.post(lichess.GAMES_BY_ID_API).mock(
+        return_value=httpx.Response(200, text=ndjson(older))
+    )
+    sync(session)
+
+    job = sync(session, game_ids=["zzOlder", "zzNewer"])
+
+    assert by_id.call_count == 1
+    assert by_id.calls[0].request.content == b"zzOlder"
+    assert (job.games_imported, job.games_skipped) == (1, 1)
+    assert job.cursor == "1786000009000"
+    assert {game.source_id for game in games(session)} == {"zzNewer", "zzOlder"}
+
+
+@respx.mock
+def test_a_finished_game_the_export_carried_is_not_asked_for_again(
+    session: Session, records: list[dict[str, Any]]
+) -> None:
+    # No route for the by-ID endpoint: respx refuses any request it was not told about.
+    respx.get(EXPORT).mock(
+        return_value=httpx.Response(200, text=ndjson(_stamped(records, "zzNewer", 1786000009000)))
+    )
+
+    job = sync(session, game_ids=["zzNewer"])
+
+    assert job.status is JobStatus.DONE
+    assert job.games_imported == 1
+
+
+@respx.mock
+def test_the_cursor_is_found_however_many_syncs_came_after_it(
+    session: Session, archive: str
+) -> None:
+    route = respx.get(EXPORT).mock(
+        side_effect=[httpx.Response(200, text=archive), httpx.Response(200, text="")]
+    )
+    sync(session)
+    # A second account's syncs, more of them than any fixed window of recent jobs holds.
+    session.add_all(
+        ImportJob(source=Source.LICHESS, status=JobStatus.DONE, cursor="1", message="Other")
+        for _ in range(250)
+    )
+    session.commit()
+
+    sync(session)
+
+    assert route.calls[1].request.url.params["since"] == NEWEST
+
+
 @respx.mock
 def test_a_token_is_sent_as_a_bearer_header(session: Session, archive: str) -> None:
     route = respx.get(EXPORT).mock(return_value=httpx.Response(200, text=archive))
@@ -435,6 +637,82 @@ def test_an_unknown_player_fails_the_job_without_a_stack_trace(session: Session)
 
     assert job.status is JobStatus.FAILED
     assert job.message == "UnknownPlayerError: lichess has no player called 'ExamplePlayer'"
+
+
+@respx.mock
+def test_a_mistyped_name_leaves_no_account_behind(session: Session) -> None:
+    """An owner account is what the schedule syncs. One for a name Lichess does not know
+    would be synced, and fail, for ever — and the sources box would keep showing it."""
+    respx.get(EXPORT).mock(return_value=httpx.Response(404, json={"error": "Not found"}))
+
+    job = sync(session)
+
+    assert job.status is JobStatus.FAILED
+    assert job.account_id is None
+    assert session.scalar(select(func.count()).select_from(Account)) == 0
+
+
+@respx.mock
+def test_an_account_a_mistyped_name_left_behind_goes_at_the_next_not_found(
+    session: Session,
+) -> None:
+    """Older versions registered the account before asking. Such a row never finished a
+    sync and names no game, so a 404 for it is the answer it never got."""
+    stale = Account(platform=Platform.LICHESS, username=PLAYER, is_owner=True)
+    session.add(stale)
+    session.commit()
+    earlier = ImportJob(source=Source.LICHESS, status=JobStatus.FAILED, account_id=stale.id)
+    session.add(earlier)
+    session.commit()
+    respx.get(EXPORT).mock(return_value=httpx.Response(404, json={"error": "Not found"}))
+
+    sync(session)
+
+    assert session.scalar(select(func.count()).select_from(Account)) == 0
+    session.refresh(earlier)
+    assert earlier.account_id is None
+
+
+@respx.mock
+def test_an_account_that_ever_synced_outlives_a_not_found(session: Session, archive: str) -> None:
+    respx.get(EXPORT).mock(
+        side_effect=[
+            httpx.Response(200, text=archive),
+            httpx.Response(404, json={"error": "Not found"}),
+        ]
+    )
+    sync(session)
+
+    closed = sync(session)
+
+    assert closed.status is JobStatus.FAILED
+    assert session.scalar(select(func.count()).select_from(Account)) == 1
+    # Still a sync of that account, so the schedule counts it and waits its interval.
+    assert closed.account_id == session.scalars(select(Account.id)).one()
+
+
+@respx.mock
+def test_a_sync_that_fails_before_lichess_answers_is_still_the_accounts(
+    session: Session, archive: str
+) -> None:
+    """The schedule finds an account's last sync by the account it names. A failed sync
+    that named none would leave the last good one as the newest, and the account would be
+    due again on every tick — every minute of an outage, for as long as it lasts."""
+    from backend.services.auto_sync import due_syncs
+
+    respx.get(EXPORT).mock(
+        side_effect=[httpx.Response(200, text=archive), httpx.Response(503, text="down")]
+    )
+    good = sync(session)
+    assert good.started_at is not None
+    good.created_at = good.started_at = good.started_at - timedelta(hours=2)
+    session.commit()
+
+    down = sync(session)
+
+    assert down.status is JobStatus.FAILED
+    assert down.account_id == session.scalars(select(Account.id)).one()
+    assert due_syncs(session, 60, down.created_at + timedelta(minutes=1)) == []
 
 
 @respx.mock

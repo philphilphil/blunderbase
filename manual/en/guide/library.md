@@ -11,6 +11,13 @@ then **Sync**. The same button syncs it again afterwards, resuming where the las
 run stopped. Every import is deduplicated on the way in, so a second sync of the same
 archive stores nothing twice.
 
+A name the site does not know fails the sync and connects nothing, so a typo can simply be
+corrected and connected again. FICS cannot tell an unknown name from a player without
+games; its box connects with the first game it finds. A Lichess game still being played,
+such as a correspondence game, is left out until it has ended, and the first sync after
+that brings it in, however long it ran. A correspondence game that ended before this
+version and never arrived comes in with one sync **From the beginning**.
+
 ### Sync options
 
 The strip above the boxes is read by every source:
@@ -59,6 +66,10 @@ up from there.
 Choose a file in the PGN box, or drop one anywhere in the window; several dropped at once
 are read as one file. Say whether the games are **Mine** or **Not mine** first. Games that
 are not yours are analysed and searchable like any other, but count in no statistic.
+
+The file may be UTF-8 or the Latin-1 / Windows-1252 that ChessBase and many older programs
+write; each file is read in whichever of the two it is, so accented names such as "Müller"
+arrive as written.
 
 ### Correspondence games
 

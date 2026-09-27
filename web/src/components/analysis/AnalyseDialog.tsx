@@ -67,6 +67,12 @@ export interface AnalyseDialogProps {
   cursor: number
   /** The move at `cursor` as the move list prints it, for the choice's caption. */
   cursorSan: string | null
+  /**
+   * How far the game's own numbering is shifted from the initial array (`gameModel.plyOffset`)
+   * — non-zero for a game set up from a position. It only moves the caption's move number;
+   * `cursor` stays the game's own ply, which is what the run's window is counted in.
+   */
+  plyOffset?: number
   plyCount: number
   pending: boolean
   error: string | null
@@ -80,6 +86,7 @@ export function AnalyseDialog({
   defaultNodes,
   cursor,
   cursorSan,
+  plyOffset = 0,
   plyCount,
   pending,
   error,
@@ -135,7 +142,7 @@ export function AnalyseDialog({
 
   const budget = formatNodes(defaultNodes)
   const moveName =
-    !atStart && cursorSan ? `${moveNumberLabel(cursor)} ${notate(cursorSan)}` : null
+    !atStart && cursorSan ? `${moveNumberLabel(cursor + plyOffset)} ${notate(cursorSan)}` : null
 
   return (
     <Frame

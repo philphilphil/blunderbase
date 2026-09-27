@@ -678,6 +678,50 @@ def test_the_downgrade_clears_only_the_folds_the_old_readers_cannot_read(
     assert [tuple(row) for row in stored] == [(0, 0), (1, 1), (1, 0)]
 
 
+def test_the_cards_of_games_set_up_from_a_position_are_folded_again(
+    settings: Settings,
+) -> None:
+    """0033: a card numbered off the game's real start goes — Black to move, or a start past
+    move 1. One whose numbering never moved stays: the initial array, a chess960 array, a
+    set-up position with White to move at move 1. A NULL card drops out of the "worst" sort
+    until something refolds it, so clearing a correct one would cost for nothing."""
+    upgrade_to_head(settings)
+    config = alembic_config(settings)
+    command.downgrade(config, "0032_import_job_unfinished")
+    engine = get_engine(settings)
+    card = {"analyzed": True, "requested": False, "eval_curve": [], "worst_moments": []}
+    pgns = (
+        '[FEN "4k3/8/8/8/8/8/4P3/4K3 b - - 0 1"]\n[SetUp "1"]\n\n1... Kd7',
+        '[Event "Casual"]\n\n1. e4',
+        '[FEN "bbrnnkrq/pppppppp/8/8/8/8/PPPPPPPP/BBRNNKRQ w KQkq - 0 1"]\n\n1. e4',
+        '[FEN "4k3/8/8/8/8/8/4P3/4K3 w - - 0 1"]\n[SetUp "1"]\n\n1. Kd2',
+        '[FEN "4k3/8/8/8/8/8/4P3/4K3 w - - 0 20"]\n[SetUp "1"]\n\n20. Kd2',
+    )
+    with engine.begin() as connection:
+        for index, pgn in enumerate(pgns):
+            connection.execute(
+                text(
+                    "INSERT INTO games "
+                    "(source, dedup_hash, white_name, black_name, result, variant, pgn, "
+                    "moves_uci, moves_san, ply_count, imported_at, card) "
+                    "VALUES ('pgn', :hash, 'owner', 'opponent', '1-0', 'standard', "
+                    ":pgn, '[]', '[]', 0, :now, :card)"
+                ),
+                {
+                    "hash": f"start{index}",
+                    "pgn": pgn,
+                    "now": "2026-08-01 12:00:00",
+                    "card": json.dumps(card),
+                },
+            )
+
+    command.upgrade(config, "head")
+
+    with engine.connect() as connection:
+        stored = connection.execute(text("SELECT card IS NULL FROM games ORDER BY id")).all()
+    assert [row[0] for row in stored] == [1, 0, 0, 0, 1]
+
+
 def test_games_no_source_named_are_named_once_from_the_book(settings: Settings) -> None:
     """The importer now names such games on the way in; 0021 does it once for the stored."""
     from sqlalchemy.orm import sessionmaker

@@ -14,12 +14,12 @@ import {
   formatRemaining,
   formatSeconds,
   moveTimeSummary,
-  plyLabel,
-  sideOf,
+  pointSide,
   thinkHeight,
   type MoveTimePoint,
   type MoveTimeSummary,
 } from '../gameModel'
+import { usePlyLabel } from '../plyNumbering'
 import { PlotBars, PlotMarks, type PlotPoint } from './graphParts'
 
 const AXIS = 0
@@ -71,7 +71,8 @@ export function MoveTimePlot({
         const height = thinkHeight(point.seconds)
         return {
           ply: point.ply,
-          value: sideOf(point.ply) === 'white' ? height : -height,
+          value: pointSide(point) === 'white' ? height : -height,
+          side: pointSide(point),
           seconds: point.seconds,
           classification: point.classification,
         }
@@ -173,6 +174,7 @@ export function MoveTimePlot({
  * repeated them would be a second table an inch from the first.
  */
 function TimeReadout({ payload }: { payload?: { payload?: TimeSeriesPoint }[] }) {
+  const plyLabel = usePlyLabel()
   const point = payload?.[0]?.payload
   if (!point || !Number.isInteger(point.ply)) return null
   return (
@@ -243,6 +245,7 @@ function TimeTally({
   summary: MoveTimeSummary | null
 }) {
   const { t } = useLingui()
+  const plyLabel = usePlyLabel()
   const average = summary?.average != null ? formatSeconds(summary.average) : '—'
   const longest = summary?.longest ? formatSeconds(summary.longest.seconds) : '—'
   // A clock reading, in the clock's own format — `2:45`, never `165s` — because the move

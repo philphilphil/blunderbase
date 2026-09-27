@@ -370,9 +370,7 @@ export function RepertoirePage() {
           <NodeEditor
             node={current}
             main={continuationIsMain(roots, ucis, current)}
-            onComment={(comment) =>
-              current ? update.mutateAsync({ id: current.id, body: { comment } }) : Promise.resolve()
-            }
+            onComment={(id, comment) => update.mutateAsync({ id, body: { comment } })}
             onPromote={() =>
               current ? update.mutate({ id: current.id, body: { promote: true } }) : undefined
             }
@@ -501,6 +499,13 @@ function ColorToggle({ color, onChange }: { color: Color; onChange: (next: Color
  * Unlike a note, emptying the box *is* a valid edit and clears the comment: a comment is
  * one field on a move the owner is already looking at, not a document, and there is no
  * other way to take one off.
+ *
+ * Blur is not the only way out of the box, though. Playing a move on the board changes the
+ * selection without ever blurring it — chessground swallows the mousedown — so the box
+ * would be refilled with the next move's text and the draft lost. What the box holds, and
+ * for which move, is therefore kept in `draft`, and a selection change writes a changed
+ * draft to the move it was typed on before the box follows the new one. `onComment` takes
+ * that move's id rather than reading the page's current move, which by then is the next.
  */
 function NodeEditor({
   node,
@@ -512,7 +517,8 @@ function NodeEditor({
   node: RepertoireNode | null
   /** Whether it is already the main move, which is what hides `Promote`. */
   main: boolean
-  onComment: (comment: string | null) => Promise<unknown>
+  /** Write `comment` onto the move `id` — the move it was typed on, not the selected one. */
+  onComment: (id: number, comment: string | null) => Promise<unknown>
   onPromote: () => void
   onDelete: () => void
 }) {
@@ -526,12 +532,54 @@ function NodeEditor({
   const id = node?.id ?? null
   const stored = node?.comment ?? ''
 
+  /** What the box holds, which move it belongs to, and what that move has stored. */
+  const draft = useRef<{ id: number | null; text: string; stored: string }>({
+    id: null,
+    text: '',
+    stored: '',
+  })
+  // Read through a ref so the unmount flush below writes with the latest callback.
+  const onCommentRef = useRef(onComment)
+  useEffect(() => {
+    onCommentRef.current = onComment
+  })
+
+  /**
+   * Write what the box holds, if it changed, and mark it written — so the blur that may
+   * still follow a selection change, or the refetch that follows a write, writes nothing.
+   * `null` is the contract's way of clearing a comment; the tree payload never carries one
+   * back as null, so the box is bound to the empty string either way.
+   */
+  const flush = useCallback((): Promise<boolean> | null => {
+    const held = draft.current
+    if (held.id === null || held.text === held.stored) return null
+    const before = held.stored
+    held.stored = held.text
+    // The failure is already on screen through the mutation's own error; catching it here
+    // is only so a rejected write is not also an unhandled rejection. A draft still in the
+    // box goes back to changed, so the next blur tries again. It answers whether it landed.
+    return onCommentRef.current(held.id, held.text === '' ? null : held.text).then(
+      () => true,
+      () => {
+        if (held.stored === held.text) held.stored = before
+        return false
+      },
+    )
+  }, [])
+
   // The box follows the selection: walking the tree must never carry one move's text onto
   // another, and a refetch after a write is what puts the saved text back under the box.
+  // A draft typed on the move being left is written to *that* move first (see the doc
+  // above); a refetch of the same move replaces the text as it always did.
   useEffect(() => {
+    if (draft.current.id !== id) void flush()
+    draft.current = { id, text: stored, stored }
     setText(stored)
     setConfirming(false)
-  }, [id, stored])
+  }, [id, stored, flush])
+
+  // And a page left with the cursor still in the box keeps what was typed in it.
+  useEffect(() => () => void flush(), [flush])
 
   useEffect(() => {
     if (!flash) return
@@ -560,14 +608,9 @@ function NodeEditor({
       abandoned.current = false
       return
     }
-    if (text === stored) return
-    // `null` is the contract's way of clearing a comment; the tree payload never carries
-    // one back as null, so the box is bound to the empty string either way.
-    // The failure is already on screen through the mutation's own error; the catch is only
-    // so a rejected write is not also an unhandled rejection.
-    void onComment(text === '' ? null : text)
-      .then(() => setFlash(Date.now()))
-      .catch(() => {})
+    void flush()?.then((landed) => {
+      if (landed) setFlash(Date.now())
+    })
   }
 
   return (
@@ -588,13 +631,17 @@ function NodeEditor({
       <textarea
         value={text}
         rows={2}
-        onChange={(event) => setText(event.target.value)}
+        onChange={(event) => {
+          draft.current.text = event.target.value
+          setText(event.target.value)
+        }}
         onBlur={commit}
         onKeyDown={(event) => {
           if (event.key === 'Escape') {
             event.stopPropagation()
             abandoned.current = true
-            setText(stored)
+            draft.current.text = draft.current.stored
+            setText(draft.current.stored)
             event.currentTarget.blur()
           }
         }}

@@ -44,7 +44,8 @@ of the PGN. **Esc** takes the cursor back out and leaves the search as it is.
 
 **Save filter** names the current filter and puts it in the rail under **Games**, with its
 count beside it. Two come with the app: **Losses as black** and **Blunders**. Hovering one
-you saved shows the × that forgets it.
+you saved shows the × that forgets it. Picking one, there or from `⌘K`, keeps the order
+you had the table in, and it stays highlighted however you sort or page it.
 
 ## Sort and page
 
@@ -94,4 +95,7 @@ later sync cannot bring the game back; forgetting that record is
 ## Share a filtered list
 
 The filters live in the address, so any cut of the library is a link you can send or
-bookmark. Which page you are on and how many rows you asked for do not.
+bookmark. The sort and the page you are on go into it too, which is why going back from a
+game — with Back or with the **Library** crumb above it — lands on the same page in the
+same order. How many rows you asked for does not: that
+stays a setting of your own browser.

@@ -7,6 +7,7 @@ rather than as an exception.
 
 from __future__ import annotations
 
+import codecs
 import io
 import re
 from collections.abc import Iterator
@@ -49,6 +50,68 @@ CLOCK_PATTERN = re.compile(r"^(\d+)\+(\d+)$")
 LICHESS_ID = re.compile(r"lichess\.org/(\w{8})")
 CHESSCOM_ID = re.compile(r"chess\.com/game/(?:live|daily)/(\d+)")
 
+# How a PGN's bytes become text. A PGN is often not UTF-8: the standard's own charset is
+# Latin-1, and ChessBase and most older exports write Windows-1252. Read as UTF-8 with
+# errors replaced, "Müller" is stored as "M�ller" for good — it never matches the
+# owner's account or the same game from another source again. So a file is read as strict
+# UTF-8 (a BOM is dropped) when every byte of it is valid UTF-8, and as Windows-1252
+# otherwise: a Latin-1 file is almost never valid UTF-8 by accident, and valid UTF-8 is
+# never worth second-guessing. The browser reads a file it uploads the same way
+# (`web/src/lib/chess/pgnFile.ts`).
+UTF8 = "utf-8-sig"
+CP1252 = "cp1252"
+# The five bytes Windows-1252 leaves undefined (0x81, 0x8D, 0x8F, 0x90, 0x9D) decode to
+# the code point of the same number, as the WHATWG decoder the browser uses does, so the
+# fallback can never fail and both sides read the same file the same way.
+CP1252_ERRORS = "blunderbase-cp1252-c1"
+CHUNK = 1 << 20
+
+
+def _c1_controls(error: UnicodeError) -> tuple[str, int]:
+    if not isinstance(error, UnicodeDecodeError):
+        raise error
+    undefined = error.object[error.start : error.end]
+    return "".join(chr(byte) for byte in undefined), error.end
+
+
+codecs.register_error(CP1252_ERRORS, _c1_controls)
+
+
+def decode_pgn(raw: bytes) -> str:
+    """A PGN's text: strict UTF-8 when the bytes are UTF-8, Windows-1252 otherwise."""
+    try:
+        return raw.decode(UTF8)
+    except UnicodeDecodeError:
+        # A UTF-8 file with one stray Windows-1252 game in it still starts with the BOM;
+        # read as Windows-1252 it would be "ï»¿" in front of the first tag, which then no
+        # longer parses as one and costs that game its headers.
+        return raw.removeprefix(codecs.BOM_UTF8).decode(CP1252, errors=CP1252_ERRORS)
+
+
+def open_pgn(path: str | Path) -> TextIO:
+    """A PGN file opened for lazy reading in the charset `decode_pgn` would choose.
+
+    The file is checked in chunks first so a big archive is never held in memory whole;
+    it costs one extra read of the file, which is cheap next to parsing every game in it.
+    """
+    file = Path(path).expanduser()
+    decoder = codecs.getincrementaldecoder(UTF8)()
+    encoding = UTF8
+    with file.open("rb") as stream:
+        try:
+            while chunk := stream.read(CHUNK):
+                decoder.decode(chunk)
+            decoder.decode(b"", final=True)
+        except UnicodeDecodeError:
+            encoding = CP1252
+    if encoding == UTF8:
+        return file.open("r", encoding=UTF8)
+    # Past a BOM, for the same reason `decode_pgn` drops it before the fallback.
+    binary = file.open("rb")
+    if binary.read(len(codecs.BOM_UTF8)) != codecs.BOM_UTF8:
+        binary.seek(0)
+    return io.TextIOWrapper(binary, encoding=CP1252, errors=CP1252_ERRORS)
+
 
 def run(
     session: Session,
@@ -56,6 +119,7 @@ def run(
     *,
     path: str | None = None,
     text: str | None = None,
+    data: bytes | None = None,
     max_games: int | None = None,
     progress: ProgressHook | None = None,
     analyze: bool = True,
@@ -63,6 +127,9 @@ def run(
     **options: Any,
 ) -> ImportResult:
     """Read one PGN file (or one uploaded blob) and hand every game to the pipeline.
+
+    `data` is an upload as it arrived, still bytes: its charset is decided here, by
+    `decode_pgn`, the same way as a file's. `text` is PGN that is already text.
 
     `analyze=False` lands the games without queueing the automatic analysis pass.
 
@@ -72,6 +139,8 @@ def run(
     True because the common PGN is an export of one's own archive, and because that is
     what every PGN imported before this flag existed was taken to be.
     """
+    if data is not None:
+        text = decode_pgn(data)
     if text is not None:
         return ingest_games(
             session,
@@ -87,7 +156,7 @@ def run(
     if not file.is_file():
         raise FileNotFoundError(f"no such PGN file: {file}")
     job.message = str(file)
-    with file.open("r", encoding="utf-8-sig", errors="replace") as stream:
+    with open_pgn(file) as stream:
         return ingest_games(
             session,
             job,
@@ -102,7 +171,7 @@ def parse_file(
     path: str | Path, *, limit: int | None = None
 ) -> Iterator[ParsedGame | ImportFailure]:
     """Every game in a PGN file, in order. Reads the file lazily."""
-    with Path(path).expanduser().open("r", encoding="utf-8-sig", errors="replace") as stream:
+    with open_pgn(path) as stream:
         yield from parse_stream(stream, limit=limit)
 
 

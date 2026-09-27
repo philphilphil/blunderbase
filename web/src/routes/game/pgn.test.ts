@@ -97,4 +97,20 @@ describe('buildPgn', () => {
     expect(pgn).toContain('[White "a \\"quoted\\" name"]')
     expect(pgn).toContain('[Variant "chess960"]')
   })
+
+  it('writes where a set-up game starts, and numbers its movetext from there', () => {
+    const fen = 'rnbqkbnr/pppp1ppp/8/4p3/4P3/5N2/PPPP1PPP/RNBQKB1R b KQkq - 1 2'
+    const moves: MoveRow[] = [
+      { ply: 0, san: 'Nc6', uci: 'b8c6' },
+      { ply: 1, san: 'Bb5', uci: 'f1b5' },
+      { ply: 2, san: 'a6', uci: 'a7a6' },
+    ]
+    const pgn = buildPgn({ ...GAME, start_fen: fen }, moves)
+    expect(pgn).toContain('[SetUp "1"]')
+    expect(pgn).toContain(`[FEN "${fen}"]`)
+    expect(pgn).toContain('2... Nc6 3. Bb5 a6 0-1')
+    // A game from the initial array carries neither tag.
+    expect(buildPgn(GAME, MOVES)).not.toContain('[FEN')
+    expect(buildPgn(GAME, MOVES)).toContain('1. e4 d5 2. exd5 Qxd5')
+  })
 })

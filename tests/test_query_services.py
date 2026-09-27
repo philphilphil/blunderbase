@@ -563,6 +563,55 @@ def test_has_blunders_counts_only_the_owners_own_moves(analysed: Library) -> Non
     assert "qg000003" in {game.source_id for game in without}
 
 
+def test_has_blunders_reads_only_the_run_that_answers(
+    analysed: Library, engine_row: Engine
+) -> None:
+    """A blunder a deeper run has since called a mistake is no blunder, as in Stats."""
+    session = analysed.session
+    game = analysed["qg000006"]  # owner blunders on plies 28 and 30 in the import pass
+
+    def listed(has_blunders: bool) -> bool:
+        found = games_service.search_games(session, GameFilters(has_blunders=has_blunders))
+        return game.id in {row.id for row in found}
+
+    # A look at a window and a Maia fill are no verdict on the whole game: still a blunder.
+    analyse(
+        session,
+        game,
+        [{"ply": 28, "classification": Classification.MISTAKE}],
+        engine=engine_row,
+        priority=10,
+        ply_start=26,
+        ply_end=30,
+    )
+    analyse(session, game, [{"ply": 30}], engine=engine_row, maia_only=True)
+    assert listed(True) and not listed(False)
+
+    deeper = analyse(
+        session,
+        game,
+        [
+            {"ply": 28, "classification": Classification.MISTAKE, "win_loss": 14.0},
+            {"ply": 30, "classification": Classification.MISTAKE, "win_loss": 18.0},
+        ],
+        engine=engine_row,
+        priority=10,
+    )
+    assert stats.primary_run_id(session, game.id) == deeper.id
+    assert not listed(True) and listed(False)
+    in_stats = stats.get_stats(session, "blunders_by_phase", filters=GameFilters(has_blunders=True))
+    assert in_stats["total"]["blunder"] == 2  # qg000001's, none of this game's
+
+    # An import pass re-queued afterwards does not take over from the requested run.
+    analyse(
+        session,
+        game,
+        [{"ply": 28, "classification": Classification.BLUNDER, "win_loss": 40.0}],
+        engine=engine_row,
+    )
+    assert not listed(True) and listed(False)
+
+
 def test_a_card_says_when_a_requested_run_is_done(analysed: Library, engine_row: Engine) -> None:
     session = analysed.session
     game = analysed["qg000001"]
@@ -1828,6 +1877,41 @@ def test_the_dashboard_matches_six_dimensions_but_reads_games_once(
         for dimension in stats.DIMENSIONS
     }
     assert dashboard["dimensions"] == expected
+
+
+@pytest.mark.parametrize("folded", [False, True])
+def test_an_undated_game_counts_on_all_time_but_in_no_day_window(
+    analysed: Library, folded: bool
+) -> None:
+    """A PGN with `Date "????.??.??"` is still a game: all time counts it everywhere."""
+    session = analysed.session
+    undated = analysed["qg000001"]  # blitz, analysed, owner blunders on plies 6 and 8
+    undated.played_at = None
+    club = collections_service.create_collection(session, name="OTB", game_ids=[undated.id])
+    session.commit()
+    if folded:
+        fold_every_summary(session)
+    stats.reset_stats_cache()
+
+    dashboard = stats.get_dashboard(session)
+    assert dashboard["since"] is None and dashboard["until"] is None
+    for dimension in ("performance_by_speed", "blunders_by_phase", "blunders_by_piece"):
+        assert dashboard["dimensions"][dimension] == stats.get_stats(session, dimension)
+    speed = dashboard["dimensions"]["performance_by_speed"]
+    assert speed["total"]["games"] == len(games_service.search_games(session, GameFilters()))
+    assert dashboard["dimensions"]["blunders_by_phase"]["total"]["blunder"] == 2 + 2
+
+    scoped = GameFilters(collection=club.id)
+    in_club = stats.get_dashboard(session, filters=scoped)["dimensions"]
+    summary = stats.collection_outcome_summaries(session, [club.id])[club.id]
+    assert in_club["performance_by_speed"]["total"]["games"] == summary["games"] == 1
+    assert in_club["blunders_by_phase"]["total"]["blunder"] == 2
+
+    # A game with no date is in no stretch of days, however long.
+    windowed = stats.get_dashboard(session, days=3650)
+    assert windowed["until"] == windowed["anchor"]
+    assert windowed["dimensions"]["performance_by_speed"]["total"]["games"] == 5
+    assert windowed["dimensions"]["blunders_by_phase"]["total"]["blunder"] == 2
 
 
 def test_filters_narrow_a_dimension(analysed: Library) -> None:

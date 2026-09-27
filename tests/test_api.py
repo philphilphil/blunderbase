@@ -676,6 +676,32 @@ def test_a_pgn_file_can_be_uploaded_as_the_request_body(api: TestClient) -> None
     assert api.get("/analysis/queue").json()["queued"] == 1
 
 
+def test_a_windows_1252_upload_keeps_its_accented_names(api: TestClient) -> None:
+    """A ChessBase export sent as it is, in its own charset: the names arrive as written,
+    not as U+FFFD, so they can still match an account and the same game from elsewhere."""
+    pgn = ONE_GAME.replace("newcomer", "Müller, José").replace("upload01", "upload1252")
+    response = api.post(
+        "/import/pgn/upload?wait=true",
+        content=pgn.encode("cp1252"),
+        headers={"content-type": "application/x-chess-pgn"},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["job"]["games_imported"] == 1
+    found = api.get("/games", params={"text": "Müller"}).json()
+    assert found["total"] == 1
+    assert found["games"][0]["opponent"] == "Müller, José"
+
+
+def test_an_upload_of_only_a_byte_order_mark_is_empty(api: TestClient) -> None:
+    response = api.post(
+        "/import/pgn/upload",
+        content=b"\xef\xbb\xbf \n",
+        headers={"content-type": "application/x-chess-pgn"},
+    )
+    assert response.status_code == 422
+
+
 def test_an_import_can_land_its_games_without_queueing_a_pass(api: TestClient) -> None:
     """Skip evaluation, as the import page offers it: the games arrive, the queue stays
     where it was, and the passes are asked for later over the games worth looking at."""

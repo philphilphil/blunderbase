@@ -3,9 +3,11 @@ from __future__ import annotations
 import json
 import secrets
 from collections.abc import Callable
+from urllib.parse import urlsplit
 
 from anyio import to_thread
 from mcp.server import MCPServer
+from mcp.server.transport_security import TransportSecuritySettings
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session, sessionmaker
 from starlette.applications import Starlette
@@ -94,6 +96,53 @@ class BearerGuard:
         await send({"type": "http.response.body", "body": body})
 
 
+LOOPBACK_BINDS = frozenset({"127.0.0.1", "localhost", "::1"})
+LOOPBACK_HOSTS = ("127.0.0.1:*", "localhost:*", "[::1]:*", "127.0.0.1", "localhost", "[::1]")
+LOOPBACK_ORIGINS = ("http://127.0.0.1:*", "http://localhost:*", "http://[::1]:*")
+DEFAULT_PORTS = {"http": 80, "https": 443}
+
+
+def transport_security(settings: Settings) -> TransportSecuritySettings | None:
+    """The SDK's Host/Origin check, told about the name this installation is reached by.
+
+    On a loopback bind the SDK switches DNS-rebinding protection on and, left alone,
+    accepts only a localhost Host — so a reverse proxy in front of a source checkout,
+    forwarding `Host: blunderbase.example.com`, got 421 for every request. The check
+    stays on; `BLUNDERBASE_PUBLIC_URL` (which that setup already needs) joins the
+    loopback names on its allow-list. A non-loopback bind returns None and keeps the
+    SDK's own answer, which is no Host check: that server is meant to be reached by
+    whatever name the network gives it, and the bearer key is its door.
+    """
+    if settings.host not in LOOPBACK_BINDS:
+        return None
+    hosts = list(LOOPBACK_HOSTS)
+    origins = list(LOOPBACK_ORIGINS)
+    public = urlsplit(settings.public_url.strip())
+    try:
+        port = public.port
+    except ValueError:  # "host:abc" — not a URL anything could be reached by
+        public = public._replace(netloc="")
+        port = None
+    if public.scheme in {"http", "https"} and public.netloc:
+        netloc = public.netloc.rpartition("@")[2].lower()
+        hosts.append(netloc)
+        origins.append(f"{public.scheme}://{netloc}")
+        if port is None:
+            # A proxy may pass the port along in Host even when it is the default one.
+            hosts.append(f"{netloc}:*")
+        elif port == DEFAULT_PORTS[public.scheme]:
+            # `https://host:443/` names the same place as `https://host/`, and clients
+            # leave a default port out of Host and Origin — allow the bare forms too.
+            bare = netloc.rpartition(":")[0]
+            hosts.append(bare)
+            origins.append(f"{public.scheme}://{bare}")
+    return TransportSecuritySettings(
+        enable_dns_rebinding_protection=True,
+        allowed_hosts=hosts,
+        allowed_origins=origins,
+    )
+
+
 def create_http_app(
     settings: Settings | None = None,
     *,
@@ -113,14 +162,12 @@ def create_http_app(
     keys work without restarting the transport.
     """
     resolved = settings or get_settings()
-    # The bind host decides the SDK's DNS-rebinding policy, and this app is the one
-    # transport meant to be reachable from elsewhere: told the loopback default it would
-    # reject the owner's own hostname. Nothing unauthenticated reaches it either way.
     app = (server or build_server(resolved, sessions)).streamable_http_app(
         streamable_http_path=path,
         json_response=json_response,
         stateless_http=True,
         host=resolved.host,
+        transport_security=transport_security(resolved),
     )
     verify = key_verifier(resolved, sessions, before_setup=before_setup)
     return BearerGuard(app, resolved.mcp_bearer_key, verify=verify)
@@ -205,6 +252,8 @@ def run_http(settings: Settings | None = None, host: str | None = None, port: in
     import uvicorn
 
     resolved = settings or get_settings()
-    uvicorn.run(
-        create_http_app(resolved), host=host or resolved.host, port=port or resolved.port
-    )
+    bind = host or resolved.host
+    if bind != resolved.host:
+        # The transport's Host check follows the address it is actually bound to.
+        resolved = resolved.model_copy(update={"host": bind})
+    uvicorn.run(create_http_app(resolved), host=bind, port=port or resolved.port)

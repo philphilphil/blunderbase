@@ -47,7 +47,9 @@ jede Partie der Sammlung darin.
 **Filter speichern** gibt dem aktuellen Filter einen Namen und hängt ihn in der
 Seitenleiste unter **Partien** ein, mit der Trefferzahl daneben. Zwei sind vorgegeben:
 **Niederlagen mit Schwarz** und **Grobe Patzer**. Fährst du über
-einen selbst gespeicherten, erscheint das Kreuz zum Entfernen.
+einen selbst gespeicherten, erscheint das Kreuz zum Entfernen. Wählst du einen aus, dort
+oder über `⌘K`, bleibt die Tabelle so sortiert, wie sie war, und der Eintrag bleibt
+hervorgehoben, egal wie du sortierst oder blätterst.
 
 ## Sortieren und blättern { #sort-and-page }
 
@@ -100,5 +102,8 @@ hereinholt; dieses Gedächtnis löschst du unter [Bibliothek → Verwalten](libr
 ## Eine gefilterte Liste teilen { #share-a-filtered-list }
 
 Die Filter stehen in der Adresszeile. Jeder Ausschnitt der Bibliothek ist also ein Link, den
-du verschicken oder als Lesezeichen ablegen kannst. Die aktuelle Seite und die Zeilen pro
-Seite gehören nicht dazu.
+du verschicken oder als Lesezeichen ablegen kannst. Auch Sortierung und aktuelle Seite
+stehen darin; deshalb landest du nach dem Zurückgehen aus einer Partie – mit Zurück oder
+über **Bibliothek** in der Pfadleiste darüber – wieder auf derselben Seite in derselben
+Reihenfolge. Die Zeilen pro Seite gehören nicht dazu, die merkt sich dein
+Browser für dich.

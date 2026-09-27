@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import codecs
 import io
 from pathlib import Path
 
@@ -124,3 +125,85 @@ def test_a_time_control_that_is_not_a_clock_stays_unparsed() -> None:
     assert pgn_import._time_control("40/9000:1800") == (None, None)
     assert pgn_import._time_control("600") == (600, 0)
     assert pgn_import._time_control("180+2") == (180, 2)
+
+
+# ChessBase's charset, and the PGN standard's: "ü" and "é" are one byte each, which UTF-8
+# does not accept.
+ACCENTED = """[Event "Bundesliga"]
+[Site "Köln"]
+[White "Müller, Hans"]
+[Black "Pérez, José"]
+[Result "1-0"]
+
+1. e4 e5 {Schöner Zug} 1-0
+"""
+
+
+def _names(path: Path) -> tuple[str | None, str | None]:
+    (game,) = _games(path)
+    assert isinstance(game, ParsedGame)
+    return game.white_name, game.black_name
+
+
+def test_a_windows_1252_file_keeps_its_accented_names(tmp_path: Path) -> None:
+    path = tmp_path / "chessbase.pgn"
+    path.write_bytes(ACCENTED.encode("cp1252"))
+    assert _names(path) == ("Müller, Hans", "Pérez, José")
+    (game,) = _games(path)
+    assert isinstance(game, ParsedGame)
+    assert "�" not in (game.pgn or "")
+    assert "Köln" in (game.pgn or "")
+
+
+def test_a_utf8_file_is_read_as_utf8(tmp_path: Path) -> None:
+    path = tmp_path / "lichess.pgn"
+    path.write_bytes(ACCENTED.encode("utf-8"))
+    assert _names(path) == ("Müller, Hans", "Pérez, José")
+
+
+def test_a_utf8_file_with_a_byte_order_mark_is_read_as_utf8(tmp_path: Path) -> None:
+    path = tmp_path / "bom.pgn"
+    path.write_bytes(ACCENTED.encode("utf-8-sig"))
+    assert _names(path) == ("Müller, Hans", "Pérez, José")
+
+
+def test_a_utf8_file_invalid_only_near_its_end_still_falls_back(tmp_path: Path) -> None:
+    """The check reads the whole file, not a sniffed prefix: a Latin-1 name in the last game
+    of a long archive decides the charset as much as one in the first."""
+    padding = NO_DATE + "\n" * (pgn_import.CHUNK + 1)
+    path = tmp_path / "long.pgn"
+    path.write_bytes(padding.encode("ascii") + ACCENTED.encode("cp1252"))
+    items = _games(path)
+    assert len(items) == 2
+    last = items[-1]
+    assert isinstance(last, ParsedGame)
+    assert last.white_name == "Müller, Hans"
+
+
+# A BOM (Notepad's UTF-8 default) in front of Windows-1252 bytes, as when a ChessBase game
+# is pasted into such a file: not valid UTF-8, so it falls back, and the BOM must not end up
+# as "ï»¿" before the first tag, where it would cost that game its headers.
+BOM_THEN_CP1252 = codecs.BOM_UTF8 + ACCENTED.encode("cp1252")
+
+
+def test_a_bom_file_that_falls_back_keeps_its_first_games_headers(tmp_path: Path) -> None:
+    path = tmp_path / "mixed.pgn"
+    path.write_bytes(BOM_THEN_CP1252)
+    assert _names(path) == ("Müller, Hans", "Pérez, José")
+
+
+def test_decode_pgn_drops_a_bom_before_the_windows_1252_fallback() -> None:
+    text = pgn_import.decode_pgn(BOM_THEN_CP1252)
+    assert text.startswith('[Event "Bundesliga"]')
+    (game,) = list(pgn_import.parse_stream(io.StringIO(text)))
+    assert isinstance(game, ParsedGame)
+    assert game.white_name == "Müller, Hans"
+
+
+def test_decode_pgn_reads_strict_utf8_and_falls_back_to_windows_1252() -> None:
+    assert pgn_import.decode_pgn(ACCENTED.encode("cp1252")) == ACCENTED
+    assert pgn_import.decode_pgn(ACCENTED.encode("utf-8")) == ACCENTED
+    assert pgn_import.decode_pgn(ACCENTED.encode("utf-8-sig")) == ACCENTED
+    # Windows-1252 beyond Latin-1 (the euro sign), and a byte it leaves undefined, which
+    # decodes to its own code point the way the browser's decoder reads it.
+    assert pgn_import.decode_pgn(b"\x80 \x81 \xfc") == "€ \x81 ü"

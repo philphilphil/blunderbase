@@ -313,6 +313,12 @@ def command_serve(args: argparse.Namespace, settings: Settings) -> int:
     import uvicorn
 
     settings.ensure_directories()
+    # The app is built from settings when uvicorn imports it, so the flag has to reach
+    # them — otherwise `--host 0.0.0.0` binds everywhere while /mcp still believes it is
+    # on loopback and answers 421 to every Host but localhost, exactly as
+    # BLUNDERBASE_HOST=0.0.0.0 would not. The environment carries it into a --reload child.
+    settings.host = args.host
+    os.environ["BLUNDERBASE_HOST"] = args.host
     uvicorn.run("backend.api.app:app", host=args.host, port=args.port, reload=args.reload)
     return 0
 

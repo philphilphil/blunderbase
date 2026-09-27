@@ -9,6 +9,7 @@ Progress reaches the UI over `/events`; a client that missed it polls the job in
 from __future__ import annotations
 
 import asyncio
+import codecs
 import contextlib
 from collections.abc import Callable
 from typing import Annotated, Any
@@ -130,10 +131,11 @@ async def upload_pgn(
     but they are not the owner's and no statistic counts them.
     """
     raw = await request.body()
-    text = raw.decode("utf-8-sig", errors="replace")
-    if not text.strip():
+    if not raw.removeprefix(codecs.BOM_UTF8).strip():
         raise ApiError(422, "empty_upload", "the request body carried no PGN")
-    options: dict[str, Any] = {"text": text}
+    # Handed on as bytes: which charset the file is in — UTF-8, or the Windows-1252 of a
+    # ChessBase export — is the adapter's call, made the same way for an upload and a path.
+    options: dict[str, Any] = {"data": raw}
     if max_games is not None:
         options["max_games"] = max_games
     # Passed on only when it is switched off, the way `ImportRequest.options` carries it:

@@ -46,7 +46,9 @@ blunderbase.example.com {
 ```
 
 Das ist die ganze Datei. Caddy terminiert TLS selbst, reicht `Authorization` weiter und
-setzt `X-Forwarded-*`, ohne gefragt zu werden, und `reverse_proxy` erfindet nie eine
+setzt `X-Forwarded-*`, ohne gefragt zu werden – nach der Verbindung, die tatsächlich bei
+ihm ankam; ein `X-Forwarded-For`, das der Client selbst mitschickt, ignoriert er –, und
+`reverse_proxy` erfindet nie eine
 Umleitung auf einen abschließenden Schrägstrich – `path /mcp` trifft genau `/mcp` und
 nichts sonst.
 
@@ -66,7 +68,9 @@ statt auf Server-Ebene.
 proxy_http_version 1.1;
 proxy_set_header Host              $host;
 proxy_set_header X-Real-IP         $remote_addr;
-proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
+# Ersetzen, nie anhängen: ein angehängter Header trägt vor der echten Adresse weiter, was
+# der Client hineingeschrieben hat, und das Anmeldelimit zählt je Adresse.
+proxy_set_header X-Forwarded-For   $remote_addr;
 proxy_set_header X-Forwarded-Proto $scheme;
 # Standardmäßig weitergereicht; hier ausgeschrieben, damit eine Überschreibung auf
 # Server-Ebene nicht stillschweigend den einen Header entfernt, mit dem sich /mcp
@@ -129,6 +133,11 @@ server {
 }
 ```
 
+Steht nginx selbst hinter einem CDN oder einem weiteren Proxy, ist `$remote_addr` dieser
+Proxy und nicht der Besucher. Dann gehört das `real_ip`-Modul von nginx dazu
+(`set_real_ip_from` für die Adressen dieses Proxys, `real_ip_header`), damit
+`$remote_addr` schon der Besucher ist, bevor es weitergereicht wird.
+
 ## Nachprüfen { #check-it }
 
 Der MCP-Endpunkt durch den Proxy ist `https://<dein Host>/mcp`, und der Header lautet
@@ -181,15 +190,84 @@ wird. Sie wird in die `runner.yaml` geschrieben, die beim Anlegen eines Runners
 herauskommt; ohne sie kann der Server nur aus der Anfrage raten, die er gerade beantwortet.
 Setz sie auf die URL des Proxys. Die Verbindung des Runners trägt in jedem Frame ein
 Bearer-Token, sie sollte also `https://` sein, und der Runner leitet `wss://` daraus ab.
-Siehe [Remote Runner](runners.md).
+Siehe [Remote Runner](runners.md). Ein Server, der nur auf Loopback lauscht – ein
+Quellcode-Checkout mit dem voreingestellten `BLUNDERBASE_HOST` und dem Proxy auf derselben
+Maschine –, erfährt von hier auch, unter welchem Namen er durch den Proxy angesprochen
+wird: `/mcp` weist jeden `Host` außer `localhost` und dem Host dieser URL mit
+`421 Invalid Host header` ab.
 
-`FORWARDED_ALLOW_IPS` ist eine Variable von uvicorn, keine von Blunderbase. Sie vertraut
-`X-Forwarded-Proto` und seinen Geschwistern standardmäßig nur von `127.0.0.1`. Ein Proxy in
-einem anderen Container braucht deshalb seine Adresse – oder `*` in einem Netz, das nur der
-Proxy erreicht –, damit die App weiß, dass die Anfrage über TLS kam. Darüber kommt auch
-die Client-Adresse für das Anmeldelimit an. Ohne vertrauenswürdige Weiterleitung teilen
-sich alle Besucher das Limit des Proxys. Vertraue nur deinem Proxy; er muss
-`X-Forwarded-For` anhand des tatsächlichen Clients setzen.
+`FORWARDED_ALLOW_IPS` ist eine Variable von uvicorn, keine von Blunderbase. Sie nennt die
+Adressen, deren `X-Forwarded-For` und `X-Forwarded-Proto` geglaubt wird – und das sollte
+genau dein Proxy sein. So erfährt die App, dass eine Anfrage über TLS kam, und auf wessen
+Adresse ein fehlgeschlagener Anmeldeversuch zählt. Fehlt die Einstellung, gilt jeder
+Besucher als der Proxy: ein einziges Anmeldelimit für alle, und ein Fremder, der
+Passwörter rät, sperrt dich gleich mit aus. Der Standardwert `127.0.0.1` passt nur, wenn die App
+direkt auf der Maschine des Proxys läuft. In einem Container kommt der Proxy nie von
+`127.0.0.1`:
+
+- **Proxy auf dem Host, Port des Containers auf Loopback veröffentlicht.** Die Verbindung
+  kommt vom Gateway des Docker-Netzes, in dem der Container hängt. Gib dem Netz einen
+  festen Adressbereich, damit das Gateway nicht wandert, wenn `docker compose down` das
+  Netz neu anlegt, und vertraue genau dieser Adresse. Jeder private Bereich, den auf der
+  Maschine sonst nichts belegt, ist recht:
+
+    ```yaml
+    services:
+      blunderbase:
+        ports:
+          - "127.0.0.1:8765:8765"
+        environment:
+          FORWARDED_ALLOW_IPS: 10.87.65.1
+    networks:
+      default:
+        ipam:
+          config:
+            - subnet: 10.87.65.0/24
+              gateway: 10.87.65.1
+    ```
+
+    Mit `docker run` legst du das Netz vorher an
+    (`docker network create --subnet 10.87.65.0/24 --gateway 10.87.65.1 blunderbase`) und
+    ergänzt `--network blunderbase -e FORWARDED_ALLOW_IPS=10.87.65.1`.
+
+- **Proxy in einem anderen Container.** Vertraue der eigenen Adresse des Proxys in dem
+  Netz, das beide teilen, und nagle sie mit `ipv4_address` in einem Netz mit festem
+  Bereich fest – sonst kommt ein neu angelegter Proxy unter einer anderen Adresse zurück,
+  und seine alte bekommt irgendein anderer Container. Der Proxy erreicht Blunderbase über
+  dieses Netz, der Port muss also gar nicht veröffentlicht sein:
+
+    ```yaml
+    services:
+      proxy:
+        networks:
+          default:
+            ipv4_address: 10.87.65.10
+      blunderbase:
+        # kein ports: – nur der Proxy spricht mit ihm
+        environment:
+          FORWARDED_ALLOW_IPS: 10.87.65.10
+    networks:
+      default:
+        ipam:
+          config:
+            - subnet: 10.87.65.0/24
+              gateway: 10.87.65.1
+    ```
+
+    Dem ganzen Bereich (`10.87.65.0/24`) zu vertrauen geht nur gut, solange außer dem
+    Proxy und Blunderbase niemand im Netz hängt **und Blunderbase keinen Port
+    veröffentlicht**. Die mitgelieferte `docker-compose.yml` veröffentlicht `8765:8765`,
+    und eine Verbindung über einen veröffentlichten Port kann vom Gateway des Netzes
+    kommen, `10.87.65.1` – und das liegt in diesem Bereich: Dockers Portweiterleitung bei
+    einer Verbindung von der Maschine selbst, ein anderer Container, der über den Host
+    wieder hereinkommt, jeder Prozess auf dem Host. Ihnen allen würde `X-Forwarded-For`
+    geglaubt, und ein gefälschter Header verschafft jedem Rateversuch wieder ein frisches
+    Anmeldelimit.
+
+Setz sie nie auf `*`. Dann glaubt uvicorn der *ersten* Adresse in `X-Forwarded-For`, und
+die schreibt der Client selbst hinein: Jeder Rateversuch kann sich eine neue Adresse und
+damit ein frisches Limit geben. Im Server-Log steht zu jeder Anfrage, woher sie kam –
+solange dem Proxy nicht vertraut wird, ist das der Proxy, danach der Besucher.
 
 `BLUNDERBASE_CROSS_ORIGIN_ISOLATION` ist voreingestellt an und das Einzige hier, was ein
 Proxy stillschweigend kaputt machen kann. Die Seite wird mit

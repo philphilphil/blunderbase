@@ -17,6 +17,7 @@ import { Trans, useLingui } from '@lingui/react/macro'
 import { Bot, Signpost, Swords, User } from 'lucide-react'
 import {
   createContext,
+  useCallback,
   useContext,
   useEffect,
   useMemo,
@@ -56,6 +57,7 @@ import { useRuntimeCapabilities } from '@/lib/runtime/capabilities'
 import { cn } from '@/lib/utils'
 import { paramsFromFilters } from '@/routes/games/filters'
 import { formatGameDate, formatResult, outcomeTone } from '@/routes/games/format'
+import { carrySort } from '@/routes/games/libraryLinks'
 import { filterLabel, useSavedFilters } from '@/routes/games/savedFilters'
 import { noteHref, oneLine } from '@/routes/notes/presentation'
 import { REPORTS, reportPath } from '@/routes/stats/reports'
@@ -456,6 +458,17 @@ function Dialog({ onClose }: { onClose: () => void }) {
     setActive(0)
   }
 
+  // A jump from the library to another cut of it — a saved filter, an opponent, an opening
+  // — keeps the order the reader had the table in, as the rail's saved filters do.
+  const { pathname: herePath, search: hereSearch } = location
+  const go = useCallback(
+    (item: PaletteItem) => {
+      onClose()
+      navigate(carrySort(item.to, herePath, hereSearch))
+    },
+    [onClose, navigate, herePath, hereSearch],
+  )
+
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
@@ -474,17 +487,15 @@ function Dialog({ onClose }: { onClose: () => void }) {
         const item = items[active]
         if (!item) return
         event.preventDefault()
-        onClose()
-        navigate(item.to)
+        go(item)
       }
     }
     document.addEventListener('keydown', onKeyDown)
     return () => document.removeEventListener('keydown', onKeyDown)
-  }, [items, active, navigate, onClose])
+  }, [items, active, go, onClose])
 
   function pick(item: PaletteItem) {
-    onClose()
-    navigate(item.to)
+    go(item)
   }
 
   const searching = needle.length >= MIN_QUERY

@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest'
 
-import { buildLine, parseLineParam, plyLabel, truncateTo, withMove } from './line'
+import {
+  buildLine,
+  parseLineParam,
+  plyLabel,
+  promotionRole,
+  truncateTo,
+  withMove,
+} from './line'
 
 const START = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1'
 
@@ -74,6 +81,13 @@ describe('withMove', () => {
       'e6',
     ])
     expect(withMove(line, 'b7', 'b8')?.at(-1)).toBe('b7b8q')
+  })
+
+  it('plays the piece a clicked promotion row names, not always a queen', () => {
+    const line = buildLine(['b2b4', 'a7a5', 'b4a5', 'b7b5', 'a5b6', 'b8a6', 'b6b7', 'e7e6'])
+    expect(promotionRole('b7b8n')).toBe('knight')
+    expect(promotionRole('e2e4')).toBeUndefined()
+    expect(withMove(line, 'b7', 'b8', promotionRole('b7b8n'))?.at(-1)).toBe('b7b8n')
   })
 })
 

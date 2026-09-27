@@ -72,6 +72,9 @@ class ImportResult:
     blocked: int = 0
     failed: int = 0
     cursor: str | None = None
+    # The games the next sync has to ask for by ID (`ImportJob.unfinished`); None for an
+    # adapter that keeps no such list.
+    unfinished: list[str] | None = None
     # Set when the run stopped because it was asked to, rather than because the stream ran
     # out. The counts are still what it managed; `run_import` marks the job cancelled.
     cancelled: bool = False
@@ -338,6 +341,10 @@ def run_import(
         # back to here.
         if result.cursor is not None and not result.cancelled:
             job.cursor = result.cursor
+        # The same goes for the games still to be asked for by ID: a stopped run may not
+        # have reached them, and the list the last finished run left names them all still.
+        if result.unfinished is not None and not result.cancelled:
+            job.unfinished = result.unfinished
     job.finished_at = utcnow()
     session.commit()
     _forget_cancel(job.id)
@@ -996,6 +1003,57 @@ def latest_cursor(session: Session, source: str, account_id: int | None = None) 
     if account_id is not None:
         statement = statement.where(ImportJob.account_id == account_id)
     return session.scalars(statement.limit(1)).first()
+
+
+def latest_unfinished(session: Session, source: str, account_id: int) -> list[str] | None:
+    """The games the last successful sync of this account left to be asked for by ID.
+
+    None when no finished sync of the account has kept such a list yet — a job from before
+    there were any — which the adapter reads as "nothing is known, ask the site".
+    """
+    statement = (
+        select(ImportJob.unfinished)
+        .where(
+            ImportJob.source == Source(source),
+            ImportJob.status == JobStatus.DONE,
+            ImportJob.account_id == account_id,
+            ImportJob.unfinished.is_not(None),
+        )
+        .order_by(ImportJob.created_at.desc(), ImportJob.id.desc())
+    )
+    remembered = session.scalars(statement.limit(1)).first()
+    if remembered is None:
+        return None
+    return [str(game_id) for game_id in remembered if isinstance(game_id, str) and game_id]
+
+
+def account_cursor(session: Session, source: str, username: str) -> str | None:
+    """The cursor of the last successful sync of this username's account on this source.
+
+    Two accounts on one site have two archives, and resuming one from the other's cursor
+    would skip everything before it, so the lookup is by the account the job names — the
+    whole history, not a window of recent jobs that a busy second account could push the
+    answer out of. A job from before syncs named their account carries the username in its
+    message instead, and is matched on that when no job names the account.
+    """
+    platform = accounts_service.PLATFORM_FOR_SOURCE[Source(source)]
+    account = accounts_service.find_account(session, platform, username)
+    if account is not None:
+        cursor = latest_cursor(session, source, account.id)
+        if cursor is not None:
+            return cursor
+    legacy = (
+        select(ImportJob.cursor)
+        .where(
+            ImportJob.source == Source(source),
+            ImportJob.status == JobStatus.DONE,
+            ImportJob.cursor.is_not(None),
+            ImportJob.account_id.is_(None),
+            func.lower(func.trim(ImportJob.message)) == fold(username),
+        )
+        .order_by(ImportJob.created_at.desc(), ImportJob.id.desc())
+    )
+    return session.scalars(legacy.limit(1)).first()
 
 
 def _stamp() -> str:

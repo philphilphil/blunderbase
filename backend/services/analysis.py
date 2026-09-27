@@ -353,13 +353,18 @@ class RunPlan:
         the cost, for a deployment that only wants the "would I have found it" reading. A
         run whose game names no owner asks about everything either way, because there is no
         colour to filter on.
+
+        Who moves at a ply is read from the game's own start (`initial_fen`), the same shift
+        the move rows are numbered with: in a game set up with Black to move, ply 0 is
+        Black's, and a parity taken from the initial array would ask about the opponent.
         """
         if self.is_position_run:
             return [self.ply_start]
         if self.maia_both_sides or self.owner_color is None:
             return list(self.plies)
         white = self.owner_color is Color.WHITE
-        return [ply for ply in self.plies if (ply % 2 == 0) == white]
+        offset = games_service.ply_offset(self.initial_fen)
+        return [ply for ply in self.plies if ((ply + offset) % 2 == 0) == white]
 
 
 # --- win percentage and classification ------------------------------------
@@ -1110,17 +1115,30 @@ def _settled_maia_levels(
         .group_by(MoveEval.run_id)
         .subquery()
     )
+    # A done run with a note is one whose Maia pass fell over. `apply_maia` writes nothing
+    # then, but a runner older than that, or a run stored before it, may have kept the
+    # plies it reached — and one of those as the representative would settle a level only
+    # half the game has, so the fill would never ask for the rest.
     stored = (
         select(AnalysisRun.game_id, MoveEval.maia_policy)
         .join(representative, representative.c.run_id == AnalysisRun.id)
         .join(MoveEval, MoveEval.id == representative.c.eval_id)
-        .where(AnalysisRun.status == RunStatus.DONE, AnalysisRun.game_id.is_not(None))
+        .where(
+            AnalysisRun.status == RunStatus.DONE,
+            AnalysisRun.game_id.is_not(None),
+            AnalysisRun.error.is_(None),
+        )
     )
+    # A fill that finished with a note on it is one whose Maia pass did not happen: that is
+    # how a failed pass was recorded before `finish_run` failed it instead, and what a
+    # runner older than that still reports. Its levels were never asked, so they are not
+    # settled — otherwise the button would count them as there and never queue them again.
     asked = select(AnalysisRun.game_id, AnalysisRun.maia_elos).where(
         AnalysisRun.status == RunStatus.DONE,
         AnalysisRun.maia_only.is_(True),
         AnalysisRun.game_id.is_not(None),
         AnalysisRun.maia_elos.is_not(None),
+        AnalysisRun.error.is_(None),
     )
     if wanted is not None:
         stored = stored.where(AnalysisRun.game_id.in_(wanted))
@@ -1990,14 +2008,30 @@ def _same_token(expected: str | None, presented: str) -> bool:
 
 
 def requeue_stale_runs(
-    session: Session, *, stale_after: float = STALE_AFTER_SECONDS
+    session: Session,
+    *,
+    stale_after: float | None = None,
+    exclude_engine_ids: Sequence[int] = (),
+    exclude_run_ids: Sequence[int] = (),
 ) -> list[AnalysisRun]:
-    """Collect the runs a dead process left `running`; called when one starts.
+    """Collect the runs a dead process left `running`; called when one starts, and on a timer.
 
     Only the ones that have stopped saying they are alive: a second worker set — the owner
     running `blunderbase analyze` while the server is up — must take nothing off the first,
     because both would then search the same game and each theft would spend an attempt on a
     run that never failed.
+
+    On a timer as well as at start, because a process can die and be replaced inside
+    `stale_after`: the desktop shell kills its backend on quit, and a relaunch a few seconds
+    later finds the dead process's runs still looking alive. Only a later sweep can collect
+    them. `exclude_run_ids` is what the caller is itself working on — a belt to the
+    heartbeat's braces — and `exclude_engine_ids` the runs another sweeper answers for (the
+    local worker set leaves the runner gateway's runs to the gateway).
+
+    Each run is taken back with a guarded UPDATE — still running, still quiet — rather than
+    by writing the row it read: two sweepers (the gateway's and the worker set's) can read
+    the same stale row, and the second must not put back in the queue a run that the first
+    requeued and a worker has claimed since.
 
     A run whose retry is already spent is failed rather than queued again, so a pass that
     takes the engine down with it cannot survive restarts forever.
@@ -2012,36 +2046,59 @@ def requeue_stale_runs(
     "the engine threw" and "the position was rejected" are the work going wrong rather than
     the host going away, and those must still cost an attempt.
     """
-    cutoff = utcnow() - timedelta(seconds=stale_after)
-    stale = list(
-        session.scalars(
-            select(AnalysisRun).where(
-                AnalysisRun.status == RunStatus.RUNNING,
-                (AnalysisRun.heartbeat_at.is_(None)) | (AnalysisRun.heartbeat_at < cutoff),
-            )
+    window = STALE_AFTER_SECONDS if stale_after is None else stale_after
+    cutoff = utcnow() - timedelta(seconds=window)
+    quiet = (AnalysisRun.heartbeat_at.is_(None)) | (AnalysisRun.heartbeat_at < cutoff)
+    candidates = select(AnalysisRun).where(AnalysisRun.status == RunStatus.RUNNING, quiet)
+    if exclude_engine_ids:
+        candidates = candidates.where(
+            AnalysisRun.engine_id.is_(None)
+            | AnalysisRun.engine_id.not_in(list(exclude_engine_ids))
         )
-    )
+    if exclude_run_ids:
+        candidates = candidates.where(AnalysisRun.id.not_in(list(exclude_run_ids)))
+    found = list(session.scalars(candidates))
     # One query for the lot rather than one per run: a sweep after a long outage collects
     # everything a whole worker set was holding.
-    forgiven = engines_service.browser_engine_ids(session) if stale else set()
-    for run in stale:
+    forgiven = engines_service.browser_engine_ids(session) if found else set()
+    stale: list[AnalysisRun] = []
+    for run in found:
         orphaned_by_browser = run.engine_id in forgiven
-        run.error = BROWSER_GONE_MESSAGE if orphaned_by_browser else STALE_RUN_MESSAGE
-        run.heartbeat_at = None
+        values: dict[str, Any] = {
+            "error": BROWSER_GONE_MESSAGE if orphaned_by_browser else STALE_RUN_MESSAGE,
+            "heartbeat_at": None,
+        }
         if orphaned_by_browser:
             # The claim that is being undone charged an attempt; the next claim will charge
             # it again, so refunding it here is what makes the flap cost nothing.
-            run.attempts = max(0, run.attempts - 1)
-            run.status = RunStatus.QUEUED
-            run.started_at = None
+            values |= {
+                "attempts": max(0, run.attempts - 1),
+                "status": RunStatus.QUEUED,
+                "started_at": None,
+            }
         elif run.attempts >= MAX_ATTEMPTS:
-            run.status = RunStatus.FAILED
-            run.finished_at = utcnow()
+            values |= {"status": RunStatus.FAILED, "finished_at": utcnow()}
         else:
-            run.status = RunStatus.QUEUED
-            run.started_at = None
-    if stale:
+            values |= {"status": RunStatus.QUEUED, "started_at": None}
+        taken = session.execute(
+            update(AnalysisRun)
+            .where(
+                AnalysisRun.id == run.id,
+                AnalysisRun.status == RunStatus.RUNNING,
+                AnalysisRun.attempts == run.attempts,
+                quiet,
+            )
+            .values(**values)
+            .execution_options(synchronize_session=False)
+        )
+        if taken.rowcount == 1:
+            stale.append(run)
+    if found:
         session.commit()
+    for run in stale:
+        # The UPDATE went round the identity map, and the session does not expire on
+        # commit: the row as written is what the events and the tasks below read.
+        session.refresh(run)
     _reconcile_stale_tasks(session, stale)
     for run in stale:
         event = EVENT_RUN_QUEUED if run.status is RunStatus.QUEUED else EVENT_RUN_FAILED
@@ -2246,6 +2303,31 @@ def note_run(session: Session, run: AnalysisRun, message: str) -> None:
     """Record something that degraded the run without failing it — a missing Maia, say."""
     run.error = message
     session.commit()
+
+
+def finish_run(
+    session: Session,
+    run: AnalysisRun,
+    evals: Sequence[MoveEval],
+    note: str | None = None,
+    *,
+    stderr: str | None = None,
+    attempt_token: str | None = None,
+) -> RunStatus:
+    """Settle a run whose search ended: stored and done, with its note if something degraded.
+
+    The note is what a skipped human-move pass leaves, and on a full run that is a degraded
+    run and still a done one — its evaluations never depended on Maia. A fill is different:
+    it *is* its Maia pass, so a fill with a note did none of its work, and marking it done
+    would settle its levels (`_settled_maia_levels`) and keep the fill button from ever
+    asking for them again. It fails instead, through the ordinary retry.
+    """
+    if note and run.maia_only:
+        return fail_run(session, run, note, stderr, retry=True, attempt_token=attempt_token)
+    complete_run(session, run, evals, attempt_token=attempt_token)
+    if note:
+        note_run(session, run, note)
+    return run.status
 
 
 def run_event(event: str, run: AnalysisRun, **extra: Any) -> dict[str, Any]:
@@ -2531,6 +2613,11 @@ def apply_maia(
     `engine` is the spec, config or row the process was started from, where the caller has
     one: a fixed-weights build's own rating is usually named by its weights file rather than
     by the UCI id, and that decides which levels it can honestly answer for.
+
+    All or nothing: every ply is asked before any row is touched. A Maia that dies halfway
+    must leave no policy behind, because the levels a game already has are read off one row
+    of it (`_settled_maia_levels`) — half a game written would count the level as settled
+    and "fill in missing levels" would never ask for the rest.
     """
     levels = _levels_this_build_can_answer(plan, adapter, engine)
     if not levels:
@@ -2542,8 +2629,10 @@ def apply_maia(
     boards = dict(replay(plan))
     by_ply = {row.ply: row for row in rows}
     wanted = [ply for ply in plan.maia_plies() if ply in by_ply and ply in boards]
-    for ply in wanted:
-        policy = adapter.policy_at(boards[ply], levels, multipv=MAIA_POLICY_MOVES)
+    answers = {
+        ply: adapter.policy_at(boards[ply], levels, multipv=MAIA_POLICY_MOVES) for ply in wanted
+    }
+    for ply, policy in answers.items():
         row = by_ply[ply]
         merged = dict(row.maia_policy or {})
         merged.update(

@@ -439,11 +439,24 @@ async def test_get_game_reads_a_game_move_by_move(
     assert payload["game"]["id"] == game.id
     assert len(payload["moves"]) == game.ply_count
     assert [move["ply"] for move in payload["moves"][:3]] == [0, 1, 2]
+    assert [(move["move_number"], move["color"]) for move in payload["moves"][:3]] == [
+        (1, "white"),
+        (1, "black"),
+        (2, "white"),
+    ]
     assert payload["moves"][0]["san"] == game.moves_san[0]
     assert payload["runs"][0]["requested"] is False
     assert payload["runs"][0]["status"] == "done"
     assert payload["runs"][0]["maia_only"] is False
     assert "engine_id" in payload["runs"][0]
+
+
+def test_a_move_row_says_who_moved_as_the_service_numbered_it() -> None:
+    """A game set up with Black to move has Black on ply 0; the coach reads that, not parity."""
+    row = payloads.move_row(
+        {"ply": 0, "move_number": 20, "color": "black", "san": "Kd7"}, include_lines=False
+    )
+    assert (row["ply"], row["move_number"], row["color"]) == (0, 20, "black")
 
 
 def test_a_run_row_says_when_the_pass_was_a_maia_fill() -> None:

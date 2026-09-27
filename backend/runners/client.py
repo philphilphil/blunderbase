@@ -1177,8 +1177,15 @@ class RunnerClient:
             except Exception as exc:
                 await self._answer_failure(job, _message(exc), None)
                 return
-            note = await self._add_maia(job, evals)
-            await self._answer(job, evals, note)
+            skipped = await self._add_maia(job, evals)
+            if skipped is None:
+                await self._answer(job, evals, None)
+            elif job.plan.maia_only:
+                # A fill is nothing but its Maia pass: done without one would tell the
+                # server those levels were asked for, and the fill would never ask again.
+                await self._answer_failure(job, skipped.error, skipped.stderr)
+            else:
+                await self._answer(job, evals, f"human-move predictions skipped: {skipped.error}")
         except asyncio.CancelledError:
             raise
         except Exception:
@@ -1207,8 +1214,16 @@ class RunnerClient:
 
         return await self._with_engine(job.engine, work)
 
-    async def _add_maia(self, job: Job, evals: list[MoveEval]) -> str | None:
-        """The human-policy pass. A Maia that will not answer degrades, never fails."""
+    async def _add_maia(self, job: Job, evals: list[MoveEval]) -> EngineFailure | None:
+        """The human-policy pass. Returns why it did not happen, or None.
+
+        A Maia that will not answer degrades a full run, never fails it. A fill is only this
+        pass, so there the caller fails the run instead.
+        """
+        if job.plan.maia_only and job.maia is None and evals:
+            # The server named a Maia this runner has not got (or none at all). A fill with
+            # nothing to ask has not been done, whatever rows it could send back.
+            return EngineFailure("this pass asks the human-move model, and this runner has none")
         # A plan that carries no Maia pass costs this runner nothing: no process, no slot.
         # A plan from a server that predates the flag carries it as true, so the runner does
         # what it always did.
@@ -1225,9 +1240,9 @@ class RunnerClient:
         except asyncio.CancelledError:
             raise
         except EngineFailure as failure:
-            return f"human-move predictions skipped: {failure.error}"
+            return failure
         except Exception as exc:
-            return f"human-move predictions skipped: {_message(exc)}"
+            return EngineFailure(_message(exc))
         return None
 
     async def _with_engine(self, engine: EngineConfig, work: Callable[[Adapter], Any]) -> Any:

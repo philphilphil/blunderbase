@@ -57,8 +57,10 @@ Gewinnprozent vor dem Zug minus Gewinnprozent danach. Die voreingestellten Schwe
 der Rest kosten würde. **Nachtragen** reiht die Importanalyse für jede Partie ein, die
 noch keine Analyse hat; Partien, die schon eine haben, werden übersprungen. Bei einer
 großen Bibliothek auf einem langsamen Server dauert das lange – dafür steht die Schätzung
-auf der Karte. **Fehlende Stufen nachtragen** tut dasselbe für Maia. **Warteschlange
-leeren** leert sie, und **Fehlgeschlagene Durchläufe** listet auf, was du wiederholen
+auf der Karte. **Fehlende Stufen nachtragen** tut dasselbe für Maia. Antwortet Maia dabei
+nicht, wird es einmal wiederholt und landet dann unter **Fehlgeschlagene Durchläufe**; die
+Stufen gelten weiter als fehlend, und das nächste Nachtragen fragt sie erneut an.
+**Warteschlange leeren** leert sie, und **Fehlgeschlagene Durchläufe** listet auf, was du wiederholen
 kannst; eine Wiederholung läuft mit derselben Engine, Grenze, Zugauswahl und Variantenzahl
 wie der fehlgeschlagene Versuch.
 

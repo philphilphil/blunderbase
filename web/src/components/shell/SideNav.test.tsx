@@ -10,6 +10,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import type { ConnectionStatus } from '@/lib/events/EventsProvider'
 import { ThemeProvider } from '@/lib/ui/theme'
+import { paramsFromFilters } from '@/routes/games/filters'
 
 import { PageChromeProvider, SetPageChrome } from './PageChrome'
 import { NavDrawer, SideNav } from './SideNav'
@@ -359,6 +360,23 @@ describe('collections', () => {
 
     expect(screen.getByText('Filters')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'New collection' })).not.toBeInTheDocument()
+  })
+
+  it('keeps a saved filter lit however the library is sorted or paged', () => {
+    const cut = paramsFromFilters({ has_blunders: true }).toString()
+    draw({ path: `/games?${cut}&order=black&direction=desc&page=3` })
+
+    // Sort and page are how the cut is being read, not which games it is.
+    const link = screen.getByRole('link', { name: /Blunders/ })
+    expect(link).toHaveClass('bg-selected')
+    // And following another cut keeps that order rather than falling back to newest first;
+    // the page does not come along, as a new cut starts at its first.
+    const other = screen.getByRole('link', { name: /Losses/ })
+    const href = new URL(other.getAttribute('href')!, 'http://localhost')
+    expect(href.searchParams.get('order')).toBe('black')
+    expect(href.searchParams.get('direction')).toBe('desc')
+    expect(href.searchParams.has('page')).toBe(false)
+    expect(other).not.toHaveClass('bg-selected')
   })
 
   it("keeps a Stats page's collection when the rail switches report", () => {

@@ -3,9 +3,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   DEFAULT_PAGE_SIZE,
   PAGE_SIZE_KEY,
+  pageFromParams,
   pageRange,
   readPageSize,
   resolvePageSize,
+  writePageParam,
   writePageSize,
 } from './paging'
 
@@ -64,5 +66,22 @@ describe('the stored page size', () => {
     expect(readPageSize()).toBe(100)
     writePageSize('fit')
     expect(readPageSize()).toBe('fit')
+  })
+})
+
+describe('the page in the address', () => {
+  it('reads a page past the first, and anything else as the first', () => {
+    expect(pageFromParams(new URLSearchParams('page=3'))).toBe(3)
+    for (const raw of ['', 'page=1', 'page=0', 'page=-2', 'page=2.5', 'page=x']) {
+      expect(pageFromParams(new URLSearchParams(raw))).toBe(1)
+    }
+  })
+
+  it('never writes the first page', () => {
+    const params = new URLSearchParams('page=4&q=berlin')
+    writePageParam(params, 1)
+    expect(params.toString()).toBe('q=berlin')
+    writePageParam(params, 2)
+    expect(params.toString()).toBe('q=berlin&page=2')
   })
 })

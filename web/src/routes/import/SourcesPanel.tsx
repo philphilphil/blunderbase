@@ -27,6 +27,7 @@ import { Label } from '@/components/ui/label'
 import type { AccountSummary, ImportJob } from '@/lib/api/types'
 
 import { AccountCard } from './AccountCard'
+import { accountFor } from './accountFor'
 import { AutoSyncControl } from './AutoSyncControl'
 import { PgnCard } from './PgnCard'
 import { SyncCheckbox } from './SyncCheckbox'
@@ -124,21 +125,21 @@ export function SourcesPanel({
       <div className="grid items-start gap-2.5 p-3.5 md:grid-cols-2 xl:grid-cols-4">
         <AccountCard
           source="lichess"
-          account={accounts.find((account) => account.platform === 'lichess')}
+          account={accountFor(accounts, 'lichess', latestOf('lichess'))}
           lastJob={latestOf('lichess')}
           progress={progress.lichess}
           options={options}
         />
         <AccountCard
           source="chesscom"
-          account={accounts.find((account) => account.platform === 'chesscom')}
+          account={accountFor(accounts, 'chesscom', latestOf('chesscom'))}
           lastJob={latestOf('chesscom')}
           progress={progress.chesscom}
           options={options}
         />
         <AccountCard
           source="fics"
-          account={accounts.find((account) => account.platform === 'fics')}
+          account={accountFor(accounts, 'fics', latestOf('fics'))}
           lastJob={latestOf('fics')}
           progress={progress.fics}
           options={options}

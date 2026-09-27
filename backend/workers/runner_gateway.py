@@ -1353,6 +1353,18 @@ class RunnerGateway:
                 analysis.fail_run(session, run, str(exc), retry=False, attempt_token=token)
                 return None
             maia = engines_service.maia_engine_for_host(session, runner_id)
+            if plan.maia_only and maia is None:
+                # A fill is nothing but its Maia levels; the local worker set refuses one on
+                # a host with no model the same way, and for the same reason.
+                analysis.fail_run(
+                    session,
+                    run,
+                    "this pass asks the human-move model and nothing else, and there is no "
+                    "Maia on this runner to ask",
+                    retry=False,
+                    attempt_token=token,
+                )
+                return None
             return Dispatch(
                 run_id=run.id,
                 attempt_token=token,
@@ -1375,9 +1387,11 @@ class RunnerGateway:
                 return False, protocol.ERROR_UNKNOWN_RUN
             except analysis.StaleResultError:
                 return False, protocol.ERROR_STALE_RESULT
-            analysis.complete_run(session, run, list(evals), attempt_token=attempt_token)
-            if note:
-                analysis.note_run(session, run, str(note))
+            # `finish_run` rather than complete-then-note: a fill whose Maia pass was skipped
+            # (a runner older than failing it itself says so in the note) has to fail.
+            analysis.finish_run(
+                session, run, list(evals), str(note) if note else None, attempt_token=attempt_token
+            )
         return True, None
 
     def _fail(

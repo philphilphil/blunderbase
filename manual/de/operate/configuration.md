@@ -91,7 +91,10 @@ dem gleichnamigen Schlüssel in `runner.yaml`.
 ## Nicht von uns { #not-ours }
 
 `FORWARDED_ALLOW_IPS` gehört uvicorn, dem Server darunter. Es entscheidet, welchen Adressen
-bei `X-Forwarded-Proto` und dessen Geschwistern vertraut werden darf, und steht
-voreingestellt auf `127.0.0.1`. Ein Proxy in einem anderen Container braucht seine Adresse
-hier, damit die App weiß, dass die Anfrage über TLS kam. Siehe
+bei `X-Forwarded-For`, `X-Forwarded-Proto` und deren Geschwistern vertraut werden darf,
+und steht voreingestellt auf `127.0.0.1`. Trag hier die Adresse deines Proxys ein, so wie
+der Container ihn sieht – das Gateway des Docker-Netzes bei einem Proxy auf dem Host, die
+eigene Adresse des Proxys bei einem in einem anderen Container. Dann weiß die App, dass
+die Anfrage über TLS kam, und jeder Besucher hat sein eigenes Anmeldelimit. Nie `*`: Das
+glaubt einer Adresse, die der Client selbst geschrieben hat. Siehe
 [Hinter einem Proxy](deploy.md#settings-worth-knowing).

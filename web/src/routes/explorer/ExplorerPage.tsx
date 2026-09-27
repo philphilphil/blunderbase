@@ -71,6 +71,7 @@ import {
   buildLine,
   formatLineParam,
   parseLineParam,
+  promotionRole,
   truncateTo,
   withMove,
   type LinePosition,
@@ -301,7 +302,8 @@ export function ExplorerPage() {
 
   const play = useCallback(
     (uci: string) => {
-      const next = withMove(line, uci.slice(0, 2), uci.slice(2, 4))
+      // The piece a promotion row names travels with it: `e7e8n` is not the queen a drag makes.
+      const next = withMove(line, uci.slice(0, 2), uci.slice(2, 4), promotionRole(uci))
       if (next) setLine(next)
     },
     [line, setLine],

@@ -17,14 +17,17 @@ import {
   formatSeconds,
   formatVariation,
   gameAnalysisSummary,
+  gameStart,
   humanMoves,
   maiaLevels,
   maiaLive,
+  movesOffset,
   moveTimeSummary,
   moveTimes,
   nextFlaggedPly,
   pairMoves,
   plyLabel,
+  plyOffset,
   preferredLevel,
   previousFlaggedPly,
   recurringMistake,
@@ -35,6 +38,7 @@ import {
   scoreBefore,
   sideOf,
   thinkHeight,
+  uciOf,
   whiteWinAfter,
 } from './gameModel'
 
@@ -309,9 +313,119 @@ describe('engineLines', () => {
     expect(engineLines(line, 0, move(0, 'e4', 'e2e4'))).toEqual([])
   })
 
-  it('compares moves ignoring the promotion suffix', () => {
+  it('reads a bare promotion as a queen and tells the pieces apart', () => {
     expect(sameMove('e7e8q', 'e7e8')).toBe(true)
     expect(sameMove('e7e8q', 'd7d8q')).toBe(false)
+    // A typed `e8=N` is not the engine's `e7e8q` line.
+    expect(sameMove('e7e8n', 'e7e8q')).toBe(false)
+    expect(sameMove('e7e8n', 'e7e8')).toBe(false)
+    expect(sameMove('e7e8n', 'e7e8N')).toBe(true)
+    expect(sameMove('e2e4', 'e2e4')).toBe(true)
+  })
+})
+
+describe('a game that does not start from the initial array', () => {
+  /** After 1.e4 e5 2.Nf3: Black to move, on move 2. */
+  const SET_UP = 'rnbqkbnr/pppp1ppp/8/4p3/4P3/5N2/PPPP1PPP/RNBQKB1R b KQkq - 1 2'
+  /** Rows as the backend numbers them from that start. */
+  const SET_UP_MOVES: MoveRow[] = [
+    { ply: 0, move_number: 2, color: 'black', san: 'Nc6', uci: 'b8c6' },
+    { ply: 1, move_number: 3, color: 'white', san: 'Bb5', uci: 'f1b5' },
+    { ply: 2, move_number: 3, color: 'black', san: 'a6', uci: 'a7a6' },
+  ]
+
+  it('replays from its own start rather than freezing on the initial array', () => {
+    const line = buildGameLine(SET_UP_MOVES, gameStart({ start_fen: SET_UP }))
+    expect(line.playable).toBe(3)
+    expect(line.positions[0]!.fen).toBe(SET_UP)
+    expect(line.positions[0]!.turn).toBe('black')
+    expect(line.offset).toBe(3)
+    // Without the start the very first move (a knight from b8 with Black to move) is
+    // illegal from the initial array, which is how the board used to freeze.
+    expect(buildGameLine(SET_UP_MOVES).playable).toBe(0)
+  })
+
+  it('numbers plies from the start’s side to move and move number', () => {
+    expect(plyOffset(SET_UP)).toBe(3)
+    expect(plyOffset('8/8/8/8/8/8/8/K1k5 w - - 0 30')).toBe(58)
+    expect(plyOffset(null)).toBe(0)
+    expect(sideOf(0, 3)).toBe('black')
+    expect(plyLabel(0, 3)).toBe('2…')
+    expect(plyLabel(1, 3)).toBe('3.')
+    expect(formatVariation(0, ['Nc6', 'Bb5', 'a6'], 3)).toBe('2…Nc6 3.Bb5 a6')
+    expect(movesOffset(SET_UP_MOVES)).toBe(3)
+    expect(movesOffset(OPENING)).toBe(0)
+  })
+
+  it('takes the mover off the row, so Black’s first move keeps its own eval sign', () => {
+    // Black plays ply 0 and is 30cp better after it, in the mover's frame.
+    const first: MoveRow = { ...SET_UP_MOVES[0]!, eval_after_cp: 30, win_after: 60 }
+    expect(scoreAfter(first)).toEqual({ cp: -30, mate: undefined })
+    expect(whiteWinAfter(first)).toBe(40)
+    const pairs = pairMoves(SET_UP_MOVES)
+    expect(pairs.map((pair) => [pair.moveNumber, pair.white?.san, pair.black?.san])).toEqual([
+      [2, undefined, 'Nc6'],
+      [3, 'Bb5', 'a6'],
+    ])
+    expect(gameAnalysisSummary([{ ...first, classification: 'blunder' }]).black.blunder).toBe(1)
+  })
+
+  it('numbers engine lines from the start as well', () => {
+    const line = buildGameLine(SET_UP_MOVES, gameStart({ start_fen: SET_UP }))
+    const rows = engineLines(line, 0, {
+      ...SET_UP_MOVES[0]!,
+      best_lines: [{ multipv: 1, cp: 20, pv: ['g8f6', 'd2d3'] }],
+    })
+    expect(rows[0]!.text).toBe('2…Nf6 3.d3')
+  })
+
+  it('replays a chess960 castle stored king-takes-rook', () => {
+    const fen = 'rk5r/pppppppp/8/8/8/8/PPPPPPPP/RK5R w HAha - 0 1'
+    const moves: MoveRow[] = [
+      { ply: 0, move_number: 1, color: 'white', san: 'O-O', uci: 'b1h1' },
+      { ply: 1, move_number: 1, color: 'black', san: 'O-O', uci: 'b8h8' },
+    ]
+    const line = buildGameLine(moves, gameStart({ start_fen: fen, variant: 'chess960' }))
+    expect(line.chess960).toBe(true)
+    expect(line.playable).toBe(2)
+    expect(line.positions[2]!.fen.split(' ')[0]).toBe('r4rk1/pppppppp/8/8/8/8/PPPPPPPP/R4RK1')
+  })
+
+  it('takes chess960 off the backend flag for a standard-named game with 960 castling', () => {
+    // A "from position" game with the rooks off their corners: standard by name, replayed
+    // king-takes-rook by the backend, which says so in `chess960`.
+    const fen = '1r2k1r1/pppppppp/8/8/8/8/PPPPPPPP/1R2K1R1 w GBgb - 0 1'
+    expect(gameStart({ start_fen: fen, variant: null, chess960: true }).chess960).toBe(true)
+    expect(gameStart({ start_fen: fen, variant: null }).chess960).toBe(false)
+    expect(gameStart({ start_fen: null, variant: 'chess960', chess960: null }).chess960).toBe(true)
+  })
+
+  it('keeps a standard game exactly as it was', () => {
+    const line = buildGameLine(OPENING, gameStart({ start_fen: null, variant: null }))
+    expect(line.offset).toBe(0)
+    expect(line.chess960).toBe(false)
+    expect(line.playable).toBe(4)
+  })
+})
+
+describe('uciOf', () => {
+  /** 1.e4 e5 2.Nf3 Nc6 3.Bc4 Nf6 — White to castle. */
+  const castling = buildGameLine([
+    move(0, 'e4', 'e2e4'),
+    move(1, 'e5', 'e7e5'),
+    move(2, 'Nf3', 'g1f3'),
+    move(3, 'Nc6', 'b8c6'),
+    move(4, 'Bc4', 'f1c4'),
+    move(5, 'Nf6', 'g8f6'),
+  ])
+
+  it('spells castling the engine’s way in a standard game, whichever way it came in', () => {
+    const board = castling.boards[6]!
+    expect(uciOf(board, { from: 4, to: 7 }, false)).toBe('e1g1')
+    expect(uciOf(board, { from: 4, to: 6 }, false)).toBe('e1g1')
+    expect(uciOf(board, { from: 4, to: 7 }, true)).toBe('e1h1')
+    // Anything that is not a castle is spelled as it is.
+    expect(uciOf(board, { from: 21, to: 38 }, false)).toBe('f3g5')
   })
 })
 

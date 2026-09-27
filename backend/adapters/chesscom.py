@@ -26,7 +26,7 @@ import chess.pgn
 import httpx
 
 from backend.adapters import is_full_archive, pgn_import
-from backend.db.enums import JobStatus, Platform, Result, Source, Speed
+from backend.db.enums import Platform, Result, Source, Speed
 from backend.services import accounts
 from backend.services.import_service import (
     AccountIndex,
@@ -34,8 +34,8 @@ from backend.services.import_service import (
     ImportResult,
     ParsedGame,
     ProgressHook,
+    account_cursor,
     ingest_games,
-    list_jobs,
 )
 
 if TYPE_CHECKING:
@@ -79,17 +79,32 @@ MONTH_TEXT = re.compile(r"^(\d{4})[-/](\d{1,2})$")
 CURSOR_SEPARATOR = "|"
 OPENING_NAME_LENGTH = 128
 
-# How far back the cursor lookup reads. A sync writes one job, so this is "the last two
-# hundred chess.com syncs", which is far more than a resume ever needs.
-CURSOR_LOOKBACK = 200
+
+class UnknownPlayerError(LookupError):
+    """chess.com has no player by that name."""
 
 
 @dataclass(slots=True)
 class ArchiveCursor:
-    """How far into which archive a run got, written back as the job's cursor."""
+    """How far into which archive a run got, written back as the job's cursor.
+
+    `ingest_games` advances it, not the stream, the way it does Lichess's `Cursor` and
+    FICS's `SyncState`: every game carries its own `<archive>|<number>` marker, and the
+    cursor moves onto it once the storing side has answered for the game — stored, already
+    known, or refused for what it contained — and stops for good at the first game the
+    database was too busy to take. A cursor past that game would step over it on every
+    later sync; one behind it costs the next sync a few duplicates the dedup skips. A run
+    that settles nothing hands back where it started.
+    """
 
     archive: str | None = None
     count: int = 0
+
+    def settled(self, item: ParsedGame | ImportFailure) -> None:
+        """Move onto one item the storing side has answered for."""
+        archive, count = parse_cursor(item.cursor)
+        if archive is not None:
+            self.archive, self.count = archive, count
 
     def text(self) -> str | None:
         if self.archive is None:
@@ -122,12 +137,6 @@ def run(
     if not USERNAME.fullmatch(name):
         raise ValueError("a chess.com import needs the username whose archives to read")
     job.message = name
-    # The account a sync was asked for is the owner's, and it has to exist before the
-    # first game is stored: `owner_color` is read off the accounts as they are on the way
-    # in, and a game stored without one is a game with no side of its own.
-    job.account_id = accounts.register_account(session, Platform.CHESSCOM, name).id
-    index = AccountIndex.load(session)
-
     if cursor is not None:
         resume, month = cursor, None
     elif since is not None:
@@ -135,16 +144,36 @@ def run(
     else:
         resume, month = stored_cursor(session, name), None
     archive_url, offset = parse_cursor(resume)
+    # An account the owner already has is this job's from the start, so a sync that fails
+    # before chess.com answers — an outage, a closed account — is still a sync of it, and
+    # the schedule retries it on its interval rather than on every tick.
+    known = accounts.find_account(session, Platform.CHESSCOM, name)
+    if known is not None and known.is_owner:
+        job.account_id = known.id
+        session.commit()
 
     headers = request_headers(user_agent)
     owned = client is None
     http = client if client is not None else httpx.Client(timeout=TIMEOUT, headers=headers)
-    reached = ArchiveCursor()
     try:
-        archives = select_archives(
-            fetch_archives(http, name, headers=headers), cursor_url=archive_url, month=month
-        )
-        start = offset if archives and archives[0] == archive_url else 0
+        # Asked before a new account is written: a mistyped name is a 404, and has to fail
+        # the job without leaving an owner account behind that the schedule would sync, and
+        # fail, for ever.
+        try:
+            listed = fetch_archives(http, name, headers=headers)
+        except UnknownPlayerError:
+            accounts.forget_unconfirmed(session, Platform.CHESSCOM, name)
+            raise
+        # The account a sync was asked for is the owner's, and it has to exist before the
+        # first game is stored: `owner_color` is read off the accounts as they are on the
+        # way in, and a game stored without one is a game with no side of its own.
+        job.account_id = accounts.register_account(session, Platform.CHESSCOM, name).id
+        index = AccountIndex.load(session)
+
+        archives = select_archives(listed, cursor_url=archive_url, month=month)
+        resumed = bool(archives) and archives[0] == archive_url
+        start = offset if resumed else 0
+        reached = ArchiveCursor(archive_url, offset) if resumed else ArchiveCursor()
         result = ingest_games(
             session,
             job,
@@ -153,12 +182,12 @@ def run(
                 archives,
                 offset=start,
                 max_games=max_games,
-                reached=reached,
                 headers=headers,
             ),
             progress=progress,
             accounts=index,
             analyze=analyze,
+            settled=reached.settled,
         )
     finally:
         if owned:
@@ -174,7 +203,7 @@ def fetch_archives(
     """Every monthly archive URL chess.com has for a player, oldest first."""
     response = _get(client, ARCHIVES_URL.format(username=quote(username)), headers)
     if response.status_code == 404:
-        raise LookupError(f"chess.com has no player {username!r}")
+        raise UnknownPlayerError(f"chess.com has no player {username!r}")
     response.raise_for_status()
     payload = response.json()
     archives = payload.get("archives") if isinstance(payload, dict) else None
@@ -224,31 +253,30 @@ def stream_games(
     *,
     offset: int = 0,
     max_games: int | None = None,
-    reached: ArchiveCursor | None = None,
     headers: dict[str, str] | None = None,
 ) -> Iterator[ParsedGame | ImportFailure]:
     """Fetch the archives in order and yield their games, one failure per unreadable one.
 
-    `reached` is filled in as the stream runs, so the caller knows where to resume from
-    even when a limit stopped it half-way through a month.
+    Every item carries where it sits — `<archive>|<number>` — as its cursor, which the
+    caller's `ArchiveCursor` moves onto once the game has settled, so a run stopped by a
+    limit half-way through a month resumes there.
     """
-    state = reached if reached is not None else ArchiveCursor()
     produced = 0
     for index, url in enumerate(archives):
         if max_games is not None and produced >= max_games:
             return
         games = fetch_archive(client, url, headers=headers)
         start = offset if index == 0 else 0
-        state.archive, state.count = url, min(start, len(games))
         for number, payload in enumerate(games[start:], start=start + 1):
             if max_games is not None and produced >= max_games:
                 return
             produced += 1
-            state.count = number
+            marker = f"{url}{CURSOR_SEPARATOR}{number}"
             try:
                 item: ParsedGame | ImportFailure = parse_game(payload)
             except Exception as exc:
                 item = ImportFailure(ref=reference(payload), error=f"{type(exc).__name__}: {exc}")
+            item.cursor = marker
             yield item
 
 
@@ -322,17 +350,9 @@ def stored_cursor(session: Session, player: str) -> str | None:
     Scoped by account name and not only by source: two chess.com accounts in one database
     have two archive lists, and the other one's cursor names a month this player's list
     does not have, which sends `select_archives` back to the start of the whole archive on
-    every second sync. The name lives in the job's message, which is where `run` puts it.
+    every second sync. A sync job names its account, however long ago it last synced.
     """
-    key = player.strip().casefold()
-    for job in list_jobs(session, Source.CHESSCOM, limit=CURSOR_LOOKBACK):
-        if (
-            job.status == JobStatus.DONE
-            and job.cursor
-            and (job.message or "").strip().casefold() == key
-        ):
-            return job.cursor
-    return None
+    return account_cursor(session, Source.CHESSCOM, player)
 
 
 def parse_cursor(value: str | None) -> tuple[str | None, int]:

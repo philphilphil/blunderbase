@@ -19,7 +19,7 @@ import type { LineResponse, MoveRow, NoteSource } from '@/lib/api/types'
 import { notateEnglish, type Notate } from '@/lib/chess/notation'
 import { explorerHref, gameHref, gameLabel } from '@/routes/notes/presentation'
 
-import { plyLabel, type GameNote } from './gameModel'
+import { movesOffset, plyLabel, type GameNote } from './gameModel'
 
 /** A note's anchor in this game, resolved to something the page can jump to. */
 export type NoteAnchor =
@@ -91,20 +91,25 @@ function moveContext(moves: readonly MoveRow[], count: number, notate: Notate): 
   if (count <= 0) return t`start`
   const move = moves[count - 1]
   if (!move?.san) return null
-  return `${plyLabel(count - 1)}${notate(move.san)}`
+  return `${plyLabel(count - 1, movesOffset(moves))}${notate(move.san)}`
 }
 
-/** The same, inside a variation: SAN comes off the line rather than off the game. */
+/**
+ * The same, inside a variation: SAN comes off the line rather than off the game. `offset` is
+ * the game's numbering shift (`movesOffset`), so a game set up with Black to move numbers
+ * its lines the way its move list does.
+ */
 function lineContext(
   line: LineResponse | undefined,
   base: number,
   index: number,
   notate: Notate,
+  offset: number,
 ): string | null {
   if (index <= 0) return t`branch`
   const san = line?.sans[index - 1]
   if (!san) return null
-  return `${plyLabel(base + index - 1)}${notate(san)}`
+  return `${plyLabel(base + index - 1, offset)}${notate(san)}`
 }
 
 /**
@@ -145,6 +150,7 @@ export function noteRows(
               anchor.base,
               anchor.index,
               notate,
+              movesOffset(moves),
             )
           : null
     // `scope: 'position'` is the backend saying this note was written somewhere else and
@@ -323,7 +329,7 @@ export function noteTarget(input: {
     const index = Math.min(branch.cursor, branch.sans.length)
     const san = branch.sans[index - 1]
     const ply = branch.base + index
-    const move = san ? `${plyLabel(ply - 1)}${notate(san)}` : null
+    const move = san ? `${plyLabel(ply - 1, movesOffset(moves))}${notate(san)}` : null
     return {
       kind: 'line',
       gameId,

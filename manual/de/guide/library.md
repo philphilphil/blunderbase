@@ -12,6 +12,15 @@ drücken, dann **Synchronisieren**. Dieselbe Schaltfläche synchronisiert späte
 macht dort weiter, wo der letzte abgeschlossene Lauf aufgehört hat. Jeder Import prüft auf
 Duplikate, ein zweiter Durchlauf über dasselbe Archiv speichert also nichts doppelt.
 
+Kennt die Seite den Namen nicht, schlägt die Synchronisierung fehl und es wird nichts
+verbunden; ein Tippfehler lässt sich also einfach korrigieren und neu verbinden. FICS kann
+einen unbekannten Namen nicht von einem Spieler ohne Partien unterscheiden, dort gilt das
+Konto erst mit der ersten gefundenen Partie als verbunden. Eine Lichess-Partie, die noch
+läuft, etwa eine Fernpartie, bleibt draußen, bis sie beendet ist; die erste
+Synchronisierung danach holt sie herein, egal wie lange sie gedauert hat. Fernpartien, die
+schon vor dieser Version zu Ende gingen und nie angekommen sind, holt eine einzige
+Synchronisierung **Von Anfang an** nach.
+
 ### Optionen für die Synchronisierung
 
 Die Leiste über den Feldern gilt für alle Quellen:
@@ -64,6 +73,10 @@ Wähle im PGN-Feld eine Datei oder zieh eine irgendwo ins Fenster; mehrere auf e
 wie eine Datei gelesen. Gib vorher an, ob es **Meine** oder **Nicht meine** Partien sind.
 Fremde Partien werden analysiert und sind durchsuchbar wie alle anderen, zählen aber in
 keiner Statistik.
+
+Ob die Datei in UTF-8 vorliegt oder in Latin-1 bzw. Windows-1252, wie ChessBase und viele
+ältere Programme sie schreiben, erkennt Blunderbase für jede Datei selbst. Namen mit
+Umlauten und Akzenten wie „Müller“ kommen so an, wie sie in der Datei stehen.
 
 ### Fernschachpartien { #correspondence-games }
 

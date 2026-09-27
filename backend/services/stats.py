@@ -435,10 +435,16 @@ def get_dashboard(
             )
         )
         anchor = _utc(latest) if latest is not None else datetime.now(UTC)
+        # All time has no bounds at all. An upper bound at the anchor excludes no dated
+        # game — the anchor is the newest of them — but `played_at <= anchor` is false for
+        # an undated one (a PGN with `Date "????.??.??"`, common over the board), so it
+        # quietly took those out of every card while the games list, a collection's card
+        # and the coach's `get_stats` all counted them. A day window drops them anyway:
+        # a game with no date is in no stretch of days.
         scope = replace(
             base,
             since=None if days is None else anchor - timedelta(days=days),
-            until=anchor,
+            until=None if days is None else anchor,
         )
 
         game_rows = _game_rows(session, scope)
@@ -1151,7 +1157,7 @@ def _hashable(value: Any) -> Any:
 _REQUESTED_LIFT = 1 << 40
 
 
-def primary_runs(game_id: int | None = None) -> Any:
+def primary_runs(game_id: int | ColumnElement[int] | None = None) -> Any:
     """The one run per game that stats read: the last done full-game UCI pass by rank.
 
     Rank is `games.run_rank`, `(priority > 0, id)`: a whole-game run somebody asked for
@@ -1172,7 +1178,8 @@ def primary_runs(game_id: int | None = None) -> Any:
     `game_id` narrows the same definition to one game, which is what turns a fold of one
     game's summary from a grouped pass over every run in the library into an index lookup.
     Only a narrowing: what it selects for that game is exactly what the unrestricted form
-    selects for it.
+    selects for it. It may also be `Game.id`, which correlates the subquery on the game
+    row of an enclosing query — how `games`' has-blunders filter asks the same question.
     """
     conditions = [] if game_id is None else [AnalysisRun.game_id == game_id]
     ranked = case(

@@ -345,7 +345,9 @@ def _register_query(server: MCPServer, coach: Coach) -> None:
     ) -> TextContent:
         """One game move by move, with the eval after each ply, the classification and
         better move on every inaccuracy, mistake and blunder, Maia's human predictions
-        where a Maia pass has run, and any notes. Narrow a long game with a ply range
+        where a Maia pass has run, and any notes. Each move says its `color` and
+        `move_number`; read those rather than ply parity, since a game with a `start_fen`
+        may begin with Black or deep into the game. Narrow a long game with a ply range
         (half-moves, end exclusive); `include_lines` adds the engine's multi-PV lines,
         which are large."""
         window = args.ply_range(ply_start, ply_end)

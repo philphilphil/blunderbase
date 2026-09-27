@@ -27,6 +27,8 @@ If a report looks thin, check **Analysis → Coverage**.
 Four controls sit above the report: **Window** (7 days, 30 days, 90 days, a year or all
 time), **Colour**, **Speed** and **Collection**. **vs previous** shows every number against
 the equally long window before this one; all time has nothing to compare against.
+A game with no date, such as a PGN whose `Date` is `????.??.??`, counts under all time and
+in no shorter window.
 
 **Collection** appears once you have made a [collection](collections.md). It is
 **All games** unless you pick one; then every number on the report is over your games in

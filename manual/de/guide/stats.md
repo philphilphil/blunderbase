@@ -28,6 +28,7 @@ ein Bericht dünn, sieh unter **Analyse → Abdeckung** nach.
 Über dem Bericht stehen vier Steuerelemente: **Zeitraum** (7 Tage, 30 Tage, 90 Tage, ein
 Jahr oder alles), **Farbe**, **Bedenkzeit** und **Sammlung**. **vs. davor** stellt jede Zahl
 dem gleich langen Zeitraum davor gegenüber; bei „alles“ gibt es nichts zu vergleichen.
+Eine Partie ohne Datum, etwa aus einer PGN mit `Date "????.??.??"`, zählt nur bei „alles“.
 
 **Sammlung** erscheint, sobald du eine [Sammlung](collections.md) angelegt hast. Es
 steht auf **Alle Partien**, bis du eine wählst. Dann rechnet der ganze Bericht nur mit deinen

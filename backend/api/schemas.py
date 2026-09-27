@@ -292,6 +292,12 @@ class GameSummary(Payload):
     increment: int | None = None
     rated: bool | None = None
     variant: str | None = None
+    # The FEN the game starts from (`services.games.start_fen`) — a chess960 array, a game
+    # set up from a position. Absent for a game from the initial array.
+    start_fen: str | None = None
+    # Replayed as chess960 (`services.games.is_chess960`): by variant, or by castling rights
+    # only a chess960 start can have. Absent for a standard game.
+    chess960: bool | None = None
     eco: str | None = None
     opening: str | None = None
     termination: str | None = None
@@ -1252,7 +1258,8 @@ class StatsDashboardResponse(Payload):
 
     anchor: datetime
     since: datetime | None = None
-    until: datetime
+    # None on all time, which has no upper bound: one at the anchor would drop undated games.
+    until: datetime | None = None
     dimensions: dict[str, StatsResponse]
 
 

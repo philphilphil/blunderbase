@@ -57,3 +57,32 @@ const NATURAL_DIRECTION: Record<SortKey, 'asc' | 'desc'> = {
   worst: 'desc',
   source: 'asc',
 }
+
+const SORT_KEYS = Object.keys(NATURAL_DIRECTION) as SortKey[]
+
+/**
+ * The sort as the library's own URL carries it (`/games?order=black&direction=desc`), in the
+ * API's words. It rides in the address beside the filters so that Back from a game returns
+ * to the list as it was sorted, which state held in the page could not: the page unmounts
+ * the moment a row is opened. A key or direction that is not one reads as the default.
+ */
+export function sortFromParams(params: URLSearchParams): Sort {
+  const order = params.get('order')
+  const key = SORT_KEYS.includes(order as SortKey) ? (order as SortKey) : DEFAULT_SORT.key
+  const direction = params.get('direction')
+  return {
+    key,
+    direction: direction === 'asc' || direction === 'desc' ? direction : NATURAL_DIRECTION[key],
+  }
+}
+
+/**
+ * Write `sort` into `params`, leaving out whatever is the default — the default column, and
+ * a column's natural direction — so an unsorted library's address stays `/games`.
+ */
+export function writeSortParams(params: URLSearchParams, sort: Sort): void {
+  params.delete('order')
+  params.delete('direction')
+  if (sort.key !== DEFAULT_SORT.key) params.set('order', sort.key)
+  if (sort.direction !== NATURAL_DIRECTION[sort.key]) params.set('direction', sort.direction)
+}

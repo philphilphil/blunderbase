@@ -36,7 +36,7 @@ import { useEngineHidden } from '@/lib/ui/engineVisibility'
 import { useIsMobile } from '@/lib/ui/media'
 import { WAY_BACK } from '@/lib/ui/wayBack'
 import { cn } from '@/lib/utils'
-import { advanceTrail, useGameTrail } from '@/routes/games/gameTrail'
+import { advanceTrail, useGameTrail, useLibraryAddress } from '@/routes/games/gameTrail'
 import { tokenTrouble } from '@/routes/explorer/reference'
 
 import { buildAnalysisLine, lineStartingWith, withBoardMove } from './analysisLine'
@@ -73,6 +73,7 @@ import {
   formatGameDate,
   formatVariation,
   gameAnalysisSummary,
+  gameStart,
   humanMoves,
   maiaComparison,
   maiaLevelFor,
@@ -95,6 +96,7 @@ import {
   type Side,
 } from './gameModel'
 import { setMaiaCompare, setMaiaEloPick, useMaiaCompare, useMaiaEloPick } from './maiaPreferences'
+import { PlyOffsetContext } from './plyNumbering'
 import {
   noteAtTarget,
   noteRows,
@@ -541,7 +543,15 @@ export function GameStudio({ game: from }: { game: StudioGame }) {
   )
   const plyCount = moves.length
 
-  const line = useMemo(() => buildGameLine(moves), [moves])
+  // Replayed from where the game really starts — a chess960 array, a set-up position — and
+  // numbered from it: `line.offset` is what every move number on this screen is shifted by.
+  const startFen = detail?.game.start_fen ?? null
+  const variant = detail?.game.variant ?? null
+  const chess960 = detail?.game.chess960 ?? null
+  const line = useMemo(
+    () => buildGameLine(moves, gameStart({ start_fen: startFen, variant, chess960 })),
+    [moves, startFen, variant, chess960],
+  )
   const pairs = useMemo(() => pairMoves(moves), [moves])
   const curve = useMemo(() => evalCurve(moves), [moves])
   // Empty for a game played without a clock, which is what keeps the graph pane to one tab.
@@ -661,12 +671,16 @@ export function GameStudio({ game: from }: { game: StudioGame }) {
    * and forth over the same square asks once.
    */
   const exploredBook = usePositionBook(exploring ? (boardPosition?.fen ?? null) : null)
-  /** What the hovered line draws: the transient position, its shapes, and where it stands. */
+  /**
+   * What the hovered line draws: the transient position, its shapes, and where it stands.
+   * The ply is only its numbering (caption, arrow badges), so it is counted the way the move
+   * list counts — shifted by `line.offset` for a game set up from a position.
+   */
   const previewView = useLinePreview(
     boardPosition?.fen ?? null,
     preview,
     previewPrefs,
-    analysisPly,
+    analysisPly + line.offset,
   )
 
   /**
@@ -1518,7 +1532,7 @@ export function GameStudio({ game: from }: { game: StudioGame }) {
       return {
         multipv: row.multipv,
         score: row.score,
-        text: sans.length > 0 ? formatVariation(analysisPly, sans) : '',
+        text: sans.length > 0 ? formatVariation(analysisPly, sans, line.offset) : '',
         sans,
         // Truncated to what actually replayed, so a click on the last SAN can never play a
         // move that is not there — `engineLines` holds itself to the same rule.
@@ -1531,7 +1545,7 @@ export function GameStudio({ game: from }: { game: StudioGame }) {
       } satisfies EngineLineView
     })
     return { rows, score: first.score, next: first.pv[walked.length] ?? null }
-  }, [analysis, analysisPly, boardIndex, boardPosition, exploring, lines])
+  }, [analysis, analysisPly, boardIndex, boardPosition, exploring, line.offset, lines])
 
   /**
    * What the board actually points at: the live search's top move while one is running on
@@ -1705,6 +1719,9 @@ export function GameStudio({ game: from }: { game: StudioGame }) {
    * held would send the reader somewhere they never asked to go.
    */
   const trail = useGameTrail(gameId)
+  // The "Library" crumb goes back to the table this game was opened from — its filters,
+  // sort and page — and to the bare library when it was reached some other way.
+  const libraryAddress = useLibraryAddress(gameId)
   const goToGame = useCallback(
     (delta: number, id: number | null) => {
       if (id === null) return
@@ -2233,7 +2250,7 @@ export function GameStudio({ game: from }: { game: StudioGame }) {
         readOnly
           ? [{ label: t`Explorer`, to: backToExplorer ?? '/explorer' }, { label: players }]
           : [
-              { label: t`Library`, to: '/games' },
+              { label: t`Library`, to: libraryAddress },
               { label: formatGameDate(detail.game.played_at), mono: true },
               { label: players },
             ]
@@ -2256,6 +2273,7 @@ export function GameStudio({ game: from }: { game: StudioGame }) {
       defaultNodes={analysisRequest.dialog.defaultNodes}
       cursor={cursor}
       cursorSan={moves[cursor]?.san ?? null}
+      plyOffset={line.offset}
       plyCount={plyCount}
       pending={analysisRequest.pending}
       error={analysisRequest.dialog.error}
@@ -2279,7 +2297,7 @@ export function GameStudio({ game: from }: { game: StudioGame }) {
 
   if (mobile) {
     return (
-      <>
+      <PlyOffsetContext value={line.offset}>
         {chrome}
         {analysisRequest.setupDialog}
         {analyseDialog}
@@ -2320,12 +2338,12 @@ export function GameStudio({ game: from }: { game: StudioGame }) {
           maiaPanel={maiaPanel}
           notesTrack={notesTrack}
         />
-      </>
+      </PlyOffsetContext>
     )
   }
 
   return (
-    <>
+    <PlyOffsetContext value={line.offset}>
       {chrome}
       {analysisRequest.setupDialog}
       {analyseDialog}
@@ -2479,6 +2497,6 @@ export function GameStudio({ game: from }: { game: StudioGame }) {
           {evalGraph}
         </div>
       </div>
-    </>
+    </PlyOffsetContext>
   )
 }

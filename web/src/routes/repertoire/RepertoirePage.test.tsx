@@ -1,5 +1,5 @@
 import { QueryClient } from '@tanstack/react-query'
-import { render, screen, waitFor } from '@testing-library/react'
+import { act, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { describe, expect, it, vi } from 'vitest'
@@ -242,6 +242,53 @@ describe('RepertoirePage', () => {
     expect(patch?.url).toContain('/repertoire/moves/20')
     expect(patch?.body).toEqual({ comment: 'the open game' })
     expect(await screen.findByRole('status')).toHaveTextContent('saved')
+
+    vi.unstubAllGlobals()
+  })
+
+  it('saves a comment to its own move when a move is played before the box loses focus', async () => {
+    // chessground swallows the mousedown, so playing a move never blurs the box: the
+    // draft has to be written on the selection change, and to the move it was typed on.
+    const user = userEvent.setup()
+    const seen = stubApi()
+    renderPage('/repertoire?line=e2e4,e7e5')
+
+    const box = await screen.findByLabelText('Comment on e5')
+    await user.click(box)
+    await user.type(box, 'the open game')
+
+    act(() => playMove?.('g1', 'f3'))
+
+    const next = await screen.findByLabelText('Comment on Nf3')
+    expect(next).toHaveValue('')
+    await waitFor(() => expect(seen.some((call) => call.method === 'PATCH')).toBe(true))
+    const patches = seen.filter((call) => call.method === 'PATCH')
+    expect(patches).toHaveLength(1)
+    expect(patches[0]?.url).toContain('/repertoire/moves/20')
+    expect(patches[0]?.body).toEqual({ comment: 'the open game' })
+
+    // The blur that finally comes finds the new move's box unchanged and writes nothing.
+    await user.tab()
+    expect(seen.filter((call) => call.method === 'PATCH')).toHaveLength(1)
+
+    vi.unstubAllGlobals()
+  })
+
+  it('writes a comment once when the box is left and then a move is played', async () => {
+    const user = userEvent.setup()
+    const seen = stubApi()
+    renderPage('/repertoire?line=e2e4,e7e5')
+
+    const box = await screen.findByLabelText('Comment on e5')
+    await user.click(box)
+    await user.type(box, 'the open game')
+    await user.tab()
+    await waitFor(() => expect(seen.some((call) => call.method === 'PATCH')).toBe(true))
+
+    act(() => playMove?.('g1', 'f3'))
+    await screen.findByLabelText('Comment on Nf3')
+
+    expect(seen.filter((call) => call.method === 'PATCH')).toHaveLength(1)
 
     vi.unstubAllGlobals()
   })

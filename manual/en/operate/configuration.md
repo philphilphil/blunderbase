@@ -89,6 +89,9 @@ Set these where `blunderbase-runner` runs, not on the server. Each beats the sam
 ## Not ours
 
 `FORWARDED_ALLOW_IPS` belongs to uvicorn, the server underneath. It decides which addresses
-may be trusted for `X-Forwarded-Proto` and its siblings, and defaults to `127.0.0.1`. A
-proxy in another container needs its address here for the app to know the request arrived
-over TLS. See [Deploy](deploy.md#settings-worth-knowing).
+may be trusted for `X-Forwarded-For`, `X-Forwarded-Proto` and their siblings, and
+defaults to `127.0.0.1`. Set it to your proxy's address as the container sees it — the
+Docker network's gateway for a proxy on the host, the proxy's own address for one in
+another container — so the app knows the request arrived over TLS and each visitor gets a
+login limit of their own. Never `*`: that believes an address the client wrote itself.
+See [Deploy](deploy.md#settings-worth-knowing).

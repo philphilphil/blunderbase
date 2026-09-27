@@ -56,3 +56,23 @@ export function pageRange(page: number, pageSize: number, loaded: number, total:
   const first = total === 0 ? 0 : (page - 1) * pageSize + 1
   return { first, last: Math.min(first + Math.max(loaded - 1, 0), total) }
 }
+
+/**
+ * Which page the library's URL is on (`/games?page=3`), 1 when it names none or nonsense.
+ *
+ * The page rides in the address, unlike the size, for the same reason the sort does: opening
+ * a game unmounts the library, and Back has to land on the page the row was on. It is never
+ * written for the first page, so an unpaged library's address stays `/games`.
+ */
+export function pageFromParams(params: URLSearchParams): number {
+  const raw = params.get('page')
+  if (raw === null || !/^\d+$/.test(raw)) return 1
+  const page = Number(raw)
+  return Number.isSafeInteger(page) && page > 1 ? page : 1
+}
+
+/** Write `page` into `params`, leaving the first page out. */
+export function writePageParam(params: URLSearchParams, page: number): void {
+  if (page > 1) params.set('page', String(page))
+  else params.delete('page')
+}

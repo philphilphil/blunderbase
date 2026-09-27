@@ -13,7 +13,7 @@ import { Chess } from 'chessops/chess'
 import { chessgroundDests } from 'chessops/compat'
 import { makeFen, parseFen } from 'chessops/fen'
 import { makeSanAndPlay } from 'chessops/san'
-import type { Move, NormalMove, SquareName } from 'chessops/types'
+import type { Move, NormalMove, Role, SquareName } from 'chessops/types'
 import { makeUci, parseUci } from 'chessops/util'
 
 export interface LineStep {
@@ -106,13 +106,16 @@ export function buildLine(ucis: readonly string[], rootFen?: string | null): Lin
 
 /**
  * The line extended by one board move, or null when that move is not legal here.
- * A pawn reaching the last rank promotes to a queen — the explorer walks openings, and no
- * repertoire hinges on an underpromotion on move six.
+ * A dragged pawn reaching the last rank promotes to a queen — the explorer walks openings,
+ * and no repertoire hinges on an underpromotion on move six. A move clicked in a table is
+ * another matter: its row names the piece (`e7e8n`), and `promotion` carries it, so the
+ * row played is the row clicked.
  */
 export function withMove(
   line: LinePosition,
   orig: string,
   dest: string,
+  promotion?: Role,
 ): string[] | null {
   const position = replay(line.steps, line.root)
   const plain = parseUci(`${orig}${dest}`)
@@ -121,9 +124,15 @@ export function withMove(
   const promotes =
     position.board.getRole(plain.from) === 'pawn' &&
     (dest.endsWith('8') || dest.endsWith('1'))
-  const move: NormalMove = promotes ? { ...plain, promotion: 'queen' } : plain
+  const move: NormalMove = promotes ? { ...plain, promotion: promotion ?? 'queen' } : plain
   if (!position.isLegal(move)) return null
   return [...line.steps.map((step) => step.uci), makeUci(move)]
+}
+
+/** The piece a UCI move promotes to (`e7e8n` → knight), or undefined where it names none. */
+export function promotionRole(uci: string): Role | undefined {
+  const parsed = parseUci(uci)
+  return parsed && isNormal(parsed) ? parsed.promotion : undefined
 }
 
 /**

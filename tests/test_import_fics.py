@@ -170,6 +170,34 @@ def test_a_second_sync_refetches_only_the_cursors_year_and_deduplicates(
     ]
 
 
+def test_a_name_with_no_games_leaves_no_account_behind(session: Session) -> None:
+    """The games database answers a name it has never seen with an empty archive, so a
+    game of theirs is the only proof a player exists. A mistyped name must not leave an
+    owner account behind for the schedule to sync for ever; the first game registers it."""
+    empty = FakeDatabase(lambda _: httpx.Response(200, text="<p>No games found</p>"))
+
+    missing = sync(session, empty, since="2026-01-01")
+
+    assert missing.status is JobStatus.DONE
+    assert missing.account_id is None
+    assert session.scalars(select(Account)).all() == []
+
+    found = sync(session, FakeDatabase(), since="2026-01-01")
+
+    account = session.scalars(select(Account)).one()
+    assert found.account_id == account.id
+    assert session.scalars(select(Game)).one().owner_color is Color.WHITE
+
+
+def test_a_known_account_is_named_by_a_sync_that_finds_nothing(session: Session) -> None:
+    sync(session, FakeDatabase(), since="2026-01-01")
+    empty = FakeDatabase(lambda _: httpx.Response(200, text="<p>No games found</p>"))
+
+    quiet = sync(session, empty)
+
+    assert quiet.account_id == session.scalars(select(Account.id)).one()
+
+
 def test_a_generated_temporary_archive_is_polled_until_ready(session: Session) -> None:
     temporary = f"{fics.BASE_URL}/tmp/player.pgn.zip"
     polls = 0
@@ -422,3 +450,14 @@ def test_a_game_refused_for_its_content_lets_the_cursor_past(session: Session) -
     assert (job.games_imported, job.games_failed) == (1, 1)
     assert "crazyhouse" in job.errors[0]["error"]
     assert job.cursor == "2026-08-31"
+
+
+def test_an_archive_in_windows_1252_keeps_its_accents() -> None:
+    """The archive's bytes go through the PGN adapter's charset rule, not a lossy UTF-8."""
+    text = PGN.replace('[Site "FICS freechess.org"]', '[Site "Zürich"]')
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w") as archive:
+        archive.writestr("games.pgn", text.encode("cp1252"))
+
+    assert fics._decode_archive(buffer.getvalue()) == text
+    assert fics._decode_archive(text.encode("cp1252")) == text

@@ -43,8 +43,9 @@ blunderbase.example.com {
 ```
 
 That is the whole file. Caddy terminates TLS itself, forwards `Authorization` and sets
-`X-Forwarded-*` without being asked, and `reverse_proxy` never invents a trailing-slash
-redirect — `path /mcp` matches exactly `/mcp` and nothing else.
+`X-Forwarded-*` without being asked — from the connection it actually received, ignoring
+any `X-Forwarded-For` the client wrote itself — and `reverse_proxy` never invents a
+trailing-slash redirect: `path /mcp` matches exactly `/mcp` and nothing else.
 
 If the proxy is a container beside this one, `127.0.0.1:8765` becomes the service name:
 `reverse_proxy blunderbase:8765`. If you add `encode`, exclude the two streaming paths from
@@ -62,7 +63,9 @@ level.
 proxy_http_version 1.1;
 proxy_set_header Host              $host;
 proxy_set_header X-Real-IP         $remote_addr;
-proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
+# Replace, never append: an appended header still carries whatever the client wrote in
+# front of the real address, and the login limit is counted per address.
+proxy_set_header X-Forwarded-For   $remote_addr;
 proxy_set_header X-Forwarded-Proto $scheme;
 # Forwarded by default; spelled out so a server-level override cannot silently drop the
 # one header /mcp authenticates with.
@@ -123,6 +126,10 @@ server {
 }
 ```
 
+If nginx itself sits behind a CDN or another proxy, `$remote_addr` is that proxy, not the
+visitor: turn on nginx's `real_ip` module (`set_real_ip_from` for that proxy's addresses,
+`real_ip_header`) so `$remote_addr` becomes the visitor before it is forwarded.
+
 ## Check it
 
 The MCP endpoint through the proxy is `https://<your host>/mcp`, and the header is
@@ -173,14 +180,79 @@ The full list is [Configuration](configuration.md); three of them matter here.
 into the `runner.yaml` the create-runner flow hands over; without it the server can only
 guess from the request it is answering. Set it to the proxy's URL. The runner link carries
 a bearer token on every frame, so it should be `https://`, and the runner derives `wss://`
-from it. See [Remote runners](runners.md).
+from it. See [Remote runners](runners.md). A server bound to loopback — a source checkout
+on the default `BLUNDERBASE_HOST` with the proxy on the same machine — also takes its
+proxied name from here: `/mcp` refuses any `Host` but `localhost` and this URL's host
+with `421 Invalid Host header`.
 
-`FORWARDED_ALLOW_IPS` is uvicorn's own variable, not a Blunderbase one. It trusts
-`X-Forwarded-Proto` and its siblings only from `127.0.0.1` by default, so a proxy running in
-another container needs its address — or `*` on a network only the proxy can reach — for
-the app to know the request arrived over TLS. This also supplies the client address for
-login throttling. Without trusted forwarding, all visitors share the proxy's login
-budget. Trust only your proxy, and have it set `X-Forwarded-For` from the real client.
+`FORWARDED_ALLOW_IPS` is uvicorn's own variable, not a Blunderbase one. It names the
+addresses whose `X-Forwarded-For` and `X-Forwarded-Proto` are believed, which should be
+exactly your proxy. That is how the app learns a request arrived over TLS, and whose
+address a failed sign-in counts against. Left out, every visitor counts as the proxy: one
+login limit shared by everyone, so a stranger guessing passwords locks you out as well.
+The default, `127.0.0.1`, is right only when the app runs directly on the proxy's
+machine. Inside a container the proxy never arrives from `127.0.0.1`:
+
+- **Proxy on the host, container port published on loopback.** The connection comes from
+  the gateway of the container's Docker network. Give the network a fixed range, so the
+  gateway does not move when `docker compose down` recreates it, and trust exactly that
+  address. Any private range nothing else on the machine uses will do:
+
+    ```yaml
+    services:
+      blunderbase:
+        ports:
+          - "127.0.0.1:8765:8765"
+        environment:
+          FORWARDED_ALLOW_IPS: 10.87.65.1
+    networks:
+      default:
+        ipam:
+          config:
+            - subnet: 10.87.65.0/24
+              gateway: 10.87.65.1
+    ```
+
+    With `docker run`, create the network first
+    (`docker network create --subnet 10.87.65.0/24 --gateway 10.87.65.1 blunderbase`) and
+    add `--network blunderbase -e FORWARDED_ALLOW_IPS=10.87.65.1`.
+
+- **Proxy in another container.** Trust the proxy's own address on the network the two
+  share, pinned with `ipv4_address` on a network with a fixed range, so a recreated proxy
+  does not come back at another address and leave its old one to some other container.
+  The proxy reaches Blunderbase over that network, so the port need not be published:
+
+    ```yaml
+    services:
+      proxy:
+        networks:
+          default:
+            ipv4_address: 10.87.65.10
+      blunderbase:
+        # no ports: — only the proxy talks to it
+        environment:
+          FORWARDED_ALLOW_IPS: 10.87.65.10
+    networks:
+      default:
+        ipam:
+          config:
+            - subnet: 10.87.65.0/24
+              gateway: 10.87.65.1
+    ```
+
+    Trusting the whole range (`10.87.65.0/24`) instead is safe only while nothing but the
+    proxy and Blunderbase joins the network **and Blunderbase publishes no port**. The
+    shipped `docker-compose.yml` publishes `8765:8765`, and a connection through a
+    published port can arrive from the network's gateway, `10.87.65.1`, which lies inside
+    that range: Docker's port forwarding for a connection from the machine itself, another
+    container going out through the host and back in, any process on the host. Each of
+    them would be believed about `X-Forwarded-For`, and a forged header buys every
+    password guess a fresh sign-in limit again.
+
+Never set it to `*`. uvicorn then believes the *first* address in `X-Forwarded-For`, which
+is whatever the client wrote there, and every guess at the password can claim a new
+address and a fresh limit. The server log shows the address each request came from:
+before the proxy is trusted that is the proxy, after it the visitor.
 
 `BLUNDERBASE_CROSS_ORIGIN_ISOLATION` is on by default and is the one thing here a proxy can
 silently break. The page is served with `Cross-Origin-Opener-Policy: same-origin` and

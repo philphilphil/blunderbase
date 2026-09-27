@@ -31,7 +31,7 @@ import { cn } from '@/lib/utils'
 import { ScoreBar } from '@/routes/explorer/components/ScoreBar'
 import { dropTone, formatAvgDrop, splitOf } from '@/routes/explorer/stats'
 
-import { plyLabel } from '../gameModel'
+import { usePlyLabel } from '../plyNumbering'
 
 /**
  * One continuation, as the explorer reports it.
@@ -94,6 +94,7 @@ const ROW = cn(GRID, 'h-[1.625rem] rounded-md px-1.5 font-mono text-data')
 export function BookPanel({ moves, ply, onPlay, onPreview, className }: BookPanelProps) {
   const { t } = useLingui()
   const notate = useNotation()
+  const plyLabel = usePlyLabel()
 
   if (moves.length === 0) {
     return (

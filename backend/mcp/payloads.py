@@ -117,6 +117,10 @@ def game_row(summary: Mapping[str, Any]) -> dict[str, Any]:
     # saying nothing.
     if summary.get("collections"):
         row["collections"] = list(summary["collections"])
+    # Where a set-up or chess960 game starts, so its plies can be read as moves; only on
+    # such a game, for the same reason.
+    if summary.get("start_fen"):
+        row["start_fen"] = summary["start_fen"]
     return row
 
 
@@ -179,11 +183,18 @@ def worst_moment(entry: Mapping[str, Any]) -> dict[str, Any]:
 
 
 def move_row(move: Mapping[str, Any], *, include_lines: bool) -> dict[str, Any]:
-    """One ply of a game: what was played, what it was worth, what was better."""
+    """One ply of a game: what was played, what it was worth, what was better.
+
+    Who moved and the move number come from the service row, which numbers from the game's
+    own start: a game set up with Black to move has Black on ply 0, so a coach reading ply
+    parity would hand every move to the wrong side.
+    """
     classification = move.get("classification")
     notable = classification in NOTABLE
     row: dict[str, Any] = {
         "ply": move.get("ply"),
+        "move_number": move.get("move_number"),
+        "color": move.get("color"),
         "san": move.get("san"),
         "cp": move.get("eval_after_cp"),
         "mate": move.get("eval_after_mate"),

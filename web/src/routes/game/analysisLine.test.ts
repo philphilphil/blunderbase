@@ -149,3 +149,46 @@ describe('lineStartingWith', () => {
     expect(lineStartingWith([], 'c7c6')).toBeNull()
   })
 })
+
+describe('castling in the analysis line', () => {
+  /** 1.e4 e5 2.Nf3 Nc6 3.Bc4 Nf6 — White can castle short. */
+  const italian = buildGameLine([
+    move(0, 'e4', 'e2e4'),
+    move(1, 'e5', 'e7e5'),
+    move(2, 'Nf3', 'g1f3'),
+    move(3, 'Nc6', 'b8c6'),
+    move(4, 'Bc4', 'f1c4'),
+    move(5, 'Nf6', 'g8f6'),
+  ])
+
+  it('keeps the engine’s e1g1 rather than rewriting it king-takes-rook', () => {
+    const analysis = buildAnalysisLine(italian, 6, ['e1g1', 'f8c5'])!
+    expect(analysis.moves).toEqual(['e1g1', 'f8c5'])
+    expect(analysis.sans).toEqual(['O-O', 'Bc5'])
+    // A line an older browser stored king-takes-rook comes out the same way.
+    expect(buildAnalysisLine(italian, 6, ['e1h1'])!.moves).toEqual(['e1g1'])
+  })
+
+  it('spells a king dropped on its rook the way the engine does, so it snaps onto O-O', () => {
+    const analysis = buildAnalysisLine(italian, 6, [])!
+    for (const dest of ['h1', 'g1']) {
+      const played = withBoardMove(analysis, 'e1', dest)
+      expect(played).toEqual(['e1g1'])
+      expect(lineStartingWith([['e1g1', 'f8c5']], played!.at(-1)!)).toEqual(['e1g1', 'f8c5'])
+    }
+  })
+
+  it('keeps king-takes-rook in a chess960 game, which is how the engine spells it there', () => {
+    const fen = 'rk5r/pppppppp/8/8/8/8/PPPPPPPP/RK5R w HAha - 0 1'
+    const chess960 = buildGameLine([], { fen, chess960: true })
+    const analysis = buildAnalysisLine(chess960, 0, ['b1h1'])!
+    expect(analysis.moves).toEqual(['b1h1'])
+    expect(analysis.sans).toEqual(['O-O'])
+    expect(withBoardMove(buildAnalysisLine(chess960, 0, [])!, 'b1', 'h1')).toEqual(['b1h1'])
+  })
+
+  it('keeps a typed underpromotion rather than matching the engine’s queen', () => {
+    expect(lineStartingWith([['e7e8q']], 'e7e8n')).toBeNull()
+    expect(lineStartingWith([['e7e8q']], 'e7e8q')).toEqual(['e7e8q'])
+  })
+})

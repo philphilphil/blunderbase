@@ -15,11 +15,11 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import Any
 
-from sqlalchemy import ColumnElement, and_, func, select, update
+from sqlalchemy import ColumnElement, and_, func, or_, select, update
 from sqlalchemy.orm import Session
 
-from backend.db.enums import Color, Platform, Source
-from backend.db.models import Account, Game
+from backend.db.enums import Color, JobStatus, Platform, Source
+from backend.db.models import Account, Game, ImportJob
 from backend.services import collections as collections_service
 from backend.services import explorer as explorer_service
 from backend.services import games as games_service
@@ -155,6 +155,39 @@ def register_account(
     if reconcile:
         reconcile_games(session, account)
     return account
+
+
+def forget_unconfirmed(session: Session, platform: Platform | str, username: str) -> bool:
+    """Drop an account the site says does not exist, if nothing ever came of it.
+
+    A sync registers its account only once the site has answered for the name, but older
+    versions registered it first, so a mistyped Connect left an owner account behind that
+    the schedule then synced, and failed, for ever. Such a row is recognisable: no sync of
+    it ever finished and no stored game names it. One that has either is kept whatever the
+    site says today — a closed account's games are still the owner's. The failed jobs that
+    named it keep their history and lose only the link. Answers whether a row went.
+    """
+    account = find_account(session, platform, username)
+    if account is None:
+        return False
+    finished = session.scalar(
+        select(func.count())
+        .select_from(ImportJob)
+        .where(ImportJob.account_id == account.id, ImportJob.status == JobStatus.DONE)
+    )
+    named = session.scalar(
+        select(func.count())
+        .select_from(Game)
+        .where(or_(Game.white_account_id == account.id, Game.black_account_id == account.id))
+    )
+    if finished or named:
+        return False
+    session.execute(
+        update(ImportJob).where(ImportJob.account_id == account.id).values(account_id=None)
+    )
+    session.delete(account)
+    session.commit()
+    return True
 
 
 def register_and_reconcile(

@@ -79,6 +79,18 @@ describe('AnalyseDialog', () => {
     expect(onQueue).toHaveBeenCalledWith({ engine_id: 2, nodes: 500_000 })
   })
 
+  it('numbers the move from the game’s own start, but counts the window in its plies', async () => {
+    // A game set up with Black to move at move 2 (offset 3): its ply 5 is White's move 5,
+    // not Black's move 3 as ply parity from the initial array would have it.
+    const { onQueue } = draw({ cursorSan: 'Nc3', plyOffset: 3 })
+    await userEvent.click(screen.getByRole('button', { name: 'This move' }))
+    expect(screen.getByText(/5\. Nc3/)).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: 'Analyse' }))
+    expect(onQueue).toHaveBeenLastCalledWith(
+      expect.objectContaining({ ply_start: 5, ply_end: 6 }),
+    )
+  })
+
   it('sends this move and from here on as windows starting at the move on the board', async () => {
     const { onQueue } = draw()
     await userEvent.click(screen.getByRole('button', { name: 'This move' }))

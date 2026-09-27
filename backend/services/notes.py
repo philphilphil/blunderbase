@@ -115,19 +115,24 @@ def save_line(session: Session, game_id: int, base_ply: int, moves: Sequence[str
     base = int(base_ply)
     if base < 0 or base > game.ply_count:
         raise ValueError(f"base_ply {base} is outside game {game.id}")
-    # Raises on an illegal continuation, which is the whole reason it runs here.
-    _replay(_board_at(game, base), wanted)
+    # Raises on an illegal continuation, which is the whole reason it runs here. It also
+    # spells the line the one way this game spells moves (`_spelled`): castling arrives as
+    # `e1g1` from an engine or an assistant and as `e1h1` from an older browser, and two
+    # spellings of one line must fold into one row rather than sit side by side.
+    start = _board_at(game, base)
+    wanted = _spelled(start, wanted)
 
     stored = list(
         session.scalars(
             select(Line).where(Line.game_id == game.id, Line.base_ply == base).order_by(Line.id)
         )
     )
+    spelled = {line.id: _spelled_leniently(start, line.moves or ()) for line in stored}
     for line in stored:
-        if _is_prefix(wanted, list(line.moves or ())):
+        if _is_prefix(wanted, spelled[line.id]):
             return line
     for line in stored:
-        if _is_prefix(list(line.moves or ()), wanted):
+        if _is_prefix(spelled[line.id], wanted):
             line.moves = wanted
             line.updated_at = utcnow()
             session.commit()
@@ -170,7 +175,7 @@ def line_payload(session: Session, line: Line, *, with_notes: bool = False) -> d
         "id": line.id,
         "game_id": line.game_id,
         "base_ply": line.base_ply,
-        "moves": list(line.moves or ()),
+        "moves": line_moves(line),
         "sans": line_sans(line),
         "created_at": line.created_at.isoformat(),
         "updated_at": line.updated_at.isoformat(),
@@ -200,6 +205,20 @@ def line_sans(line: Line) -> list[str]:
         sans.append(board.san(move))
         board.push(move)
     return sans
+
+
+def line_moves(line: Line) -> list[str]:
+    """The line's UCI in the spelling its game uses — `e1g1` castling outside chess960.
+
+    A line pinned by an older browser was stored king-takes-rook (`e1h1`); read back as
+    stored it matched neither the engine's lines nor a line the reader walks today, so the
+    walk never claimed it. Spelled on the way out instead of rewritten in place, and as
+    leniently as `line_sans`: a tail that no longer replays is handed back as it was stored.
+    """
+    game = line.game
+    if game is None:
+        return list(line.moves or ())
+    return _spelled_leniently(_board_at(game, line.base_ply), line.moves or ())
 
 
 # --- notes -----------------------------------------------------------------
@@ -1135,6 +1154,37 @@ def _replay(board: chess.Board, moves: Iterable[str]) -> chess.Board:
     for uci in moves:
         board.push(board.parse_uci(uci))
     return board
+
+
+def _spelled(board: chess.Board, moves: Iterable[str]) -> list[str]:
+    """`moves` replayed from `board` and written back as the board spells them.
+
+    python-chess reads castling either way (`e1g1` or `e1h1`) and writes it the way the
+    board's rules do: the king's destination in a standard game, king-takes-rook in
+    chess960. Raises `ValueError` on the first move that is not legal. `board` is untouched.
+    """
+    replay = board.copy(stack=False)
+    out: list[str] = []
+    for uci in moves:
+        move = replay.parse_uci(uci)
+        out.append(replay.uci(move))
+        replay.push(move)
+    return out
+
+
+def _spelled_leniently(board: chess.Board, moves: Iterable[str]) -> list[str]:
+    """`_spelled`, keeping the stored spelling from the first move that no longer replays."""
+    replay = board.copy(stack=False)
+    stored = [str(uci) for uci in moves]
+    out: list[str] = []
+    for index, uci in enumerate(stored):
+        try:
+            move = replay.parse_uci(uci)
+        except ValueError:
+            return out + stored[index:]
+        out.append(replay.uci(move))
+        replay.push(move)
+    return out
 
 
 def _clean_moves(moves: Sequence[str]) -> list[str]:

@@ -5,7 +5,9 @@ connected account (`GET /api/stream/event`). The stream carries a few small fram
 and a keep-alive line every seven seconds; a `gameFinish` is the only frame that matters
 here, and what it sets off is the ordinary sync — `import_service.run_import` with the
 username, exactly what the Sync button and the schedule call — so a live import has the same
-cursor, the same job row and the same `/events` progress as every other.
+cursor, the same job row and the same `/events` progress as every other. It also names the
+games that finished, and the sync fetches by ID whichever of them its export did not carry:
+a correspondence game that began before the newest stored game sits behind the cursor.
 
 **Syncs are coalesced, not queued.** A finish waits a couple of seconds for Lichess's export
 to have the game, and any finish that arrives while a sync is waiting or running folds into
@@ -74,6 +76,8 @@ class LichessLive:
         self._task: asyncio.Task[None] | None = None
         self._syncer: asyncio.Task[None] | None = None
         self._wanted: str | None = None
+        # The games whose `gameFinish` arrived since the last sync started.
+        self._finished: set[str] = set()
         self._wake: asyncio.Event | None = None
         self._loop: asyncio.AbstractEventLoop | None = None
         self._unsubscribe: Callable[[], None] | None = None
@@ -174,7 +178,7 @@ class LichessLive:
             game_id = lichess_oauth.finished_game_id(event)
             if game_id is not None:
                 logger.info("lichess game %s finished; syncing %r", game_id, target.username)
-                self._request_sync(target.username)
+                self._request_sync(target.username, game_id)
 
     async def _watch(self, target: LiveTarget) -> None:
         """Return once the settings name a different target, or none."""
@@ -185,8 +189,10 @@ class LichessLive:
 
     # --- the sync ---------------------------------------------------------
 
-    def _request_sync(self, username: str) -> None:
+    def _request_sync(self, username: str, game_id: str | None = None) -> None:
         self._wanted = username
+        if game_id is not None:
+            self._finished.add(game_id)
         if self._syncer is None or self._syncer.done():
             self._syncer = asyncio.create_task(self._drain(), name="lichess-live-sync")
 
@@ -194,15 +200,26 @@ class LichessLive:
         while self._wanted is not None:
             await asyncio.sleep(self._settle)
             username, self._wanted = self._wanted, None
+            game_ids, self._finished = sorted(self._finished), set()
             try:
-                await asyncio.to_thread(self._sync, username)
+                await asyncio.to_thread(self._sync, username, game_ids)
             except Exception:
                 logger.exception("live lichess sync failed")
 
-    def _sync(self, username: str) -> None:
+    def _sync(self, username: str, game_ids: list[str]) -> None:
+        """The ordinary cursor sync, told which games have just ended.
+
+        The export the cursor reads filters on when a game *began*, so a correspondence
+        game started before the newest stored one is not in it; naming the finished games
+        has the sync fetch whichever of them the export did not carry by ID.
+        """
         with session_scope(self.settings) as session:
             import_service.run_import(
-                session, str(Source.LICHESS), progress=self.broker.publish, username=username
+                session,
+                str(Source.LICHESS),
+                progress=self.broker.publish,
+                username=username,
+                game_ids=game_ids,
             )
 
     # --- plumbing ---------------------------------------------------------

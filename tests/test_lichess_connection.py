@@ -268,21 +268,25 @@ def finish(game_id: str) -> dict[str, Any]:
 async def test_finished_games_sync_the_account_once_per_burst(
     settings: Settings, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    synced: list[str] = []
+    synced: list[tuple[str, list[str]]] = []
     target = LiveTarget(token=TOKEN, username="phib")
     monkeypatch.setattr(LichessLive, "_target", lambda self: target)
-    monkeypatch.setattr(LichessLive, "_sync", lambda self, username: synced.append(username))
+    monkeypatch.setattr(
+        LichessLive, "_sync", lambda self, username, game_ids: synced.append((username, game_ids))
+    )
 
-    stream = scripted([{"type": "gameStart"}, finish("a"), finish("b")])
+    stream = scripted([{"type": "gameStart"}, finish("b"), finish("a")])
     worker = LichessLive(
         settings=settings, broker=EventBroker(), stream=stream, settle_seconds=0.05
     )
     await worker.start()
     try:
         await eventually(lambda: connection_service.stream_state() == "live")
-        await eventually(lambda: synced == ["phib"])
+        await eventually(lambda: len(synced) == 1)
         await asyncio.sleep(0.1)
-        assert synced == ["phib"]
+        # One sync for the burst, told every game that finished in it: the export behind
+        # the cursor may not carry a correspondence game, and the sync fetches those by ID.
+        assert synced == [("phib", ["a", "b"])]
     finally:
         await worker.stop()
     assert connection_service.stream_state() == "off"
