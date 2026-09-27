@@ -10,7 +10,13 @@ import type { MessageDescriptor } from '@lingui/core'
 import { msg, plural, t } from '@lingui/core/macro'
 
 import type { NoteExportQuery, NoteQuery } from '@/lib/api/endpoints'
-import { NOTE_SCOPES, type NoteScope } from '@/lib/api/types'
+import {
+  NOTE_SCOPES,
+  NOTE_SOURCES,
+  type NoteScope,
+  type NoteSource,
+  type Outcome,
+} from '@/lib/api/types'
 
 export interface NoteFilters {
   /** Free text over the note body — `q` in the URL, `query` to the API. */
@@ -23,6 +29,15 @@ export interface NoteFilters {
   since?: string
   /** `YYYY-MM-DD`, inclusive — widened to 23:59:59 on the way to the API. */
   until?: string
+  /**
+   * The next two are about the game a note was written on, and mean what the library means
+   * by them (`services/games.opponent_condition`, `outcome_condition`): part of the other
+   * side's name, and how the game went for the owner. A note with no game matches neither.
+   */
+  opponent?: string
+  outcome?: Outcome
+  /** Who wrote it: typed here, saved by the assistant over MCP, or grabbed off the live board. */
+  source?: NoteSource
 }
 
 export const SCOPE_LABELS: Record<NoteScope, MessageDescriptor> = {
@@ -30,6 +45,43 @@ export const SCOPE_LABELS: Record<NoteScope, MessageDescriptor> = {
   position: msg`On a position`,
   line: msg`On a variation`,
   free: msg`Loose`,
+}
+
+export const OUTCOMES: readonly Outcome[] = ['win', 'loss', 'draw']
+
+export const OUTCOME_LABELS: Record<Outcome, MessageDescriptor> = {
+  win: msg`Won`,
+  loss: msg`Lost`,
+  draw: msg`Drawn`,
+}
+
+export const SOURCE_LABELS: Record<NoteSource, MessageDescriptor> = {
+  web: msg`In the app`,
+  mcp: msg`Assistant`,
+  live: msg`Live board`,
+}
+
+/** The chip's lower-case words, as their own messages for the reason `scopeSummary` gives. */
+function outcomeSummary(outcome: Outcome): string {
+  switch (outcome) {
+    case 'win':
+      return t`games won`
+    case 'loss':
+      return t`games lost`
+    case 'draw':
+      return t`games drawn`
+  }
+}
+
+function sourceSummary(source: NoteSource): string {
+  switch (source) {
+    case 'web':
+      return t`in the app`
+    case 'mcp':
+      return t`assistant`
+    case 'live':
+      return t`live board`
+  }
 }
 
 /**
@@ -68,10 +120,8 @@ function positive(value: string | null): number | undefined {
   return Number.isInteger(parsed) && parsed > 0 ? parsed : undefined
 }
 
-function scope(value: string | null): NoteScope | undefined {
-  return value !== null && (NOTE_SCOPES as readonly string[]).includes(value)
-    ? (value as NoteScope)
-    : undefined
+function oneOf<T extends string>(value: string | null, allowed: readonly T[]): T | undefined {
+  return value !== null && (allowed as readonly string[]).includes(value) ? (value as T) : undefined
 }
 
 /** Every `tag=` in the query string, trimmed, deduped, in the order they were written. */
@@ -89,10 +139,13 @@ export function filtersFromParams(params: URLSearchParams): NoteFilters {
   return prune({
     text: text(params.get('q')),
     tags: tags(params),
-    scope: scope(params.get('scope')),
+    scope: oneOf(params.get('scope'), NOTE_SCOPES),
     game_id: positive(params.get('game')),
     since: date(params.get('since')),
     until: date(params.get('until')),
+    opponent: text(params.get('opponent')),
+    outcome: oneOf(params.get('outcome'), OUTCOMES),
+    source: oneOf(params.get('source'), NOTE_SOURCES),
   })
 }
 
@@ -113,6 +166,9 @@ export function paramsFromFilters(
   if (clean.game_id !== undefined) params.set('game', String(clean.game_id))
   if (clean.since) params.set('since', clean.since)
   if (clean.until) params.set('until', clean.until)
+  if (clean.opponent) params.set('opponent', clean.opponent)
+  if (clean.outcome) params.set('outcome', clean.outcome)
+  if (clean.source) params.set('source', clean.source)
   if (extra.note !== undefined && extra.note !== null) params.set('note', String(extra.note))
   return params
 }
@@ -126,6 +182,10 @@ export function prune(filters: NoteFilters): NoteFilters {
   if (filters.game_id !== undefined) cleaned.game_id = filters.game_id
   if (filters.since) cleaned.since = filters.since
   if (filters.until) cleaned.until = filters.until
+  const opponent = filters.opponent?.trim()
+  if (opponent) cleaned.opponent = opponent
+  if (filters.outcome) cleaned.outcome = filters.outcome
+  if (filters.source) cleaned.source = filters.source
   return cleaned
 }
 
@@ -150,23 +210,50 @@ export function toNoteQuery(filters: NoteFilters, limit: number): NoteQuery {
 
 // --- the chips over the list ---------------------------------------------
 
-/** Which popover a filter belongs to; the date chip owns two keys. */
-export type NoteFilterGroup = 'tags' | 'scope' | 'game' | 'date'
+/**
+ * Which popover a filter belongs to; the date chip owns two keys.
+ *
+ * What the note says (tags, what it is about), then the game it was written on (who, how it
+ * went, which one), then the note's own history (when, by whom) — the order somebody
+ * narrows a pile of notes in.
+ */
+export type NoteFilterGroup =
+  | 'tags'
+  | 'scope'
+  | 'opponent'
+  | 'outcome'
+  | 'game'
+  | 'date'
+  | 'source'
 
-export const NOTE_FILTER_GROUPS: NoteFilterGroup[] = ['tags', 'scope', 'game', 'date']
+export const NOTE_FILTER_GROUPS: NoteFilterGroup[] = [
+  'tags',
+  'scope',
+  'opponent',
+  'outcome',
+  'game',
+  'date',
+  'source',
+]
 
 export const GROUP_LABELS: Record<NoteFilterGroup, MessageDescriptor> = {
   tags: msg`Tags`,
   scope: msg`About`,
+  opponent: msg`Opponent`,
+  outcome: msg`Result`,
   game: msg`Game`,
   date: msg`Written`,
+  source: msg`Written by`,
 }
 
 const GROUP_KEYS: Record<NoteFilterGroup, (keyof NoteFilters)[]> = {
   tags: ['tags'],
   scope: ['scope'],
+  opponent: ['opponent'],
+  outcome: ['outcome'],
   game: ['game_id'],
   date: ['since', 'until'],
+  source: ['source'],
 }
 
 /** What an active chip reads, or null when the group is unset. */
@@ -181,6 +268,12 @@ export function groupSummary(group: NoteFilterGroup, filters: NoteFilters): stri
     }
     case 'scope':
       return filters.scope ? scopeSummary(filters.scope) : null
+    case 'opponent':
+      return filters.opponent ?? null
+    case 'outcome':
+      return filters.outcome ? outcomeSummary(filters.outcome) : null
+    case 'source':
+      return filters.source ? sourceSummary(filters.source) : null
     case 'game':
       return filters.game_id === undefined ? null : `#${filters.game_id}`
     case 'date': {

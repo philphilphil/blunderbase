@@ -27,9 +27,15 @@ also.
 ## Die Notizseite
 
 **Notizen** sammelt alles, was du und dein Assistent geschrieben habt. Filtere nach Text,
-Schlagwort, Partie, Bezug und Datum. **Tafel** zeigt ein Raster aus Stellungen mit
-gekürztem Text, **Liste** eine Spalte mit jeder Notiz in voller Länge. Von hier aus öffnet
-eine Notiz die Stellung im Explorer oder die Partie, in der sie entstand.
+Schlagwort, Bezug, nach Gegner und Ausgang der Partie, zu der eine Notiz entstand, nach der
+Partie selbst, nach Datum und danach, wer sie geschrieben hat — du in der App, dein
+Assistent über MCP oder das Live-Brett. **Liste** zeigt eine Spalte mit jeder Notiz in
+voller Länge, **Tafel** ein Raster aus Stellungen mit gekürztem Text, und **Tabelle** eine
+Zeile pro Notiz mit ihrer Herkunft: Zug, Gegner samt Wertung, Ergebnis und wann die Partie
+gespielt wurde. Ein Klick auf die Zeile klappt die ganze Notiz auf, wo du sie umschreiben
+oder löschen kannst; ein Klick auf den Namen des Gegners zeigt nur noch Notizen zu Partien
+gegen ihn. Von hier aus öffnet eine Notiz die Stellung im Explorer oder die Partie, in der
+sie entstand.
 
 ## Notizen exportieren
 

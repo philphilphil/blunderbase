@@ -23,9 +23,14 @@ been written about, so a game you have thought about before says so.
 
 ## The notes page
 
-**Notes** collects everything you and your assistant have written. Filter by text, tag, game,
-what the note is about and when it was written. **Sheet** shows a grid of positions with
-the text clamped, **Stream** one column with every note in full. From here a note opens the
+**Notes** collects everything you and your assistant have written. Filter by text, tag,
+what the note is about, the opponent and the result of the game it was written on, the game
+itself, when it was written and who wrote it — you in the app, your assistant over MCP, or
+the live board. **Stream** shows one column with every note in full, **Sheet** a grid of
+positions with the text clamped, and **List** one line per note with where it came from:
+the move, the opponent and their rating, the result and when the game was played. Click a
+line to open the whole note in place, where it can be rewritten or deleted; click an
+opponent's name to see only notes on games against them. From here a note opens the
 position in the explorer or the game it was written in.
 
 ## Export notes

@@ -6,12 +6,13 @@
  * The free-text box sits outside the chips because it is what the screen is usually used
  * with: a note is prose, and prose is searched, not faceted.
  */
+import type { I18n, MessageDescriptor } from '@lingui/core'
 import { Trans, useLingui } from '@lingui/react/macro'
 
 import { Input } from '@/components/ui/input'
 import { cn } from '@/lib/utils'
 import { useNoteTags } from '@/lib/api/queries'
-import { NOTE_SCOPES, type NoteScope } from '@/lib/api/types'
+import { NOTE_SCOPES, NOTE_SOURCES } from '@/lib/api/types'
 import { DebouncedInput } from '@/routes/games/components/FilterBar'
 import {
   FilterPopover,
@@ -25,8 +26,11 @@ import {
   GROUP_LABELS,
   groupSummary,
   NOTE_FILTER_GROUPS,
+  OUTCOME_LABELS,
+  OUTCOMES,
   prune,
   SCOPE_LABELS,
+  SOURCE_LABELS,
   toggleTag,
   type NoteFilterGroup,
   type NoteFilters,
@@ -113,16 +117,7 @@ function GroupPanel({
     case 'tags':
       return <TagPanel filters={filters} onChange={onChange} />
 
-    case 'scope': {
-      // `OptionRow` takes plain strings, so the descriptors are resolved here rather than
-      // handed over — the row draws labels, it does not know about catalogs.
-      const scopeLabels = NOTE_SCOPES.reduce<Partial<Record<NoteScope, string>>>(
-        (labels, scope) => {
-          labels[scope] = i18n._(SCOPE_LABELS[scope])
-          return labels
-        },
-        {},
-      )
+    case 'scope':
       return (
         <>
           <PopoverLabel>
@@ -132,7 +127,7 @@ function GroupPanel({
             options={NOTE_SCOPES}
             value={filters.scope}
             onChange={(scope) => patch({ scope })}
-            labels={scopeLabels}
+            labels={resolve(i18n, SCOPE_LABELS)}
           />
           <span className="text-[0.6875rem] leading-snug text-dim">
             <Trans>
@@ -142,7 +137,62 @@ function GroupPanel({
           </span>
         </>
       )
-    }
+
+    case 'opponent':
+      return (
+        <>
+          <PopoverLabel>
+            <Trans>Written on a game against</Trans>
+          </PopoverLabel>
+          <DebouncedInput
+            aria-label={t`Opponent`}
+            placeholder={t`Part of a name`}
+            value={filters.opponent ?? ''}
+            onCommit={(value) => patch({ opponent: value || undefined })}
+            className="h-7 text-[0.71875rem]"
+          />
+          <span className="text-[0.6875rem] leading-snug text-dim">
+            <Trans>
+              Only notes written on a game, and a model game matches either player.
+            </Trans>
+          </span>
+        </>
+      )
+
+    case 'outcome':
+      return (
+        <>
+          <PopoverLabel>
+            <Trans>How the game went</Trans>
+          </PopoverLabel>
+          <OptionRow
+            options={OUTCOMES}
+            value={filters.outcome}
+            onChange={(outcome) => patch({ outcome })}
+            labels={resolve(i18n, OUTCOME_LABELS)}
+          />
+        </>
+      )
+
+    case 'source':
+      return (
+        <>
+          <PopoverLabel>
+            <Trans>Who wrote it</Trans>
+          </PopoverLabel>
+          <OptionRow
+            options={NOTE_SOURCES}
+            value={filters.source}
+            onChange={(source) => patch({ source })}
+            labels={resolve(i18n, SOURCE_LABELS)}
+          />
+          <span className="text-[0.6875rem] leading-snug text-dim">
+            <Trans>
+              In the app by you, by your assistant over MCP, or grabbed off the live board.
+            </Trans>
+          </span>
+        </>
+      )
 
     case 'game':
       return (
@@ -209,6 +259,19 @@ function GroupPanel({
         </>
       )
   }
+}
+
+/**
+ * A table of descriptors as the strings `OptionRow` draws — the row takes labels, it does
+ * not know about catalogs.
+ */
+function resolve<T extends string>(
+  i18n: I18n,
+  labels: Record<T, MessageDescriptor>,
+): Record<T, string> {
+  const out = {} as Record<T, string>
+  for (const key of Object.keys(labels) as T[]) out[key] = i18n._(labels[key])
+  return out
 }
 
 /** Every tag in use, with its count, as a checklist. */

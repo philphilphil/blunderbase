@@ -38,6 +38,7 @@ from backend.db.fts import NOTES_FTS, notes_fts_exists
 from backend.db.models import Game, GamePosition, Line, Note, Position
 from backend.db.types import utcnow
 from backend.services import events as events_service
+from backend.services import games as games_service
 from backend.services.explorer import find_position, get_or_create_position, normalize_fen
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
@@ -353,6 +354,9 @@ def search_notes(
     scope: str | None = None,
     line_id: int | None = None,
     has_position: bool | None = None,
+    opponent: str | None = None,
+    outcome: str | None = None,
+    source: str | None = None,
     limit: int = 50,
 ) -> list[Note]:
     """Notes matching any combination of text, tags, date, game, position and scope.
@@ -360,6 +364,10 @@ def search_notes(
     Newest first. Tags are AND-ed: asking for `["opening", "sicilian"]` means notes
     carrying both, which is what makes tags worth writing. `scope` narrows by which
     anchors a note has rather than by their values — see `SCOPES`.
+
+    `opponent` and `outcome` are about the game a note was written on, and mean exactly
+    what they mean in the library (`games.opponent_condition`, `games.outcome_condition`),
+    so a note with no game matches neither. `source` is who wrote it: web, mcp or live.
     """
     conditions: list[ColumnElement[bool]] = []
     if query:
@@ -378,6 +386,15 @@ def search_notes(
         )
     if scope:
         conditions.append(_scope_condition(scope))
+    played: list[ColumnElement[bool]] = []
+    if opponent and opponent.strip():
+        played.append(games_service.opponent_condition(opponent))
+    if outcome:
+        played.append(games_service.outcome_condition(outcome))
+    if played:
+        conditions.append(Note.game_id.in_(select(Game.id).where(*played)))
+    if source:
+        conditions.append(Note.source == _source(source))
     if fen:
         position = find_position(session, fen)
         if position is None:
@@ -643,6 +660,12 @@ def game_brief(game: Game) -> dict[str, Any]:
         "result": str(game.result),
         "date": _day(game.played_at) if game.played_at is not None else None,
         "is_owner_game": game.is_owner_game,
+        # The owner's side of it, for the notes list's game column; all None on a game no
+        # account of theirs played in.
+        "opponent": games_service.opponent_name(game),
+        "opponent_rating": games_service.opponent_rating(game),
+        "outcome": games_service.outcome_of(game),
+        "speed": str(game.speed) if game.speed is not None else None,
     }
 
 
@@ -790,6 +813,15 @@ def _scope_condition(scope: str) -> ColumnElement[bool]:
     if name == "free":
         return Note.game_id.is_(None) & Note.line_id.is_(None) & Note.position_id.is_(None)
     raise ValueError(f"unknown scope {scope!r}; expected one of {', '.join(SCOPES)}")
+
+
+def _source(source: str) -> NoteSource:
+    """A `source` filter as the enum, or a ValueError naming the ones there are."""
+    try:
+        return NoteSource(str(source).strip().casefold())
+    except ValueError:
+        known = ", ".join(str(kind) for kind in NoteSource)
+        raise ValueError(f"unknown source {source!r}; expected one of {known}") from None
 
 
 def _matches_text(session: Session, query: str) -> ColumnElement[bool]:

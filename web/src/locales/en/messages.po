@@ -737,6 +737,7 @@ msgstr "Connected accounts"
 #: src/components/shell/AccountMenu.tsx
 #: src/components/shell/CommandPalette.tsx
 #: src/routes/mcp/McpPage.tsx
+#: src/routes/notes/filters.ts
 msgid "Assistant"
 msgstr "Assistant"
 
@@ -2951,6 +2952,7 @@ msgstr "It becomes a library game: its analysis pass is queued, it counts in the
 
 #: src/routes/correspondence/components/GameHeader.tsx
 #: src/routes/games/filters.ts
+#: src/routes/notes/filters.ts
 msgid "Result"
 msgstr "Result"
 
@@ -4902,6 +4904,7 @@ msgstr "Blund"
 #: src/routes/explorer/components/MoveTreeTable.tsx
 #: src/routes/game/components/BoardPanel.tsx
 #: src/routes/notes/components/NoteEditor.tsx
+#: src/routes/notes/components/NoteRow.tsx
 msgid "Note"
 msgstr "Note"
 
@@ -5588,6 +5591,7 @@ msgid "tag…"
 msgstr "tag…"
 
 #: src/routes/game/components/NoteComposer.tsx
+#: src/routes/notes/components/NoteRow.tsx
 #: src/routes/notes/components/TagEditor.tsx
 #: src/routes/notes/filters.ts
 msgid "Tags"
@@ -6031,10 +6035,14 @@ msgstr "Exact clock"
 
 #: src/routes/games/components/FilterBar.tsx
 #: src/routes/games/filters.ts
+#: src/routes/notes/components/NoteFilterBar.tsx
+#: src/routes/notes/components/NoteRow.tsx
+#: src/routes/notes/filters.ts
 msgid "Opponent"
 msgstr "Opponent"
 
 #: src/routes/games/components/FilterBar.tsx
+#: src/routes/notes/components/NoteFilterBar.tsx
 msgid "Part of a name"
 msgstr "Part of a name"
 
@@ -6144,6 +6152,7 @@ msgstr "Elo"
 
 #. Column header, short for "Result", in a 40px column
 #: src/routes/games/components/columns.ts
+#: src/routes/notes/components/NoteRow.tsx
 msgid "Res"
 msgstr "Res"
 
@@ -6863,12 +6872,13 @@ msgid "{arrows, plural, one {# arrow} other {# arrows}} · {squares, plural, one
 msgstr "{arrows, plural, one {# arrow} other {# arrows}} · {squares, plural, one {# square} other {# squares}}"
 
 #: src/routes/live/SessionMeta.tsx
-msgid "Off the game"
-msgstr "Off the game"
-
-#: src/routes/live/SessionMeta.tsx
+#: src/routes/notes/components/NoteRow.tsx
 msgid "Played"
 msgstr "Played"
+
+#: src/routes/live/SessionMeta.tsx
+msgid "Off the game"
+msgstr "Off the game"
 
 #: src/routes/live/live.ts
 msgid "Nothing on the board"
@@ -7044,6 +7054,14 @@ msgid "A grid of positions, text clamped"
 msgstr "A grid of positions, text clamped"
 
 #: src/routes/notes/NotesPage.tsx
+msgid "List"
+msgstr "List"
+
+#: src/routes/notes/NotesPage.tsx
+msgid "One line per note, with the game it was written on"
+msgstr "One line per note, with the game it was written on"
+
+#: src/routes/notes/NotesPage.tsx
 msgid "How to show the notes"
 msgstr "How to show the notes"
 
@@ -7096,6 +7114,26 @@ msgid "A variation note is pinned to a line off a game; a loose note is pinned t
 msgstr "A variation note is pinned to a line off a game; a loose note is pinned to nothing at all."
 
 #: src/routes/notes/components/NoteFilterBar.tsx
+msgid "Written on a game against"
+msgstr "Written on a game against"
+
+#: src/routes/notes/components/NoteFilterBar.tsx
+msgid "Only notes written on a game, and a model game matches either player."
+msgstr "Only notes written on a game, and a model game matches either player."
+
+#: src/routes/notes/components/NoteFilterBar.tsx
+msgid "How the game went"
+msgstr "How the game went"
+
+#: src/routes/notes/components/NoteFilterBar.tsx
+msgid "Who wrote it"
+msgstr "Who wrote it"
+
+#: src/routes/notes/components/NoteFilterBar.tsx
+msgid "In the app by you, by your assistant over MCP, or grabbed off the live board."
+msgstr "In the app by you, by your assistant over MCP, or grabbed off the live board."
+
+#: src/routes/notes/components/NoteFilterBar.tsx
 msgid "Game id"
 msgstr "Game id"
 
@@ -7144,6 +7182,7 @@ msgid "written from live"
 msgstr "written from live"
 
 #: src/routes/notes/components/NoteItem.tsx
+#: src/routes/notes/components/NoteRow.tsx
 msgid "Written on a model game, not one of yours"
 msgstr "Written on a model game, not one of yours"
 
@@ -7152,6 +7191,7 @@ msgid "model game"
 msgstr "model game"
 
 #: src/routes/notes/components/NoteItem.tsx
+#: src/routes/notes/components/NoteRow.tsx
 msgid "written {when}"
 msgstr "written {when}"
 
@@ -7164,6 +7204,7 @@ msgid "Forget this note"
 msgstr "Forget this note"
 
 #: src/routes/notes/components/NoteItem.tsx
+#: src/routes/notes/components/NoteRow.tsx
 msgid "Show only notes tagged {tag}"
 msgstr "Show only notes tagged {tag}"
 
@@ -7195,6 +7236,33 @@ msgstr "Open this position in the opening explorer"
 msgid "In the opening explorer"
 msgstr "In the opening explorer"
 
+#: src/routes/notes/components/NoteRow.tsx
+#: src/routes/notes/filters.ts
+msgid "Written"
+msgstr "Written"
+
+#: src/routes/notes/components/NoteRow.tsx
+#: src/routes/notes/filters.ts
+msgid "About"
+msgstr "About"
+
+#: src/routes/notes/components/NoteRow.tsx
+msgid "Close this note"
+msgstr "Close this note"
+
+#: src/routes/notes/components/NoteRow.tsx
+msgid "Open this note"
+msgstr "Open this note"
+
+#. placeholder {0}: game.opponent
+#: src/routes/notes/components/NoteRow.tsx
+msgid "Show only notes on games against {0}"
+msgstr "Show only notes on games against {0}"
+
+#: src/routes/notes/components/NoteRow.tsx
+msgid "Open where this note was written"
+msgstr "Open where this note was written"
+
 #: src/routes/notes/components/TagEditor.tsx
 msgid "add a tag"
 msgstr "add a tag"
@@ -7220,6 +7288,50 @@ msgid "Loose"
 msgstr "Loose"
 
 #: src/routes/notes/filters.ts
+msgid "Won"
+msgstr "Won"
+
+#: src/routes/notes/filters.ts
+msgid "Lost"
+msgstr "Lost"
+
+#: src/routes/notes/filters.ts
+msgid "Drawn"
+msgstr "Drawn"
+
+#: src/routes/notes/filters.ts
+msgid "In the app"
+msgstr "In the app"
+
+#: src/routes/notes/filters.ts
+msgid "Live board"
+msgstr "Live board"
+
+#: src/routes/notes/filters.ts
+msgid "games won"
+msgstr "games won"
+
+#: src/routes/notes/filters.ts
+msgid "games lost"
+msgstr "games lost"
+
+#: src/routes/notes/filters.ts
+msgid "games drawn"
+msgstr "games drawn"
+
+#: src/routes/notes/filters.ts
+msgid "in the app"
+msgstr "in the app"
+
+#: src/routes/notes/filters.ts
+msgid "assistant"
+msgstr "assistant"
+
+#: src/routes/notes/filters.ts
+msgid "live board"
+msgstr "live board"
+
+#: src/routes/notes/filters.ts
 msgid "on a game"
 msgstr "on a game"
 
@@ -7237,12 +7349,8 @@ msgid "loose"
 msgstr "loose"
 
 #: src/routes/notes/filters.ts
-msgid "About"
-msgstr "About"
-
-#: src/routes/notes/filters.ts
-msgid "Written"
-msgstr "Written"
+msgid "Written by"
+msgstr "Written by"
 
 #. placeholder {0}: tagged.length
 #: src/routes/notes/filters.ts

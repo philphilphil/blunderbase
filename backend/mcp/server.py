@@ -913,6 +913,8 @@ def _register_memory(server: MCPServer, coach: Coach) -> None:
         game_id: int | None = None,
         fen: str | None = None,
         scope: str | None = None,
+        opponent: str | None = None,
+        outcome: str | None = None,
         limit: int = MAX_EXPORT_NOTES,
     ) -> TextContent:
         """The notes the same filters as search_notes would find, as one document:
@@ -938,6 +940,8 @@ def _register_memory(server: MCPServer, coach: Coach) -> None:
                 game_id=int(game_id) if game_id is not None else None,
                 fen=position,
                 scope=scope,
+                opponent=opponent,
+                outcome=outcome,
                 limit=count,
             )
             document = notes_service.export_notes(session, found, fmt=wanted)
@@ -954,17 +958,21 @@ def _register_memory(server: MCPServer, coach: Coach) -> None:
         fen: str | None = None,
         scope: str | None = None,
         line_id: int | None = None,
+        opponent: str | None = None,
+        outcome: str | None = None,
         limit: int = DEFAULT_NOTES,
     ) -> TextContent:
         """What was written down before — start a session with this. Free text, tags
         (all of them must match), a date window ('30d' works), a game or a position;
         newest first. `scope` narrows by what a note is attached to rather than to what:
-        'game', 'position', 'line' or 'free'. With no arguments it returns the most recent
-        notes and every tag in use. Each note says where it was written — `move` is the
-        move, `game` the game it was on, and `game.is_owner_game` false means a model game
-        the owner only studied — and how far the position reaches: `position_games` is how
-        many of their own games pass through it, `position_reference_games` how many model
-        games do."""
+        'game', 'position', 'line' or 'free'. `opponent` (part of a name) and `outcome`
+        ('win', 'loss', 'draw') narrow to notes on games against that player or that went
+        that way; `game.opponent` and `game.outcome` say it per note. With no arguments it
+        returns the most recent notes and every tag in use. Each note says where it was
+        written — `move` is the move, `game` the game it was on, and `game.is_owner_game`
+        false means a model game the owner only studied — and how far the position
+        reaches: `position_games` is how many of their own games pass through it,
+        `position_reference_games` how many model games do."""
         position = args.fen(fen, required=False)
         count = args.capped(limit, DEFAULT_NOTES, MAX_NOTES)
         with coach.session() as session:
@@ -978,6 +986,8 @@ def _register_memory(server: MCPServer, coach: Coach) -> None:
                 fen=position,
                 scope=scope,
                 line_id=int(line_id) if line_id is not None else None,
+                opponent=opponent,
+                outcome=outcome,
                 limit=count,
             )
             rows = [
@@ -985,7 +995,8 @@ def _register_memory(server: MCPServer, coach: Coach) -> None:
                 for payload in notes_service.note_payloads(session, found)
             ]
             payload = {"notes": rows, "count": len(rows)}
-            if not any((query, tags, since, until, game_id, fen, scope, line_id)):
+            filtered = (query, tags, since, until, game_id, fen, scope, line_id, opponent, outcome)
+            if not any(filtered):
                 payload["tags"] = notes_service.list_tags(session)
         return payloads.result(payload)
 

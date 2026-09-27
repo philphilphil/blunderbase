@@ -2859,6 +2859,38 @@ def test_search_narrows_by_scope_and_by_line(library: Library) -> None:
         notes.search_notes(session, scope="sideways")
 
 
+def test_search_narrows_by_the_game_a_note_was_written_on(library: Library) -> None:
+    """Opponent and outcome mean what the library means by them; a loose note has neither."""
+    session = library.session
+    first = library.all[0]
+    other = next(
+        game
+        for game in library.all
+        if games_service.opponent_name(game) != games_service.opponent_name(first)
+        and games_service.outcome_of(game) != games_service.outcome_of(first)
+    )
+    on_first = notes.save_note(session, "first", game_id=first.id)
+    on_other = notes.save_note(session, "other", game_id=other.id)
+    notes.save_note(session, "loose")
+    live = notes.save_note(session, "from the coach", source="mcp")
+
+    def ids(**filters: object) -> list[int]:
+        return [note.id for note in notes.search_notes(session, **filters)]  # type: ignore[arg-type]
+
+    opponent = games_service.opponent_name(first)
+    assert opponent is not None
+    assert ids(opponent=opponent[1:-1].upper()) == [on_first.id]
+    assert ids(outcome=games_service.outcome_of(other)) == [on_other.id]
+    assert ids(opponent=opponent, outcome=games_service.outcome_of(other)) == []
+    assert ids(source="mcp") == [live.id]
+    with pytest.raises(ValueError, match="unknown source"):
+        notes.search_notes(session, source="fax")
+
+    brief = notes.note_payload(session, on_first)["game"]
+    assert brief["opponent"] == opponent
+    assert brief["outcome"] == games_service.outcome_of(first)
+
+
 def test_free_text_search_survives_a_database_without_the_index(session: Session) -> None:
     """FTS5 is an optimisation, not a dependency: the fallback has to find the same note."""
     from backend.db import fts

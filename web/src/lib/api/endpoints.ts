@@ -87,7 +87,9 @@ import type {
   NoteExportFormat,
   NoteResponse,
   NoteScope,
+  NoteSource,
   NoteUpdate,
+  Outcome,
   PositionAnalysis,
   GameBookEntry,
   PositionOccurrence,
@@ -627,6 +629,12 @@ export interface NoteQuery {
   line_id?: number
   /** True for only the notes that know their position, false for only those that do not. */
   has_position?: boolean
+  /** Notes on games against this player — part of a name, as the library matches it. */
+  opponent?: string
+  /** Notes on games the owner won, lost or drew. */
+  outcome?: Outcome
+  /** Who wrote it — see `NoteSource`. */
+  source?: NoteSource
   limit?: number
 }
 

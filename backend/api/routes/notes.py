@@ -40,6 +40,13 @@ def search_notes(
     has_position: Annotated[
         bool | None, Query(description="only notes that know their position, or only those without")
     ] = None,
+    opponent: Annotated[
+        str | None, Query(description="notes on games against this player (substring)")
+    ] = None,
+    outcome: Annotated[
+        str | None, Query(description="win | loss | draw — notes on games that went this way")
+    ] = None,
+    source: Annotated[str | None, Query(description="web | mcp | live — who wrote it")] = None,
     limit: Annotated[int, Query(ge=1, le=MAX_PAGE)] = 50,
 ) -> list[Any]:
     found = _found(
@@ -53,6 +60,9 @@ def search_notes(
         scope=scope,
         line_id=line_id,
         has_position=has_position,
+        opponent=opponent,
+        outcome=outcome,
+        source=source,
         limit=limit,
     )
     return notes_service.note_payloads(session, found)
@@ -100,6 +110,9 @@ def export_notes(
     scope: str | None = None,
     line_id: int | None = None,
     has_position: bool | None = None,
+    opponent: str | None = None,
+    outcome: str | None = None,
+    source: str | None = None,
 ) -> Response:
     """The notes the same filters would list, as a document to keep.
 
@@ -123,6 +136,9 @@ def export_notes(
         scope=scope,
         line_id=line_id,
         has_position=has_position,
+        opponent=opponent,
+        outcome=outcome,
+        source=source,
         limit=EXPORT_LIMIT,
     )
     media_type, filename = notes_service.EXPORT_FORMATS[fmt]
@@ -167,6 +183,9 @@ def _found(
     scope: str | None,
     line_id: int | None,
     has_position: bool | None,
+    opponent: str | None,
+    outcome: str | None,
+    source: str | None,
     limit: int,
 ) -> list[Any]:
     """The one filter vocabulary, shared by the listing and the export."""
@@ -181,5 +200,8 @@ def _found(
         scope=scope,
         line_id=line_id,
         has_position=has_position,
+        opponent=opponent,
+        outcome=outcome,
+        source=source,
         limit=limit,
     )

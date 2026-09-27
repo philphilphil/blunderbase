@@ -48,6 +48,10 @@ const NOTES: NoteResponse[] = [
       result: '1-0',
       date: '2026-08-20',
       is_owner_game: true,
+      opponent: 'maia',
+      opponent_rating: 1650,
+      outcome: 'win',
+      speed: 'blitz',
     },
     move: { ply: 8, move_number: 4, color: 'black', san: 'Bb4', label: '4... Bb4' },
     position_games: 3,
@@ -207,6 +211,41 @@ describe('NotesPage', () => {
 
     await user.click(screen.getByRole('radio', { name: 'Stream' }))
     expect(screen.queryByText('no position')).not.toBeInTheDocument()
+  })
+
+  it('lists one line per note with the game it came from, and opens a row in place', async () => {
+    const user = userEvent.setup()
+    draw()
+    await screen.findByText('The bishop has nothing to do on b5 here.')
+
+    await user.click(screen.getByRole('radio', { name: 'List' }))
+    expect(window.localStorage.getItem(NOTE_VIEW_KEY)).toBe('list')
+
+    // Where each note came from, on its own line: the move, the opponent and the result.
+    const row = document.querySelector('[data-note-row="1"]')!
+    expect(row).toHaveTextContent('4... Bb4')
+    expect(row).toHaveTextContent('maia')
+    expect(row).toHaveTextContent('1650')
+    expect(row).toHaveTextContent('1–0')
+    // Closed, a row is one line and not the note: no rewrite button until it is opened.
+    expect(screen.queryByRole('button', { name: 'Rewrite this note' })).toBeNull()
+
+    const toggle = screen.getByRole('button', { name: /The bishop has nothing to do/ })
+    await user.click(toggle)
+    expect(toggle).toHaveAttribute('aria-expanded', 'true')
+    expect(screen.getByRole('button', { name: 'Rewrite this note' })).toBeInTheDocument()
+  })
+
+  it('re-asks for one opponent when a name in the list is clicked', async () => {
+    const user = userEvent.setup()
+    window.localStorage.setItem(NOTE_VIEW_KEY, 'list')
+    resetNoteView()
+    draw()
+    await screen.findByText('The bishop has nothing to do on b5 here.')
+
+    await user.click(screen.getByRole('button', { name: 'maia' }))
+
+    await waitFor(() => expect(listedWith().some((url) => url.includes('opponent=maia'))).toBe(true))
   })
 
   it('rewrites a note in either view, because a view you cannot write from is one you leave', async () => {

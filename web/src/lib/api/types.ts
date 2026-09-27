@@ -1528,6 +1528,12 @@ export interface NoteGameBrief extends Extra {
   date?: string | null
   /** False for a model game from the reference books — one kept for study, not played. */
   is_owner_game?: boolean
+  /** The other side, by the owner's colour — null on a game no account of theirs played. */
+  opponent?: string | null
+  opponent_rating?: number | null
+  /** The owner's result; null where they did not play. */
+  outcome?: Outcome | null
+  speed?: Speed | null
 }
 
 /**

@@ -1,5 +1,5 @@
 /**
- * How the notes page draws its notes — the stream, or the sheet.
+ * How the notes page draws its notes — the stream, the sheet, or the list.
  *
  * A per-browser reading preference, not a filter, which is why it is here and not in the
  * URL beside `filters.ts`. A filter says *which* notes; this says how they are laid out,
@@ -14,8 +14,13 @@
  */
 import { useSyncExternalStore } from 'react'
 
-/** `stream` is one column of whole notes; `sheet` is a packed grid of positions. */
-export type NoteView = 'stream' | 'sheet'
+/**
+ * `stream` is one column of whole notes; `sheet` is a packed grid of positions; `list` is
+ * one line per note with where it came from beside it.
+ */
+export type NoteView = 'stream' | 'sheet' | 'list'
+
+const VIEWS: readonly NoteView[] = ['stream', 'sheet', 'list']
 
 export const NOTE_VIEW_KEY = 'blunderbase.noteView'
 
@@ -35,7 +40,8 @@ function storage(): Storage | null {
 
 function read(): NoteView {
   try {
-    return storage()?.getItem(NOTE_VIEW_KEY) === 'sheet' ? 'sheet' : DEFAULT
+    const stored = storage()?.getItem(NOTE_VIEW_KEY)
+    return VIEWS.find((view) => view === stored) ?? DEFAULT
   } catch {
     return DEFAULT
   }

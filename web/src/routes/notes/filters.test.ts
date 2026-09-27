@@ -15,7 +15,8 @@ import {
 describe('filtersFromParams', () => {
   it('reads every filter the notes route takes', () => {
     const params = new URLSearchParams(
-      'q=rook+endgame&tag=endgame&tag=rooks&scope=position&game=412&since=2026-01-01&until=2026-02-01',
+      'q=rook+endgame&tag=endgame&tag=rooks&scope=position&game=412&since=2026-01-01&until=2026-02-01' +
+        '&opponent=maia&outcome=loss&source=mcp',
     )
     expect(filtersFromParams(params)).toEqual({
       text: 'rook endgame',
@@ -24,11 +25,16 @@ describe('filtersFromParams', () => {
       game_id: 412,
       since: '2026-01-01',
       until: '2026-02-01',
+      opponent: 'maia',
+      outcome: 'loss',
+      source: 'mcp',
     })
   })
 
   it('drops values it cannot trust rather than passing them to the API', () => {
-    const params = new URLSearchParams('q=+&scope=sideways&game=-3&since=yesterday&until=2026-13')
+    const params = new URLSearchParams(
+      'q=+&scope=sideways&game=-3&since=yesterday&until=2026-13&opponent=+&outcome=won&source=fax',
+    )
     expect(filtersFromParams(params)).toEqual({})
   })
 
@@ -47,6 +53,9 @@ describe('paramsFromFilters', () => {
       game_id: 7,
       since: '2026-03-01',
       until: '2026-03-31',
+      opponent: 'kn1ght',
+      outcome: 'draw' as const,
+      source: 'live' as const,
     }
     expect(filtersFromParams(paramsFromFilters(filters))).toEqual(filters)
   })
@@ -85,6 +94,14 @@ describe('toNoteQuery', () => {
     })
   })
 
+  it('passes the game filters through under their own names', () => {
+    expect(toNoteExportQuery({ opponent: 'maia', outcome: 'win', source: 'web' })).toEqual({
+      opponent: 'maia',
+      outcome: 'win',
+      source: 'web',
+    })
+  })
+
   it('exports without a page size — the document is capped by the backend', () => {
     expect(toNoteExportQuery({ scope: 'free' })).toEqual({ scope: 'free' })
     expect('limit' in toNoteExportQuery({ scope: 'free' })).toBe(false)
@@ -98,6 +115,9 @@ describe('the chips', () => {
     expect(groupSummary('tags', { tags: ['endgame', 'rooks'] })).toBe('2 tags')
     expect(groupSummary('scope', { scope: 'position' })).toBe('on a position')
     expect(groupSummary('game', { game_id: 9 })).toBe('#9')
+    expect(groupSummary('opponent', { opponent: 'maia' })).toBe('maia')
+    expect(groupSummary('outcome', { outcome: 'loss' })).toBe('games lost')
+    expect(groupSummary('source', { source: 'mcp' })).toBe('assistant')
     expect(groupSummary('date', { since: '2026-01-01' })).toBe('from 2026-01-01')
     expect(groupSummary('date', { until: '2026-01-01' })).toBe('until 2026-01-01')
   })

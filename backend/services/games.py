@@ -577,7 +577,7 @@ def game_conditions(filters: GameFilters) -> list[ColumnElement[bool]]:
     if filters.variant:
         conditions.append(func.lower(Game.variant) == filters.variant.strip().casefold())
     if filters.opponent:
-        conditions.append(_opponent_condition(filters.opponent))
+        conditions.append(opponent_condition(filters.opponent))
     if filters.has_blunders is not None:
         blunders = _has_classification(Classification.BLUNDER)
         conditions.append(blunders if filters.has_blunders else ~blunders)
@@ -1637,7 +1637,7 @@ def _has_done_run() -> ColumnElement[bool]:
     )
 
 
-def _opponent_condition(name: str) -> ColumnElement[bool]:
+def opponent_condition(name: str) -> ColumnElement[bool]:
     """Whoever was on the other side of the board — either name when there is no owner."""
     return or_(
         and_(Game.owner_color == Color.WHITE, _contains(Game.black_name, name)),

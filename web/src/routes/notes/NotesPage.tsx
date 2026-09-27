@@ -15,10 +15,13 @@
  * What orders it now is time, cut by `ageBuckets` into rules that cost a line rather than a
  * row. Nothing is re-sorted here — the API answers newest-first and the rules follow it.
  *
- * **Two views, and the reader picks.** *Stream* is two notes to a row, board beside the
+ * **Three views, and the reader picks.** *Stream* is two notes to a row, board beside the
  * words, with the whole of every note and no clipping; *Sheet* is a denser grid of tiles,
- * board on top, text clamped, for finding a note by seeing its position. Both are the same notes under the same filters and
- * both can rewrite and forget one — a view you can only read from is a view you leave. Which
+ * board on top, text clamped, for finding a note by seeing its position; *List* is one line
+ * per note with where it came from beside it — the move, the opponent, how the game went —
+ * for finding a note by its game (`NoteRow`). All three are the same notes under the same
+ * filters and all three can rewrite and forget one — a view you can only read from is a
+ * view you leave; a list row opens in place into the whole note for that. Which
  * is showing is a per-browser preference (`viewMode.ts`), not a URL parameter: it is how
  * somebody reads, not which notes they are looking at, so a shared link arrives in the
  * recipient's own shape.
@@ -30,7 +33,7 @@
 import type { MessageDescriptor } from '@lingui/core'
 import { msg } from '@lingui/core/macro'
 import { Trans, useLingui } from '@lingui/react/macro'
-import { Download, FileText, LayoutGrid, Loader2, Rows3, StickyNote } from 'lucide-react'
+import { Download, FileText, LayoutGrid, List, Loader2, Rows3, StickyNote } from 'lucide-react'
 import { useCallback, useMemo } from 'react'
 import { useSearchParams } from 'react-router-dom'
 
@@ -45,6 +48,7 @@ import { cn } from '@/lib/utils'
 
 import { NoteFilterBar } from './components/NoteFilterBar'
 import { NoteItem } from './components/NoteItem'
+import { NoteListHeader, NoteRow } from './components/NoteRow'
 import {
   filterCount,
   filtersFromParams,
@@ -81,6 +85,13 @@ const STREAM = 'grid items-start gap-2.5 max-w-[46rem] lg:max-w-[93rem] lg:grid-
  * actually read at.
  */
 const SHEET = 'grid items-start gap-2.5 sm:grid-cols-2 xl:grid-cols-3 min-[110rem]:grid-cols-4'
+
+/**
+ * The list: one bounded panel of rows per date rule, capped where a row stops gaining from
+ * width. The columns are `NoteRow`'s, so the sections line up under one header — which
+ * carries the same cap (`NoteListHeader`); change one and change the other.
+ */
+const LIST = 'flex flex-col rounded-lg border border-line bg-panel max-w-[93rem]'
 
 export function NotesPage() {
   const { t } = useLingui()
@@ -121,7 +132,36 @@ export function NotesPage() {
     [filters, setFilters],
   )
 
-  const list = view === 'sheet' ? SHEET : STREAM
+  const setOpponent = useCallback(
+    (opponent: string) => setFilters({ ...filters, opponent }),
+    [filters, setFilters],
+  )
+
+  const list = view === 'sheet' ? SHEET : view === 'list' ? LIST : STREAM
+
+  // One note in whichever view is open. The list draws rows in a `ul`; the other two draw
+  // the note itself.
+  const item = (note: NoteResponse, highlight: boolean) =>
+    view === 'list' ? (
+      <NoteRow
+        key={note.id}
+        note={note}
+        highlighted={highlight}
+        tagSuggestions={suggestions}
+        onTagClick={addTag}
+        onOpponentClick={setOpponent}
+      />
+    ) : (
+      <NoteItem
+        key={note.id}
+        note={note}
+        layout={view}
+        highlighted={highlight}
+        tagSuggestions={suggestions}
+        onTagClick={addTag}
+      />
+    )
+  const Group = view === 'list' ? 'ul' : 'div'
 
   return (
     <PageBody>
@@ -149,11 +189,14 @@ export function NotesPage() {
       </div>
 
       {notes.isPending ? (
-        <div className={list}>
+        <div className={view === 'list' ? 'flex max-w-[93rem] flex-col gap-1' : list}>
           {[0, 1, 2, 3, 4, 5].map((cell) => (
             <Skeleton
               key={cell}
-              className={cn('w-full rounded-lg', view === 'sheet' ? 'h-[15rem]' : 'h-[9rem]')}
+              className={cn(
+                'w-full rounded-lg',
+                view === 'sheet' ? 'h-[15rem]' : view === 'list' ? 'h-7' : 'h-[9rem]',
+              )}
             />
           ))}
         </div>
@@ -173,35 +216,20 @@ export function NotesPage() {
           {linked.data ? (
             <section className="flex flex-col gap-1.5">
               <DateRule label={t`The note you followed`} note={t`outside the filters below`} />
-              <div className={list}>
-                <NoteItem
-                  note={linked.data}
-                  layout={view}
-                  highlighted
-                  tagSuggestions={suggestions}
-                  onTagClick={addTag}
-                />
-              </div>
+              <Group className={list}>{item(linked.data, true)}</Group>
             </section>
           ) : null}
 
           {total === 0 ? <Empty filtered={filterCount(filters) > 0} /> : null}
 
+          {view === 'list' && total > 0 ? <NoteListHeader /> : null}
+
           {buckets.map((bucket) => (
             <section key={bucket.key} className="flex flex-col gap-1.5">
               <DateRule label={bucket.label} count={bucket.notes.length} />
-              <div className={list}>
-                {bucket.notes.map((note) => (
-                  <NoteItem
-                    key={note.id}
-                    note={note}
-                    layout={view}
-                    highlighted={note.id === highlighted}
-                    tagSuggestions={suggestions}
-                    onTagClick={addTag}
-                  />
-                ))}
-              </div>
+              <Group className={list}>
+                {bucket.notes.map((note) => item(note, note.id === highlighted))}
+              </Group>
             </section>
           ))}
 
@@ -229,13 +257,19 @@ const VIEWS: {
     icon: LayoutGrid,
     hint: msg`A grid of positions, text clamped`,
   },
+  {
+    id: 'list',
+    label: msg`List`,
+    icon: List,
+    hint: msg`One line per note, with the game it was written on`,
+  },
 ]
 
 /**
- * Stream or sheet, as one segmented control rather than two buttons.
+ * Stream, sheet or list, as one segmented control rather than three buttons.
  *
- * A pair of radios in `aria` terms, because that is what it is: two mutually exclusive ways
- * of showing one list, one of which is always on. Labels are hidden below `sm` — the icons
+ * Radios in `aria` terms, because that is what they are: mutually exclusive ways of showing
+ * one list, one of which is always on. Labels are hidden below `sm` — the icons
  * carry it on a phone, where the row is already tight.
  */
 function ViewToggle({ view }: { view: NoteView }) {
