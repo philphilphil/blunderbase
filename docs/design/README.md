@@ -108,7 +108,11 @@ directory are local snapshots pulled 2026-08-25.
     | `text-value` | 0.9375rem / 1.25rem (15) | 500 | `ink`, mono | key numbers: a chart's current rating, a trend's value |
 
     There is no page-title size, because there is no page title (see "The titlebar is
-    the page's heading" below). `web/src/lib/utils.ts` extends tailwind-merge with the
+    the page's heading" below). Nothing else sets a font size: no `text-[…rem]` and none
+    of Tailwind's stock `text-xs` … `text-xl`. `scale.test.ts` fails on either, except for
+    the short list of things that are not text in this sense (the captured-piece
+    figurines, the two Stats display numerals), each named there with its reason.
+    `web/src/lib/utils.ts` extends tailwind-merge with the
     same six names. Without
     that, `cn()` reads `text-meta` as a colour and silently drops it, or the colour
     beside it; `utils.test.ts` pins the merge. Do not name a size after a colour alias

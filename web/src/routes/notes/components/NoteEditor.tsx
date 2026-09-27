@@ -59,7 +59,7 @@ export function NoteEditor({ note, onDone, tagSuggestions = [] }: NoteEditorProp
         }}
         aria-label={t`Note`}
         rows={4}
-        className="w-full resize-y rounded-md border border-input bg-elevated px-2.5 py-2 text-[0.78125rem] leading-[1.55] text-ink outline-none focus-visible:border-accent-teal/50"
+        className="w-full resize-y rounded-md border border-input bg-elevated px-2.5 py-2 text-data leading-[1.55] text-ink outline-none focus-visible:border-accent-teal/50"
       />
       <TagEditor
         tags={tags}
@@ -82,7 +82,7 @@ export function NoteEditor({ note, onDone, tagSuggestions = [] }: NoteEditorProp
           <Trans>Cancel</Trans>
         </Button>
         {update.isError ? (
-          <span className="text-[0.6875rem] text-blunder">{update.error.message}</span>
+          <span className="text-label text-blunder">{update.error.message}</span>
         ) : null}
       </div>
     </>
@@ -97,7 +97,7 @@ export function DeleteConfirm({ noteId, onCancel }: { noteId: number; onCancel: 
   const remove = useDeleteNote()
   return (
     <div className="flex items-center gap-2 rounded-md border border-blunder/28 bg-blunder/5 px-2 py-1.5 max-md:flex-wrap max-md:gap-y-1.5">
-      <span className="text-[0.6875rem] text-blunder">
+      <span className="text-label text-blunder">
         <Trans>Forget this note for good?</Trans>
       </span>
       <span className="flex-1" />

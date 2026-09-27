@@ -62,17 +62,17 @@ export function LibraryManagement() {
       <section className="flex flex-wrap items-center gap-3 rounded-xl border border-line bg-panel px-4 py-3.5">
         <Download className="size-4 text-faint" aria-hidden />
         <div className="min-w-56 flex-1">
-          <h2 className="text-xs font-semibold text-ink">
+          <h2 className="text-data font-semibold text-ink">
             <Trans>Portable PGN export</Trans>
           </h2>
-          <p className="mt-1 text-[0.6875rem] leading-[1.5] text-dim">
+          <p className="mt-1 text-label leading-[1.5] text-dim">
             <Trans>
               Every game, note and saved line for another chess application. Engine analysis
               and settings are not part of PGN.
             </Trans>
           </p>
           {exporting.isError ? (
-            <p role="alert" className="mt-1 text-[0.6875rem] text-blunder">
+            <p role="alert" className="mt-1 text-label text-blunder">
               {exporting.error.message}
             </p>
           ) : null}
@@ -97,14 +97,14 @@ export function LibraryManagement() {
         <HardDriveDownload className="size-4 text-faint" aria-hidden />
         <div className="min-w-56 flex-1">
           <div className="flex items-center gap-2">
-            <h2 className="text-xs font-semibold text-ink">
+            <h2 className="text-data font-semibold text-ink">
               <Trans>Database backup</Trans>
             </h2>
-            <span className="rounded-sm border border-edge px-1.5 py-0.5 font-mono text-[0.5625rem] tracking-wide text-faint uppercase">
+            <span className="rounded-sm border border-edge px-1.5 py-0.5 font-mono text-meta tracking-wide text-faint uppercase">
               <Trans>Technical</Trans>
             </span>
           </div>
-          <p className="mt-1 text-[0.6875rem] leading-[1.5] text-dim">
+          <p className="mt-1 text-label leading-[1.5] text-dim">
             <Trans>
               A lossless SQLite copy including analysis, accounts and settings. Restoring it
               requires the CLI while Blunderbase is stopped.{' '}
@@ -118,12 +118,12 @@ export function LibraryManagement() {
               </a>
             </Trans>
           </p>
-          <p className="mt-1 text-[0.6875rem] text-faint">
+          <p className="mt-1 text-label text-faint">
             {estimate}{' '}
             <Trans>The download appears after Blunderbase prepares a consistent snapshot.</Trans>
           </p>
           {backingUp.isError ? (
-            <p role="alert" className="mt-1 text-[0.6875rem] text-blunder">
+            <p role="alert" className="mt-1 text-label text-blunder">
               {backingUp.error.message}
             </p>
           ) : null}
@@ -147,18 +147,18 @@ export function LibraryManagement() {
       <section className="flex flex-wrap items-center gap-3 rounded-xl border border-blunder/28 bg-panel px-4 py-3.5">
         <Trash2 className="size-4 text-blunder" aria-hidden />
         <div className="min-w-56 flex-1">
-          <h2 className="text-xs font-semibold text-ink">
+          <h2 className="text-data font-semibold text-ink">
             <Trans>Reset imported Library</Trans>
           </h2>
           {deleted ? (
-            <p role="status" className="mt-1 text-[0.6875rem] text-dim">
+            <p role="status" className="mt-1 text-label text-dim">
               {t`Deleted ${plural(deleted.games, { one: '# game', other: '# games' })}, ${plural(
                 deleted.runs,
                 { one: '# analysis run', other: '# analysis runs' },
               )} and ${plural(deleted.notes, { one: '# note', other: '# notes' })}.`}
             </p>
           ) : (
-            <p className="mt-1 text-[0.6875rem] leading-[1.5] text-dim">
+            <p className="mt-1 text-label leading-[1.5] text-dim">
               {total === undefined ? (
                 <Trans>Delete the imported games and everything attached to them.</Trans>
               ) : (

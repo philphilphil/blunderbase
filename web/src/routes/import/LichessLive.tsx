@@ -32,7 +32,7 @@ export function LichessLive() {
   if (!connected || !username) {
     return (
       <div className="flex flex-col items-start gap-1.5 border-t border-edge pt-2">
-        <p className="text-[0.6875rem] leading-relaxed text-dim">
+        <p className="text-label leading-relaxed text-dim">
           {connected
             ? t`Connect again to import games as soon as they end.`
             : t`Connect Lichess to import games as soon as they end.`}
@@ -54,7 +54,7 @@ export function LichessLive() {
   return (
     <div className="flex flex-col items-start gap-1.5 border-t border-edge pt-2">
       <div className="flex w-full items-center gap-2">
-        <span className="min-w-0 flex-1 truncate text-[0.6875rem] text-soft">
+        <span className="min-w-0 flex-1 truncate text-label text-soft">
           <Trans>
             Connected as <span className="font-medium text-ink">{username}</span>
           </Trans>
@@ -63,12 +63,12 @@ export function LichessLive() {
           type="button"
           onClick={() => disconnect.mutate()}
           disabled={disconnect.isPending}
-          className="text-[0.6875rem] text-dim hover:text-ink disabled:text-faint-2"
+          className="text-label text-dim hover:text-ink disabled:text-faint-2"
         >
           <Trans>Disconnect</Trans>
         </button>
       </div>
-      <p className="flex items-center gap-1.5 text-[0.6875rem] text-dim" data-stream={stream}>
+      <p className="flex items-center gap-1.5 text-label text-dim" data-stream={stream}>
         <span
           aria-hidden
           className={cn(
@@ -80,7 +80,7 @@ export function LichessLive() {
       </p>
       {stream === 'rejected' ? <ConnectLichessButton reconnect /> : null}
       {disconnect.error ? (
-        <p className="text-[0.6875rem] text-blunder">{disconnect.error.message}</p>
+        <p className="text-label text-blunder">{disconnect.error.message}</p>
       ) : null}
     </div>
   )

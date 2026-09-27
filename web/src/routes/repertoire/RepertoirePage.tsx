@@ -261,7 +261,7 @@ export function RepertoirePage() {
               {/* The two repertoires are named whole rather than by a colour dropped into
                   a shared frame: an adjective before a noun agrees with it in most
                   languages, and there are only ever two of these. */}
-              <h1 className="text-[0.9375rem] font-semibold text-ink">
+              <h1 className="text-value font-semibold text-ink">
                 {color === 'white' ? (
                   <Trans>White repertoire</Trans>
                 ) : (
@@ -296,7 +296,7 @@ export function RepertoirePage() {
                 aria-label={t`Back one move`}
                 onClick={back}
                 disabled={line.steps.length === 0}
-                className="border-r border-edge px-2.5 py-1 text-xs text-soft transition-colors hover:bg-selected hover:text-ink disabled:text-faint-2 disabled:hover:bg-transparent"
+                className="border-r border-edge px-2.5 py-1 text-data text-soft transition-colors hover:bg-selected hover:text-ink disabled:text-faint-2 disabled:hover:bg-transparent"
               >
                 ◀
               </button>
@@ -304,7 +304,7 @@ export function RepertoirePage() {
                 type="button"
                 aria-label={t`Forward one move`}
                 onClick={forward}
-                className="px-2.5 py-1 text-xs text-soft transition-colors hover:bg-selected hover:text-ink"
+                className="px-2.5 py-1 text-data text-soft transition-colors hover:bg-selected hover:text-ink"
               >
                 ▶
               </button>
@@ -312,7 +312,7 @@ export function RepertoirePage() {
             <button
               type="button"
               onClick={() => setFlipped((was) => !was)}
-              className="rounded-md border border-edge bg-elevated px-2.5 py-1 text-xs text-soft transition-colors hover:text-ink"
+              className="rounded-md border border-edge bg-elevated px-2.5 py-1 text-data text-soft transition-colors hover:text-ink"
             >
               ⇅ <Trans>Flip</Trans>
             </button>
@@ -320,13 +320,13 @@ export function RepertoirePage() {
               <button
                 type="button"
                 onClick={() => setLine([])}
-                className="rounded-md border border-edge bg-elevated px-2.5 py-1 text-xs text-soft transition-colors hover:text-ink"
+                className="rounded-md border border-edge bg-elevated px-2.5 py-1 text-data text-soft transition-colors hover:text-ink"
               >
                 <Trans>Reset</Trans>
               </button>
             ) : null}
             <div className="flex-1" />
-            <span className="font-mono text-[0.6875rem] tabular text-dim">
+            <span className="font-mono text-label tabular text-dim">
               {line.turn === 'white' ? (
                 <Trans>white to move · ply {ply}</Trans>
               ) : (
@@ -350,7 +350,7 @@ export function RepertoirePage() {
           */}
           {tree.isSuccess && !onBook && writes === 0 && !tree.isFetching ? (
             <div className="flex items-center gap-2.5 rounded-[0.5625rem] border border-mistake/28 bg-mistake/5 px-3 py-2.5">
-              <p className="flex-1 text-[0.78125rem] leading-relaxed text-soft">
+              <p className="flex-1 text-data leading-relaxed text-soft">
                 {color === 'white' ? (
                   <Trans>This line is not in your white repertoire yet.</Trans>
                 ) : (
@@ -360,7 +360,7 @@ export function RepertoirePage() {
               <button
                 type="button"
                 onClick={() => store(ucis)}
-                className="flex-none rounded-md border border-edge-input px-2.5 py-1 text-[0.71875rem] text-soft hover:border-edge-hover hover:text-ink"
+                className="flex-none rounded-md border border-edge-input px-2.5 py-1 text-data text-soft hover:border-edge-hover hover:text-ink"
               >
                 <Trans>Add this line</Trans>
               </button>
@@ -386,13 +386,13 @@ export function RepertoirePage() {
           />
 
           {writeError ? (
-            <p className="text-[0.6875rem] text-blunder">{writeError.message}</p>
+            <p className="text-label text-blunder">{writeError.message}</p>
           ) : null}
         </div>
 
         <div className="flex min-w-0 flex-1 flex-col gap-3.5 overflow-y-auto max-md:flex-none max-md:overflow-visible">
           <div className="flex flex-none items-center gap-2.5">
-            <span className="text-[0.75rem] font-semibold text-ink">
+            <span className="text-data font-semibold text-ink">
               {color === 'white' ? (
                 <Trans>Your white repertoire</Trans>
               ) : (
@@ -400,30 +400,30 @@ export function RepertoirePage() {
               )}
             </span>
             <div className="flex-1" />
-            <span className="font-mono text-[0.6875rem] tabular text-dim">
+            <span className="font-mono text-label tabular text-dim">
               <Plural value={total} one="# move" other="# moves" />
             </span>
           </div>
 
           {tree.isError ? (
             <div className="flex flex-col items-start gap-2.5 rounded-xl border border-blunder/28 bg-blunder/5 p-5">
-              <span className="text-[0.75rem] font-semibold text-blunder">
+              <span className="text-data font-semibold text-blunder">
                 <Trans>Could not read the repertoire</Trans>
               </span>
-              <p className="text-[0.78125rem] leading-relaxed text-soft">
+              <p className="text-data leading-relaxed text-soft">
                 {tree.error?.message ?? t`The backend did not answer.`}
               </p>
               <button
                 type="button"
                 onClick={() => void tree.refetch()}
-                className="rounded-md border border-edge-input px-2.5 py-1 text-[0.71875rem] text-soft hover:border-edge-hover hover:text-ink"
+                className="rounded-md border border-edge-input px-2.5 py-1 text-data text-soft hover:border-edge-hover hover:text-ink"
               >
                 <Trans>Try again</Trans>
               </button>
             </div>
           ) : rows.length === 0 ? (
             <div className="rounded-[0.5625rem] border border-dashed border-edge-strong bg-panel/60 px-5 py-8 text-center">
-              <p className="text-[0.78125rem] leading-relaxed text-dim">
+              <p className="text-data leading-relaxed text-dim">
                 {tree.isPending ? (
                   <Trans>Reading your repertoire…</Trans>
                 ) : color === 'white' ? (
@@ -470,7 +470,7 @@ function ColorToggle({ color, onChange }: { color: Color; onChange: (next: Color
   const { i18n } = useLingui()
   const options: Color[] = ['white', 'black']
   return (
-    <div className="flex overflow-hidden rounded-md border border-edge font-mono text-[0.6875rem]">
+    <div className="flex overflow-hidden rounded-md border border-edge font-mono text-label">
       {options.map((option, index) => (
         <button
           key={option}
@@ -590,10 +590,10 @@ function NodeEditor({
   if (!node) {
     return (
       <div className="flex flex-none flex-col gap-[0.4375rem] rounded-[0.5625rem] border border-line bg-panel p-[0.8125rem]">
-        <span className="text-[0.75rem] font-semibold text-ink">
+        <span className="text-data font-semibold text-ink">
           <Trans>No move selected</Trans>
         </span>
-        <p className="text-[0.78125rem] leading-relaxed text-dim">
+        <p className="text-data leading-relaxed text-dim">
           <Trans>Play a move on the board, or pick one from the tree, to comment on it.</Trans>
         </p>
       </div>
@@ -616,13 +616,13 @@ function NodeEditor({
   return (
     <div className="flex flex-none flex-col gap-[0.4375rem] rounded-[0.5625rem] border border-line bg-panel p-[0.8125rem]">
       <div className="flex items-center gap-2">
-        <span className="text-[0.75rem] font-semibold text-ink">
+        <span className="text-data font-semibold text-ink">
           <Trans>
             <span className="font-mono">{san}</span> — your note on this move
           </Trans>
         </span>
         {flash ? (
-          <span role="status" className="text-[0.625rem] text-good">
+          <span role="status" className="text-meta text-good">
             <Trans>saved</Trans>
           </span>
         ) : null}
@@ -647,7 +647,7 @@ function NodeEditor({
         }}
         placeholder={t`Why this move? It saves when you click away.`}
         aria-label={t`Comment on ${san}`}
-        className="w-full resize-none rounded-md border border-input bg-raised px-2.5 py-1.5 text-[0.78125rem] leading-[1.5] text-ink outline-none placeholder:text-faint focus-visible:border-accent-teal/50"
+        className="w-full resize-none rounded-md border border-input bg-raised px-2.5 py-1.5 text-lead text-ink outline-none placeholder:text-faint focus-visible:border-accent-teal/50"
       />
 
       <div className="flex items-center gap-2">
@@ -655,7 +655,7 @@ function NodeEditor({
           <button
             type="button"
             onClick={onPromote}
-            className="rounded-md border border-edge px-2 py-[0.1875rem] text-[0.6875rem] text-soft hover:border-edge-hover hover:text-ink"
+            className="rounded-md border border-edge px-2 py-[0.1875rem] text-label text-soft hover:border-edge-hover hover:text-ink"
           >
             <Trans>Promote to main</Trans>
           </button>
@@ -674,7 +674,7 @@ function NodeEditor({
           }}
           onBlur={() => setConfirming(false)}
           className={cn(
-            'rounded-md border px-2 py-[0.1875rem] text-[0.6875rem] transition-colors',
+            'rounded-md border px-2 py-[0.1875rem] text-label transition-colors',
             confirming
               ? 'border-blunder/45 bg-blunder/10 text-blunder'
               : 'border-edge text-soft hover:border-edge-hover hover:text-blunder',
@@ -709,7 +709,7 @@ function MoveTree({
   const notate = useNotation()
   return (
     <div
-      className="flex flex-col gap-px font-mono text-[0.78125rem]"
+      className="flex flex-col gap-px font-mono text-lead"
       role="tree"
       aria-label={t`Repertoire moves`}
     >
@@ -733,7 +733,7 @@ function MoveTree({
                   : 'text-dim hover:bg-elevated-2 hover:text-soft',
             )}
           >
-            <span className={cn(row.depth > 0 && 'text-[0.71875rem]')}>
+            <span className={cn(row.depth > 0 && 'text-data')}>
               {plyLabel(row.ply)}
               {notate(row.node.san)}
             </span>

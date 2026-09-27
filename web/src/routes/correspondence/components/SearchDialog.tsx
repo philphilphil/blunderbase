@@ -125,7 +125,7 @@ export function SearchDialog({
           </Label>
           <EnginePicker engines={engines} mode="search" value={engineId} onChange={setEngineId} />
           {engines.length > 0 && engineId === null ? (
-            <p className="text-[0.71875rem] text-mistake">
+            <p className="text-label text-mistake">
               <Trans>
                 None of these can run a search here: one is needed on this machine that can
                 drive a board. Each greyed engine says why under the pointer.
@@ -169,7 +169,7 @@ export function SearchDialog({
 
         {candidates.length > 0 ? (
           <div className="flex flex-col gap-1.5 border-t border-hairline pt-3">
-            <label className="flex items-center gap-2 text-[0.75rem] text-body">
+            <label className="flex items-center gap-2 text-data text-body">
               <input
                 type="checkbox"
                 checked={restricted}
@@ -178,7 +178,7 @@ export function SearchDialog({
               />
               <Trans>Only the marked moves</Trans>
             </label>
-            <p className="text-[0.625rem] leading-[1.5] text-dim-2">
+            <p className="text-meta leading-[1.5] text-dim-2">
               <Trans>
                 The engine spends everything on the moves you pick and answers nothing about
                 the rest.
@@ -200,7 +200,7 @@ export function SearchDialog({
                         )
                       }
                       className={cn(
-                        'rounded-md border px-2 py-1 font-mono text-[0.6875rem] transition-colors',
+                        'rounded-md border px-2 py-1 font-mono text-label transition-colors',
                         on
                           ? 'border-accent-teal/40 bg-selected text-ink'
                           : 'border-edge text-dim hover:border-edge-hover hover:text-ink',
@@ -216,7 +216,7 @@ export function SearchDialog({
         ) : null}
 
         {error ? (
-          <p role="alert" className="text-[0.6875rem] text-blunder">
+          <p role="alert" className="text-label text-blunder">
             {error}
           </p>
         ) : null}

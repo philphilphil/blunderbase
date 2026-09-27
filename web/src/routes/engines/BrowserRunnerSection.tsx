@@ -172,14 +172,14 @@ export function BrowserRunnerSection({
       }
       detail={
         !support.supported ? (
-          <p className="text-[0.71875rem] leading-[1.6] text-dim">
+          <p className="text-label leading-[1.6] text-dim">
             <Trans>
               {unsupportedReason}. Everything else on this page works as it always did — engines
               on this host, and runners on other machines.
             </Trans>
           </p>
         ) : !installed ? (
-          <div className="text-[0.71875rem] leading-[1.6] text-dim">
+          <div className="text-label leading-[1.6] text-dim">
             <Trans>
               Nothing is installed here. The engine and its network are about 15 MB and are served
               by Blunderbase itself, so nothing is fetched from anywhere else — and the token this
@@ -192,12 +192,12 @@ export function BrowserRunnerSection({
             {hasEngine(state) ? (
               <div className="flex items-center gap-2 rounded-md border border-edge bg-elevated px-3 py-2">
                 <StatusDot tone="healthy" />
-                <span className="truncate font-mono text-[0.6875rem] text-body">
+                <span className="truncate font-mono text-label text-body">
                   {engineLabel(state)}
                 </span>
               </div>
             ) : (
-              <p className="rounded-md border border-edge bg-elevated px-3 py-2 text-[0.6875rem] text-dim">
+              <p className="rounded-md border border-edge bg-elevated px-3 py-2 text-label text-dim">
                 <Trans>
                   The engine has not started yet. It lives in this browser rather than at a path —
                   there is nothing on a filesystem to point at.
@@ -206,7 +206,7 @@ export function BrowserRunnerSection({
             )}
 
             {!state.isolated && hasEngine(state) ? (
-              <p className="text-[0.6875rem] leading-[1.6] text-mistake">
+              <p className="text-label leading-[1.6] text-mistake">
                 <Trans>
                   This page is not cross-origin isolated, so the engine gets one thread instead of
                   several. Blunderbase sends the headers that ask for isolation; a reverse proxy in
@@ -219,7 +219,7 @@ export function BrowserRunnerSection({
               const refusedName = engine.name
               const refusedReason = engine.reason
               return (
-                <p key={engine.name} className="text-[0.6875rem] leading-[1.6] text-mistake">
+                <p key={engine.name} className="text-label leading-[1.6] text-mistake">
                   <Trans>
                     The server refused {refusedName}: {refusedReason}
                   </Trans>
@@ -231,14 +231,14 @@ export function BrowserRunnerSection({
               <p
                 className={
                   state.phase === 'refused'
-                    ? 'text-[0.6875rem] leading-[1.6] text-blunder'
-                    : 'text-[0.6875rem] leading-[1.6] text-dim'
+                    ? 'text-label leading-[1.6] text-blunder'
+                    : 'text-label leading-[1.6] text-dim'
                 }
               >
                 {state.error.message}
               </p>
             ) : null}
-            {failure ? <p className="text-[0.6875rem] text-blunder">{failure}</p> : null}
+            {failure ? <p className="text-label text-blunder">{failure}</p> : null}
           </div>
         )
       }

@@ -86,14 +86,14 @@ export function JobProgress({
   return (
     <div className={cn('flex flex-col gap-2 border-t border-hairline pt-2.5', className)}>
       <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-        <span className={cn('text-[0.6875rem]', tone)}>{i18n._(text)}</span>
+        <span className={cn('text-label', tone)}>{i18n._(text)}</span>
         {jobId !== null ? (
-          <span className="font-mono text-[0.625rem] text-faint">
+          <span className="font-mono text-meta text-faint">
             <Trans>job {jobId}</Trans>
           </span>
         ) : null}
         <div className="flex-1" />
-        <span className="font-mono text-[0.6875rem] text-ink tabular">
+        <span className="font-mono text-label text-ink tabular">
           {settled}/{progress.seen}
         </span>
         {progress.running && jobId !== null ? (
@@ -112,7 +112,7 @@ export function JobProgress({
       </div>
 
       {mine && cancel.isError ? (
-        <p className="text-[0.6875rem] text-blunder">{cancel.error.message}</p>
+        <p className="text-label text-blunder">{cancel.error.message}</p>
       ) : null}
 
       <Progress
@@ -121,7 +121,7 @@ export function JobProgress({
         barClassName={cn(bar, progress.running && progress.seen === 0 && 'animate-pulse')}
       />
 
-      <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 font-mono text-[0.65625rem] text-dim tabular">
+      <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 font-mono text-meta text-dim tabular">
         <span className="text-soft">
           <Trans>{imported} imported</Trans>
         </span>
@@ -141,23 +141,23 @@ export function JobProgress({
       </div>
 
       {progress.lastRef ? (
-        <p className="truncate font-mono text-[0.65625rem] text-faint">{progress.lastRef}</p>
+        <p className="truncate font-mono text-meta text-faint">{progress.lastRef}</p>
       ) : null}
 
       {progress.status === 'failed' && progress.message ? (
-        <p className="font-mono text-[0.65625rem] leading-[1.5] text-blunder">{progress.message}</p>
+        <p className="font-mono text-label text-blunder">{progress.message}</p>
       ) : null}
 
       {progress.failures.length > 0 ? (
         <ul className="flex flex-col gap-1 border-t border-hairline pt-1.5">
           {progress.failures.slice(-SHOWN_FAILURES).map((failure, index) => (
-            <li key={`${failure.ref}-${index}`} className="flex flex-col font-mono text-[0.65625rem]">
+            <li key={`${failure.ref}-${index}`} className="flex flex-col font-mono text-label">
               <span className="truncate text-soft-2">{failure.ref}</span>
               <span className="truncate text-blunder">{failure.error}</span>
             </li>
           ))}
           {extra > 0 ? (
-            <li className="text-[0.65625rem] text-dim">
+            <li className="text-label text-dim">
               <Trans>and {extra} more — see the sync history</Trans>
             </li>
           ) : null}

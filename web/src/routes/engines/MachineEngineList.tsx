@@ -26,7 +26,7 @@ export function MachineEngineList({
 }) {
   if (engines.length === 0) {
     return (
-      <p className="text-[0.6875rem] text-dim-2">
+      <p className="text-label text-dim-2">
         <Trans>Nothing has been advertised.</Trans>
       </p>
     )
@@ -65,13 +65,13 @@ function MachineEngineRow({
       <StatusDot tone={engine.enabled ? 'healthy' : 'away'} />
       {/* The name is what the row is read for, so the path gives way first: a `m…` beside
           forty characters of path was the row saying the least important thing. */}
-      <span className="max-w-[60%] flex-none truncate text-[0.71875rem] text-body">
+      <span className="max-w-[60%] flex-none truncate text-data text-body">
         {engine.name}
       </span>
       <KindBadge kind={engine.kind} />
       {queueOnly ? (
         <span
-          className="flex-none rounded-sm border border-mistake/28 bg-mistake/8 px-1.5 py-px text-[0.59375rem] text-mistake"
+          className="flex-none rounded-sm border border-mistake/28 bg-mistake/8 px-1.5 py-px text-meta text-mistake"
           title={
             engine.streams
               ? t`this link takes queue work but cannot open an analysis board`
@@ -81,7 +81,7 @@ function MachineEngineRow({
           <Trans>queue only</Trans>
         </span>
       ) : null}
-      <span className="min-w-0 flex-1 truncate text-right font-mono text-[0.65625rem] text-faint">
+      <span className="min-w-0 flex-1 truncate text-right font-mono text-label text-faint">
         {engine.path}
       </span>
     </div>

@@ -113,7 +113,7 @@ export function PgnCard({
         <SourceBadge source="pgn" title={t`A PGN export, of one game or a hundred thousand.`} />
         <div className="flex-1" />
         {files.length > 0 ? (
-          <span className="font-mono text-[0.71875rem] text-dim tabular">{size(total)}</span>
+          <span className="font-mono text-label text-dim tabular">{size(total)}</span>
         ) : null}
       </div>
 
@@ -122,7 +122,7 @@ export function PgnCard({
       <div className="flex min-h-7 items-center gap-2">
         {files.length > 0 ? (
           <>
-            <span className="min-w-0 flex-1 truncate font-mono text-[0.6875rem] text-soft">
+            <span className="min-w-0 flex-1 truncate font-mono text-label text-soft">
               {files.length === 1
                 ? files[0]!.name
                 : plural(files.length, { one: '# file', other: '# files' })}
@@ -143,7 +143,7 @@ export function PgnCard({
           <button
             type="button"
             onClick={() => input.current?.click()}
-            className="inline-flex items-center gap-1.5 text-[0.6875rem] text-accent-teal transition-colors hover:text-accent-link"
+            className="inline-flex items-center gap-1.5 text-label text-accent-teal transition-colors hover:text-accent-link"
           >
             <FileUp className="size-3.5" aria-hidden />
             <Trans>Choose a file, or drop one here</Trans>
@@ -159,9 +159,9 @@ export function PgnCard({
         data-testid="pgn-file-input"
         onChange={(event) => accept(event.target.files)}
       />
-      {readError ? <p className="text-[0.6875rem] text-blunder">{readError}</p> : null}
+      {readError ? <p className="text-label text-blunder">{readError}</p> : null}
       {upload.isError ? (
-        <p className="text-[0.6875rem] text-blunder">{upload.error.message}</p>
+        <p className="text-label text-blunder">{upload.error.message}</p>
       ) : null}
 
       <div className="flex flex-wrap items-center gap-2">

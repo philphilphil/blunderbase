@@ -196,12 +196,12 @@ function Row({
           ) : null}
         </span>
       </span>
-      <span className="text-right text-[0.6875rem] text-body tabular-nums">
+      <span className="text-right text-label text-body tabular-nums">
         {node.own ? formatScore(inWhiteFrame(node.own, node.frame)) : ''}
       </span>
       <span
         className={cn(
-          'text-right text-[0.625rem] tabular-nums',
+          'text-right text-meta tabular-nums',
           direction === 'down' ? 'text-mistake' : direction === 'up' ? 'text-good' : 'text-dim',
         )}
         title={
@@ -216,7 +216,7 @@ function Row({
           ? `↳ ${formatScore(inWhiteFrame(node.backed, node.frame))}`
           : ''}
       </span>
-      <span className="text-right text-[0.625rem] text-dim tabular-nums">
+      <span className="text-right text-meta text-dim tabular-nums">
         {depth !== null ? (
           <>
             d<span className="text-body">{depth}</span>
@@ -225,7 +225,7 @@ function Row({
           ''
         )}
       </span>
-      <span className="text-right text-[0.625rem] text-body tabular-nums">
+      <span className="text-right text-meta text-body tabular-nums">
         {nodeCount ? formatNodes(nodeCount) : ''}
       </span>
       <span className="flex items-baseline gap-1">
@@ -245,7 +245,7 @@ function Row({
             fold.onToggle()
           }}
           className={cn(
-            'inline-flex size-3.5 items-center justify-center rounded-sm border text-[0.625rem] leading-none',
+            'inline-flex size-3.5 items-center justify-center rounded-sm border text-meta leading-none',
             fold.collapsed
               ? 'border-edge-strong text-body hover:bg-raised'
               : 'border-edge text-dim hover:border-edge-hover hover:text-ink',
@@ -255,14 +255,14 @@ function Row({
         </button>
       ) : null}
       {node.disagree ? (
-        <span className="text-[0.625rem] text-mistake" title={t`Two engines disagree here`}>
+        <span className="text-meta text-mistake" title={t`Two engines disagree here`}>
           ≠
         </span>
       ) : null}
       {node.stale ? (
         <span
           data-testid={`tree-stale-${node.id}`}
-          className="text-[0.625rem] text-inaccuracy"
+          className="text-meta text-inaccuracy"
           title={t`This number is stale: it was reached below the stale depth, or by a version of the engine you no longer have. Refresh subtree asks again.`}
         >
           ⟳
@@ -309,7 +309,7 @@ function Row({
       {queued || outstanding ? (
         <span
           data-testid={`tree-queued-${node.id}`}
-          className="text-[0.625rem] text-accent-teal"
+          className="text-meta text-accent-teal"
           title={
             task?.status === 'queued'
               ? t`A task is waiting in the analysis queue`
@@ -320,7 +320,7 @@ function Row({
         >
           ◌
           {outstanding ? (
-            <span className="ml-0.5 text-[0.5625rem] text-dim">
+            <span className="ml-0.5 text-meta text-dim">
               {t`${outstanding.left} of ${outstanding.total}`}
             </span>
           ) : null}
@@ -334,7 +334,7 @@ function Row({
 function Comment({ text, level }: { text: string; level: number }) {
   return (
     <div
-      className="my-0.5 border-l-2 border-edge py-px pl-2 font-sans text-[0.6875rem] leading-[1.45] text-soft"
+      className="my-0.5 border-l-2 border-edge py-px pl-2 font-sans text-label leading-[1.45] text-soft"
       style={{ marginLeft: `calc(${indent(level)} + 1.75rem)` }}
     >
       {text}
@@ -348,7 +348,7 @@ function Heading() {
     <div
       className={cn(
         COLUMNS,
-        'sticky top-0 z-10 grid gap-x-2 border-b border-hairline bg-surface py-1 pr-1 font-sans text-[0.625rem] text-dim',
+        'sticky top-0 z-10 grid gap-x-2 border-b border-hairline bg-surface py-1 pr-1 font-sans text-meta text-dim',
       )}
     >
       <span>
@@ -510,7 +510,7 @@ function MenuItem({
       title={title}
       onClick={onClick}
       className={cn(
-        'w-full rounded-sm px-2 py-1 text-left text-[0.75rem] transition-colors',
+        'w-full rounded-sm px-2 py-1 text-left text-data transition-colors',
         disabled ? 'cursor-default text-faint' : 'text-body hover:bg-selected hover:text-ink',
         danger && !disabled && 'text-blunder hover:text-blunder',
       )}
@@ -560,7 +560,7 @@ export function TreePane({
 
   if (!tree) {
     return (
-      <div className="p-4 text-[0.75rem] text-dim">
+      <div className="p-4 text-data text-dim">
         <Trans>This game has no tree yet.</Trans>
       </div>
     )
@@ -575,7 +575,7 @@ export function TreePane({
       onMouseLeave={() => onHover?.(null)}
       className="relative min-h-0 flex-1 overflow-auto px-3 pb-2"
     >
-      <div className="font-mono text-[0.75rem] leading-[1.5]">
+      <div className="font-mono text-data leading-[1.5]">
         <Heading />
         <Line
           start={tree}
@@ -672,7 +672,7 @@ export function TreePane({
           ) : null}
           <hr className="my-1 border-0 border-t border-line" />
           <div className="flex items-center gap-1 px-2 py-1">
-            <span className="text-[0.625rem] text-dim">
+            <span className="text-meta text-dim">
               <Trans>Mark</Trans>
             </span>
             <div className="flex flex-1 justify-end gap-0.5">
@@ -690,7 +690,7 @@ export function TreePane({
                     setMenu(null)
                   }}
                   className={cn(
-                    'min-w-6 rounded-sm border px-1 py-px font-mono text-[0.6875rem] transition-colors',
+                    'min-w-6 rounded-sm border px-1 py-px font-mono text-label transition-colors',
                     menuNode.mark === mark
                       ? 'border-accent-teal/40 bg-selected'
                       : 'border-edge hover:bg-raised',

@@ -86,7 +86,7 @@ export function ClockPressureCard({ query }: { query: StatsQuery }) {
     <StatCard
       title={t`Eval loss by clock remaining`}
       aside={
-        <span className="font-mono text-[0.65625rem] tabular text-dim-2">
+        <span className="font-mono text-label tabular text-dim-2">
           <Trans>avg win % given away</Trans>
         </span>
       }
@@ -94,7 +94,7 @@ export function ClockPressureCard({ query }: { query: StatsQuery }) {
         <>
           {said ? i18n._(said) : null}
           {unknownMoves > 0 && rows.length > 0 ? (
-            <span className="block font-mono text-[0.625rem] tabular text-faint">
+            <span className="block font-mono text-meta tabular text-faint">
               <Trans>{unclocked} moves have no clock and are left out</Trans>
             </span>
           ) : null}

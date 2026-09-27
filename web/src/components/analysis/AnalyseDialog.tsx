@@ -157,7 +157,7 @@ export function AnalyseDialog({
             <Trans>Engine</Trans>
           </Label>
           {engines === undefined ? (
-            <p className="flex items-center gap-2 text-[0.71875rem] text-dim">
+            <p className="flex items-center gap-2 text-label text-dim">
               <Loader2 className="size-3 animate-spin" aria-hidden />
               <Trans>Looking for engines…</Trans>
             </p>
@@ -167,7 +167,7 @@ export function AnalyseDialog({
           {/* Said out loud rather than only under the pointer: a greyed chip with no
               reason on a phone is an engine that silently does not work. */}
           {troubled.map((engine) => (
-            <p key={engine.engine_id} className="text-[0.71875rem] text-mistake">
+            <p key={engine.engine_id} className="text-label text-mistake">
               {engine.name}: {engine.search_trouble}
             </p>
           ))}
@@ -220,7 +220,7 @@ export function AnalyseDialog({
                   title={disabled ? t`No move has been played at the starting position` : undefined}
                   onClick={() => setMoves(choice)}
                   className={cn(
-                    'rounded-md border px-2 py-1 text-[0.6875rem] transition-colors',
+                    'rounded-md border px-2 py-1 text-label transition-colors',
                     effectiveMoves === choice
                       ? 'border-accent-teal/40 bg-selected text-ink'
                       : 'border-edge text-dim hover:border-edge-hover hover:text-ink',
@@ -238,7 +238,7 @@ export function AnalyseDialog({
               )
             })}
           </div>
-          <p className="text-[0.625rem] leading-[1.5] text-dim-2">
+          <p className="text-meta leading-[1.5] text-dim-2">
             {effectiveMoves === 'whole' ? (
               <Trans>Every move of the game.</Trans>
             ) : effectiveMoves === 'this' ? (
@@ -250,7 +250,7 @@ export function AnalyseDialog({
         </div>
 
         {error ? (
-          <p role="alert" className="text-[0.6875rem] text-blunder">
+          <p role="alert" className="text-label text-blunder">
             {error}
           </p>
         ) : null}

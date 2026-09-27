@@ -46,7 +46,7 @@ export function WhoseGamesToggle({
       role="group"
       aria-label={t`Whose games this PGN holds`}
       className={cn(
-        'flex overflow-hidden rounded-md border border-edge bg-elevated font-mono text-[0.65625rem]',
+        'flex overflow-hidden rounded-md border border-edge bg-elevated font-mono text-label',
         disabled && 'opacity-50',
         className,
       )}

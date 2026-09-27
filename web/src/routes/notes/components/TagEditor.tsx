@@ -62,7 +62,7 @@ export function TagEditor({
       {tags.map((tag) => (
         <span
           key={tag}
-          className="inline-flex items-center gap-1 rounded-sm border border-edge bg-elevated px-1.5 py-px text-[0.625rem] text-soft"
+          className="inline-flex items-center gap-1 rounded-sm border border-edge bg-elevated px-1.5 py-px text-meta text-soft"
         >
           {tag}
           <button
@@ -100,7 +100,7 @@ export function TagEditor({
             onChange(tags.slice(0, -1))
           }
         }}
-        className="min-w-[6rem] flex-1 bg-transparent text-[0.6875rem] text-ink outline-none placeholder:text-faint"
+        className="min-w-[6rem] flex-1 bg-transparent text-label text-ink outline-none placeholder:text-faint"
       />
       {offered.length ? (
         <datalist id={listId}>

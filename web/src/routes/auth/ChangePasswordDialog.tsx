@@ -61,10 +61,10 @@ export function ChangePasswordDialog({ onClose }: { onClose: () => void }) {
         className="bb-card bb-rise-in flex w-full max-w-[22rem] flex-col gap-4 px-5 py-5 shadow-[0_1rem_3rem_var(--bb-shadow)]"
       >
         <div className="flex flex-col gap-1.5">
-          <h2 id="change-password-title" className="text-[0.875rem] font-semibold text-ink">
+          <h2 id="change-password-title" className="text-heading font-semibold text-ink">
             <Trans>Change the password</Trans>
           </h2>
-          <p className="text-[0.75rem] leading-[1.65] text-dim">
+          <p className="text-data leading-[1.65] text-dim">
             <Trans>
               Every other browser is signed out. This browser stays signed in, and your MCP
               keys keep working.
@@ -76,7 +76,7 @@ export function ChangePasswordDialog({ onClose }: { onClose: () => void }) {
           <>
             <div className="flex items-center gap-2.5 rounded-md border border-good/30 bg-good/8 px-3 py-2.5">
               <Check className="size-3.5 flex-none text-good" aria-hidden />
-              <span className="text-[0.71875rem] text-good">
+              <span className="text-data text-good">
                 <Trans>Changed. You are still signed in here.</Trans>
               </span>
             </div>

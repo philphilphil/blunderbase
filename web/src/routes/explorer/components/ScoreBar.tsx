@@ -41,7 +41,7 @@ function LabeledBar({
       title={label}
       style={{ height }}
       className={cn(
-        'flex overflow-hidden rounded-[0.25rem] border border-edge-strong bg-raised font-mono text-[0.625rem] tabular divide-x divide-edge-strong',
+        'flex overflow-hidden rounded-[0.25rem] border border-edge-strong bg-raised font-mono text-meta tabular divide-x divide-edge-strong',
         className,
       )}
     >

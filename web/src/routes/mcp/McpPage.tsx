@@ -70,17 +70,17 @@ export function McpPage() {
         <section data-tour="assistant" className="flex flex-col rounded-xl border border-line bg-panel">
           <div className="flex items-center gap-2.5 border-b border-hairline px-3.5 py-3">
             <Bot className="size-3.5 text-faint" aria-hidden />
-            <h2 className="text-xs font-semibold text-ink">
+            <h2 className="text-data font-semibold text-ink">
               <Trans>Connect a client</Trans>
             </h2>
             <div className="flex-1" />
-            <span className="font-mono text-[0.625rem] text-dim">
+            <span className="font-mono text-meta text-dim">
               <Trans>streamable HTTP at /mcp</Trans>
             </span>
           </div>
 
           <div className="flex flex-col gap-4 px-3.5 py-3.5">
-            <p className="text-[0.71875rem] leading-[1.5] text-dim">
+            <p className="text-label leading-[1.5] text-dim">
               {minted ? (
                 <Trans>These carry the key you just minted; copy them before you press Done.</Trans>
               ) : (
@@ -109,7 +109,7 @@ export function McpPage() {
               <Trans>Drop this into the client&rsquo;s JSON config.</Trans>
             </Snippet>
 
-            <p className="text-[0.6875rem] leading-[1.5] text-faint">
+            <p className="text-label leading-[1.5] text-faint">
               <Trans>
                 Where the deployment sets{' '}
                 <span className="font-mono text-soft-2">BLUNDERBASE_MCP_BEARER_KEY</span> that key
@@ -121,7 +121,7 @@ export function McpPage() {
           </div>
         </section>
 
-        <p className="text-[0.6875rem] leading-[1.5] text-faint">
+        <p className="text-label leading-[1.5] text-faint">
           <Trans>
             Nothing to query yet?{' '}
             <Link to="/library/import" className="text-accent-teal hover:text-accent-link">

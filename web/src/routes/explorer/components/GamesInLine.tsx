@@ -28,7 +28,7 @@ export function GamesInLine({
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-2.5 max-md:flex-none">
       <div className="flex items-baseline gap-2">
-        <span className="text-[0.75rem] font-semibold text-ink">
+        <span className="text-data font-semibold text-ink">
           <Trans>Games in this line</Trans>
         </span>
         <div className="flex-1" />
@@ -36,7 +36,7 @@ export function GamesInLine({
           <button
             type="button"
             onClick={onOpenLibrary}
-            className="text-[0.6875rem] text-accent-teal hover:text-accent-link"
+            className="text-label text-accent-teal hover:text-accent-link"
           >
             <Trans>open in library</Trans>
           </button>
@@ -50,13 +50,13 @@ export function GamesInLine({
           ))}
         </div>
       ) : games.length === 0 ? (
-        <p className="rounded-[0.3125rem] border border-dashed border-edge-strong px-3 py-5 text-center text-[0.75rem] text-dim">
+        <p className="rounded-[0.3125rem] border border-dashed border-edge-strong px-3 py-5 text-center text-data text-dim">
           <Trans>Nothing has reached this position yet.</Trans>
         </p>
       ) : (
         // The list scrolls inside the right-hand pane on desktop; below `md` the page is
         // the only scroller, so it runs on in normal flow instead.
-        <div className="flex min-h-0 flex-col overflow-y-auto font-mono text-[0.71875rem] tabular max-md:overflow-visible">
+        <div className="flex min-h-0 flex-col overflow-y-auto font-mono text-data tabular max-md:overflow-visible">
           {games.map((occurrence) => (
             <button
               key={`${occurrence.game.id}-${occurrence.ply}`}
@@ -68,7 +68,7 @@ export function GamesInLine({
               <span className="w-[4.25rem] flex-none text-soft">
                 {formatGameDate(occurrence.game.played_at)}
               </span>
-              <span className="min-w-0 flex-1 truncate font-sans text-[0.78125rem] text-body">
+              <span className="min-w-0 flex-1 truncate font-sans text-lead text-body">
                 {occurrence.game.opponent ?? '—'}
               </span>
               <span className="w-11 flex-none text-right text-soft">

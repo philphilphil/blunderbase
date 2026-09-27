@@ -54,7 +54,7 @@ export function SettingField({
         className="w-full font-mono tabular"
         onChange={(event) => onChange(event.target.value)}
       />
-      <span className="font-mono text-[0.625rem] text-dim-2 tabular">{field.unset}</span>
+      <span className="font-mono text-meta text-dim-2 tabular">{field.unset}</span>
     </div>
   )
 }

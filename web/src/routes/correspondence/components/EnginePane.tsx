@@ -149,7 +149,7 @@ export function EnginePane({
           narrow a single row squeezed the name — the one thing that tells two panes on
           the same node apart — to nothing. The controls sit by the name; what the
           engine is doing and how far it has got sits under it. */}
-      <div className="flex flex-none flex-col gap-0.5 border-b border-line bg-panel px-2.5 py-1.5 text-[0.6875rem]">
+      <div className="flex flex-none flex-col gap-0.5 border-b border-line bg-panel px-2.5 py-1.5 text-label">
         <div className="flex items-center gap-2">
           <span
             aria-hidden
@@ -179,7 +179,7 @@ export function EnginePane({
               }
               onClick={() => onPin(pane.pinned ? null : pane.engineId)}
               className={cn(
-                'ml-auto flex-none rounded-sm border px-1.5 py-px text-[0.625rem] transition-colors',
+                'ml-auto flex-none rounded-sm border px-1.5 py-px text-meta transition-colors',
                 pane.pinned
                   ? 'border-accent-teal/40 bg-selected text-accent-teal'
                   : 'border-transparent text-dim hover:bg-raised hover:text-ink',
@@ -274,7 +274,7 @@ export function EnginePane({
             </span>
           )}
 
-          <span className="ml-auto flex flex-none items-center gap-2 font-mono text-[0.625rem] tabular text-dim">
+          <span className="ml-auto flex flex-none items-center gap-2 font-mono text-meta tabular text-dim">
             {/* Per verdict rather than per node: this engine's number can be old news while
                 the one in the pane below it is current, and the tree's own mark cannot say
                 which of the two it meant. */}
@@ -290,7 +290,7 @@ export function EnginePane({
             {depth !== null ? <span>{t`depth ${depth}`}</span> : null}
             {nodes ? <span>{t`${formatNodes(nodes)} nodes`}</span> : null}
             {live && snapshot?.nps ? <span>{formatNps(snapshot.nps)}</span> : null}
-            <span className="font-sans text-[0.6875rem] font-semibold text-body">
+            <span className="font-sans text-label font-semibold text-body">
               {formatScore(score)}
             </span>
           </span>
@@ -301,14 +301,14 @@ export function EnginePane({
           reason on a row that is no longer active — `pane.ended`. It is the only place that
           sentence exists, so it is printed here rather than lost. */}
       {search?.error || pane.ended?.error ? (
-        <p role="alert" className="border-b border-hairline bg-blunder/5 px-2.5 py-1 text-[0.625rem] text-blunder">
+        <p role="alert" className="border-b border-hairline bg-blunder/5 px-2.5 py-1 text-meta text-blunder">
           {search?.error ?? pane.ended?.error}
         </p>
       ) : null}
 
       <div className="min-h-0 flex-1 overflow-auto" onMouseLeave={() => onHover(null)}>
         {lines.length === 0 ? (
-          <p className="px-2.5 py-2 text-[0.6875rem] text-dim">
+          <p className="px-2.5 py-2 text-label text-dim">
             {live ? (
               <Trans>The engine has not sent a line yet.</Trans>
             ) : stopped ? (
@@ -338,14 +338,14 @@ export function EnginePane({
               >
                 <span
                   className={cn(
-                    'font-mono text-[0.6875rem] font-semibold tabular',
+                    'font-mono text-label font-semibold tabular',
                     line.multipv === 1 ? 'text-good' : 'text-body',
                   )}
                 >
                   {formatScore(rowAsWhite(line, node))}
                 </span>
                 <span
-                  className="truncate font-mono text-[0.625rem] leading-[1.55] text-soft"
+                  className="truncate font-mono text-meta leading-[1.55] text-soft"
                   title={text}
                 >
                   {text || '—'}
@@ -356,7 +356,7 @@ export function EnginePane({
         )}
       </div>
 
-      <div className="flex h-5.5 flex-none items-center gap-2 border-t border-line bg-panel px-2.5 text-[0.625rem] text-dim">
+      <div className="flex h-5.5 flex-none items-center gap-2 border-t border-line bg-panel px-2.5 text-meta text-dim">
         {points ? (
           <svg
             aria-hidden

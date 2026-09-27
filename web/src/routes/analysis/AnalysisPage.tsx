@@ -44,10 +44,10 @@ export function AnalysisPage() {
         <Skeleton className="h-28 w-full max-w-3xl" data-testid="coverage-loading" />
       ) : coverage.isError ? (
         <div className="max-w-2xl rounded-md border border-blunder/28 bg-blunder/5 px-3 py-2.5">
-          <p className="text-[0.75rem] text-blunder">
+          <p className="text-data text-blunder">
             <Trans>The coverage could not be read.</Trans>
           </p>
-          <p className="mt-1 font-mono text-[0.6875rem] text-blunder/80">
+          <p className="mt-1 font-mono text-label text-blunder/80">
             {coverage.error.message}
           </p>
           <Button

@@ -199,10 +199,10 @@ export function BoardSettingsButton({
           >
             <header className="flex items-start gap-3 border-b border-hairline px-4 py-3.5">
               <div className="flex flex-1 flex-col gap-1">
-                <h2 id="board-settings-title" className="text-sm font-semibold text-ink">
+                <h2 id="board-settings-title" className="text-heading font-semibold text-ink">
                   <Trans>Board</Trans>
                 </h2>
-                <p className="text-[0.6875rem] text-dim">
+                <p className="text-label text-dim">
                   <Trans>This browser only.</Trans>
                 </p>
               </div>
@@ -221,10 +221,10 @@ export function BoardSettingsButton({
                 writes a move as. See the file comment for why it lives in this dialog. */}
             <section className="flex flex-col gap-3 px-4 py-4">
               <div className="flex flex-col gap-0.5">
-                <h3 className="text-[0.75rem] font-semibold text-ink">
+                <h3 className="text-data font-semibold text-ink">
                   <Trans>Notation</Trans>
                 </h3>
-                <p className="text-[0.6875rem] text-dim">
+                <p className="text-label text-dim">
                   <Trans>How a move is written, here and on every other screen.</Trans>
                 </p>
               </div>
@@ -249,10 +249,10 @@ export function BoardSettingsButton({
 
             <section className="flex flex-col gap-3 border-t border-hairline px-4 py-4">
               <div className="flex flex-col gap-0.5">
-                <h3 className="text-[0.75rem] font-semibold text-ink">
+                <h3 className="text-data font-semibold text-ink">
                   <Trans>Arrows</Trans>
                 </h3>
-                <p className="text-[0.6875rem] text-dim">
+                <p className="text-label text-dim">
                   <Trans>Drawn on the position the board is showing.</Trans>
                 </p>
               </div>
@@ -285,10 +285,10 @@ export function BoardSettingsButton({
                 anyone has ever set a volume. */}
             <section className="flex flex-col gap-3 border-t border-hairline px-4 py-4">
               <div className="flex flex-col gap-0.5">
-                <h3 className="text-[0.75rem] font-semibold text-ink">
+                <h3 className="text-data font-semibold text-ink">
                   <Trans>Sound</Trans>
                 </h3>
-                <p className="text-[0.6875rem] text-dim">
+                <p className="text-label text-dim">
                   <Trans>A click as each move lands.</Trans>
                 </p>
               </div>
@@ -321,7 +321,7 @@ export function BoardSettingsButton({
             </section>
 
             <section className="flex flex-col gap-3 border-t border-hairline px-4 py-4">
-              <h3 className="text-[0.75rem] font-semibold text-ink">
+              <h3 className="text-data font-semibold text-ink">
                 <Trans>Evaluation graph</Trans>
               </h3>
               {/* Two fields on their own line under the heading, each named by its own
@@ -367,10 +367,10 @@ export function BoardSettingsButton({
 
             <section className="flex flex-col gap-3 border-t border-hairline px-4 py-4">
               <div className="flex flex-col gap-0.5">
-                <h3 className="text-[0.75rem] font-semibold text-ink">
+                <h3 className="text-data font-semibold text-ink">
                   <Trans>Line preview</Trans>
                 </h3>
-                <p className="text-[0.6875rem] text-dim">
+                <p className="text-label text-dim">
                   <Trans>What pointing at an engine line does to the board.</Trans>
                 </p>
               </div>

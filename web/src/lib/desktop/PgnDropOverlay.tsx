@@ -120,7 +120,7 @@ export function PgnDropOverlay() {
     >
       <div className="flex flex-col items-center gap-3 text-accent-teal">
         <FileUp className="size-8" aria-hidden />
-        <span className="text-sm font-semibold">
+        <span className="text-heading font-semibold">
           <Trans>Drop to import PGN</Trans>
         </span>
       </div>
@@ -170,10 +170,10 @@ function WhoseGamesDialog({
         className="bb-card bb-rise-in flex w-full max-w-[22rem] flex-col gap-4 px-5 py-5 shadow-[0_1rem_3rem_var(--bb-shadow)]"
       >
         <div className="flex flex-col gap-1.5">
-          <h2 id="pgn-drop-title" className="text-sm font-semibold text-ink">
+          <h2 id="pgn-drop-title" className="text-heading font-semibold text-ink">
             <Trans>Whose games are these?</Trans>
           </h2>
-          <p className="text-xs text-dim">
+          <p className="text-data text-dim">
             <Trans>
               <span className="font-mono text-soft">{named}</span>. Games that are not yours are
               stored and analysed like any other, and counted in no statistic.

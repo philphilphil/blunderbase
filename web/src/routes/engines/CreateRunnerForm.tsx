@@ -47,7 +47,7 @@ export function CreateRunnerForm({ onCancel }: { onCancel: () => void }) {
         className="flex flex-col gap-3 rounded-xl border border-line bg-panel px-3.5 py-3.5"
       >
         <div className="flex items-center gap-2.5">
-          <span className="text-xs font-semibold text-ink">
+          <span className="text-data font-semibold text-ink">
             <Trans>{runnerName} is registered</Trans>
           </span>
           <div className="flex-1" />
@@ -56,7 +56,7 @@ export function CreateRunnerForm({ onCancel }: { onCancel: () => void }) {
           </Button>
         </div>
 
-        <p className="rounded-md border border-mistake/28 bg-mistake/5 px-3 py-2 text-[0.6875rem] leading-[1.6] text-mistake">
+        <p className="rounded-md border border-mistake/28 bg-mistake/5 px-3 py-2 text-label leading-[1.6] text-mistake">
           <Trans>
             Shown once. Nothing stores it, so nothing can show it again — a lost token is a revoke
             and a new runner.
@@ -64,7 +64,7 @@ export function CreateRunnerForm({ onCancel }: { onCancel: () => void }) {
         </p>
 
         <CopyField label={t`Token`} copyLabel={t`Copy token`} value={created.token}>
-          <code className="block truncate font-mono text-[0.71875rem] text-ink">
+          <code className="block truncate font-mono text-data text-ink">
             {created.token}
           </code>
         </CopyField>
@@ -72,12 +72,12 @@ export function CreateRunnerForm({ onCancel }: { onCancel: () => void }) {
         {/* The yaml's own file name is the label, so it is not a word to translate — only
             the verb in front of it on the button is. */}
         <CopyField label="runner.yaml" copyLabel={t`Copy runner.yaml`} value={created.config_yaml}>
-          <pre className="overflow-x-auto font-mono text-[0.65625rem] leading-[1.6] text-soft">
+          <pre className="overflow-x-auto font-mono text-label leading-[1.6] text-soft">
             {created.config_yaml}
           </pre>
         </CopyField>
 
-        <p className="text-[0.6875rem] leading-[1.6] text-dim">
+        <p className="text-label leading-[1.6] text-dim">
           <Trans>
             Save that as <span className="font-mono text-soft">runner.yaml</span> on the other
             machine, edit the engine paths, and start it with{' '}
@@ -94,14 +94,14 @@ export function CreateRunnerForm({ onCancel }: { onCancel: () => void }) {
       className="flex flex-col gap-3 rounded-xl border border-line bg-panel px-3.5 py-3.5"
     >
       <div className="flex items-center gap-2.5">
-        <span className="text-xs font-semibold text-ink">
+        <span className="text-data font-semibold text-ink">
           <Trans>Add a remote runner</Trans>
         </span>
         <div className="flex-1" />
         <button
           type="button"
           onClick={onCancel}
-          className="text-[0.6875rem] text-dim transition-colors hover:text-ink"
+          className="text-label text-dim transition-colors hover:text-ink"
         >
           <Trans>Cancel</Trans>
         </button>
@@ -135,13 +135,13 @@ export function CreateRunnerForm({ onCancel }: { onCancel: () => void }) {
         </div>
       </div>
 
-      {invalid ? <p className="text-[0.6875rem] text-blunder">{invalid}</p> : null}
+      {invalid ? <p className="text-label text-blunder">{invalid}</p> : null}
       {create.isError ? (
-        <p className="text-[0.6875rem] text-blunder">{create.error.message}</p>
+        <p className="text-label text-blunder">{create.error.message}</p>
       ) : null}
 
       <div className="flex items-center gap-2">
-        <p className="flex-1 text-[0.6875rem] leading-[1.6] text-dim">
+        <p className="flex-1 text-label leading-[1.6] text-dim">
           <Trans>
             A slot is one engine job or one analysis board. The token is minted here and shown
             once.

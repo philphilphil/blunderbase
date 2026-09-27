@@ -207,10 +207,10 @@ export function NotesPage() {
         </div>
       ) : notes.isError ? (
         <div className="rounded-xl border border-blunder/28 bg-blunder/5 px-4 py-5">
-          <p className="text-[0.78125rem] text-blunder">
+          <p className="text-data text-blunder">
             <Trans>The notes could not be read.</Trans>
           </p>
-          <p className="mt-1 font-mono text-[0.6875rem] text-blunder/80">{notes.error.message}</p>
+          <p className="mt-1 font-mono text-label text-blunder/80">{notes.error.message}</p>
         </div>
       ) : (
         <>
@@ -275,13 +275,13 @@ const VIEWS: readonly ViewOption<NoteView>[] = [
 function DateRule({ label, note, count }: { label: string; note?: string; count?: number }) {
   return (
     <div className="flex items-center gap-2.5 pt-1">
-      <span className="font-mono text-[0.6875rem] tracking-[0.08em] text-dim-2 uppercase">
+      <span className="font-mono text-label tracking-[0.08em] text-dim-2 uppercase">
         {label}
       </span>
-      {note ? <span className="text-[0.6875rem] text-faint">{note}</span> : null}
+      {note ? <span className="text-label text-faint">{note}</span> : null}
       <span className="h-px flex-1 bg-hairline" />
       {count === undefined ? null : (
-        <span className="font-mono text-[0.625rem] tabular text-faint">{count}</span>
+        <span className="font-mono text-meta tabular text-faint">{count}</span>
       )}
     </div>
   )
@@ -291,7 +291,7 @@ function Empty({ filtered }: { filtered: boolean }) {
   return (
     <div className="flex flex-1 flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-edge-strong bg-panel/60 p-10 text-center max-md:p-6">
       <StickyNote className="size-5 text-faint" aria-hidden />
-      <p className="max-w-md text-[0.78125rem] leading-relaxed text-dim">
+      <p className="max-w-md text-data leading-relaxed text-dim">
         {filtered ? (
           <Trans>No note matches those filters. Clear one and try again.</Trans>
         ) : (
@@ -321,7 +321,7 @@ function ExportButtons({ filters, disabled }: { filters: NoteFilters; disabled: 
   return (
     <div className="flex items-center gap-1.5 max-md:flex-wrap max-md:gap-y-1">
       {exporting.isError ? (
-        <span className="max-w-[16rem] truncate text-[0.6875rem] text-blunder max-md:max-w-full max-md:basis-full">
+        <span className="max-w-[16rem] truncate text-label text-blunder max-md:max-w-full max-md:basis-full">
           {exporting.error.message}
         </span>
       ) : null}

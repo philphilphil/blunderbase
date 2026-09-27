@@ -19,7 +19,7 @@ export function LineBreadcrumb({
 }) {
   const notate = useNotation()
   return (
-    <div className="flex flex-wrap items-center gap-1.5 font-mono text-[0.71875rem]">
+    <div className="flex flex-wrap items-center gap-1.5 font-mono text-label">
       <button
         type="button"
         onClick={() => onTruncate(0)}

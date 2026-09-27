@@ -376,12 +376,12 @@ export function ExplorerPage() {
         <div className="flex w-[31.25rem] flex-none flex-col gap-3.5 max-md:w-full">
           <div className="flex flex-col gap-[0.4375rem]">
             <div className="flex items-baseline gap-2">
-              <h1 className="text-[0.9375rem] font-semibold text-ink">
+              <h1 className="text-value font-semibold text-ink">
                 {opening?.name ??
                   (line.steps.length === 0 ? t`The initial position` : t`This line`)}
               </h1>
               {opening?.eco ? (
-                <span className="font-mono text-[0.6875rem] text-dim">{opening.eco}</span>
+                <span className="font-mono text-label text-dim">{opening.eco}</span>
               ) : null}
             </div>
             <LineBreadcrumb
@@ -415,7 +415,7 @@ export function ExplorerPage() {
                 aria-label={t`Back one move`}
                 onClick={back}
                 disabled={line.steps.length === 0}
-                className="border-r border-edge px-2.5 py-1 text-xs text-soft transition-colors hover:bg-selected hover:text-ink disabled:text-faint-2 disabled:hover:bg-transparent"
+                className="border-r border-edge px-2.5 py-1 text-data text-soft transition-colors hover:bg-selected hover:text-ink disabled:text-faint-2 disabled:hover:bg-transparent"
               >
                 ◀
               </button>
@@ -423,7 +423,7 @@ export function ExplorerPage() {
                 type="button"
                 aria-label={t`Forward one move`}
                 onClick={forward}
-                className="px-2.5 py-1 text-xs text-soft transition-colors hover:bg-selected hover:text-ink"
+                className="px-2.5 py-1 text-data text-soft transition-colors hover:bg-selected hover:text-ink"
               >
                 ▶
               </button>
@@ -431,7 +431,7 @@ export function ExplorerPage() {
             <button
               type="button"
               onClick={() => setFlipped((current) => !current)}
-              className="rounded-md border border-edge bg-elevated px-2.5 py-1 text-xs text-soft transition-colors hover:text-ink"
+              className="rounded-md border border-edge bg-elevated px-2.5 py-1 text-data text-soft transition-colors hover:text-ink"
             >
               <Trans>⇅ Flip</Trans>
             </button>
@@ -439,7 +439,7 @@ export function ExplorerPage() {
               <button
                 type="button"
                 onClick={() => setLine([])}
-                className="rounded-md border border-edge bg-elevated px-2.5 py-1 text-xs text-soft transition-colors hover:text-ink"
+                className="rounded-md border border-edge bg-elevated px-2.5 py-1 text-data text-soft transition-colors hover:text-ink"
               >
                 <Trans>Reset</Trans>
               </button>
@@ -452,13 +452,13 @@ export function ExplorerPage() {
             {backToGame ? (
               <Link
                 to={backToGame}
-                className={cn(WAY_BACK, 'px-2.5 py-1 text-xs')}
+                className={cn(WAY_BACK, 'px-2.5 py-1 text-data')}
               >
                 <Trans>← Back to game</Trans>
               </Link>
             ) : null}
             <div className="flex-1" />
-            <span className="font-mono text-[0.6875rem] tabular text-dim">
+            <span className="font-mono text-label tabular text-dim">
               <Trans>
                 {turn} to move · ply {ply}
               </Trans>
@@ -482,7 +482,7 @@ export function ExplorerPage() {
         <div className="flex min-w-0 flex-1 flex-col gap-3.5 overflow-y-auto max-md:flex-none max-md:overflow-visible">
           <div className="flex flex-none flex-col gap-1.5">
             <div className="flex items-center gap-2.5 max-md:flex-wrap">
-              <span className="text-[0.75rem] font-semibold text-ink">
+              <span className="text-data font-semibold text-ink">
                 {source === 'mine'
                   ? t`Your move tree from here`
                   : source === 'masters'
@@ -601,7 +601,7 @@ function SourceToggle({
 }) {
   const { i18n } = useLingui()
   return (
-    <div className="flex overflow-hidden rounded-md border border-edge bg-elevated font-mono text-[0.75rem]">
+    <div className="flex overflow-hidden rounded-md border border-edge bg-elevated font-mono text-data">
       {SOURCES.map((option, index) => (
         <button
           key={option}
@@ -633,12 +633,12 @@ function Failure({
 }) {
   return (
     <div className="flex flex-col items-start gap-2.5 rounded-xl border border-blunder/28 bg-blunder/5 p-5">
-      <span className="text-[0.75rem] font-semibold text-blunder">{title}</span>
-      <p className="text-[0.78125rem] leading-relaxed text-soft">{message}</p>
+      <span className="text-data font-semibold text-blunder">{title}</span>
+      <p className="text-data leading-relaxed text-soft">{message}</p>
       <button
         type="button"
         onClick={onRetry}
-        className="rounded-md border border-edge-input px-2.5 py-1 text-[0.71875rem] text-soft hover:border-edge-hover hover:text-ink"
+        className="rounded-md border border-edge-input px-2.5 py-1 text-data text-soft hover:border-edge-hover hover:text-ink"
       >
         <Trans>Try again</Trans>
       </button>
@@ -669,7 +669,7 @@ function ScopeToggle({
   return (
     <div
       className={cn(
-        'flex overflow-hidden rounded-md border border-edge bg-elevated font-mono text-[0.75rem]',
+        'flex overflow-hidden rounded-md border border-edge bg-elevated font-mono text-data',
         disabled && 'opacity-40',
       )}
     >

@@ -53,7 +53,7 @@ export function EnginePicker({
   const { t } = useLingui()
   if (engines.length === 0) {
     return (
-      <p className="text-[0.71875rem] text-mistake">
+      <p className="text-data text-mistake">
         <Trans>
           No engine is switched on that speaks UCI. Add one under Analysis → Engines.
         </Trans>
@@ -73,7 +73,7 @@ export function EnginePicker({
             title={usable ? undefined : (engine.search_trouble ?? undefined)}
             onClick={() => onChange(engine.engine_id)}
             className={cn(
-              'flex min-w-0 items-center gap-2 rounded-md border px-2.5 py-1.5 text-[0.75rem] transition-colors',
+              'flex min-w-0 items-center gap-2 rounded-md border px-2.5 py-1.5 text-data transition-colors',
               value === engine.engine_id
                 ? 'border-accent-teal/40 bg-selected text-ink'
                 : 'border-edge text-dim hover:border-edge-hover hover:text-ink',
@@ -82,9 +82,9 @@ export function EnginePicker({
           >
             <span className="truncate">{engine.name}</span>
             {engine.runner_id !== null && engine.runner_id !== undefined ? (
-              <span className="truncate text-[0.625rem] text-dim-2">· {engine.host}</span>
+              <span className="truncate text-meta text-dim-2">· {engine.host}</span>
             ) : engine.hash_mb ? (
-              <span className="font-mono text-[0.625rem] text-dim-2">
+              <span className="font-mono text-meta text-dim-2">
                 {t`${engine.hash_mb} MB`}
               </span>
             ) : null}

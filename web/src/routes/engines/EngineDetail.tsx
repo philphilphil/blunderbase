@@ -52,7 +52,7 @@ function Section({
   return (
     <section className="flex flex-col gap-2.5 border-t border-hairline px-3.5 py-3.5 first:border-t-0">
       <div className="flex items-center gap-2.5">
-        <h3 className="text-[0.625rem] tracking-[0.1em] text-faint uppercase">{title}</h3>
+        <h3 className="text-meta tracking-[0.1em] text-faint uppercase">{title}</h3>
         <div className="flex-1" />
         {aside}
       </div>
@@ -216,15 +216,15 @@ export function EngineDetail({
     >
       <div className="flex items-center gap-2.5 border-b border-hairline px-3.5 py-3">
         {embedded ? (
-          <span className="text-[0.6875rem] text-dim">
+          <span className="text-label text-dim">
             {locked ? t`Runner-owned settings are read-only here` : t`Engine settings`}
           </span>
         ) : (
           <>
-            <span className="text-xs font-semibold text-ink">{engine.name}</span>
+            <span className="text-data font-semibold text-ink">{engine.name}</span>
             <KindBadge kind={engine.kind} />
             {engine.version ? (
-              <span className="truncate font-mono text-[0.65625rem] text-dim">
+              <span className="truncate font-mono text-meta text-dim">
                 {engine.version}
               </span>
             ) : null}
@@ -232,7 +232,7 @@ export function EngineDetail({
           </>
         )}
         <div className="flex-1" />
-        <span className="text-[0.6875rem] text-dim">
+        <span className="text-label text-dim">
           {engine.enabled ? t`Enabled` : t`Disabled`}
         </span>
         <Toggle
@@ -247,7 +247,7 @@ export function EngineDetail({
         {remote && inBrowser ? (
           // A tab has no yaml and no filesystem, so the sentence a remote *machine* gets
           // would be three wrong instructions in a row.
-          <p className="rounded-md border border-edge bg-elevated px-3 py-2.5 text-[0.6875rem] leading-[1.6] text-dim">
+          <p className="rounded-md border border-edge bg-elevated px-3 py-2.5 text-label leading-[1.6] text-dim">
             <Trans>
               Runs <span className="font-medium text-soft">{whereItRuns}</span>. This row is the
               tab&rsquo;s own advertisement and is rewritten every time it connects — there is no
@@ -256,7 +256,7 @@ export function EngineDetail({
             </Trans>
           </p>
         ) : remote ? (
-          <p className="rounded-md border border-edge bg-elevated px-3 py-2.5 text-[0.6875rem] leading-[1.6] text-dim">
+          <p className="rounded-md border border-edge bg-elevated px-3 py-2.5 text-label leading-[1.6] text-dim">
             <Trans>
               Advertised by <span className="font-medium text-soft">{runnerName}</span>. This row
               is that machine&rsquo;s advertisement and is rewritten every time it connects —
@@ -265,7 +265,7 @@ export function EngineDetail({
             </Trans>
           </p>
         ) : hostKnown ? null : (
-          <p className="rounded-md border border-edge bg-elevated px-3 py-2.5 text-[0.6875rem] leading-[1.6] text-dim">
+          <p className="rounded-md border border-edge bg-elevated px-3 py-2.5 text-label leading-[1.6] text-dim">
             <Trans>
               Which machine advertises this engine is not known yet, so nothing here is editable
               and the binary is not probed — a runner&rsquo;s path is a path on that machine, not
@@ -298,7 +298,7 @@ export function EngineDetail({
           with no role still runs whatever names it: the Analyse dialog, a correspondence
           search, an analysis board.
         */}
-        <p className="text-[0.65625rem] leading-[1.5] text-dim">
+        <p className="text-label leading-[1.5] text-dim">
           {roles.length > 0 ? (
             <Trans>
               Assigned to <span className="font-medium text-soft">{assignment}</span>.
@@ -332,7 +332,7 @@ export function EngineDetail({
             className={inBrowser ? undefined : 'font-mono'}
             onChange={(event) => setPath(event.target.value)}
           />
-          <p className="text-[0.65625rem] text-dim">
+          <p className="text-label text-dim">
             {inBrowser
               ? t`The build ships with Blunderbase and is loaded by the tab itself. There is no file on any machine.`
               : remote
@@ -343,7 +343,7 @@ export function EngineDetail({
         {engine.kind === 'uci' && !remote ? (
           // The two options the Machines page multiplies: said here, where the whole engine
           // is, and edited under More settings with the rest of what the binary declares.
-          <p className="text-[0.65625rem] leading-[1.5] text-dim">
+          <p className="text-label leading-[1.5] text-dim">
             <Trans>
               One process of this engine costs{' '}
               <span className="font-medium text-soft">{threads}</span>{' '}
@@ -365,10 +365,10 @@ export function EngineDetail({
         onClick={() => setMoreSettings((open) => !open)}
         className="flex w-full items-center gap-2.5 border-t border-hairline px-3.5 py-3 text-left transition-colors hover:bg-raised"
       >
-        <span className="text-[0.6875rem] font-medium text-soft">
+        <span className="text-label font-medium text-soft">
           <Trans>More settings</Trans>
         </span>
-        <span className="text-[0.65625rem] text-dim">
+        <span className="text-label text-dim">
           <Trans>UCI options and test runs</Trans>
         </span>
         <div className="flex-1" />
@@ -386,9 +386,9 @@ export function EngineDetail({
               remote ? null : (
                 <div className="flex items-center gap-2">
                   {probe.isFetching ? (
-                    <span className="text-[0.65625rem] text-dim">{t`probing…`}</span>
+                    <span className="text-label text-dim">{t`probing…`}</span>
                   ) : probe.isSuccess ? (
-                    <span className="font-mono text-[0.65625rem] text-dim">
+                    <span className="font-mono text-label text-dim">
                       {probe.data.name ?? t`unnamed`}
                       {probe.data.author ? ` · ${probe.data.author.split('(')[0]!.trim()}` : ''}
                     </span>
@@ -411,7 +411,7 @@ export function EngineDetail({
             }
           >
             {remote ? (
-              <p className="rounded-md border border-dashed border-edge-strong px-3 py-4 text-center text-[0.71875rem] text-dim">
+              <p className="rounded-md border border-dashed border-edge-strong px-3 py-4 text-center text-data text-dim">
                 <Trans>Options come from the runner&rsquo;s own probe.</Trans>
               </p>
             ) : probe.isFetching && !probe.data ? (
@@ -422,15 +422,15 @@ export function EngineDetail({
               </div>
             ) : probe.isError ? (
               <div className="rounded-md border border-blunder/28 bg-blunder/5 px-3 py-2.5">
-                <p className="text-[0.75rem] text-blunder">
+                <p className="text-data text-blunder">
                   <Trans>The binary could not be probed.</Trans>
                 </p>
-                <p className="mt-1 font-mono text-[0.6875rem] leading-[1.5] text-blunder/80">
+                <p className="mt-1 font-mono text-label leading-[1.5] text-blunder/80">
                   {probe.error.message}
                 </p>
               </div>
             ) : !probe.data ? (
-              <p className="rounded-md border border-dashed border-edge-strong px-3 py-4 text-center text-[0.71875rem] text-dim">
+              <p className="rounded-md border border-dashed border-edge-strong px-3 py-4 text-center text-data text-dim">
                 {engine.kind === 'maia'
                   ? t`Probing a Maia model loads its network first, which takes a while — press Probe when you want to edit its options.`
                   : t`Press Probe to read what this binary declares.`}
@@ -447,7 +447,7 @@ export function EngineDetail({
 
           {remote ? (
             <Section title={t`Test run`}>
-              <p className="text-[0.6875rem] leading-[1.6] text-dim">
+              <p className="text-label leading-[1.6] text-dim">
                 {inBrowser ? (
                   <Trans>
                     A test run starts a binary on this host. This engine has none — it runs{' '}
@@ -522,7 +522,7 @@ export function EngineDetail({
               </div>
 
               <div className="flex items-center gap-2">
-                <span className="flex-1 text-[0.6875rem] text-dim">
+                <span className="flex-1 text-label text-dim">
                   <Trans>
                     Runs whether the engine is enabled or not — the point of the button is to
                     decide.
@@ -545,10 +545,10 @@ export function EngineDetail({
 
               {testRun.isError ? (
                 <div className="rounded-md border border-blunder/28 bg-blunder/5 px-3 py-2.5">
-                  <p className="text-[0.75rem] text-blunder">
+                  <p className="text-data text-blunder">
                     <Trans>The engine did not answer.</Trans>
                   </p>
-                  <p className="mt-1 font-mono text-[0.6875rem] leading-[1.5] text-blunder/80">
+                  <p className="mt-1 font-mono text-label leading-[1.5] text-blunder/80">
                     {testRun.error.message}
                   </p>
                 </div>
@@ -564,7 +564,7 @@ export function EngineDetail({
         {remote ? (
           // Removing the row would delete an advertisement the runner recreates on its next
           // connection. Revoking the runner in the section below is the honest way out.
-          <p className="text-[0.6875rem] leading-[1.6] text-dim">
+          <p className="text-label leading-[1.6] text-dim">
             {inBrowser ? (
               <Trans>
                 Nothing here is editable. This row belongs to a browser tab — uninstall it under{' '}
@@ -588,7 +588,7 @@ export function EngineDetail({
           </p>
         ) : confirmDelete ? (
           <>
-            <span className="flex-1 text-[0.6875rem] text-blunder">
+            <span className="flex-1 text-label text-blunder">
               <Trans>Remove {engineName}? Analysis already stored keeps its runs.</Trans>
             </span>
             <Button
@@ -621,14 +621,14 @@ export function EngineDetail({
               <Trans context="button">Remove</Trans>
             </Button>
             {update.isError ? (
-              <span className="min-w-0 flex-1 truncate text-[0.6875rem] text-blunder" title={update.error.message}>
+              <span className="min-w-0 flex-1 truncate text-label text-blunder" title={update.error.message}>
                 {update.error.message}
               </span>
             ) : (
               <div className="flex-1" />
             )}
             {blocked ? (
-              <span className="text-[0.6875rem] text-blunder">
+              <span className="text-label text-blunder">
                 <Trans>Fix the options above first</Trans>
               </span>
             ) : null}
@@ -645,7 +645,7 @@ export function EngineDetail({
         )}
       </div>
       {remove.isError ? (
-        <p className="px-3.5 pb-2.5 text-[0.6875rem] text-blunder">{remove.error.message}</p>
+        <p className="px-3.5 pb-2.5 text-label text-blunder">{remove.error.message}</p>
       ) : null}
     </div>
   )

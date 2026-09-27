@@ -102,14 +102,14 @@ export function MachineRow({
             <MachineDot tone={tone} />
             <span className="min-w-0 flex-1">
               <span className="flex items-baseline gap-2">
-                <span className="truncate text-[0.8125rem] font-medium text-ink">{name}</span>
-                <span className="truncate text-[0.6875rem] font-medium text-dim">{type}</span>
+                <span className="truncate text-lead font-medium text-ink">{name}</span>
+                <span className="truncate text-label font-medium text-dim">{type}</span>
               </span>
-              <span className="mt-0.5 block truncate text-[0.65625rem] text-dim">{caption}</span>
+              <span className="mt-0.5 block truncate text-label text-dim">{caption}</span>
             </span>
             <span className="flex-none text-right">
-              <span className="block font-mono text-[0.6875rem] text-soft">{slots}</span>
-              <span className="block text-[0.59375rem] text-faint">
+              <span className="block font-mono text-label text-soft">{slots}</span>
+              <span className="block text-meta text-faint">
                 {/* The count arrives as the string the column shows; the plural rule needs
                     the number behind it, so it is read back rather than threaded through. */}
                 <Plural value={Number(engines)} one="# engine" other="# engines" />
@@ -147,18 +147,18 @@ export function MachineRow({
           />
           <MachineDot tone={tone} />
           <span className="flex min-w-0 flex-1 items-baseline gap-2">
-            <span className="flex-none truncate text-[0.78125rem] font-medium text-ink">
+            <span className="flex-none truncate text-lead font-medium text-ink">
               {name}
             </span>
-            <span className="min-w-0 flex-1 truncate text-[0.6875rem] text-dim">{caption}</span>
+            <span className="min-w-0 flex-1 truncate text-label text-dim">{caption}</span>
           </span>
-          <span className={cn(MACHINE_COL.type, 'truncate text-[0.71875rem] text-dim')}>
+          <span className={cn(MACHINE_COL.type, 'truncate text-data text-dim')}>
             {type}
           </span>
-          <span className={cn(MACHINE_COL.slots, 'font-mono text-[0.71875rem] tabular text-dim')}>
+          <span className={cn(MACHINE_COL.slots, 'font-mono text-data tabular text-dim')}>
             {slots}
           </span>
-          <span className={cn(MACHINE_COL.engines, 'font-mono text-[0.71875rem] tabular text-dim')}>
+          <span className={cn(MACHINE_COL.engines, 'font-mono text-data tabular text-dim')}>
             {engines}
           </span>
         </button>

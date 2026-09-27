@@ -66,7 +66,7 @@ export function QueueIndicator({ className }: { className?: string }) {
             */}
             <span
               className={cn(
-                'text-[0.6875rem] max-lg:hidden',
+                'text-label max-lg:hidden',
                 paused ? 'text-mistake' : idle ? 'text-dim-2' : 'text-soft',
               )}
             >
@@ -80,7 +80,7 @@ export function QueueIndicator({ className }: { className?: string }) {
             />
             <span
               className={cn(
-                'font-mono text-[0.6875rem] tabular',
+                'font-mono text-label tabular',
                 idle ? 'text-faint' : 'text-ink',
               )}
             >
@@ -195,7 +195,7 @@ function ClearQueueButton({ queued }: { queued: number }) {
         clear.mutate()
       }}
       className={cn(
-        'flex items-center gap-1 rounded-md border px-2.5 py-[0.3125rem] font-mono text-[0.6875rem] transition-colors disabled:opacity-60',
+        'flex items-center gap-1 rounded-md border px-2.5 py-[0.3125rem] font-mono text-label transition-colors disabled:opacity-60',
         armed
           ? 'border-blunder/40 bg-blunder/10 text-blunder hover:bg-blunder/20'
           : 'border-edge text-dim hover:border-edge-hover hover:text-ink',

@@ -138,14 +138,14 @@ export function AccountCard({
         {/* An account nobody has connected has no count to give, and a bare em dash in a
             box says less than the reason there is no number. */}
         {account ? (
-          <span className="font-mono text-[0.71875rem] text-body tabular">
+          <span className="font-mono text-label text-body tabular">
             {account.games?.toLocaleString() ?? '—'}
             <span className="ml-1 font-sans text-dim">
               <Trans>games</Trans>
             </span>
           </span>
         ) : (
-          <span className="text-[0.6875rem] text-faint">
+          <span className="text-label text-faint">
             <Trans>not connected</Trans>
           </span>
         )}
@@ -163,7 +163,7 @@ export function AccountCard({
             : [...(schedule.data?.disabled_sources ?? []), source],
         })}
       />
-      {schedule.isError || updateSchedule.isError ? <p role="alert" className="text-xs text-blunder">{schedule.error?.message ?? updateSchedule.error?.message}</p> : null}
+      {schedule.isError || updateSchedule.isError ? <p role="alert" className="text-data text-blunder">{schedule.error?.message ?? updateSchedule.error?.message}</p> : null}
       <Label htmlFor={`${source}-username`} className="sr-only">
         <Trans>Username</Trans>
       </Label>
@@ -186,13 +186,13 @@ export function AccountCard({
           if (invalid) setInvalid(null)
         }}
       />
-      {invalid ? <p className="text-[0.6875rem] text-blunder">{invalid}</p> : null}
+      {invalid ? <p className="text-label text-blunder">{invalid}</p> : null}
       {start.isError ? (
-        <p className="text-[0.6875rem] text-blunder">{start.error.message}</p>
+        <p className="text-label text-blunder">{start.error.message}</p>
       ) : null}
 
       <div className="flex items-center gap-2">
-        <span className="font-mono text-[0.6875rem] text-dim tabular">
+        <span className="font-mono text-label text-dim tabular">
           {when === null ? t`never synced` : t`synced ${when}`}
         </span>
         <div className="flex-1" />

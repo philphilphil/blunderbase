@@ -1215,7 +1215,7 @@ function TransportButton({
       title={hint ? `${label} (${hint})` : label}
       disabled={disabled}
       onClick={onClick}
-      className="grid min-w-8 place-items-center px-2 text-data text-body transition-colors hover:bg-raised hover:text-ink disabled:cursor-default disabled:text-faint-2 disabled:hover:bg-transparent max-md:px-3 max-md:py-1.5 max-md:text-sm"
+      className="grid min-w-8 place-items-center px-2 text-data text-body transition-colors hover:bg-raised hover:text-ink disabled:cursor-default disabled:text-faint-2 disabled:hover:bg-transparent max-md:px-3 max-md:py-1.5 max-md:text-heading"
     >
       {children}
     </button>

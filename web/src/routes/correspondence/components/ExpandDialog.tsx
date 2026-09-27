@@ -126,7 +126,7 @@ export function ExpandDialog({
                   aria-pressed={stages === count}
                   onClick={() => setStages(count)}
                   className={cn(
-                    'min-w-9 rounded-md border px-2 py-1 font-mono text-[0.6875rem] transition-colors',
+                    'min-w-9 rounded-md border px-2 py-1 font-mono text-label transition-colors',
                     stages === count
                       ? 'border-accent-teal/40 bg-selected text-ink'
                       : 'border-edge text-dim hover:border-edge-hover hover:text-ink',
@@ -137,7 +137,7 @@ export function ExpandDialog({
               ))}
             </div>
           </div>
-          <p className="max-w-[16rem] pt-6 text-[0.625rem] leading-[1.6] text-dim-2">
+          <p className="max-w-[16rem] pt-6 text-meta leading-[1.6] text-dim-2">
             <Trans>
               Up to {expansionSize(chosen, stages)} positions. Your marks change that as it
               goes: an excluded move is skipped, a bad one stops after one stage, and a good
@@ -146,7 +146,7 @@ export function ExpandDialog({
           </p>
         </div>
 
-        <label className="flex items-start gap-2 border-t border-hairline pt-3 text-[0.75rem] text-body">
+        <label className="flex items-start gap-2 border-t border-hairline pt-3 text-data text-body">
           <input
             type="checkbox"
             checked={tasks}
@@ -155,7 +155,7 @@ export function ExpandDialog({
           />
           <span className="flex flex-col gap-0.5">
             <Trans>Queue tasks</Trans>
-            <span className="text-[0.625rem] leading-[1.5] text-dim-2">
+            <span className="text-meta leading-[1.5] text-dim-2">
               <Trans>
                 Off, the moves go into the tree and nothing is calculated.
               </Trans>
@@ -169,7 +169,7 @@ export function ExpandDialog({
               <Trans>Engine</Trans>
             </Label>
             <EnginePicker engines={engines} mode="task" value={engineId} onChange={setEngineId} />
-            <p className="text-[0.625rem] leading-[1.5] text-dim-2">
+            <p className="text-meta leading-[1.5] text-dim-2">
               <Trans>
                 Every task of this expansion runs on it, the later stages too. A runner's
                 engine is allowed: a task is ordinary queue work.
@@ -179,7 +179,7 @@ export function ExpandDialog({
         ) : null}
 
         {evaluated ? null : (
-          <p className="text-[0.625rem] leading-[1.55] text-dim-2">
+          <p className="text-meta leading-[1.55] text-dim-2">
             <Trans>
               No engine has looked at this position yet, so one task is queued on the move
               itself and the branches appear when it answers.
@@ -188,7 +188,7 @@ export function ExpandDialog({
         )}
 
         {error ? (
-          <p role="alert" className="text-[0.6875rem] text-blunder">
+          <p role="alert" className="text-label text-blunder">
             {error}
           </p>
         ) : null}

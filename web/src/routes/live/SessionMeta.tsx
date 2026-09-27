@@ -12,8 +12,8 @@ import { isVariation, plyLabel } from './live'
 function Row({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div className="flex items-baseline gap-3 border-b border-hairline py-1.5 last:border-b-0">
-      <span className="w-20 flex-none text-[0.6875rem] text-dim">{label}</span>
-      <div className="min-w-0 flex-1 text-right text-[0.75rem] text-body">{children}</div>
+      <span className="w-20 flex-none text-label text-dim">{label}</span>
+      <div className="min-w-0 flex-1 text-right text-data text-body">{children}</div>
     </div>
   )
 }
@@ -40,11 +40,11 @@ export function SessionMeta({
   return (
     <section className={cn('flex flex-col rounded-xl border border-line bg-panel', className)}>
       <div className="flex items-center gap-2 border-b border-hairline px-3.5 py-2.5">
-        <span className="text-xs font-semibold text-ink">
+        <span className="text-data font-semibold text-ink">
           <Trans>Session</Trans>
         </span>
         <div className="flex-1" />
-        <span className="font-mono text-[0.625rem] text-dim tabular">
+        <span className="font-mono text-meta text-dim tabular">
           <Plural value={state.viewer_count} one="# viewer" other="# viewers" />
         </span>
       </div>
@@ -70,7 +70,7 @@ export function SessionMeta({
           <Row label={t`Source`}>
             <span className="inline-flex items-center gap-2">
               {game.opening ? (
-                <span className="truncate text-[0.71875rem] text-soft-2">{game.opening}</span>
+                <span className="truncate text-data text-soft-2">{game.opening}</span>
               ) : null}
               <SourceBadge source={game.source} size="sm" />
             </span>
@@ -111,14 +111,14 @@ export function SessionMeta({
 
       {state.moves.length > 0 ? (
         <div className="flex flex-col gap-1.5 border-t border-hairline px-3.5 py-2.5">
-          <span className="text-[0.625rem] tracking-[0.1em] text-faint uppercase">
+          <span className="text-meta tracking-[0.1em] text-faint uppercase">
             {isVariation(state) ? t`Off the game` : t`Played`}
           </span>
           <div className="flex flex-wrap gap-1">
             {state.moves.map((move, index) => (
               <span
                 key={`${move}-${index}`}
-                className="rounded-sm border border-edge bg-elevated px-1.5 py-px font-mono text-[0.6875rem] text-soft"
+                className="rounded-sm border border-edge bg-elevated px-1.5 py-px font-mono text-label text-soft"
               >
                 {move}
               </span>
@@ -130,7 +130,7 @@ export function SessionMeta({
       {marks === 0 ? null : (
         <div className="flex flex-col gap-1 border-t border-hairline px-3.5 py-2.5">
           {state.arrows.map((arrow, index) => (
-            <div key={`arrow-${index}`} className="flex items-center gap-2 font-mono text-[0.6875rem]">
+            <div key={`arrow-${index}`} className="flex items-center gap-2 font-mono text-label">
               <span className="size-[0.375rem] rounded-full" style={{ background: color(arrow.color) }} />
               <span className="text-soft">
                 {arrow.from}
@@ -140,7 +140,7 @@ export function SessionMeta({
             </div>
           ))}
           {state.squares.map((square, index) => (
-            <div key={`square-${index}`} className="flex items-center gap-2 font-mono text-[0.6875rem]">
+            <div key={`square-${index}`} className="flex items-center gap-2 font-mono text-label">
               <span
                 className="size-[0.375rem] rounded-[0.0625rem]"
                 style={{ background: color(square.color) }}

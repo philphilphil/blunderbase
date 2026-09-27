@@ -151,7 +151,7 @@ export function MoveTreeTable({
       <div
         role="row"
         className={cn(
-          'flex h-[1.875rem] flex-none items-center gap-3 rounded-[0.4375rem] border border-line bg-panel px-3 text-[0.65625rem] tracking-[.06em] text-dim-2 uppercase',
+          'flex h-[1.875rem] flex-none items-center gap-3 rounded-[0.4375rem] border border-line bg-panel px-3 text-meta tracking-[.06em] text-dim-2 uppercase',
           MIN_TABLE,
         )}
       >
@@ -191,7 +191,7 @@ export function MoveTreeTable({
           style={{ height: ROWS_HEIGHT }}
           className="flex items-center justify-center rounded-[0.5625rem] border border-dashed border-edge-strong bg-panel/60 px-3 text-center"
         >
-          <p className="text-[0.78125rem] text-dim">
+          <p className="text-data text-dim">
             <Trans>No game of yours goes any further than this position.</Trans>
           </p>
         </div>
@@ -204,7 +204,7 @@ export function MoveTreeTable({
           // `md` the whole table still slides sideways under its own header.
           style={{ height: ROWS_HEIGHT }}
           className={cn(
-            'flex flex-col gap-0.5 overflow-y-auto font-mono text-[0.78125rem] tabular',
+            'flex flex-col gap-0.5 overflow-y-auto font-mono text-data tabular',
             MIN_TABLE,
           )}
         >
@@ -233,7 +233,7 @@ export function MoveTreeTable({
               >
                 <span
                   style={style(78)}
-                  className={cn('text-[0.84375rem]', main ? 'text-bright' : 'text-body')}
+                  className={cn('text-lead', main ? 'text-bright' : 'text-body')}
                 >
                   {plyLabel(ply)}
                   {notate(move.san)}
@@ -267,14 +267,14 @@ export function MoveTreeTable({
                 </span>
                 <span
                   style={style('flex')}
-                  className="truncate font-sans text-[0.71875rem] text-soft-2"
+                  className="truncate font-sans text-data text-soft-2"
                   title={move.name ?? undefined}
                 >
                   {move.name}
                 </span>
                 <span
                   style={style('flex')}
-                  className="truncate font-sans text-[0.71875rem] text-dim-2"
+                  className="truncate font-sans text-data text-dim-2"
                   title={note ?? undefined}
                 >
                   {note}

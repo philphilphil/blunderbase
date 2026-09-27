@@ -79,7 +79,7 @@ function RetryError({ error }: { error: Error }) {
   const unavailable = error instanceof ApiError && error.status === 409
 
   return (
-    <p role="alert" className="text-[0.6875rem] leading-[1.5] text-blunder">
+    <p role="alert" className="text-label leading-[1.5] text-blunder">
       {unavailable ? (
         <Trans>
           Nothing was queued: the engine these runs failed on still cannot take them, so a
@@ -116,10 +116,10 @@ export function FailedRuns({ failed }: { failed: number }) {
       className="flex flex-col gap-3 rounded-xl border border-line bg-panel p-3.5"
     >
       <header className="flex flex-wrap items-center gap-2">
-        <h2 id="failed-runs-title" className="text-xs font-semibold text-ink">
+        <h2 id="failed-runs-title" className="text-data font-semibold text-ink">
           <Trans>Failed runs</Trans>
         </h2>
-        <span className="font-mono text-[0.6875rem] tabular text-blunder">
+        <span className="font-mono text-label tabular text-blunder">
           {formatCount(failed)}
         </span>
         <div className="flex-1" />
@@ -140,7 +140,7 @@ export function FailedRuns({ failed }: { failed: number }) {
       </header>
 
       {receipt ? (
-        <p role="status" className="text-[0.6875rem] leading-[1.5] text-dim">
+        <p role="status" className="text-label leading-[1.5] text-dim">
           {receipt.queued === 0
             ? t`Nothing queued — all ${skippedCount} of them are over games that have since been analysed, or over a position rather than a game.`
             : t`Queued ${queuedCount} ${plural(receipt.queued, {
@@ -152,11 +152,11 @@ export function FailedRuns({ failed }: { failed: number }) {
       {retry.isError ? <RetryError error={retry.error} /> : null}
 
       {failed === 0 ? (
-        <p className="text-[0.6875rem] leading-[1.5] text-dim-2">
+        <p className="text-label leading-[1.5] text-dim-2">
           <Trans>Nothing has failed. A run that does will be listed here until it is retried.</Trans>
         </p>
       ) : runs.isPending ? (
-        <p className="text-[0.6875rem] text-dim-2">
+        <p className="text-label text-dim-2">
           <Trans>Reading the failures…</Trans>
         </p>
       ) : (
@@ -168,24 +168,24 @@ export function FailedRuns({ failed }: { failed: number }) {
                 className="flex flex-col gap-1 rounded-[0.3125rem] bg-blunder/5 px-2 py-2"
               >
                 <div className="flex items-start gap-2">
-                  <span className="font-mono text-[0.65625rem] tabular text-blunder">
+                  <span className="font-mono text-label tabular text-blunder">
                     {`${formatCount(group.runs.length)}×`}
                   </span>
                   {group.chips.map((chip) => (
                     <span
                       key={`${chip.kind}:${chip.label}`}
                       className={cn(
-                        'rounded-sm border px-1.5 py-px text-[0.59375rem] whitespace-nowrap',
+                        'rounded-sm border px-1.5 py-px text-label whitespace-nowrap',
                         RUN_STYLES[chip.kind].chipClass,
                       )}
                     >
                       {chip.label}
                     </span>
                   ))}
-                  <span className="flex-1 text-[0.6875rem] leading-[1.45] text-body-3">
+                  <span className="flex-1 text-label leading-[1.45] text-body-3">
                     {group.message}
                   </span>
-                  <span className="flex-none font-mono text-[0.625rem] tabular text-dim-2">
+                  <span className="flex-none font-mono text-meta tabular text-dim-2">
                     {stamp(group.runs[0]?.finished_at ?? group.runs[0]?.created_at)}
                   </span>
                 </div>
@@ -195,7 +195,7 @@ export function FailedRuns({ failed }: { failed: number }) {
           </ul>
 
           {failed > listed ? (
-            <p className="text-[0.625rem] text-dim-2">
+            <p className="text-meta text-dim-2">
               <Trans>
                 Showing the newest {shown} of {failures}. Retrying takes on every one of them, not
                 only the ones listed.
@@ -219,7 +219,7 @@ function GameList({ runs }: { runs: RunResponse[] }) {
   ]
   if (games.length === 0) {
     return (
-      <span className="text-[0.625rem] text-dim-2">
+      <span className="text-meta text-dim-2">
         <Trans>Over a position rather than a game — nothing to re-analyse.</Trans>
       </span>
     )
@@ -228,7 +228,7 @@ function GameList({ runs }: { runs: RunResponse[] }) {
   const rest = games.length - named.length
   const more = formatCount(rest)
   return (
-    <span className="flex flex-wrap items-center gap-1.5 text-[0.625rem] text-dim-2">
+    <span className="flex flex-wrap items-center gap-1.5 text-meta text-dim-2">
       {named.map((id) => (
         <Link
           key={id}

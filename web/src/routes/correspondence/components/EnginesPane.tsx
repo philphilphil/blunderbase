@@ -64,10 +64,10 @@ export function EnginesPane({
   if (!node || panes.length === 0) {
     return (
       <div className="flex min-h-0 flex-1 flex-col justify-center gap-1.5 px-4 py-6 text-center">
-        <p className="text-[0.75rem] text-dim">
+        <p className="text-data text-dim">
           <Trans>No engine has looked at this position yet.</Trans>
         </p>
-        <p className="text-[0.6875rem] leading-[1.55] text-dim-2">
+        <p className="text-label leading-[1.55] text-dim-2">
           <Trans>
             Search with… puts one on it for as long as you let it. Several engines can work
             on the same position at once, each in a pane of its own.

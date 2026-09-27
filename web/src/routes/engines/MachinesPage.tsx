@@ -95,10 +95,10 @@ export function MachinesPage() {
 
         {status.error ? (
           <div className="rounded-lg border border-blunder/28 bg-blunder/5 px-4 py-5 text-center">
-            <p className="text-[0.78125rem] text-blunder">
+            <p className="text-data text-blunder">
               <Trans>Compute capacity could not be read.</Trans>
             </p>
-            <p className="mt-1 font-mono text-[0.6875rem] text-blunder/80">
+            <p className="mt-1 font-mono text-label text-blunder/80">
               {status.error.message}
             </p>
             <Button
@@ -146,7 +146,7 @@ export function MachinesPage() {
               </div>
             ) : null}
             {remote && remoteRunners.length === 0 ? (
-              <p className="text-[0.6875rem] text-dim-2">
+              <p className="text-label text-dim-2">
                 <Trans>
                   No remote runners are registered. This server and browser still work
                   independently.
@@ -169,10 +169,10 @@ export function MachinesPage() {
 function RemoteRunnerInfo() {
   return (
     <div className="rounded-lg border border-edge-strong bg-elevated px-3.5 py-3">
-      <h3 className="text-[0.75rem] font-medium text-ink">
+      <h3 className="text-data font-medium text-ink">
         <Trans>How remote runners work</Trans>
       </h3>
-      <p className="mt-1.5 text-[0.6875rem] leading-[1.6] text-dim">
+      <p className="mt-1.5 text-label leading-[1.6] text-dim">
         <Trans>
           A runner is a small process on another machine that connects outward to this
           Blunderbase deployment. Registering one mints a token shown once and a paste-ready{' '}
@@ -182,7 +182,7 @@ function RemoteRunnerInfo() {
           that machine is the source of truth.
         </Trans>
       </p>
-      <p className="mt-2 text-[0.65625rem] text-faint">
+      <p className="mt-2 text-label text-faint">
         <Trans>The manual chapter behind Manual, at the foot of the rail, has the setup and the troubleshooting.</Trans>
       </p>
     </div>

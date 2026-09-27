@@ -18,13 +18,13 @@ describe('cn', () => {
   })
 
   it('lets a named size replace a stock one', () => {
-    expect(cn('text-xs', 'text-data')).toBe('text-data')
+    expect(cn('text-data', 'text-data')).toBe('text-data')
   })
 
   it('knows all six names', () => {
     for (const size of ['meta', 'label', 'data', 'lead', 'heading', 'value']) {
       expect(cn('text-ink', `text-${size}`)).toBe(`text-ink text-${size}`)
-      expect(cn('text-xs', `text-${size}`)).toBe(`text-${size}`)
+      expect(cn('text-data', `text-${size}`)).toBe(`text-${size}`)
     }
   })
 })

@@ -62,14 +62,14 @@ export function AddEngineForm({
       className="flex flex-col gap-3 rounded-xl border border-line bg-panel px-3.5 py-3.5"
     >
       <div className="flex items-center gap-2.5">
-        <span className="text-xs font-semibold text-ink">
+        <span className="text-data font-semibold text-ink">
           <Trans>Add an engine</Trans>
         </span>
         <div className="flex-1" />
         <button
           type="button"
           onClick={onCancel}
-          className="text-[0.6875rem] text-dim transition-colors hover:text-ink"
+          className="text-label text-dim transition-colors hover:text-ink"
         >
           <Trans>Cancel</Trans>
         </button>
@@ -106,10 +106,10 @@ export function AddEngineForm({
 
       {probe.isError ? (
         <div className="rounded-md border border-blunder/28 bg-blunder/5 px-3 py-2.5">
-          <p className="text-[0.75rem] text-blunder">
+          <p className="text-data text-blunder">
             <Trans>That binary could not be started.</Trans>
           </p>
-          <p className="mt-1 font-mono text-[0.6875rem] leading-[1.5] text-blunder/80">
+          <p className="mt-1 font-mono text-label leading-[1.5] text-blunder/80">
             {probe.error.message}
           </p>
         </div>
@@ -118,10 +118,10 @@ export function AddEngineForm({
       {probe.isSuccess ? (
         <div className="flex items-center gap-2.5 rounded-md border border-good/30 bg-good/8 px-3 py-2">
           <Check className="size-3.5 flex-none text-good" aria-hidden />
-          <span className="min-w-0 flex-1 truncate font-mono text-[0.71875rem] text-good">
+          <span className="min-w-0 flex-1 truncate font-mono text-data text-good">
             {probe.data.name ?? t`unnamed engine`}
           </span>
-          <span className="font-mono text-[0.65625rem] text-good/70 tabular">
+          <span className="font-mono text-label text-good/70 tabular">
             <Plural value={declared} one="# option" other="# options" />
           </span>
         </div>
@@ -148,7 +148,7 @@ export function AddEngineForm({
             id="add-engine-kind"
             value={kind}
             onChange={(event) => setKind(event.target.value as EngineKind)}
-            className="h-8 rounded-md border border-input bg-elevated px-2 text-xs text-ink outline-none transition-colors focus-visible:border-accent-teal/50"
+            className="h-8 rounded-md border border-input bg-elevated px-2 text-data text-ink outline-none transition-colors focus-visible:border-accent-teal/50"
           >
             <option value="uci">{t`Normal engine`}</option>
             <option value="maia">{t`Human moves (Maia)`}</option>
@@ -156,11 +156,11 @@ export function AddEngineForm({
         </div>
       </div>
 
-      {invalid ? <p className="text-[0.6875rem] text-blunder">{invalid}</p> : null}
-      {add.isError ? <p className="text-[0.6875rem] text-blunder">{add.error.message}</p> : null}
+      {invalid ? <p className="text-label text-blunder">{invalid}</p> : null}
+      {add.isError ? <p className="text-label text-blunder">{add.error.message}</p> : null}
 
       <div className="flex items-center gap-2">
-        <p className="flex-1 text-[0.6875rem] text-dim">
+        <p className="flex-1 text-label text-dim">
           <Trans>
             A Maia model is a network behind an lc0-style binary — give the command line as the
             path.

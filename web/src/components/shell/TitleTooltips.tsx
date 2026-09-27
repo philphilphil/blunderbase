@@ -177,7 +177,7 @@ export function TitleTooltips() {
         bottom: tip.above ? window.innerHeight - tip.y : undefined,
         maxWidth: Math.max(120, half * 2),
       }}
-      className="bb-fade-in pointer-events-none fixed z-[90] max-w-[20rem] -translate-x-1/2 rounded-md border border-edge bg-elevated px-2 py-1 text-[0.6875rem] leading-snug text-body shadow-[0_0.375rem_1.125rem_var(--bb-shadow)]"
+      className="bb-fade-in pointer-events-none fixed z-[90] max-w-[20rem] -translate-x-1/2 rounded-md border border-edge bg-elevated px-2 py-1 text-label leading-snug text-body shadow-[0_0.375rem_1.125rem_var(--bb-shadow)]"
     >
       {tip.text}
     </div>,

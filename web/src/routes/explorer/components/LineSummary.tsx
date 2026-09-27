@@ -60,17 +60,17 @@ export function LineSummary({
   return (
     <div className="flex flex-col gap-2.5 rounded-[0.5625rem] border border-line bg-panel p-3.5">
       <div className="flex items-baseline gap-2">
-        <span className="text-[0.75rem] font-semibold text-ink">
+        <span className="text-data font-semibold text-ink">
           <Trans>Your results in this line</Trans>
         </span>
         <div className="flex-1" />
-        <span className="font-mono text-[0.6875rem] tabular text-dim">
+        <span className="font-mono text-label tabular text-dim">
           <Plural value={split.games} one="# game" other="# games" />
         </span>
       </div>
 
       {split.games === 0 ? (
-        <p className="py-3 text-[0.78125rem] leading-relaxed text-dim">
+        <p className="py-3 text-data leading-relaxed text-dim">
           <Trans>
             You have never had this position on the board. Walk back a move, or play a different
             continuation.
@@ -79,7 +79,7 @@ export function LineSummary({
       ) : (
         <>
           <ScoreBar split={split} />
-          <div className="flex font-mono text-[0.6875rem] tabular text-soft-2">
+          <div className="flex font-mono text-label tabular text-soft-2">
             <span className="flex-1">
               <Trans comment="W abbreviates “wins”.">{wins} W</Trans>
             </span>
@@ -108,10 +108,10 @@ export function LineSummary({
             <div className="flex-1" />
             {worst ? (
               <div className="flex flex-col items-end gap-[0.1875rem]">
-                <span className="text-[0.65625rem] text-dim-2">
+                <span className="text-label text-dim-2">
                   <Trans>Worst move here</Trans>
                 </span>
-                <span className={cn('font-mono text-[0.8125rem]', dropTone(worst.avg_win_loss))}>
+                <span className={cn('font-mono text-lead', dropTone(worst.avg_win_loss))}>
                   {plyLabel(ply)}
                   {notate(worst.san)}
                 </span>
@@ -127,8 +127,8 @@ export function LineSummary({
 function Stat({ label, value, tone }: { label: string; value: string; tone: string }) {
   return (
     <div className="flex flex-col gap-[0.1875rem]">
-      <span className="text-[0.65625rem] text-dim-2">{label}</span>
-      <span className={cn('font-mono text-[0.9375rem] tabular', tone)}>{value}</span>
+      <span className="text-label text-dim-2">{label}</span>
+      <span className={cn('font-mono text-value tabular', tone)}>{value}</span>
     </div>
   )
 }

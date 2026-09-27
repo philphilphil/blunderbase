@@ -73,7 +73,8 @@ Full reasoning in `docs/ARCHITECTURE.md`. The short version:
     (a card's footer too); `xs` only in pane-title strips; one filled `default` per region;
     `ghost` only where a border would be noise (icon actions inside table rows).
   - Text sizes are the named scale — `text-meta` / `label` / `data` / `lead` / `heading` /
-    `value` — never `text-[…rem]`. UI labels are sans; mono is for numbers, moves and IDs.
+    `value` — never `text-[…rem]` and never Tailwind's `text-xs`/`text-sm`; `scale.test.ts`
+    fails on both. UI labels are sans; mono is for numbers, moves and IDs.
   - Selection is `bg-selected text-ink` (a `Button` gets it from `aria-pressed`), hover is
     `hover:bg-raised`, radii are `rounded-md` for controls and `rounded-sm` for inline badges.
   - A screen that switches how a list is drawn uses `components/ui/view-toggle.tsx` and

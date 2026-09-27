@@ -70,7 +70,7 @@ export function TaskDialog({
             <Trans>Engine</Trans>
           </Label>
           <EnginePicker engines={engines} mode="task" value={engineId} onChange={setEngineId} />
-          <p className="text-[0.625rem] leading-[1.5] text-dim-2">
+          <p className="text-meta leading-[1.5] text-dim-2">
             <Trans>
               Any engine that is switched on, on this machine or on a runner. The budget and
               the line count are the ones under Analysis → Correspondence.
@@ -78,7 +78,7 @@ export function TaskDialog({
           </p>
         </div>
         {error ? (
-          <p role="alert" className="text-[0.6875rem] text-blunder">
+          <p role="alert" className="text-label text-blunder">
             {error}
           </p>
         ) : null}

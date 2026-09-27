@@ -132,7 +132,7 @@ function RolePicker({
         value={assigned === null ? '' : String(assigned)}
         disabled={pending}
         onChange={(event) => onAssign(event.target.value === '' ? null : Number(event.target.value))}
-        className="h-8 w-full min-w-0 rounded-md border border-input bg-elevated px-2 text-xs text-ink outline-none transition-colors hover:border-edge-hover focus-visible:border-accent-teal/50 disabled:opacity-50"
+        className="h-8 w-full min-w-0 rounded-md border border-input bg-elevated px-2 text-data text-ink outline-none transition-colors hover:border-edge-hover focus-visible:border-accent-teal/50 disabled:opacity-50"
       >
         <option value="">{t`Nothing assigned`}</option>
         {missing ? (
@@ -145,11 +145,11 @@ function RolePicker({
         ))}
       </select>
       {error ? (
-        <p className="text-[0.6875rem] leading-[1.5] text-blunder">{error.message}</p>
+        <p className="text-label leading-[1.5] text-blunder">{error.message}</p>
       ) : status.available ? null : status.reason ? (
         <p
           className={cn(
-            'text-[0.6875rem] leading-[1.5]',
+            'text-label leading-[1.5]',
             tone === 'broken' ? 'text-mistake' : 'text-dim',
           )}
         >
@@ -192,7 +192,7 @@ export function RolesForm({
   if (error) {
     const reason = error.message
     return (
-      <p className="rounded-lg border border-blunder/28 bg-blunder/5 px-3 py-2.5 text-[0.71875rem] text-blunder">
+      <p className="rounded-lg border border-blunder/28 bg-blunder/5 px-3 py-2.5 text-data text-blunder">
         <Trans>What runs what could not be read — {reason}</Trans>
       </p>
     )
@@ -204,10 +204,10 @@ export function RolesForm({
 
   return (
     <section className="flex flex-col gap-1.5">
-      <h2 className="text-[0.625rem] tracking-[0.1em] text-faint uppercase">
+      <h2 className="text-meta tracking-[0.1em] text-faint uppercase">
         <Trans>What runs what</Trans>
       </h2>
-      <p className="text-[0.6875rem] leading-[1.5] text-dim">
+      <p className="text-label leading-[1.5] text-dim">
         <Trans>
           Each job runs on the engine chosen for it and on no other — nothing falls back, so a
           role left empty simply does not run.

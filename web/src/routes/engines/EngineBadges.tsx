@@ -33,7 +33,7 @@ export function KindBadge({ kind, className }: { kind: EngineKind; className?: s
   return (
     <span
       className={cn(
-        'inline-flex flex-none items-center rounded-sm border px-1.5 py-px text-[0.59375rem]',
+        'inline-flex flex-none items-center rounded-sm border px-1.5 py-px text-meta',
         kind === 'maia'
           ? 'border-deep/28 bg-deep/10 text-deep'
           : 'border-edge bg-elevated text-soft',
@@ -59,7 +59,7 @@ export function RoleBadge({ roles, className }: { roles: EngineRoles; className?
     <span
       title={idle ? t`Assigned to nothing right now` : undefined}
       className={cn(
-        'inline-flex flex-none items-center rounded-sm border px-1.5 py-px text-[0.59375rem]',
+        'inline-flex flex-none items-center rounded-sm border px-1.5 py-px text-meta',
         idle ? 'border-transparent text-faint' : 'border-edge-strong bg-raised text-soft',
         className,
       )}

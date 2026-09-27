@@ -136,16 +136,16 @@ export function RunnerCard({
                   type="button"
                   aria-label={t`Edit ${runnerName}`}
                   onClick={open}
-                  className="inline-flex items-center gap-1.5 text-[0.6875rem] text-dim transition-colors hover:text-ink"
+                  className="inline-flex items-center gap-1.5 text-label text-dim transition-colors hover:text-ink"
                 >
                   <Pencil className="size-3" aria-hidden />
                   <Trans>Rename or resize</Trans>
                 </button>
                 <div className="flex-1" />
                 {runner.version ? (
-                  <span className="font-mono text-[0.65625rem] text-dim">{runner.version}</span>
+                  <span className="font-mono text-meta text-dim">{runner.version}</span>
                 ) : null}
-                <span className="text-[0.65625rem] text-faint">
+                <span className="text-meta text-faint">
                   <Trans>last seen {seen}</Trans>
                 </span>
               </>
@@ -153,7 +153,7 @@ export function RunnerCard({
           </div>
 
           {update.isError ? (
-            <p className="text-[0.6875rem] text-blunder">{update.error.message}</p>
+            <p className="text-label text-blunder">{update.error.message}</p>
           ) : null}
 
           <div className="flex flex-col gap-1.5">
@@ -164,13 +164,13 @@ export function RunnerCard({
                   <div className="bg-deep" style={{ width: `${shares.streams}%` }} />
                 </div>
               </div>
-              <span className="text-[0.65625rem] text-dim-2">
+              <span className="text-label text-dim-2">
                 <Trans>
                   {free} free · {queued} queued here
                 </Trans>
               </span>
             </div>
-            <p className="text-[0.625rem] text-faint">
+            <p className="text-meta text-faint">
               <Trans>
                 <Plural value={busy} one="# queue run" other="# queue runs" /> and{' '}
                 <Plural value={streams} one="# analysis board" other="# analysis boards" /> are
@@ -180,7 +180,7 @@ export function RunnerCard({
           </div>
 
           <div className="flex flex-col gap-px border-t border-hairline pt-2.5">
-            <h4 className="mb-1 text-[0.625rem] tracking-[0.1em] text-faint uppercase">
+            <h4 className="mb-1 text-meta tracking-[0.1em] text-faint uppercase">
               <Trans>Advertised engines</Trans>
             </h4>
             <MachineEngineList
@@ -195,7 +195,7 @@ export function RunnerCard({
             <div className="flex items-center gap-2 max-md:flex-wrap max-md:justify-end">
               {confirmRevoke ? (
                 <>
-                  <span className="flex-1 text-[0.6875rem] leading-[1.6] text-blunder">
+                  <span className="flex-1 text-label leading-[1.6] text-blunder">
                     <Trans>
                       Revoking closes the link, deletes the engines it advertised and hands its
                       running work back to the queue with the attempt refunded. The token stops
@@ -241,7 +241,7 @@ export function RunnerCard({
               that appears to have done nothing is the one that most needs a reason next to it.
             */}
             {revoke.isError ? (
-              <p className="text-[0.6875rem] text-blunder">{revoke.error.message}</p>
+              <p className="text-label text-blunder">{revoke.error.message}</p>
             ) : null}
           </div>
         </div>

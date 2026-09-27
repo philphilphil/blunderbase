@@ -61,12 +61,12 @@ export function Snippet({
   return (
     <div className="flex flex-col gap-2">
       <div className="flex items-center gap-2">
-        <h3 className="text-[0.71875rem] font-semibold text-ink">{title}</h3>
+        <h3 className="text-data font-semibold text-ink">{title}</h3>
         <div className="flex-1" />
         <CopyButton text={text} label={copyLabel} />
       </div>
-      {children ? <p className="text-[0.6875rem] leading-[1.5] text-dim">{children}</p> : null}
-      <pre className="overflow-x-auto rounded-lg border border-hairline bg-elevated px-3 py-2.5 font-mono text-[0.65625rem] leading-[1.6] text-soft">
+      {children ? <p className="text-label leading-[1.5] text-dim">{children}</p> : null}
+      <pre className="overflow-x-auto rounded-lg border border-hairline bg-elevated px-3 py-2.5 font-mono text-label leading-[1.6] text-soft">
         {text}
       </pre>
     </div>

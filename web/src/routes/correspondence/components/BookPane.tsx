@@ -46,7 +46,7 @@ const MOVES = 10
  * flips between do not jump.
  */
 const GRID = 'grid grid-cols-[3.625rem_2.75rem_minmax(0,1fr)] items-center gap-2'
-const ROW = cn(GRID, 'h-[1.625rem] rounded-[0.3125rem] px-1.5 font-mono text-[0.6875rem] tabular')
+const ROW = cn(GRID, 'h-[1.625rem] rounded-[0.3125rem] px-1.5 font-mono text-label tabular')
 
 /**
  * `12.` before a White move, `12…` before a Black one — the tree's own labelling, one move
@@ -86,7 +86,7 @@ function Masters({
   if (token.data && !enabled) {
     return (
       <div className="flex flex-col items-center gap-3 px-3 py-6">
-        <p className="text-center text-[0.71875rem] leading-[1.6] text-dim">
+        <p className="text-center text-data leading-[1.6] text-dim">
           <Trans>
             The masters database is Lichess's, and it needs Lichess connected. Your own games
             are on the other tab and need nothing.
@@ -103,7 +103,7 @@ function Masters({
 
   if (masters.error) {
     return (
-      <p role="alert" className="px-3 py-6 text-center text-[0.71875rem] text-blunder">
+      <p role="alert" className="px-3 py-6 text-center text-data text-blunder">
         {masters.error.message}
       </p>
     )
@@ -115,7 +115,7 @@ function Masters({
     return (
       <p
         data-testid="correspondence-book-empty"
-        className="px-3 py-6 text-center text-[0.71875rem] text-dim"
+        className="px-3 py-6 text-center text-data text-dim"
       >
         <Trans>The masters database stops here.</Trans>
       </p>
@@ -133,7 +133,7 @@ function Masters({
         role="row"
         className={cn(
           GRID,
-          'h-5 border-b border-hairline px-1.5 text-[0.5625rem] tracking-[.06em] text-faint uppercase',
+          'h-5 border-b border-hairline px-1.5 text-meta tracking-[.06em] text-faint uppercase',
         )}
       >
         <span>
@@ -240,7 +240,7 @@ export function BookPane({
             aria-pressed={source === entry.key}
             onClick={() => onSourceChange(entry.key)}
             className={cn(
-              'rounded-md border px-2 py-px text-[0.625rem] transition-colors',
+              'rounded-md border px-2 py-px text-meta transition-colors',
               source === entry.key
                 ? 'border-accent-teal/40 bg-selected text-ink'
                 : 'border-edge text-soft hover:border-edge-hover hover:text-ink',

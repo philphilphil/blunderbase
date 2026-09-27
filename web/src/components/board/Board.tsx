@@ -92,7 +92,7 @@ export interface BoardProps {
 const RANKS = ['1', '2', '3', '4', '5', '6', '7', '8'] as const
 const FILES = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'] as const
 /** Geist Mono 10px in `--bb-dim-2`, the way design 1a sets the edge coordinates. */
-const COORD = 'font-mono text-[0.625rem] text-dim-2 select-none'
+const COORD = 'font-mono text-meta text-dim-2 select-none'
 
 const SQUARE = /^[a-h][1-8]$/
 

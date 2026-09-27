@@ -33,13 +33,13 @@ export function AuthScreen({
             alt=""
             className="size-[1.375rem] dark:[filter:invert(1)_hue-rotate(180deg)]"
           />
-          <span className="text-sm font-semibold tracking-[-0.01em] text-ink">Blunderbase</span>
+          <span className="text-heading font-semibold tracking-[-0.01em] text-ink">Blunderbase</span>
         </div>
 
         <div className="bb-card flex flex-col gap-4 px-5 py-5">
           <div className="flex flex-col gap-1.5">
-            <h1 className="text-[0.875rem] font-semibold text-ink">{title}</h1>
-            <p className="text-[0.75rem] leading-[1.65] text-dim">{description}</p>
+            <h1 className="text-heading font-semibold text-ink">{title}</h1>
+            <p className="text-data leading-[1.65] text-dim">{description}</p>
           </div>
           {children}
         </div>
@@ -68,7 +68,7 @@ export function PasswordField({
 }) {
   return (
     <div className="flex flex-col gap-1.5">
-      <label htmlFor={id} className="text-[0.6875rem] font-medium text-soft">
+      <label htmlFor={id} className="text-label font-medium text-soft">
         {label}
       </label>
       <input
@@ -81,7 +81,7 @@ export function PasswordField({
         aria-invalid={invalid || undefined}
         onChange={(event) => onChange(event.target.value)}
         className={cn(
-          'h-8 w-full min-w-0 rounded-md border border-input bg-elevated px-2.5 text-xs text-ink outline-none transition-colors',
+          'h-8 w-full min-w-0 rounded-md border border-input bg-elevated px-2.5 text-data text-ink outline-none transition-colors',
           'placeholder:text-faint focus-visible:border-accent-teal/50',
           'aria-invalid:border-blunder',
         )}
@@ -93,7 +93,7 @@ export function PasswordField({
 /** Whatever went wrong, in the one place a form says so. */
 export function FormError({ children }: { children: ReactNode }) {
   return (
-    <p role="alert" className="text-[0.6875rem] leading-[1.55] text-blunder">
+    <p role="alert" className="text-label leading-[1.55] text-blunder">
       {children}
     </p>
   )

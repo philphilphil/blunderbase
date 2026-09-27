@@ -51,10 +51,10 @@ export function Frame({
         )}
       >
         <div className="flex flex-col gap-1.5">
-          <h2 id={labelledBy} className="text-[0.875rem] font-semibold text-ink">
+          <h2 id={labelledBy} className="text-heading font-semibold text-ink">
             {title}
           </h2>
-          <p className="text-[0.75rem] leading-[1.65] text-dim">{description}</p>
+          <p className="text-data leading-[1.65] text-dim">{description}</p>
         </div>
         {children}
       </div>

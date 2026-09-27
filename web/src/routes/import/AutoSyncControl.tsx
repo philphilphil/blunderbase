@@ -51,7 +51,7 @@ export function AutoSyncControl() {
     if (wanted !== minutes) update.mutate({ minutes: wanted })
   }
 
-  const word = on ? 'text-[0.6875rem] text-soft' : 'text-[0.6875rem] text-dim'
+  const word = on ? 'text-label text-soft' : 'text-label text-dim'
 
   return (
     <div className="flex flex-wrap items-center gap-x-2 gap-y-2 border-t border-hairline px-3.5 py-2.5">
@@ -84,7 +84,7 @@ export function AutoSyncControl() {
         <span className={word}>minutes</span>
       </Trans>
       {update.isError ? (
-        <span className="text-[0.6875rem] text-blunder">{update.error.message}</span>
+        <span className="text-label text-blunder">{update.error.message}</span>
       ) : null}
     </div>
   )

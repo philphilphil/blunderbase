@@ -73,7 +73,7 @@ function Composer({
       }}
       placeholder={placeholder}
       aria-label={t`Note text`}
-      className="w-full resize-none rounded-md border border-input bg-raised px-2.5 py-1.5 text-[0.75rem] leading-[1.5] text-ink outline-none placeholder:text-faint focus-visible:border-accent-teal/50"
+      className="w-full resize-none rounded-md border border-input bg-raised px-2.5 py-1.5 text-data leading-[1.5] text-ink outline-none placeholder:text-faint focus-visible:border-accent-teal/50"
     />
   )
 }
@@ -95,9 +95,9 @@ function Written({
         note.source === 'mcp' && 'border-l-2 border-l-mistake',
       )}
     >
-      <p className="whitespace-pre-wrap text-[0.75rem] leading-[1.55] text-body-2">{note.text}</p>
+      <p className="whitespace-pre-wrap text-data leading-[1.55] text-body-2">{note.text}</p>
       <div className="flex items-center gap-2">
-        <span className="font-mono text-[0.625rem] text-faint">{relative(note.created_at)}</span>
+        <span className="font-mono text-meta text-faint">{relative(note.created_at)}</span>
         <div className="flex-1" />
         <button
           type="button"
@@ -153,10 +153,10 @@ function CommentBox({
     if (!node.comment.trim()) return null
     return (
       <div className="flex flex-col gap-1 border-b border-hairline px-2.5 py-2">
-        <span className="text-[0.625rem] tracking-[0.06em] text-faint uppercase">
+        <span className="text-meta tracking-[0.06em] text-faint uppercase">
           <Trans>Comment on the move</Trans>
         </span>
-        <p className="whitespace-pre-wrap text-[0.71875rem] leading-[1.5] text-body-2">
+        <p className="whitespace-pre-wrap text-data leading-[1.5] text-body-2">
           {node.comment}
         </p>
       </div>
@@ -165,7 +165,7 @@ function CommentBox({
 
   return (
     <div className="flex flex-col gap-1 border-b border-hairline px-2.5 py-2">
-      <span className="text-[0.625rem] tracking-[0.06em] text-faint uppercase">
+      <span className="text-meta tracking-[0.06em] text-faint uppercase">
         <Trans>Comment on the move</Trans>
       </span>
       <textarea
@@ -182,7 +182,7 @@ function CommentBox({
         }}
         placeholder={t`Goes into the PGN beside the move. Enter saves, Shift+Enter breaks the line.`}
         aria-label={t`Comment on the move`}
-        className="w-full resize-none rounded-md border border-input bg-raised px-2 py-1 text-[0.71875rem] leading-[1.5] text-ink outline-none placeholder:text-faint focus-visible:border-accent-teal/50"
+        className="w-full resize-none rounded-md border border-input bg-raised px-2 py-1 text-data leading-[1.5] text-ink outline-none placeholder:text-faint focus-visible:border-accent-teal/50"
       />
     </div>
   )
@@ -276,7 +276,7 @@ export function NotesPane({
             aria-pressed={tab === entry.key}
             onClick={() => onTabChange(entry.key)}
             className={cn(
-              'h-[2.1875rem] border-b-2 px-2 text-[0.6875rem] transition-colors',
+              'h-[2.1875rem] border-b-2 px-2 text-label transition-colors',
               tab === entry.key
                 ? 'border-b-accent-teal text-ink'
                 : 'border-b-transparent text-dim hover:text-ink',
@@ -284,7 +284,7 @@ export function NotesPane({
           >
             {entry.label}
             {entry.count > 0 ? (
-              <span className="ml-1 font-mono text-[0.625rem] text-dim">{entry.count}</span>
+              <span className="ml-1 font-mono text-meta text-dim">{entry.count}</span>
             ) : null}
           </button>
         ))}
@@ -296,7 +296,7 @@ export function NotesPane({
               abandoned.current = false
               setDraft({ id: null, text: '', saved: '' })
             }}
-            className="rounded-md border border-edge px-2 py-px text-[0.625rem] text-soft hover:border-edge-hover hover:text-ink"
+            className="rounded-md border border-edge px-2 py-px text-meta text-soft hover:border-edge-hover hover:text-ink"
           >
             <Trans>Add note</Trans>
           </button>
@@ -358,7 +358,7 @@ export function NotesPane({
           />
         ) : null}
         {notes.length === 0 && draft === null ? (
-          <p className="py-2 text-[0.71875rem] text-dim">
+          <p className="py-2 text-data text-dim">
             {tab === 'position' ? (
               <Trans>Nothing written about this position yet.</Trans>
             ) : (
@@ -366,7 +366,7 @@ export function NotesPane({
             )}
           </p>
         ) : null}
-        {error ? <p className="text-[0.6875rem] text-blunder">{error.message}</p> : null}
+        {error ? <p className="text-label text-blunder">{error.message}</p> : null}
       </div>
       )}
     </div>

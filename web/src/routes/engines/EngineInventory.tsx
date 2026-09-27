@@ -63,7 +63,7 @@ export function EngineInventory({
     <div className="overflow-hidden rounded-xl border border-line bg-panel">
       <div
         className={cn(
-          'grid gap-3 px-3 py-2 text-[0.625rem] tracking-[0.06em] text-faint uppercase',
+          'grid gap-3 px-3 py-2 text-meta tracking-[0.06em] text-faint uppercase',
           COLUMNS,
         )}
       >
@@ -118,11 +118,11 @@ export function EngineInventory({
                 <StatusDot
                   tone={state.tone === 'on' ? 'healthy' : state.tone === 'bad' ? 'degraded' : 'away'}
                 />
-                <span className="truncate text-[0.78125rem] font-medium text-ink">
+                <span className="truncate text-lead font-medium text-ink">
                   {engine.name}
                 </span>
                 {engine.version ? (
-                  <span className="truncate font-mono text-[0.625rem] text-faint">
+                  <span className="truncate font-mono text-meta text-faint">
                     {engine.version}
                   </span>
                 ) : null}
@@ -132,14 +132,14 @@ export function EngineInventory({
                 roles={roles.get(engine.id) ?? NO_ROLES}
                 className="max-md:hidden"
               />
-              <span className="truncate text-[0.6875rem] text-dim max-md:hidden">
+              <span className="truncate text-label text-dim max-md:hidden">
                 {hostLabel(host, hostKnown, local, i18n)}
               </span>
               <CostCell engine={engine} which="threads" />
               <CostCell engine={engine} which="hash" />
               <span
                 className={cn(
-                  'text-right text-[0.6875rem]',
+                  'text-right text-label',
                   state.tone === 'on'
                     ? 'text-good'
                     : state.tone === 'bad'
@@ -175,14 +175,14 @@ export function EngineInventory({
 function CostCell({ engine, which }: { engine: EngineResponse; which: 'threads' | 'hash' }) {
   const { t } = useLingui()
   if (engine.kind !== 'uci') {
-    return <span className="text-right text-[0.6875rem] text-faint max-md:hidden">—</span>
+    return <span className="text-right text-label text-faint max-md:hidden">—</span>
   }
   const value = which === 'threads' ? engineThreads(engine) : engineHashMb(engine)
   const set = which === 'threads' ? engine.options?.Threads !== undefined : value !== null
   return (
     <span
       className={cn(
-        'text-right font-mono text-[0.6875rem] tabular max-md:hidden',
+        'text-right font-mono text-label tabular max-md:hidden',
         set ? 'text-body' : 'text-faint',
       )}
       title={

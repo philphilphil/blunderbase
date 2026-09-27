@@ -51,10 +51,10 @@ export function ModelGames({
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-2.5 max-md:flex-none">
       <div className="flex items-baseline gap-2">
-        <span className="text-[0.75rem] font-semibold text-ink">
+        <span className="text-data font-semibold text-ink">
           <Trans>Model games</Trans>
         </span>
-        <span className="text-[0.6875rem] text-dim">
+        <span className="text-label text-dim">
           {source === 'masters' ? (
             <Trans>from the masters database</Trans>
           ) : (
@@ -70,11 +70,11 @@ export function ModelGames({
           ))}
         </div>
       ) : games.length === 0 ? (
-        <p className="rounded-[0.3125rem] border border-dashed border-edge-strong px-3 py-5 text-center text-[0.75rem] text-dim">
+        <p className="rounded-[0.3125rem] border border-dashed border-edge-strong px-3 py-5 text-center text-data text-dim">
           <Trans>This database has no game to show from here.</Trans>
         </p>
       ) : (
-        <div className="flex min-h-0 flex-col overflow-y-auto font-mono text-[0.71875rem] tabular max-md:overflow-visible">
+        <div className="flex min-h-0 flex-col overflow-y-auto font-mono text-data tabular max-md:overflow-visible">
           {games.map((game) => (
             <button
               key={game.id}
@@ -84,7 +84,7 @@ export function ModelGames({
             >
               <span
                 className={cn(
-                  'min-w-0 flex-1 truncate font-sans text-[0.78125rem]',
+                  'min-w-0 flex-1 truncate font-sans text-lead',
                   nameTone('white', game.winner),
                 )}
               >
@@ -98,7 +98,7 @@ export function ModelGames({
               </span>
               <span
                 className={cn(
-                  'min-w-0 flex-1 truncate font-sans text-[0.78125rem]',
+                  'min-w-0 flex-1 truncate font-sans text-lead',
                   nameTone('black', game.winner),
                 )}
               >

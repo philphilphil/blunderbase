@@ -37,11 +37,11 @@ export function MaiaLevels({ maia }: { maia: CoverageMaia }) {
       className="flex flex-col gap-3 rounded-xl border border-line bg-panel p-3.5"
     >
       <header className="flex items-baseline gap-2">
-        <h2 id="maia-levels-title" className="text-xs font-semibold text-ink">
+        <h2 id="maia-levels-title" className="text-data font-semibold text-ink">
           <Trans>Maia levels</Trans>
         </h2>
         <div className="flex-1" />
-        <span className="font-mono text-[0.6875rem] tabular text-dim-2">
+        <span className="font-mono text-label tabular text-dim-2">
           {maia.missing_games === 0 ? (
             <Trans>every analysed game has every level</Trans>
           ) : (
@@ -56,17 +56,17 @@ export function MaiaLevels({ maia }: { maia: CoverageMaia }) {
             key={level.elo}
             className="flex min-w-24 flex-col gap-1 rounded-md border border-brilliant/28 bg-brilliant/8 px-2.5 py-2"
           >
-            <span className="font-mono text-[0.6875rem] tabular text-brilliant">{level.elo}</span>
-            <span className="font-mono text-[0.8125rem] leading-none tabular text-ink">
+            <span className="font-mono text-label tabular text-brilliant">{level.elo}</span>
+            <span className="font-mono text-lead leading-none tabular text-ink">
               {formatCount(level.games)}
             </span>
-            <span className="text-[0.5625rem] text-dim-2">
+            <span className="text-meta text-dim-2">
               <Trans>games</Trans>
             </span>
           </div>
         ))}
         {maia.per_level.length === 0 ? (
-          <span className="text-[0.6875rem] text-dim-2">
+          <span className="text-label text-dim-2">
             <Trans>No levels configured.</Trans>
           </span>
         ) : null}
@@ -78,7 +78,7 @@ export function MaiaLevels({ maia }: { maia: CoverageMaia }) {
             type="button"
             aria-expanded={showing}
             onClick={() => setShowing(!showing)}
-            className="flex items-center gap-1.5 self-start text-[0.6875rem] text-soft transition-colors hover:text-ink"
+            className="flex items-center gap-1.5 self-start text-label text-soft transition-colors hover:text-ink"
           >
             {showing ? (
               <ChevronDown className="size-3 text-faint" aria-hidden />
@@ -93,7 +93,7 @@ export function MaiaLevels({ maia }: { maia: CoverageMaia }) {
               other: 'pairs',
             })}`}
           </button>
-          <p className="text-[0.625rem] leading-[1.5] text-dim-2">
+          <p className="text-meta leading-[1.5] text-dim-2">
             <Trans>
               Maia used to be asked at each game&rsquo;s own rating rather than at a fixed set,
               so the library carries a level for nearly every rating it has ever seen. They
@@ -106,7 +106,7 @@ export function MaiaLevels({ maia }: { maia: CoverageMaia }) {
               {orphans.map((level) => (
                 <li
                   key={level.elo}
-                  className="bb-chip px-1.5 py-0.5 font-mono text-[0.625rem] tabular text-dim"
+                  className="bb-chip px-1.5 py-0.5 font-mono text-meta tabular text-dim"
                 >
                   {`${level.elo} · ${formatCount(level.games)}`}
                 </li>

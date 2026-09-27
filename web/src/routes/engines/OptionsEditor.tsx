@@ -10,7 +10,7 @@ import { isEditable, type DeclaredOption, type OptionDraft } from './options'
 /** The value column narrows below `md` so the option's own name keeps room to be read. */
 const VALUE_WIDTH = 'w-44 max-md:w-28'
 
-const SELECT_CLASS = `h-8 ${VALUE_WIDTH} rounded-md border border-input bg-elevated px-2 text-xs text-ink outline-none transition-colors focus-visible:border-accent-teal/50`
+const SELECT_CLASS = `h-8 ${VALUE_WIDTH} rounded-md border border-input bg-elevated px-2 text-data text-ink outline-none transition-colors focus-visible:border-accent-teal/50`
 
 function range(option: DeclaredOption): string | null {
   if (option.type !== 'spin') return null
@@ -32,7 +32,7 @@ function Field({
   const { t } = useLingui()
   if (!isEditable(option)) {
     return (
-      <span className={cn(VALUE_WIDTH, 'text-right font-mono text-[0.6875rem] text-faint')}>
+      <span className={cn(VALUE_WIDTH, 'text-right font-mono text-label text-faint')}>
         {option.managed ? t`set per analysis` : t`action`}
       </span>
     )
@@ -150,7 +150,7 @@ export function OptionsEditor({
           type="button"
           onClick={() => setOnlySet((only) => !only)}
           className={cn(
-            'rounded-md border px-2 py-[0.1875rem] text-[0.71875rem] transition-colors',
+            'rounded-md border px-2 py-[0.1875rem] text-label transition-colors',
             onlySet
               ? 'border-accent-teal/30 bg-accent-teal/10 text-accent-teal'
               : 'border-edge bg-elevated text-soft hover:text-ink',
@@ -159,7 +159,7 @@ export function OptionsEditor({
           <Trans>Only set</Trans>
         </button>
         <div className="flex-1" />
-        <span className="font-mono text-[0.6875rem] text-dim tabular">
+        <span className="font-mono text-label text-dim tabular">
           <Trans>
             {set} of {total} set
           </Trans>
@@ -167,7 +167,7 @@ export function OptionsEditor({
       </div>
 
       {declared.length === 0 ? (
-        <p className="rounded-md border border-dashed border-edge-strong px-3 py-4 text-center text-[0.71875rem] text-dim">
+        <p className="rounded-md border border-dashed border-edge-strong px-3 py-4 text-center text-data text-dim">
           <Trans>This binary declared no options.</Trans>
         </p>
       ) : null}
@@ -179,8 +179,8 @@ export function OptionsEditor({
             className="flex items-center gap-3 border-b border-hairline py-2 last:border-b-0"
           >
             <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-              <span className="truncate font-mono text-[0.75rem] text-blunder">{name}</span>
-              <span className="text-[0.65625rem] text-blunder">
+              <span className="truncate font-mono text-data text-blunder">{name}</span>
+              <span className="text-label text-blunder">
                 {errors[name] ?? t`this engine does not declare that option`}
               </span>
             </div>
@@ -208,13 +208,13 @@ export function OptionsEditor({
               <div className="flex min-w-0 flex-1 flex-col gap-0.5">
                 <span
                   className={cn(
-                    'truncate font-mono text-[0.75rem]',
+                    'truncate font-mono text-data',
                     isEditable(option) ? 'text-body' : 'text-dim',
                   )}
                 >
                   {option.name}
                 </span>
-                <span className="flex items-center gap-2 text-[0.65625rem] text-faint">
+                <span className="flex items-center gap-2 text-label text-faint">
                   <span className="uppercase">{option.type}</span>
                   {range(option) ? <span className="font-mono tabular">{range(option)}</span> : null}
                   {optionDefault ? (
@@ -223,7 +223,7 @@ export function OptionsEditor({
                 </span>
               </div>
               {problem ? (
-                <span className="max-w-[22ch] text-right text-[0.65625rem] text-blunder">{problem}</span>
+                <span className="max-w-[22ch] text-right text-label text-blunder">{problem}</span>
               ) : null}
               <Field
                 option={option}

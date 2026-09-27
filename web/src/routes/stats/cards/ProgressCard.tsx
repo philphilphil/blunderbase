@@ -42,8 +42,8 @@ interface Row {
 function ThenNow({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex flex-col gap-0.5">
-      <span className="text-[0.65625rem] text-dim-2">{label}</span>
-      <span className="font-mono text-[0.8125rem] tabular text-ink">{value}</span>
+      <span className="text-label text-dim-2">{label}</span>
+      <span className="font-mono text-lead tabular text-ink">{value}</span>
     </div>
   )
 }
@@ -78,7 +78,7 @@ export function ProgressCard({ query }: { query: StatsQuery }) {
             <Trans>rating</Trans>
           </LegendSwatch>
           {span ? (
-            <span className="font-mono text-[0.65625rem] tabular text-dim-2">
+            <span className="font-mono text-label tabular text-dim-2">
               {first.label} → {last.label}
             </span>
           ) : null}
@@ -118,7 +118,7 @@ export function ProgressCard({ query }: { query: StatsQuery }) {
             <span className="font-mono text-[1.375rem] font-semibold tabular text-ink">
               {last.blunderRate.toFixed(1)}
             </span>
-            <span className="text-[0.71875rem] text-dim-2">
+            <span className="text-data text-dim-2">
               <Trans>blunders per 100 moves in {month} — one month is not a trend yet</Trans>
             </span>
           </div>

@@ -82,7 +82,7 @@ export function BlundersByPieceCard({ query }: { query: StatsQuery }) {
     <StatCard
       title={t`Blunders by piece`}
       aside={
-        <span className="font-mono text-[0.65625rem] tabular text-dim-2">
+        <span className="font-mono text-label tabular text-dim-2">
           <Trans>count · rate</Trans>
         </span>
       }

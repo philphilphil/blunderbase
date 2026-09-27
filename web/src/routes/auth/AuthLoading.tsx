@@ -29,10 +29,10 @@ export function AuthLoading() {
     >
       {unreachable ? (
         <div className="flex max-w-[20rem] flex-col items-center gap-2.5 text-center">
-          <p className="text-xs text-ink">
+          <p className="text-data text-ink">
             <Trans>Blunderbase is not answering.</Trans>
           </p>
-          <p className="text-[0.6875rem] leading-[1.6] text-dim">
+          <p className="text-label leading-[1.6] text-dim">
             <Trans>
               The page is here but the server behind it is not, so there is nothing to sign
               in to yet. It reconnects on its own once the backend is back.
@@ -43,7 +43,7 @@ export function AuthLoading() {
           </Button>
         </div>
       ) : slow ? (
-        <p className="text-xs text-dim">
+        <p className="text-data text-dim">
           <Trans>Checking your session…</Trans>
         </p>
       ) : null}

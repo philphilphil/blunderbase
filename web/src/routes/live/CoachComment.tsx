@@ -21,24 +21,24 @@ export function CoachComment({
   return (
     <section className={cn('flex flex-col rounded-xl border border-line bg-panel', className)}>
       <div className="flex items-center gap-2 border-b border-hairline px-3.5 py-2.5">
-        <span className="text-xs font-semibold text-ink">
+        <span className="text-data font-semibold text-ink">
           <Trans>Coach</Trans>
         </span>
-        <span className="inline-flex items-center gap-1.5 rounded-sm border border-edge px-1.5 py-px text-[0.625rem] text-soft">
+        <span className="inline-flex items-center gap-1.5 rounded-sm border border-edge px-1.5 py-px text-meta text-soft">
           <span className="size-[0.3125rem] rounded-full bg-good" />
           <Trans>via MCP</Trans>
         </span>
         <div className="flex-1" />
-        <span className="font-mono text-[0.625rem] text-dim">{relative(updatedAt)}</span>
+        <span className="font-mono text-meta text-dim">{relative(updatedAt)}</span>
       </div>
 
       <div className="px-3.5 py-3">
         {text ? (
-          <p className="border-l-2 border-accent-teal/60 pl-2.5 text-[0.78125rem] leading-[1.55] text-body-2">
+          <p className="border-l-2 border-accent-teal/60 pl-2.5 text-data leading-[1.55] text-body-2">
             {text}
           </p>
         ) : (
-          <p className="text-[0.71875rem] leading-[1.5] text-dim">
+          <p className="text-data leading-[1.5] text-dim">
             <Trans>
               Nothing said yet. Whatever your assistant writes with{' '}
               <span className="font-mono text-soft-2">annotate</span> appears here as it types

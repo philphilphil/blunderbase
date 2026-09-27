@@ -137,7 +137,7 @@ export function PracticeDialog({
             <Trans>Against</Trans>
           </Label>
           {opponents === undefined && loadError === null ? (
-            <p className="flex items-center gap-2 text-[0.71875rem] text-dim">
+            <p className="flex items-center gap-2 text-label text-dim">
               <Loader2 className="size-3 animate-spin" aria-hidden />
               <Trans>Looking for engines…</Trans>
             </p>
@@ -165,17 +165,17 @@ export function PracticeDialog({
             </div>
           )}
           {loadError ? (
-            <p role="alert" className="text-[0.71875rem] text-blunder">
+            <p role="alert" className="text-label text-blunder">
               {loadError}
             </p>
           ) : null}
           {opponents && engines.length === 0 && !opponents.maia.available ? (
-            <p className="text-[0.71875rem] text-dim">
+            <p className="text-label text-dim">
               <Trans>There is no engine here that can play. Add one under Compute → Engines.</Trans>
             </p>
           ) : null}
           {unavailable.map((row) => (
-            <p key={row.engine_id} className="text-[0.71875rem] text-mistake">
+            <p key={row.engine_id} className="text-label text-mistake">
               {row.name}: {row.reason}
             </p>
           ))}
@@ -190,7 +190,7 @@ export function PracticeDialog({
               id="practice-dialog-level"
               value={maiaLevel ?? ''}
               onChange={(event) => setLevel(Number(event.target.value))}
-              className="h-8 w-40 rounded-md border border-input bg-elevated px-2 text-xs text-ink"
+              className="h-8 w-40 rounded-md border border-input bg-elevated px-2 text-data text-ink"
             >
               {maiaLevels.map((value) => (
                 <option key={value} value={value}>
@@ -198,7 +198,7 @@ export function PracticeDialog({
                 </option>
               ))}
             </select>
-            <p className="text-[0.625rem] leading-[1.5] text-dim-2">
+            <p className="text-meta leading-[1.5] text-dim-2">
               <Trans>
                 Maia plays a move humans at this level play here, drawn by how often they play
                 it — so it blunders the way they do.
@@ -226,10 +226,10 @@ export function PracticeDialog({
                     onChange={(event) => setElo(Number(event.target.value))}
                     className="w-56 accent-accent-teal disabled:opacity-45"
                   />
-                  <span className="w-12 font-mono text-xs text-ink tabular-nums">
+                  <span className="w-12 font-mono text-data text-ink tabular-nums">
                     {full ? '—' : shownElo}
                   </span>
-                  <label className="flex items-center gap-1.5 text-xs text-soft">
+                  <label className="flex items-center gap-1.5 text-data text-soft">
                     <input
                       type="checkbox"
                       checked={full}
@@ -238,7 +238,7 @@ export function PracticeDialog({
                     <Trans>Full strength</Trans>
                   </label>
                 </div>
-                <p className="text-[0.625rem] leading-[1.5] text-dim-2">
+                <p className="text-meta leading-[1.5] text-dim-2">
                   <Trans>
                     The engine’s own rating limit, from {strength.min} to {strength.max}. It
                     plays weaker moves on purpose, calibrated for about a second a move.
@@ -246,7 +246,7 @@ export function PracticeDialog({
                 </p>
               </>
             ) : (
-              <p className="text-[0.71875rem] text-dim">
+              <p className="text-label text-dim">
                 <Trans>
                   {engine.name} declares no rating limit, so it plays at full strength.
                 </Trans>
@@ -305,7 +305,7 @@ function Choice({
       disabled={disabled}
       onClick={onClick}
       className={cn(
-        'rounded-md border px-2 py-1 text-[0.6875rem] transition-colors',
+        'rounded-md border px-2 py-1 text-label transition-colors',
         pressed && !disabled
           ? 'border-accent-teal/40 bg-selected text-ink'
           : 'border-edge text-dim hover:border-edge-hover hover:text-ink',

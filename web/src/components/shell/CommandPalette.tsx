@@ -412,12 +412,12 @@ function Row({
       ) : (
         <Icon className={cn('size-3.5 flex-none', active ? 'text-accent-teal' : 'text-faint')} aria-hidden />
       )}
-      <span className="min-w-0 flex-1 truncate text-[0.71875rem]">{item.label}</span>
+      <span className="min-w-0 flex-1 truncate text-data">{item.label}</span>
       {item.hint ? (
-        <span className="max-w-[42%] flex-none truncate text-[0.625rem] text-dim">{item.hint}</span>
+        <span className="max-w-[42%] flex-none truncate text-meta text-dim">{item.hint}</span>
       ) : null}
       {item.trailing ? (
-        <span className={cn('flex-none font-mono text-[0.625rem] tabular', item.trailingClass ?? 'text-dim-2')}>
+        <span className={cn('flex-none font-mono text-meta tabular', item.trailingClass ?? 'text-dim-2')}>
           {item.trailing}
         </span>
       ) : null}
@@ -522,9 +522,9 @@ function Dialog({ onClose }: { onClose: () => void }) {
             placeholder={t`Search games, opponents, openings, notes…`}
             aria-label={t`Search everything`}
             aria-controls="command-palette-results"
-            className="min-w-0 flex-1 bg-transparent text-[0.8125rem] text-ink outline-none placeholder:text-faint"
+            className="min-w-0 flex-1 bg-transparent text-lead text-ink outline-none placeholder:text-faint"
           />
-          <kbd className="flex-none rounded border border-edge px-1.5 py-0.5 font-mono text-[0.625rem] text-faint">
+          <kbd className="flex-none rounded border border-edge px-1.5 py-0.5 font-mono text-meta text-faint">
             esc
           </kbd>
         </div>
@@ -536,7 +536,7 @@ function Dialog({ onClose }: { onClose: () => void }) {
           className="flex max-h-[26rem] flex-col gap-0.5 overflow-y-auto p-1.5"
         >
           {items.length === 0 ? (
-            <p className="px-2 py-6 text-center text-[0.6875rem] text-dim">
+            <p className="px-2 py-6 text-center text-label text-dim">
               {searching && search.isFetching ? t`Searching…` : t`Nothing matches that.`}
             </p>
           ) : (
@@ -545,7 +545,7 @@ function Dialog({ onClose }: { onClose: () => void }) {
               if (rows.length === 0) return null
               return (
                 <div key={group} className="flex flex-col gap-0.5">
-                  <div className="px-2 pt-1.5 pb-1 text-[0.625rem] tracking-[0.12em] text-faint uppercase">
+                  <div className="px-2 pt-1.5 pb-1 text-meta tracking-[0.12em] text-faint uppercase">
                     {i18n._(GROUP_LABELS[group])}
                   </div>
                   {rows.map((item) => (
@@ -562,7 +562,7 @@ function Dialog({ onClose }: { onClose: () => void }) {
           )}
         </div>
 
-        <div className="flex items-center gap-3 border-t border-hairline px-3.5 py-2 text-[0.625rem] text-faint">
+        <div className="flex items-center gap-3 border-t border-hairline px-3.5 py-2 text-meta text-faint">
           <span>
             <Trans>↑↓ move</Trans>
           </span>

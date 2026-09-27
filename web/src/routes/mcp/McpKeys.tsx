@@ -30,7 +30,7 @@ function KeyRow({ item }: { item: McpKeyResponse }) {
       <div className="flex items-center gap-2 max-md:flex-wrap max-md:justify-end">
         {confirmRevoke ? (
           <>
-            <span className="flex-1 text-[0.6875rem] leading-[1.6] text-blunder">
+            <span className="flex-1 text-label leading-[1.6] text-blunder">
               <Trans>
                 Revoking <span className="font-mono">{keyName}</span> stops its token dead; a
                 client still holding it is refused from the next call. A new one means a new key.
@@ -58,8 +58,8 @@ function KeyRow({ item }: { item: McpKeyResponse }) {
         ) : (
           <>
             <KeyRound className="size-3.5 shrink-0 text-faint" aria-hidden />
-            <span className="font-mono text-xs text-ink">{item.name}</span>
-            <span className="flex-1 truncate text-[0.6875rem] text-dim">
+            <span className="font-mono text-data text-ink">{item.name}</span>
+            <span className="flex-1 truncate text-label text-dim">
               <Trans>
                 created {created} · last used {lastUsed}
               </Trans>
@@ -81,7 +81,7 @@ function KeyRow({ item }: { item: McpKeyResponse }) {
         appears to have done nothing is the one that most needs a reason next to it.
       */}
       {revoke.isError ? (
-        <p className="text-[0.6875rem] text-blunder">{revoke.error.message}</p>
+        <p className="text-label text-blunder">{revoke.error.message}</p>
       ) : null}
     </li>
   )
@@ -132,19 +132,19 @@ export function McpKeys({
     <section className="flex flex-col rounded-xl border border-line bg-panel">
       <div className="flex items-center gap-2.5 border-b border-hairline px-3.5 py-3">
         <KeyRound className="size-3.5 text-faint" aria-hidden />
-        <h2 className="text-xs font-semibold text-ink">
+        <h2 className="text-data font-semibold text-ink">
           <Trans>Bearer keys</Trans>
         </h2>
         <div className="flex-1" />
-        <span className="font-mono text-[0.625rem] text-dim">
+        <span className="font-mono text-meta text-dim">
           {active === null ? '' : t`${active} active`}
         </span>
       </div>
 
       {keys.isError ? (
-        <p className="px-3.5 py-3 text-[0.6875rem] text-blunder">{keys.error.message}</p>
+        <p className="px-3.5 py-3 text-label text-blunder">{keys.error.message}</p>
       ) : keys.data && keys.data.length === 0 ? (
-        <p className="px-3.5 py-3 text-[0.6875rem] leading-[1.5] text-dim">
+        <p className="px-3.5 py-3 text-label leading-[1.5] text-dim">
           <Trans>No keys yet. Mint one below and paste it into your client&rsquo;s config.</Trans>
         </p>
       ) : (
@@ -161,7 +161,7 @@ export function McpKeys({
           className="mx-3.5 mb-3 flex flex-col gap-2.5 rounded-lg border border-accent-teal/40 bg-accent-teal/5 px-3 py-3"
         >
           <div className="flex items-center gap-2.5 max-md:flex-wrap">
-            <span className="text-xs font-semibold text-ink">
+            <span className="text-data font-semibold text-ink">
               <Trans>{mintedName} is ready — this key is shown once</Trans>
             </span>
             <div className="flex-1" />
@@ -170,10 +170,10 @@ export function McpKeys({
               <Trans>Done</Trans>
             </Button>
           </div>
-          <code className="block overflow-x-auto rounded-md border border-edge bg-elevated px-3 py-2 font-mono text-[0.71875rem] text-ink">
+          <code className="block overflow-x-auto rounded-md border border-edge bg-elevated px-3 py-2 font-mono text-data text-ink">
             {minted.token}
           </code>
-          <p className="text-[0.6875rem] leading-[1.5] text-dim">
+          <p className="text-label leading-[1.5] text-dim">
             <Trans>
               Nothing stores it, so nothing can show it again. The connect commands below already
               carry it; a lost key is a revoke and a new one.
@@ -206,9 +206,9 @@ export function McpKeys({
             <Trans context="button">Create</Trans>
           </Button>
         </div>
-        {invalid ? <p className="text-[0.6875rem] text-blunder">{invalid}</p> : null}
+        {invalid ? <p className="text-label text-blunder">{invalid}</p> : null}
         {create.isError ? (
-          <p className="text-[0.6875rem] text-blunder">{create.error.message}</p>
+          <p className="text-label text-blunder">{create.error.message}</p>
         ) : null}
       </form>
     </section>

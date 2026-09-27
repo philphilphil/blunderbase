@@ -132,11 +132,11 @@ export function PositionNotes({ fen }: { fen: string }) {
       className="flex flex-none flex-col gap-[0.4375rem] rounded-[0.5625rem] border border-line bg-panel p-[0.8125rem]"
     >
       <div className="flex items-center gap-2">
-        <span className="text-[0.75rem] font-semibold text-ink">
+        <span className="text-data font-semibold text-ink">
           <Trans>Your notes on this position</Trans>
         </span>
         {flash ? (
-          <span role="status" className="text-[0.625rem] text-good">
+          <span role="status" className="text-meta text-good">
             <Trans>saved</Trans>
           </span>
         ) : null}
@@ -145,7 +145,7 @@ export function PositionNotes({ fen }: { fen: string }) {
           <button
             type="button"
             onClick={() => open({ id: null, text: '', saved: '' })}
-            className="rounded-md border border-edge px-2 py-[0.1875rem] text-[0.6875rem] text-soft hover:border-edge-hover hover:text-ink"
+            className="rounded-md border border-edge px-2 py-[0.1875rem] text-label text-soft hover:border-edge-hover hover:text-ink"
           >
             <Trans>Add note</Trans>
           </button>
@@ -190,14 +190,14 @@ export function PositionNotes({ fen }: { fen: string }) {
           <button
             type="button"
             onClick={() => open({ id: null, text: '', saved: '' })}
-            className="rounded-md border border-dashed border-edge-strong px-2.5 py-2.5 text-left text-[0.75rem] text-dim hover:border-edge-hover hover:text-soft"
+            className="rounded-md border border-dashed border-edge-strong px-2.5 py-2.5 text-left text-data text-dim hover:border-edge-hover hover:text-soft"
           >
             <Trans>Nothing written about this position yet. What is worth remembering here?</Trans>
           </button>
         ) : null}
       </div>
 
-      {error ? <p className="text-[0.6875rem] text-blunder">{error.message}</p> : null}
+      {error ? <p className="text-label text-blunder">{error.message}</p> : null}
     </div>
   )
 }
@@ -228,7 +228,7 @@ function Written({
         viaMcp && 'border-l-2 border-l-mistake',
       )}
     >
-      <p className="whitespace-pre-wrap text-[0.78125rem] leading-[1.55] text-body-2">
+      <p className="whitespace-pre-wrap text-data leading-[1.55] text-body-2">
         {note.text}
       </p>
 
@@ -241,7 +241,7 @@ function Written({
         <Link
           to={origin}
           title={move ? t`Open ${from} at ${move}` : t`Open ${from}`}
-          className="flex min-w-0 items-baseline gap-1.5 text-[0.6875rem] text-dim transition-colors hover:text-accent-teal"
+          className="flex min-w-0 items-baseline gap-1.5 text-label text-dim transition-colors hover:text-accent-teal"
         >
           {move ? <span className="flex-none font-mono tabular text-soft-2">{move}</span> : null}
           <span className="truncate">
@@ -253,14 +253,14 @@ function Written({
       <div className="flex items-center gap-2">
         {viaMcp ? (
           <span
-            className="inline-flex items-center gap-[0.3125rem] rounded-sm border border-edge px-1.5 py-px text-[0.625rem] text-soft"
+            className="inline-flex items-center gap-[0.3125rem] rounded-sm border border-edge px-1.5 py-px text-meta text-soft"
             title={t`written over MCP by ${MCP_SERVER_NAME}`}
           >
             <span className="size-[0.3125rem] rounded-full bg-good" />
             <Trans>note via MCP</Trans>
           </span>
         ) : null}
-        <span className="font-mono text-[0.625rem] text-faint">{relative(note.created_at)}</span>
+        <span className="font-mono text-meta text-faint">{relative(note.created_at)}</span>
         <div className="flex-1" />
         <button
           type="button"
@@ -321,7 +321,7 @@ function Composer({
       }}
       placeholder={t`What is worth remembering about this position? Enter saves, Shift+Enter breaks the line.`}
       aria-label={t`Note text`}
-      className="w-full resize-none rounded-md border border-input bg-raised px-2.5 py-1.5 text-[0.78125rem] leading-[1.5] text-ink outline-none placeholder:text-faint focus-visible:border-accent-teal/50"
+      className="w-full resize-none rounded-md border border-input bg-raised px-2.5 py-1.5 text-lead text-ink outline-none placeholder:text-faint focus-visible:border-accent-teal/50"
     />
   )
 }

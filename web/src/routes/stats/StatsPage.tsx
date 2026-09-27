@@ -212,9 +212,9 @@ export function StatsPage() {
   /** The small mono clause under a KPI: a movement while comparing, a unit otherwise. */
   function suffix(value: number | null, unit: string, lowerIsBetter: boolean, digits = 1) {
     if (!comparing || !canCompare) {
-      return <span className="font-mono text-[0.6875rem] text-dim">{unit}</span>
+      return <span className="font-mono text-label text-dim">{unit}</span>
     }
-    if (comparePending) return <span className="font-mono text-[0.6875rem] text-faint">…</span>
+    if (comparePending) return <span className="font-mono text-label text-faint">…</span>
     return (
       <DeltaText tone={deltaTone(value, lowerIsBetter)}>{formatDelta(value, digits)}</DeltaText>
     )
@@ -453,7 +453,7 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
     <div className="flex items-center gap-1.5">
       <span
         aria-hidden
-        className="flex-none text-[0.65625rem] tracking-[.06em] text-dim-2 uppercase"
+        className="flex-none text-meta tracking-[.06em] text-dim-2 uppercase"
       >
         {label}
       </span>

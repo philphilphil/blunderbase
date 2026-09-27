@@ -52,18 +52,18 @@ export function QueueDestinations({
             />
             <span
               className={cn(
-                'min-w-0 flex-1 truncate text-[0.65625rem]',
+                'min-w-0 flex-1 truncate text-label',
                 destination.destination === 'local' ? 'font-mono text-dim' : 'text-soft',
               )}
             >
               {destination.name}
             </span>
-            <span className="flex-none font-mono text-[0.625rem] tabular text-dim-2">
+            <span className="flex-none font-mono text-meta tabular text-dim-2">
               {destination.running}/{destination.slots ?? '—'}
             </span>
             <span
               className={cn(
-                'w-10 flex-none text-right font-mono text-[0.625rem] tabular',
+                'w-10 flex-none text-right font-mono text-meta tabular',
                 stalled ? 'text-mistake' : 'text-dim-2',
               )}
             >

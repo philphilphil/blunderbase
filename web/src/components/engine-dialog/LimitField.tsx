@@ -63,7 +63,7 @@ export function LimitField<K extends string>({
               aria-pressed={kind === option.kind}
               onClick={() => onKindChange(option.kind)}
               className={cn(
-                'rounded-md border px-2 py-1 text-[0.6875rem] transition-colors',
+                'rounded-md border px-2 py-1 text-label transition-colors',
                 kind === option.kind
                   ? 'border-accent-teal/40 bg-selected text-ink'
                   : 'border-edge text-dim hover:border-edge-hover hover:text-ink',
@@ -86,7 +86,7 @@ export function LimitField<K extends string>({
           />
         )}
       </div>
-      {hint ? <p className="text-[0.625rem] leading-[1.5] text-dim-2">{hint}</p> : null}
+      {hint ? <p className="text-meta leading-[1.5] text-dim-2">{hint}</p> : null}
     </div>
   )
 }

@@ -90,7 +90,7 @@ export function BlundersByPhaseCard({
       className={className}
       title={t`Blunders by game phase`}
       aside={
-        <span className="font-mono text-[0.625rem] tabular text-dim-2">
+        <span className="font-mono text-meta tabular text-dim-2">
           <Plural value={all} one="# blunder" other="# blunders" />
         </span>
       }

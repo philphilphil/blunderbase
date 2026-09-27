@@ -66,12 +66,12 @@ export function ConnectLichessButton({
         {reconnect ? t`Reconnect Lichess` : t`Connect Lichess`}
       </Button>
       {inBrowser ? (
-        <p className="text-[0.6875rem] text-dim">
+        <p className="text-label text-dim">
           <Trans>Finish signing in in your browser. This updates by itself.</Trans>
         </p>
       ) : null}
       {connect.error ? (
-        <p className="text-[0.6875rem] text-blunder">{connect.error.message}</p>
+        <p className="text-label text-blunder">{connect.error.message}</p>
       ) : null}
     </div>
   )
@@ -88,10 +88,10 @@ export function LichessConnectCard({ reason }: { reason: 'missing' | 'rejected' 
   const { t } = useLingui()
   return (
     <div className="flex flex-col items-start gap-2.5 rounded-xl border border-edge-strong bg-panel p-5">
-      <span className="text-[0.75rem] font-semibold text-ink">
+      <span className="text-data font-semibold text-ink">
         {reason === 'rejected' ? t`Lichess refused the connection` : t`Connect Lichess`}
       </span>
-      <p className="text-[0.78125rem] leading-relaxed text-soft">
+      <p className="text-data leading-relaxed text-soft">
         {reason === 'rejected'
           ? t`Lichess no longer accepts the stored sign-in. It may have been revoked, or it expired after a year. Connect again to read the masters and lichess databases.`
           : t`The masters and lichess databases only answer signed-in requests. Connect your Lichess account to read them; the same connection imports your Lichess games as soon as they end.`}

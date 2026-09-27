@@ -138,8 +138,8 @@ export function ServerCard({
     >
       <div className="flex flex-wrap items-center gap-2.5 border-b border-line px-3.5 py-2.5">
         <StatusDot tone={local.workers ? 'healthy' : 'degraded'} />
-        <h3 className="text-[0.8125rem] font-semibold text-ink">{name}</h3>
-        <span className="text-[0.6875rem] text-dim">
+        <h3 className="text-lead font-semibold text-ink">{name}</h3>
+        <span className="text-label text-dim">
           {cores !== null ? (
             <Plural value={cores} one="# core" other="# cores" />
           ) : (
@@ -149,7 +149,7 @@ export function ServerCard({
         <div className="flex-1" />
         <span
           className={cn(
-            'font-mono text-[0.6875rem] tabular',
+            'font-mono text-label tabular',
             local.workers ? 'text-soft' : 'text-mistake',
           )}
           title={
@@ -182,7 +182,7 @@ export function ServerCard({
           onSubmit={submit}
           className="flex flex-col gap-3 px-3.5 py-3 md:border-r md:border-line"
         >
-          <h4 className="text-[0.625rem] tracking-[0.1em] text-faint uppercase">
+          <h4 className="text-meta tracking-[0.1em] text-faint uppercase">
             <Trans>How much at once</Trans>
           </h4>
           <div className="flex flex-wrap items-start gap-4">
@@ -194,9 +194,9 @@ export function ServerCard({
                     id="analysis-concurrency"
                     readOnly
                     value={inForce ?? ''}
-                    className="h-8 w-full rounded-md border border-input bg-raised px-2 font-mono text-xs text-dim tabular"
+                    className="h-8 w-full rounded-md border border-input bg-raised px-2 font-mono text-data text-dim tabular"
                   />
-                  <span className="font-mono text-[0.625rem] text-dim-2">
+                  <span className="font-mono text-meta text-dim-2">
                     <Trans>Set by BLUNDERBASE_ANALYSIS_CONCURRENCY</Trans>
                   </span>
                 </div>
@@ -209,7 +209,7 @@ export function ServerCard({
               )}
             </div>
           </div>
-          <p className="max-w-[30rem] text-[0.625rem] leading-[1.5] text-dim-2">
+          <p className="max-w-[30rem] text-meta leading-[1.5] text-dim-2">
             {correspondenceOn ? (
               <Trans>
                 Queue processes run the passes, the tasks, the analysis boards and the
@@ -225,7 +225,7 @@ export function ServerCard({
             )}
           </p>
           {save.isError ? (
-            <p role="alert" className="text-[0.6875rem] text-blunder">
+            <p role="alert" className="text-label text-blunder">
               {save.error.message}
             </p>
           ) : null}
@@ -234,7 +234,7 @@ export function ServerCard({
           <div
             data-testid="core-budget"
             className={cn(
-              'flex flex-col gap-1.5 rounded-md border border-line bg-elevated px-3 py-2.5 text-[0.6875rem] leading-[1.6] text-body',
+              'flex flex-col gap-1.5 rounded-md border border-line bg-elevated px-3 py-2.5 text-label leading-[1.6] text-body',
               budget.over && 'border-l-2 border-l-mistake',
             )}
           >
@@ -251,7 +251,7 @@ export function ServerCard({
               <div className="bg-accent-teal" style={{ width: `${shares.used}%` }} />
               <div className="bg-blunder" style={{ width: `${shares.over}%` }} />
             </div>
-            <p className="text-[0.625rem] text-dim">
+            <p className="text-meta text-dim">
               {budget.over ? (
                 <Trans>
                   At full load, more threads than cores. Lower the cap, or an engine&rsquo;s
@@ -275,11 +275,11 @@ export function ServerCard({
         </form>
 
         <div className="flex flex-col gap-3 px-3.5 py-3">
-          <h4 className="text-[0.625rem] tracking-[0.1em] text-faint uppercase">
+          <h4 className="text-meta tracking-[0.1em] text-faint uppercase">
             <Trans>Engines on this machine</Trans>
           </h4>
           <MachineEngineList engines={local.engines} streamable connected />
-          <p className="text-[0.625rem] leading-[1.6] text-dim-2">
+          <p className="text-meta leading-[1.6] text-dim-2">
             {local.workers ? (
               <Trans>
                 {local.queued} queued, {local.running} running here. Add or edit engines on{' '}

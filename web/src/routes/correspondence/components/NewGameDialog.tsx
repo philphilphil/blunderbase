@@ -58,7 +58,7 @@ function WhichIsYou({
       aria-pressed={value === color}
       onClick={() => onChange(color)}
       className={cn(
-        'flex min-w-0 flex-1 items-center gap-2 rounded-md border px-2.5 py-1.5 text-[0.75rem] transition-colors',
+        'flex min-w-0 flex-1 items-center gap-2 rounded-md border px-2.5 py-1.5 text-data transition-colors',
         value === color
           ? 'border-accent-teal/40 bg-selected text-ink'
           : 'border-edge text-dim hover:border-edge-hover hover:text-ink',
@@ -212,7 +212,7 @@ export function NewGameDialog({
               id="cg-fen"
               value={startFen}
               autoComplete="off"
-              className="font-mono text-[0.6875rem]"
+              className="font-mono text-label"
               placeholder={t`FEN — leave empty for the normal array`}
               onChange={(changed) => setStartFen(changed.target.value)}
             />
@@ -230,7 +230,7 @@ export function NewGameDialog({
         {error ? (
           <p
             role="alert"
-            className="rounded-md border border-blunder/28 bg-blunder/5 px-2.5 py-2 text-[0.75rem] text-blunder"
+            className="rounded-md border border-blunder/28 bg-blunder/5 px-2.5 py-2 text-data text-blunder"
           >
             {error}
           </p>
@@ -308,7 +308,7 @@ export function ImportPgnDialog({
             spellCheck={false}
             onChange={(changed) => setPgn(changed.target.value)}
             placeholder={'[Event "WS/M/168"]\n[White "…"]\n\n1. e4 c5 2. Nf3 d6'}
-            className="w-full resize-y rounded-md border border-input bg-elevated px-2.5 py-2 font-mono text-[0.6875rem] leading-[1.6] text-ink outline-none placeholder:text-faint focus-visible:border-accent-teal/50"
+            className="w-full resize-y rounded-md border border-input bg-elevated px-2.5 py-2 font-mono text-label leading-[1.6] text-ink outline-none placeholder:text-faint focus-visible:border-accent-teal/50"
           />
         </div>
         <WhichIsYou
@@ -362,7 +362,7 @@ export function ImportPgnDialog({
         {error ? (
           <p
             role="alert"
-            className="rounded-md border border-blunder/28 bg-blunder/5 px-2.5 py-2 text-[0.75rem] text-blunder"
+            className="rounded-md border border-blunder/28 bg-blunder/5 px-2.5 py-2 text-data text-blunder"
           >
             {error}
           </p>

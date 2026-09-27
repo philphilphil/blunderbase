@@ -49,13 +49,13 @@ export function DeletedGamesCard() {
       <div className="flex flex-wrap items-center gap-3 px-4 py-3.5">
         <Undo2 className="size-4 text-faint" aria-hidden />
         <div className="min-w-56 flex-1">
-          <h2 className="text-xs font-semibold text-ink">
+          <h2 className="text-data font-semibold text-ink">
             <Trans>Deleted games</Trans>
           </h2>
           {/* One message per number rather than four singular/plural switches inside one
               sentence: "it" and "them" agree with the count in ways no other language
               agrees in the same places. */}
-          <p className="mt-1 text-[0.6875rem] leading-[1.5] text-dim">
+          <p className="mt-1 text-label leading-[1.5] text-dim">
             <Plural
               value={total}
               one="One game is on record as deleted, so importing it again is refused — otherwise the next sync would put it straight back. Forgetting a row lets the next import store that game again, with no analysis and no notes."
@@ -63,7 +63,7 @@ export function DeletedGamesCard() {
             />
           </p>
           {forget.isError ? (
-            <p role="alert" className="mt-1 text-[0.6875rem] text-blunder">
+            <p role="alert" className="mt-1 text-label text-blunder">
               {forget.error.message}
             </p>
           ) : null}
@@ -95,7 +95,7 @@ export function DeletedGamesCard() {
       {open ? (
         <ul className="flex flex-col border-t border-hairline">
           {deleted.isPending ? (
-            <li className="px-4 py-3 text-[0.6875rem] text-dim">
+            <li className="px-4 py-3 text-label text-dim">
               <Trans>Reading the record…</Trans>
             </li>
           ) : null}
@@ -108,7 +108,7 @@ export function DeletedGamesCard() {
             />
           ))}
           {total > rows.length ? (
-            <li className="px-4 py-2 text-[0.6875rem] text-dim">
+            <li className="px-4 py-2 text-label text-dim">
               <Trans>and {rest} more — “Forget all” covers every one of them.</Trans>
             </li>
           ) : null}
@@ -141,22 +141,22 @@ function Row({
       <SourceBadge source={row.source} size="sm" />
       <span
         className={cn(
-          'w-40 flex-none truncate font-mono text-[0.6875rem]',
+          'w-40 flex-none truncate font-mono text-label',
           row.source_id ? 'text-soft' : 'text-faint',
         )}
         title={row.source_id ?? row.dedup_hash}
       >
         {row.source_id ?? `${row.dedup_hash.slice(0, 12)}…`}
       </span>
-      <span className="min-w-40 flex-1 truncate text-[0.71875rem] text-body">
+      <span className="min-w-40 flex-1 truncate text-data text-body">
         <Trans>
           {white} vs {black}
         </Trans>
       </span>
-      <span className="font-mono text-[0.6875rem] text-dim tabular">
+      <span className="font-mono text-label text-dim tabular">
         {row.played_at ? stamp(row.played_at) : '—'}
       </span>
-      <span className="font-mono text-[0.65625rem] text-faint tabular">
+      <span className="font-mono text-meta text-faint tabular">
         <Trans>deleted {when}</Trans>
       </span>
       <Button

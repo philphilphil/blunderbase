@@ -60,3 +60,52 @@ describe('the global scale', () => {
     expect(offenders).toEqual([])
   })
 })
+
+/**
+ * Sizes that are deliberately not on the scale, each with its reason. Add one only for
+ * something that is not text in the scale's sense; a label, a cell or a heading that wants
+ * a size in between wants a named one (docs/design/README.md, "Type scale").
+ */
+const OFF_SCALE: Record<string, string> = {
+  // The captured-piece figurines are icons drawn with Unicode glyphs; they read by
+  // silhouette and need the size to be told apart.
+  '/src/routes/game/components/BoardPanel.tsx: text-[1.0625rem]': 'figurine icons',
+  // The stats display numerals. The scale has no display size; these two are the only
+  // numbers set larger than `text-value`, and they match each other.
+  '/src/routes/stats/kit/states.tsx: text-[1.375rem]': 'StatTile KPI numeral',
+  '/src/routes/stats/cards/ProgressCard.tsx: text-[1.375rem]': 'the one-month numeral',
+}
+
+describe('the type scale', () => {
+  const files = import.meta.glob('/src/**/*.{ts,tsx}', { query: '?raw', eager: true }) as Record<
+    string,
+    { default: string }
+  >
+  const sources = Object.entries(files).filter(
+    // This file names the patterns; utils.ts names the stock sizes in its doc comment.
+    ([path]) => !path.endsWith('/lib/ui/scale.test.ts') && !path.endsWith('/lib/utils.ts'),
+  )
+
+  it('sets no font size by hand, only the six named sizes', () => {
+    const found = new Set<string>()
+    for (const [path, module] of sources) {
+      for (const size of module.default.match(/\btext-\[\d[\d.]*(?:rem|em|px)\]/g) ?? []) {
+        found.add(`${path}: ${size}`)
+      }
+    }
+    expect([...found].filter((entry) => !(entry in OFF_SCALE))).toEqual([])
+    // And an exception that is gone is taken off the list, so the list stays the truth.
+    expect(Object.keys(OFF_SCALE).filter((entry) => !found.has(entry))).toEqual([])
+  })
+
+  it("uses none of Tailwind's stock sizes, which sit beside the scale rather than on it", () => {
+    const offenders: string[] = []
+    for (const [path, module] of sources) {
+      for (const size of module.default.match(/(?<![\w-])text-(?:xs|sm|base|lg|[2-9]?xl)(?![\w/-])/g) ??
+        []) {
+        offenders.push(`${path}: ${size}`)
+      }
+    }
+    expect(offenders).toEqual([])
+  })
+})

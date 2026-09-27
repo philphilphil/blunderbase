@@ -70,10 +70,10 @@ export function CorrespondenceSettingsPage() {
           <Skeleton className="h-28 w-full max-w-3xl" data-testid="settings-loading" />
         ) : (
           <div className="max-w-2xl rounded-md border border-blunder/28 bg-blunder/5 px-3 py-2.5">
-            <p className="text-[0.75rem] text-blunder">
+            <p className="text-data text-blunder">
               <Trans>The analysis configuration could not be read.</Trans>
             </p>
-            <p className="mt-1 font-mono text-[0.6875rem] text-blunder/80">
+            <p className="mt-1 font-mono text-label text-blunder/80">
               {settings.error?.message}
             </p>
             <Button
@@ -176,10 +176,10 @@ export function CorrespondenceSettingsPage() {
                 label={t`Show correspondence mode`}
               />
               <div className="flex flex-col gap-0.5 pt-1.5">
-                <span className="text-[0.71875rem] text-body">
+                <span className="text-data text-body">
                   <Trans>Show correspondence mode</Trans>
                 </span>
-                <span className="text-[0.625rem] leading-[1.5] text-dim-2">
+                <span className="text-meta leading-[1.5] text-dim-2">
                   <Trans>
                     Adds Correspondence to the rail, after Live, with the number of games
                     waiting on your move.
@@ -188,7 +188,7 @@ export function CorrespondenceSettingsPage() {
               </div>
             </div>
             {enabled ? (
-              <p className="border-t border-hairline pt-3 text-[0.625rem] text-dim-2">
+              <p className="border-t border-hairline pt-3 text-meta text-dim-2">
                 <Trans>
                   Start a game from{' '}
                   <Link to="/correspondence" className="text-accent-teal hover:text-accent-link">
@@ -238,7 +238,7 @@ export function CorrespondenceSettingsPage() {
             </CardDescription>
           </CardHeader>
           <CardContent className="flex flex-col gap-3">
-            <p className="text-[0.625rem] leading-[1.6] text-dim-2">
+            <p className="text-meta leading-[1.6] text-dim-2">
               <Trans>
                 How many engine processes this machine runs at once — searches, passes and
                 boards together — is <strong>Queue processes</strong> on{' '}
@@ -248,7 +248,7 @@ export function CorrespondenceSettingsPage() {
                 , and it takes effect when saved.
               </Trans>
             </p>
-            <p className="border-t border-hairline pt-3 text-[0.625rem] leading-[1.6] text-dim-2">
+            <p className="border-t border-hairline pt-3 text-meta leading-[1.6] text-dim-2">
               <Trans>
                 Which engine searches is chosen on the position: Search with… offers every
                 engine that is switched on, with the one holding the analysis role suggested.
@@ -281,7 +281,7 @@ export function CorrespondenceSettingsPage() {
                   onChange={(next) => setDraft({ ...draft, [field.key]: next })}
                 />
               ))}
-              <p className="max-w-xs pt-6 text-[0.625rem] leading-[1.6] text-dim-2">
+              <p className="max-w-xs pt-6 text-meta leading-[1.6] text-dim-2">
                 <Trans>
                   Forty million nodes is a minute or two of a modern engine. The line count
                   is also how wide an expansion can be, since the branches are made from
@@ -293,7 +293,7 @@ export function CorrespondenceSettingsPage() {
           </CardContent>
         </Card>
         {save.isError ? (
-          <p role="alert" className="text-[0.6875rem] text-blunder">
+          <p role="alert" className="text-label text-blunder">
             {save.error.message}
           </p>
         ) : null}

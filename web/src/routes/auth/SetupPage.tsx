@@ -75,7 +75,7 @@ export function SetupPage() {
         </Button>
       </form>
 
-      <p className="rounded-md border border-line bg-elevated px-3 py-2.5 text-[0.6875rem] leading-[1.6] text-dim">
+      <p className="rounded-md border border-line bg-elevated px-3 py-2.5 text-label leading-[1.6] text-dim">
         <Trans>
           This password signs you into Blunderbase. To connect an assistant, create a
           separate MCP key on the Assistant page after setup.

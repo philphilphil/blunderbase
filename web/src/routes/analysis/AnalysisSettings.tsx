@@ -141,10 +141,10 @@ function LoadingOrError({
   if (!error) return null
   return (
     <div className="max-w-2xl rounded-md border border-blunder/28 bg-blunder/5 px-3 py-2.5">
-      <p className="text-[0.75rem] text-blunder">
+      <p className="text-data text-blunder">
         <Trans>The analysis configuration could not be read.</Trans>
       </p>
-      <p className="mt-1 font-mono text-[0.6875rem] text-blunder/80">{error.message}</p>
+      <p className="mt-1 font-mono text-label text-blunder/80">{error.message}</p>
       <Button type="button" variant="outline" size="sm" className="mt-2.5" onClick={retry}>
         <Trans>Try again</Trans>
       </Button>
@@ -267,12 +267,12 @@ export function EnginePassesPage() {
                   </option>
                 ))}
               </select>
-              <p className="text-[0.6875rem] text-dim">
+              <p className="text-label text-dim">
                 <Trans>Still analysed — press Show the engine when you have read it.</Trans>
               </p>
             </CardContent>
           </Card>
-          {save.isError ? <p role="alert" className="text-[0.6875rem] text-blunder">{save.error.message}</p> : null}
+          {save.isError ? <p role="alert" className="text-label text-blunder">{save.error.message}</p> : null}
           <SaveRow
             dirty={dirty}
             pending={save.isPending}
@@ -312,7 +312,7 @@ function MaiaLevels({ elos, onChange }: { elos: number[]; onChange: (next: numbe
     <div className="flex flex-col gap-3">
       <div className="flex min-h-6 flex-wrap items-center gap-1.5" data-testid="maia-elos">
         {elos.map((elo) => (
-          <span key={elo} className="inline-flex items-center gap-1 rounded-full border border-brilliant/35 bg-brilliant/10 py-0.5 pl-2 pr-1 font-mono text-[0.6875rem] text-brilliant">
+          <span key={elo} className="inline-flex items-center gap-1 rounded-full border border-brilliant/35 bg-brilliant/10 py-0.5 pl-2 pr-1 font-mono text-label text-brilliant">
             {elo}
             <button type="button" aria-label={t`Remove ${elo}`} disabled={elos.length < 2} onClick={() => onChange(elos.filter((each) => each !== elo))} className="rounded-full p-px disabled:opacity-40">
               <X className="size-2.5" aria-hidden />
@@ -439,20 +439,20 @@ export function MaiaSettingsPage() {
                 <div key={item.key} className="flex items-start gap-2">
                   <Toggle checked={flag(item.key)} onChange={(next) => setDraft({ ...draft, [item.key]: next ? '1' : '0' })} label={label} />
                   <div className="flex flex-col gap-0.5 pt-1.5">
-                    <span className="text-[0.71875rem] text-body">{label}</span>
-                    <span className="text-[0.625rem] leading-[1.5] text-dim-2">{i18n._(item.caption)}</span>
+                    <span className="text-data text-body">{label}</span>
+                    <span className="text-meta leading-[1.5] text-dim-2">{i18n._(item.caption)}</span>
                   </div>
                 </div>
               )
             })}
-            <p className="border-t border-hairline pt-3 text-[0.625rem] text-dim-2">
+            <p className="border-t border-hairline pt-3 text-meta text-dim-2">
               <Trans>
                 Changed the levels? <Link to="/analysis" className="text-accent-teal hover:text-accent-link">Fill missing levels</Link> from Analysis overview.
               </Trans>
             </p>
           </CardContent>
         </Card>
-        {save.isError ? <p role="alert" className="text-[0.6875rem] text-blunder">{save.error.message}</p> : null}
+        {save.isError ? <p role="alert" className="text-label text-blunder">{save.error.message}</p> : null}
         <SaveRow dirty={dirty} pending={save.isPending} onRevert={() => { setDraft({}); setElos(null) }} />
       </form>
     </PageBody>

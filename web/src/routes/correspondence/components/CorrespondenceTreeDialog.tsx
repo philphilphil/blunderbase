@@ -50,10 +50,10 @@ export function CorrespondenceTreeDialog({
         className="bb-card bb-rise-in flex max-h-full w-full max-w-[46rem] flex-col shadow-[0_1rem_3rem_var(--bb-shadow)]"
       >
         <div className="flex flex-none items-center gap-2 border-b border-line px-3.5 py-2.5">
-          <h2 id="correspondence-tree-title" className="text-[0.8125rem] font-semibold text-ink">
+          <h2 id="correspondence-tree-title" className="text-lead font-semibold text-ink">
             <Trans>Correspondence tree</Trans>
           </h2>
-          <span className="text-[0.6875rem] text-dim">
+          <span className="text-label text-dim">
             <Trans>what was considered while the game ran</Trans>
           </span>
           <div className="flex-1" />
@@ -64,7 +64,7 @@ export function CorrespondenceTreeDialog({
         <div className="flex min-h-0 flex-1 flex-col">
           {detail.isPending ? <Skeleton className="m-3 h-40" /> : null}
           {detail.error ? (
-            <p className="px-3.5 py-3 text-[0.75rem] text-blunder">{detail.error.message}</p>
+            <p className="px-3.5 py-3 text-data text-blunder">{detail.error.message}</p>
           ) : null}
           {detail.data ? (
             <TreePane

@@ -62,7 +62,7 @@ export function LoginPage() {
         </Button>
       </form>
 
-      <p className="text-[0.6875rem] leading-[1.55] text-dim-2">
+      <p className="text-label leading-[1.55] text-dim-2">
         <Trans>
           Lost it? <code className="font-mono text-dim">{RESET_COMMAND}</code> resets it from
           a shell on the host.

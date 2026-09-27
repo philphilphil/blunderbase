@@ -72,11 +72,11 @@ export function CoverageSplit({ coverage }: { coverage: AnalysisCoverage }) {
       className="flex flex-col gap-3 rounded-xl border border-line bg-panel p-3.5"
     >
       <header className="flex items-baseline gap-2">
-        <h2 id="coverage-title" className="text-xs font-semibold text-ink">
+        <h2 id="coverage-title" className="text-data font-semibold text-ink">
           <Trans>Coverage</Trans>
         </h2>
         <div className="flex-1" />
-        <span className="font-mono text-[0.6875rem] tabular text-dim-2">
+        <span className="font-mono text-label tabular text-dim-2">
           <Trans>{games} games</Trans>
         </span>
       </header>
@@ -103,19 +103,19 @@ export function CoverageSplit({ coverage }: { coverage: AnalysisCoverage }) {
       <dl className="grid gap-2 sm:grid-cols-2">
         {rows.map((row) => (
           <div key={row.key} className="flex flex-col gap-1">
-            <dt className="flex items-center gap-1.5 text-[0.6875rem] text-soft">
+            <dt className="flex items-center gap-1.5 text-label text-soft">
               <span className={cn('size-1.5 flex-none rounded-full', row.barClass)} />
               {row.label}
             </dt>
             <dd className="flex items-baseline gap-1.5">
-              <span className="font-mono text-[1.0625rem] leading-none tabular text-ink">
+              <span className="font-mono text-value leading-none tabular text-ink">
                 {formatCount(row.count)}
               </span>
-              <span className="font-mono text-[0.65625rem] tabular text-dim-2">
+              <span className="font-mono text-label tabular text-dim-2">
                 {`${share(row.count, total).toFixed(1)}%`}
               </span>
             </dd>
-            <span className="text-[0.625rem] leading-[1.45] text-dim-2">{row.hint}</span>
+            <span className="text-meta leading-[1.45] text-dim-2">{row.hint}</span>
           </div>
         ))}
       </dl>

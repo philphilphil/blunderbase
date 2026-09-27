@@ -108,14 +108,14 @@ export function useEngineSetup() {
       <Dialog.Portal>
         <Dialog.Overlay className="bb-fade-in fixed inset-0 z-50 bg-void/75" />
         <Dialog.Content className="bb-rise-in fixed left-1/2 top-1/2 z-50 w-[min(28rem,90vw)] -translate-x-1/2 -translate-y-1/2 rounded-lg border border-edge bg-elevated p-6 shadow-xl">
-          <Dialog.Title className="text-lg font-medium"><Trans>No engine is set up</Trans></Dialog.Title>
-          <Dialog.Description className="mt-2 text-sm text-dim">
+          <Dialog.Title className="text-heading font-semibold"><Trans>No engine is set up</Trans></Dialog.Title>
+          <Dialog.Description className="mt-2 text-heading text-dim">
             {capabilities.read_only
               ? <Trans>Stockfish will run in this tab. Analysis results stay in your browser.</Trans>
               : <Trans>Set up browser Stockfish to start this analysis without leaving the page.</Trans>}
           </Dialog.Description>
-          {!support.supported ? <p className="mt-3 text-sm text-blunder">{support.reason}</p> : null}
-          {failure ? <p role="alert" className="mt-3 text-sm text-blunder">{failure}</p> : null}
+          {!support.supported ? <p className="mt-3 text-heading text-blunder">{support.reason}</p> : null}
+          {failure ? <p role="alert" className="mt-3 text-heading text-blunder">{failure}</p> : null}
           <div className="mt-5 flex flex-wrap gap-2">
             <Button asChild variant="outline"><Link to="/compute/machines" onClick={decline}><Trans>Go to Machines</Trans></Link></Button>
             <Button disabled={busy || !support.supported} onClick={() => void install()}>

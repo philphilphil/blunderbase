@@ -3,7 +3,7 @@ import { extendTailwindMerge } from 'tailwind-merge'
 
 /**
  * The type scale's six names (`index.css`'s `@theme` block). tailwind-merge knows the
- * stock sizes (`text-xs` …) but reads any other `text-*` as a colour, so without this
+ * stock sizes (`text-data` …) but reads any other `text-*` as a colour, so without this
  * `cn('text-dim', 'text-meta')` would drop one of the two as a conflict — silently, and in
  * whichever order the call site happened to write them.
  */

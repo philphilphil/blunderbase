@@ -90,7 +90,7 @@ export function TimeOfDayCard({ query }: { query: StatsQuery }) {
       footer={
         <>
           {said ? i18n._(said) : null}
-          <span className="block font-mono text-[0.625rem] tabular text-faint">
+          <span className="block font-mono text-meta tabular text-faint">
             <Trans>hour of day, UTC — the API cannot take a timezone offset yet</Trans>
           </span>
         </>

@@ -89,10 +89,10 @@ export function EnginesPage() {
         <section data-tour="engines" className="flex flex-col gap-2.5">
           <div className="flex items-center gap-2">
             <div>
-              <h2 className="text-xs font-semibold text-ink">
+              <h2 className="text-data font-semibold text-ink">
                 <Trans>Engines</Trans>
               </h2>
-              <p className="mt-1 text-[0.6875rem] text-dim">
+              <p className="mt-1 text-label text-dim">
                 <Trans>Every configured engine, where it runs, and what it costs per process.</Trans>
               </p>
             </div>
@@ -105,10 +105,10 @@ export function EnginesPage() {
             </div>
           ) : engines.isError ? (
             <div className="rounded-xl border border-blunder/28 bg-blunder/5 px-4 py-6 text-center">
-              <p className="text-[0.78125rem] text-blunder">
+              <p className="text-data text-blunder">
                 <Trans>The engine list could not be read.</Trans>
               </p>
-              <p className="mt-1 font-mono text-[0.6875rem] text-blunder/80">
+              <p className="mt-1 font-mono text-label text-blunder/80">
                 {engines.error.message}
               </p>
               <Button
@@ -124,10 +124,10 @@ export function EnginesPage() {
           ) : list.length === 0 ? (
             <div className="flex flex-col items-center gap-2 rounded-xl border border-dashed border-edge-strong bg-panel/60 px-4 py-8 text-center">
               <Cpu className="size-5 text-faint" aria-hidden />
-              <p className="text-[0.78125rem] text-soft">
+              <p className="text-data text-soft">
                 <Trans>No engines are registered.</Trans>
               </p>
-              <p className="max-w-md text-[0.71875rem] leading-[1.5] text-dim">
+              <p className="max-w-md text-label leading-[1.5] text-dim">
                 {capabilities.remote_runners ? (
                   <Trans>
                     Add a path-based engine above, or install browser Stockfish and connect
@@ -154,7 +154,7 @@ export function EnginesPage() {
             />
           )}
 
-          <p className="text-[0.6875rem] leading-[1.6] text-dim">
+          <p className="text-label leading-[1.6] text-dim">
             <Trans>
               Threads and hash belong to one process of one engine. How many processes a machine
               runs at once — passes, boards and correspondence searches together — is set per machine on{' '}

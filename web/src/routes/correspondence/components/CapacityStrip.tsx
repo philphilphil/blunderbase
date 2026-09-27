@@ -77,7 +77,7 @@ export function CapacityStrip({ status }: { status: CorrespondenceStatus | undef
     return (
       <div
         data-testid="correspondence-capacity"
-        className="flex flex-wrap gap-x-6 gap-y-1.5 border-y border-hairline py-2 text-[0.6875rem] text-dim"
+        className="flex flex-wrap gap-x-6 gap-y-1.5 border-y border-hairline py-2 text-label text-dim"
       >
         <span>
           <Trans>Reading what the engines are doing…</Trans>
@@ -103,7 +103,7 @@ export function CapacityStrip({ status }: { status: CorrespondenceStatus | undef
   return (
     <div
       data-testid="correspondence-capacity"
-      className="flex flex-wrap gap-x-6 gap-y-1.5 border-y border-hairline py-2 text-[0.6875rem] text-dim"
+      className="flex flex-wrap gap-x-6 gap-y-1.5 border-y border-hairline py-2 text-label text-dim"
     >
       <span>
         <Dot tone={inUse > 0 ? 'live' : 'idle'} />{' '}

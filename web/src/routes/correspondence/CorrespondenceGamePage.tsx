@@ -104,7 +104,7 @@ function PaneTitle({
   end?: ReactNode
 }) {
   return (
-    <div className="flex h-[2.1875rem] flex-none items-center gap-2 border-b border-line bg-panel px-2.5 text-[0.6875rem]">
+    <div className="flex h-[2.1875rem] flex-none items-center gap-2 border-b border-line bg-panel px-2.5 text-label">
       {/* Only the detail gives way on a narrow column: it is a count the pane itself shows,
           while the title names the pane and the actions at the end are the only way to them. */}
       <strong className="flex-none font-semibold text-ink">{title}</strong>
@@ -404,26 +404,26 @@ export function CorrespondenceGamePage() {
           onClick={() => setFlipped((was) => !was)}
           icon={<FlipVertical2 aria-hidden />}
         />
-        <span className="ml-2 font-mono text-[0.625rem] text-dim">
+        <span className="ml-2 font-mono text-meta text-dim">
           {preview.caption ?? (node.uci ? `${node.san} · ${t`ply ${node.ply}`}` : t`start`)}
         </span>
         {/* The board's own verdict on the position, where the caption is: a mate or a draw
             by rule is a fact about the node, and the notes pane below is about the owner's
             writing on it. */}
         {node.flags?.checkmate ? (
-          <span className="font-mono text-[0.625rem] text-blunder">
+          <span className="font-mono text-meta text-blunder">
             · <Trans>checkmate</Trans>
           </span>
         ) : node.flags?.stalemate ? (
-          <span className="font-mono text-[0.625rem] text-mistake">
+          <span className="font-mono text-meta text-mistake">
             · <Trans>stalemate</Trans>
           </span>
         ) : node.flags?.threefold ? (
-          <span className="font-mono text-[0.625rem] text-mistake">
+          <span className="font-mono text-meta text-mistake">
             · <Trans>threefold</Trans>
           </span>
         ) : node.flags?.fifty_move ? (
-          <span className="font-mono text-[0.625rem] text-mistake">
+          <span className="font-mono text-meta text-mistake">
             · <Trans>fifty-move draw</Trans>
           </span>
         ) : null}
@@ -590,7 +590,7 @@ export function CorrespondenceGamePage() {
       />
 
       {writeError ? (
-        <p role="alert" className="flex-none bg-blunder/5 px-4 py-1.5 text-[0.6875rem] text-blunder">
+        <p role="alert" className="flex-none bg-blunder/5 px-4 py-1.5 text-label text-blunder">
           {writeError.message}
         </p>
       ) : null}
@@ -605,7 +605,7 @@ export function CorrespondenceGamePage() {
                 aria-pressed={pane === each}
                 onClick={() => setPane(each)}
                 className={cn(
-                  'flex-1 border-b-2 py-2 text-[0.6875rem] transition-colors',
+                  'flex-1 border-b-2 py-2 text-label transition-colors',
                   pane === each
                     ? 'border-b-accent-teal text-ink'
                     : 'border-b-transparent text-dim hover:text-ink',
@@ -759,14 +759,14 @@ function PruneDialog({
         {nodes.map((node) => (
           <li
             key={node.id}
-            className="rounded-sm border border-edge px-1.5 py-0.5 font-mono text-[0.6875rem] text-dim"
+            className="rounded-sm border border-edge px-1.5 py-0.5 font-mono text-label text-dim"
           >
             {node.san ?? node.uci}
           </li>
         ))}
       </ul>
       {error ? (
-        <p role="alert" className="text-[0.6875rem] text-blunder">
+        <p role="alert" className="text-label text-blunder">
           {error}
         </p>
       ) : null}
@@ -807,11 +807,11 @@ function Control({
 function Missing({ message }: { message?: string }) {
   return (
     <div className="flex min-h-0 flex-1 flex-col items-start gap-2 p-6">
-      <p className="text-[0.8125rem] text-ink">
+      <p className="text-lead text-ink">
         <Trans>That correspondence game is not here.</Trans>
       </p>
-      {message ? <p className="font-mono text-[0.6875rem] text-dim">{message}</p> : null}
-      <Link to="/correspondence" className="text-[0.75rem] text-accent-teal hover:text-accent-link">
+      {message ? <p className="font-mono text-label text-dim">{message}</p> : null}
+      <Link to="/correspondence" className="text-data text-accent-teal hover:text-accent-link">
         <Trans>Back to the list</Trans>
       </Link>
     </div>

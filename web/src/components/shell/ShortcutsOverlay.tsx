@@ -30,7 +30,7 @@ import { cn } from '@/lib/utils'
 /** A key as it is printed: the app's one spelling of a keycap. */
 function Key({ children }: { children: ReactNode }) {
   return (
-    <kbd className="flex-none rounded border border-edge bg-elevated px-1.5 py-0.5 font-mono text-[0.625rem] whitespace-nowrap text-soft">
+    <kbd className="flex-none rounded border border-edge bg-elevated px-1.5 py-0.5 font-mono text-meta whitespace-nowrap text-soft">
       {children}
     </kbd>
   )
@@ -49,7 +49,7 @@ function Group({ group }: { group: ShortcutGroup }) {
   const { i18n } = useLingui()
   return (
     <section className="mb-4 break-inside-avoid">
-      <h3 className="border-b border-hairline px-1.5 pb-1 text-[0.625rem] tracking-[0.12em] text-faint uppercase">
+      <h3 className="border-b border-hairline px-1.5 pb-1 text-meta tracking-[0.12em] text-faint uppercase">
         {i18n._(group.name)}
       </h3>
       <div className="pt-1">
@@ -58,7 +58,7 @@ function Group({ group }: { group: ShortcutGroup }) {
           return (
             <div
               key={label}
-              className="flex items-baseline gap-3 rounded-md px-1.5 py-[0.1875rem] text-[0.71875rem] leading-snug text-soft"
+              className="flex items-baseline gap-3 rounded-md px-1.5 py-[0.1875rem] text-data text-soft"
             >
               <span className="min-w-0 flex-1">{label}</span>
               <span className="flex flex-none items-center gap-1">
@@ -117,10 +117,10 @@ function Dialog({ onClose }: { onClose: () => void }) {
       >
         <div className="flex flex-none items-center gap-2.5 border-b border-hairline px-4 py-2.5">
           <Keyboard className="size-3.5 flex-none text-faint" aria-hidden />
-          <span className="min-w-0 flex-1 text-[0.8125rem] font-semibold text-ink">
+          <span className="min-w-0 flex-1 text-lead font-semibold text-ink">
             <Trans>Keyboard shortcuts</Trans>
           </span>
-          <span className="flex-none text-[0.625rem] text-faint max-md:hidden">
+          <span className="flex-none text-meta text-faint max-md:hidden">
             <Trans>what this screen answers to</Trans>
           </span>
           <Key>esc</Key>

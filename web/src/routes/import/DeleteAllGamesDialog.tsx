@@ -60,13 +60,13 @@ export function DeleteAllGamesDialog({
         className="bb-card bb-rise-in flex w-full max-w-[22rem] flex-col gap-4 px-5 py-5 shadow-[0_1rem_3rem_var(--bb-shadow)]"
       >
         <div className="flex flex-col gap-1.5">
-          <h2 id="delete-all-games-title" className="flex items-center gap-2 text-[0.875rem] font-semibold text-ink">
+          <h2 id="delete-all-games-title" className="flex items-center gap-2 text-heading font-semibold text-ink">
             <TriangleAlert className="size-3.5 text-blunder" aria-hidden />
             <Trans>Reset imported library</Trans>
           </h2>
           {/* Two whole sentences rather than a count glued to a tail: which of them is on
               screen turns on whether the library has been counted yet. */}
-          <p className="text-[0.75rem] leading-[1.65] text-dim">
+          <p className="text-data leading-[1.65] text-dim">
             {count === undefined ? (
               <Trans>
                 Every game goes, with game analysis, game notes and sync history. Accounts,

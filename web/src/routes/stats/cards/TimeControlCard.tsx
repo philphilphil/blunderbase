@@ -128,7 +128,7 @@ export function TimeControlCard({ query }: { query: StatsQuery }) {
       compact
       title={t`Performance by time control`}
       aside={
-        <span className="font-mono text-[0.625rem] tabular text-dim-2">
+        <span className="font-mono text-meta tabular text-dim-2">
           <Trans>score · blunders</Trans>
         </span>
       }
@@ -145,7 +145,7 @@ export function TimeControlCard({ query }: { query: StatsQuery }) {
             "Blitz" over "1,284" over "48.2" over "1.4" over "1612" and lose the only thing
             the table is for — reading one speed against another down a column. */}
         <div className="flex min-h-0 flex-1 flex-col max-md:overflow-x-auto">
-          <div className="flex h-[1.125rem] flex-none items-center gap-2.5 border-b border-hairline text-[0.5625rem] tracking-[0.06em] text-dim-2 uppercase max-md:min-w-[22rem]">
+          <div className="flex h-[1.125rem] flex-none items-center gap-2.5 border-b border-hairline text-meta tracking-[0.06em] text-dim-2 uppercase max-md:min-w-[22rem]">
             <span className="w-[4.75rem] flex-none">
               <Trans comment="Table column: the time control a bucket of games was played at">
                 Control
@@ -167,7 +167,7 @@ export function TimeControlCard({ query }: { query: StatsQuery }) {
               <Trans>Rating</Trans>
             </span>
           </div>
-          <div className="flex flex-1 flex-col justify-start pt-0.5 font-mono text-[0.6875rem] tabular max-md:min-w-[22rem]">
+          <div className="flex flex-1 flex-col justify-start pt-0.5 font-mono text-label tabular max-md:min-w-[22rem]">
             {rows.map((row) => {
               const played = Math.max(1, row.wins + row.draws + row.losses)
               const highlight = busiest?.key === row.key && rows.length > 1

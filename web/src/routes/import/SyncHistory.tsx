@@ -39,7 +39,7 @@ function StatusChip({ status }: { status: JobStatus }) {
   return (
     <span
       className={cn(
-        'inline-flex items-center gap-1.5 rounded-[0.3125rem] border border-edge-strong bg-raised px-2 py-[0.1875rem] text-[0.71875rem]',
+        'inline-flex items-center gap-1.5 rounded-[0.3125rem] border border-edge-strong bg-raised px-2 py-[0.1875rem] text-label',
         style.text,
       )}
     >
@@ -51,7 +51,7 @@ function StatusChip({ status }: { status: JobStatus }) {
 
 function Count({ value, tone }: { value: number; tone?: string }) {
   return (
-    <span className={cn('font-mono text-[0.71875rem] tabular', value === 0 ? 'text-faint' : tone ?? 'text-body')}>
+    <span className={cn('font-mono text-data tabular', value === 0 ? 'text-faint' : tone ?? 'text-body')}>
       {value}
     </span>
   )
@@ -64,7 +64,7 @@ function Failures({ job, columns }: { job: ImportJob; columns: number }) {
       <td colSpan={columns} className="px-2.5 py-2.5">
         <ul className="flex flex-col gap-1">
           {job.errors.map((failure, index) => (
-            <li key={index} className="flex gap-3 font-mono text-[0.6875rem]">
+            <li key={index} className="flex gap-3 font-mono text-label">
               <span className="w-40 flex-none truncate text-soft-2">{failure.ref ?? '—'}</span>
               <span className="min-w-0 flex-1 text-blunder">{failure.error ?? t`failed`}</span>
             </li>
@@ -119,12 +119,12 @@ export function SyncHistory({
   return (
     <section className="flex flex-col rounded-xl border border-line bg-panel">
       <div className="flex items-center gap-2.5 border-b border-hairline px-3.5 py-3">
-        <span className="text-xs font-semibold text-ink">
+        <span className="text-data font-semibold text-ink">
           <Trans>Sync history</Trans>
         </span>
         <div className="flex-1" />
         {jobs ? (
-          <span className="font-mono text-[0.625rem] text-dim tabular">{total}</span>
+          <span className="font-mono text-meta text-dim tabular">{total}</span>
         ) : null}
       </div>
 
@@ -136,17 +136,17 @@ export function SyncHistory({
         </div>
       ) : error ? (
         <div className="px-3.5 py-6 text-center">
-          <p className="text-[0.78125rem] text-blunder">
+          <p className="text-data text-blunder">
             <Trans>The sync history could not be read.</Trans>
           </p>
-          <p className="mt-1 font-mono text-[0.6875rem] text-dim">{error.message}</p>
+          <p className="mt-1 font-mono text-label text-dim">{error.message}</p>
         </div>
       ) : !jobs || jobs.length === 0 ? (
         <div className="px-3.5 py-8 text-center">
-          <p className="text-[0.78125rem] text-soft">
+          <p className="text-data text-soft">
             <Trans>Nothing has been synced yet.</Trans>
           </p>
-          <p className="mt-1 text-[0.71875rem] text-dim">
+          <p className="mt-1 text-label text-dim">
             <Trans>Connect an account above, or drop a PGN export in.</Trans>
           </p>
         </div>
@@ -215,10 +215,10 @@ export function SyncHistory({
                   <TableCell>
                     <SourceBadge source={job.source} size="sm" />
                   </TableCell>
-                  <TableCell className="font-mono text-[0.71875rem] text-soft tabular">
+                  <TableCell className="font-mono text-data text-soft tabular">
                     {stamp(job.started_at ?? job.created_at)}
                   </TableCell>
-                  <TableCell className="text-right font-mono text-[0.71875rem] text-dim tabular">
+                  <TableCell className="text-right font-mono text-data text-dim tabular">
                     {duration(job)}
                   </TableCell>
                   <TableCell className="text-right">
@@ -245,7 +245,7 @@ export function SyncHistory({
                         <span
                           title={job.message}
                           className={cn(
-                            'max-w-[24ch] truncate font-mono text-[0.6875rem]',
+                            'max-w-[24ch] truncate font-mono text-label',
                             job.status === 'failed' ? 'text-blunder' : 'text-dim',
                           )}
                         >
@@ -264,7 +264,7 @@ export function SyncHistory({
 
       {pageCount > 1 ? (
         <div className="flex items-center gap-2 border-t border-hairline px-3.5 py-2">
-          <span className="font-mono text-[0.65625rem] text-dim tabular">
+          <span className="font-mono text-label text-dim tabular">
             <Trans>
               {first}–{last} of {total}
             </Trans>
@@ -281,7 +281,7 @@ export function SyncHistory({
           >
             <ChevronLeft className="size-3.5" aria-hidden />
           </Button>
-          <span className="font-mono text-[0.65625rem] text-soft tabular" aria-live="polite">
+          <span className="font-mono text-label text-soft tabular" aria-live="polite">
             {page} / {pageCount}
           </span>
           <Button

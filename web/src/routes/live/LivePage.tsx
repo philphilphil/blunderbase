@@ -41,7 +41,7 @@ function ConnectionPill() {
   return (
     <span
       className={cn(
-        'inline-flex items-center gap-1.5 rounded-md border px-2 py-[0.1875rem] text-[0.6875rem]',
+        'inline-flex items-center gap-1.5 rounded-md border px-2 py-[0.1875rem] text-label',
         status === 'open'
           ? 'border-edge bg-elevated text-soft'
           : status === 'connecting'
@@ -135,21 +135,21 @@ export function LivePage() {
       */}
       <header className="flex flex-none items-end gap-3 px-5 pt-4.5 pb-3 max-lg:flex-wrap max-lg:gap-y-2 max-md:px-3">
         <div className="flex min-w-0 flex-col gap-[0.1875rem]">
-          <h1 className="flex items-center gap-2.5 text-[1.1875rem] font-semibold tracking-[-0.01em] text-ink">
+          <h1 className="flex items-center gap-2.5 text-heading font-semibold tracking-[-0.01em] text-ink">
             <Trans>Live</Trans>
             {active ? (
-              <span className="inline-flex items-center gap-1.5 rounded-md border border-accent-teal/30 bg-accent-teal/10 px-2 py-px text-[0.6875rem] font-normal text-accent-teal">
+              <span className="inline-flex items-center gap-1.5 rounded-md border border-accent-teal/30 bg-accent-teal/10 px-2 py-px text-label font-normal text-accent-teal">
                 <Radio className="size-3" aria-hidden />
                 <Trans>on air</Trans>
               </span>
             ) : null}
           </h1>
-          <p className="text-[0.78125rem] text-dim">{describeSession(state, game)}</p>
+          <p className="text-label text-dim">{describeSession(state, game)}</p>
         </div>
         <div className="flex-1" />
         {(state?.position_count ?? 0) > 1 ? <div className="flex items-center gap-2">
           <Button size="sm" disabled={control.isPending || !state?.position_index} onClick={() => control.mutate((state?.position_index ?? 0) - 1)}><Trans>Prev</Trans></Button>
-          <span className="text-xs tabular-nums">{(state?.position_index ?? 0) + 1} / {state?.position_count}</span>
+          <span className="text-data tabular-nums">{(state?.position_index ?? 0) + 1} / {state?.position_count}</span>
           <Button size="sm" disabled={control.isPending || (state?.position_index ?? 0) >= (state?.position_count ?? 0) - 1} onClick={() => control.mutate((state?.position_index ?? 0) + 1)}><Trans>Next</Trans></Button>
         </div> : null}
         <Button size="sm" disabled={!active || control.isPending} onClick={() => control.mutate(null)}><Trans>Reset</Trans></Button>
@@ -158,14 +158,14 @@ export function LivePage() {
           type="button"
           onClick={() => setFlipped((value) => !value)}
           aria-label={t`Flip the board`}
-          className="inline-flex items-center gap-2 rounded-md border border-edge px-2.5 py-[0.3125rem] text-[0.6875rem] text-soft transition-colors hover:border-edge-hover hover:text-ink"
+          className="inline-flex items-center gap-2 rounded-md border border-edge px-2.5 py-[0.3125rem] text-label text-soft transition-colors hover:border-edge-hover hover:text-ink"
         >
           <FlipVertical2 className="size-3.5" aria-hidden />
           {orientation === 'white' ? t`White` : t`Black`}
         </button>
       </header>
 
-      {control.isError ? <p role="alert" className="px-5 text-sm text-blunder">{control.error.message}</p> : null}
+      {control.isError ? <p role="alert" className="px-5 text-heading text-blunder">{control.error.message}</p> : null}
       {/*
         Board over rail below `md`, in one scroller. The desktop shape is a board sized to
         the viewport height beside a rail that scrolls on its own; on a phone the height
@@ -181,10 +181,10 @@ export function LivePage() {
             />
           ) : live.isError ? (
             <div className="max-w-md rounded-xl border border-blunder/28 bg-blunder/5 px-4 py-6 text-center">
-              <p className="text-[0.78125rem] text-blunder">
+              <p className="text-data text-blunder">
                 <Trans>The live session could not be read.</Trans>
               </p>
-              <p className="mt-1 font-mono text-[0.6875rem] text-blunder/80">{live.error.message}</p>
+              <p className="mt-1 font-mono text-label text-blunder/80">{live.error.message}</p>
             </div>
           ) : (
             <div
@@ -209,10 +209,10 @@ export function LivePage() {
                 <div className="absolute inset-0 flex items-center justify-center p-6">
                   <div className="flex max-w-sm flex-col items-center gap-2 rounded-xl border border-line bg-panel/95 px-5 py-6 text-center">
                     <Radio className="size-5 text-faint" aria-hidden />
-                    <p className="text-[0.78125rem] text-soft">
+                    <p className="text-data text-soft">
                       <Trans>Nothing is on the board.</Trans>
                     </p>
-                    <p className="text-[0.71875rem] leading-[1.55] text-dim">
+                    <p className="text-label leading-[1.55] text-dim">
                       <Trans>
                         Ask your assistant to put a game on it —{' '}
                         <span className="font-mono text-soft-2">show_game</span> for a stored
@@ -237,21 +237,21 @@ export function LivePage() {
             className="rounded-xl border border-line"
           />
           {active && replay ? <section className="flex flex-col gap-3 rounded-xl border border-line p-3">
-            <h2 className="text-sm font-semibold"><Trans>Game replay</Trans></h2>
+            <h2 className="text-heading font-semibold"><Trans>Game replay</Trans></h2>
             <MiniBoard fen={replay.fen} lastMove={replay.uci} orientation={orientation} size="100%" label={t`Referenced game position`} />
             <div className="flex items-center justify-between gap-2">
               <Button size="sm" aria-label={t`Previous game move`} disabled={replayPly === 0} onClick={() => setReplayPly((ply) => ply - 1)}><Trans>Prev</Trans></Button>
-              <span className="text-xs"><Trans>Ply {replayPly}</Trans></span>
+              <span className="text-data"><Trans>Ply {replayPly}</Trans></span>
               <Button size="sm" aria-label={t`Next game move`} disabled={replayPly >= (state?.game_positions?.length ?? 1) - 1} onClick={() => setReplayPly((ply) => ply + 1)}><Trans>Next</Trans></Button>
             </div>
             <div className="flex max-h-40 flex-wrap gap-1 overflow-y-auto" aria-label={t`Game moves`}>
-              {state?.game_positions?.map((position) => <button type="button" key={position.ply} aria-current={position.ply === replayPly ? 'step' : undefined} className={cn('rounded px-1.5 py-1 text-xs', position.ply === replayPly ? 'bg-accent-teal/20 text-ink' : 'text-soft hover:bg-elevated')} onClick={() => setReplayPly(position.ply)}>{position.ply === 0 ? t`Start` : `${Math.ceil(position.ply / 2)}${position.ply % 2 ? '.' : '…'} ${notate(position.san ?? '')}`}</button>)}
+              {state?.game_positions?.map((position) => <button type="button" key={position.ply} aria-current={position.ply === replayPly ? 'step' : undefined} className={cn('rounded px-1.5 py-1 text-data', position.ply === replayPly ? 'bg-accent-teal/20 text-ink' : 'text-soft hover:bg-elevated')} onClick={() => setReplayPly(position.ply)}>{position.ply === 0 ? t`Start` : `${Math.ceil(position.ply / 2)}${position.ply % 2 ? '.' : '…'} ${notate(position.san ?? '')}`}</button>)}
             </div>
           </section> : null}
           <CoachComment text={state?.text} updatedAt={state?.updated_at} />
           {state && active ? <SessionMeta state={state} game={game} /> : null}
           {followed.isError ? (
-            <p className="rounded-lg border border-mistake/28 bg-mistake/5 px-3 py-2.5 text-[0.71875rem] text-mistake">
+            <p className="rounded-lg border border-mistake/28 bg-mistake/5 px-3 py-2.5 text-data text-mistake">
               <Trans>The followed game could not be read — {followedError}</Trans>
             </p>
           ) : null}

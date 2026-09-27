@@ -78,7 +78,7 @@ export function TopBar({ onOpenNav }: { onOpenNav: () => void }) {
           alt=""
           className="size-[1.1875rem] dark:[filter:invert(1)_hue-rotate(180deg)]"
         />
-        <span className="text-[0.8125rem] font-semibold tracking-[-0.01em] text-ink max-md:hidden">
+        <span className="text-lead font-semibold tracking-[-0.01em] text-ink max-md:hidden">
           Blunderbase
         </span>
       </Link>

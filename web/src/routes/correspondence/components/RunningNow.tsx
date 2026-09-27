@@ -73,12 +73,12 @@ function Card({
       )}
     >
       <span className="flex min-w-0 items-baseline gap-1.5">
-        <span className="truncate text-[0.75rem] font-semibold text-ink">
+        <span className="truncate text-data font-semibold text-ink">
           {search.engine_name ?? t`Engine`}
         </span>
         {task ? (
           <span
-            className="flex-none rounded-sm border border-edge px-1 text-[0.5625rem] text-dim uppercase"
+            className="flex-none rounded-sm border border-edge px-1 text-meta text-dim uppercase"
             title={t`A bounded look through the analysis queue`}
           >
             <Trans>task</Trans>
@@ -92,12 +92,12 @@ function Card({
       */}
       <span
         title={t`from the side to move's point of view`}
-        className="self-center font-mono text-[0.8125rem] font-semibold text-body"
+        className="self-center font-mono text-lead font-semibold text-body"
       >
         {formatScore(snapshot?.lines?.[0] ?? null)}
       </span>
-      <span className="col-span-2 truncate text-[0.625rem] text-dim">{detail || '—'}</span>
-      <span className="col-span-2 flex items-center gap-1.5 text-[0.625rem] text-dim-2">
+      <span className="col-span-2 truncate text-meta text-dim">{detail || '—'}</span>
+      <span className="col-span-2 flex items-center gap-1.5 text-meta text-dim-2">
         <span
           aria-hidden
           className={cn(
@@ -151,7 +151,7 @@ export function RunningNow({
   const byId = gamesById(games)
   if (searches.length === 0) {
     return (
-      <p className="py-4 text-[0.75rem] text-dim">
+      <p className="py-4 text-data text-dim">
         <Trans>No engine is on a correspondence position right now.</Trans>
       </p>
     )

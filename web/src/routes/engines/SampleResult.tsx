@@ -28,7 +28,7 @@ function Pv({ line }: { line: EngineLine }) {
   const notate = useNotation()
   const moves = (line.san ?? line.pv ?? []).slice(0, PV_MOVES)
   return (
-    <span className="min-w-0 flex-1 truncate font-mono text-[0.71875rem] text-soft-2">
+    <span className="min-w-0 flex-1 truncate font-mono text-data text-soft-2">
       {notate(moves.join(' ')) || '—'}
     </span>
   )
@@ -53,10 +53,10 @@ export function SampleResult({ sample }: { sample: SampleResponse }) {
   return (
     <div className="flex flex-col gap-2.5 rounded-lg border border-line bg-surface-2 px-3 py-2.5">
       <div className="flex items-center gap-2.5">
-        <span className="text-[0.71875rem] font-medium text-ink">{sample.engine_name}</span>
+        <span className="text-data font-medium text-ink">{sample.engine_name}</span>
         <span
           className={cn(
-            'rounded-sm border px-1.5 py-px text-[0.625rem]',
+            'rounded-sm border px-1.5 py-px text-meta',
             sample.kind === 'maia'
               ? 'border-deep/28 bg-deep/10 text-deep'
               : 'border-edge bg-elevated text-soft',
@@ -65,7 +65,7 @@ export function SampleResult({ sample }: { sample: SampleResponse }) {
           {sample.kind}
         </span>
         <div className="flex-1" />
-        <span className="font-mono text-[0.65625rem] text-dim tabular">
+        <span className="font-mono text-label text-dim tabular">
           <Trans>{elapsed} ms</Trans>
         </span>
       </div>
@@ -73,24 +73,24 @@ export function SampleResult({ sample }: { sample: SampleResponse }) {
       {sample.kind === 'maia' ? (
         <div className="flex flex-col gap-2">
           {policy.length === 0 ? (
-            <p className="text-[0.71875rem] text-dim">
+            <p className="text-data text-dim">
               <Trans>The model returned no policy.</Trans>
             </p>
           ) : null}
           {policy.map(([level, moves]) => (
             <div key={level} className="flex flex-col gap-1">
-              <span className="font-mono text-[0.65625rem] text-dim">
+              <span className="font-mono text-meta text-dim">
                 {level === 'any' ? t`policy` : t`rating ${level}`}
               </span>
               <div className="flex flex-wrap gap-1.5">
                 {moves.slice(0, 5).map((move, index) => (
                   <span
                     key={`${level}-${move.uci ?? index}`}
-                    className="inline-flex items-center gap-1.5 rounded-sm border border-deep/28 bg-deep/10 px-1.5 py-px font-mono text-[0.6875rem] text-deep"
+                    className="inline-flex items-center gap-1.5 rounded-sm border border-deep/28 bg-deep/10 px-1.5 py-px font-mono text-label text-deep"
                   >
                     {move.san ? notate(move.san) : (move.uci ?? '—')}
                     {typeof move.p === 'number' ? (
-                      <span className="tabular text-[0.625rem] text-deep/70">
+                      <span className="tabular text-meta text-deep/70">
                         {(move.p * 100).toFixed(0)}%
                       </span>
                     ) : null}
@@ -105,16 +105,16 @@ export function SampleResult({ sample }: { sample: SampleResponse }) {
           <div className="flex items-baseline gap-3">
             <EvalText
               score={{ cp: sample.cp, mate: sample.mate }}
-              className="text-[1.25rem] font-semibold"
+              className="text-value font-semibold"
             />
-            <span className="font-mono text-[0.6875rem] text-dim tabular">
+            <span className="font-mono text-label text-dim tabular">
               <Trans>
                 {depth} · {nodes} nodes
               </Trans>
             </span>
             <div className="flex-1" />
             {sample.best_move ? (
-              <span className="font-mono text-[0.75rem] text-accent-teal">
+              <span className="font-mono text-data text-accent-teal">
                 {sample.best_move.san ? notate(sample.best_move.san) : sample.best_move.uci}
               </span>
             ) : null}
@@ -124,12 +124,12 @@ export function SampleResult({ sample }: { sample: SampleResponse }) {
             <ul className="flex flex-col gap-1 border-t border-hairline pt-2">
               {lines.map((line, index) => (
                 <li key={line.multipv ?? index} className="flex items-center gap-2.5">
-                  <span className="w-4 font-mono text-[0.65625rem] text-faint tabular">
+                  <span className="w-4 font-mono text-meta text-faint tabular">
                     {line.multipv ?? index + 1}
                   </span>
                   <EvalText
                     score={{ cp: line.cp, mate: line.mate }}
-                    className="w-14 text-[0.71875rem]"
+                    className="w-14 text-label"
                   />
                   <Pv line={line} />
                 </li>
@@ -139,7 +139,7 @@ export function SampleResult({ sample }: { sample: SampleResponse }) {
         </>
       )}
 
-      <p className="truncate border-t border-hairline pt-2 font-mono text-[0.65625rem] text-faint">
+      <p className="truncate border-t border-hairline pt-2 font-mono text-meta text-faint">
         {sample.fen}
       </p>
     </div>

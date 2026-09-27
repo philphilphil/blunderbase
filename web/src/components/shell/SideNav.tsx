@@ -229,7 +229,7 @@ function Item({
           // The selected row is a filled row and nothing else. It used to carry an accent
           // bar down its left edge as well, which made every rail on screen argue with the
           // fill about which one was saying "you are here".
-          'flex items-center gap-2.5 rounded-md py-[0.4375rem] text-[0.8125rem] transition-colors',
+          'flex items-center gap-2.5 rounded-md py-[0.4375rem] text-lead transition-colors',
           collapsed ? 'justify-center px-0' : 'px-2',
           isActive ? 'bg-selected text-ink' : 'text-soft hover:bg-raised hover:text-ink',
         )
@@ -270,7 +270,7 @@ function SubPages({ pages }: { pages: { to: string; label: MessageDescriptor }[]
           to={page.to}
           className={({ isActive }) =>
             cn(
-              'rounded-md px-1.5 py-[0.375rem] text-[0.75rem] transition-colors',
+              'rounded-md px-1.5 py-[0.375rem] text-data transition-colors',
               isActive ? 'bg-selected text-ink' : 'text-dim hover:bg-raised hover:text-ink',
             )
           }
@@ -308,7 +308,7 @@ function DotRow({
       to={to}
       title={title}
       className={cn(
-        'flex items-center gap-1.5 rounded-md px-1.5 py-[0.375rem] text-[0.75rem] transition-colors',
+        'flex items-center gap-1.5 rounded-md px-1.5 py-[0.375rem] text-data transition-colors',
         active ? 'bg-selected text-ink' : 'text-soft hover:bg-raised hover:text-ink',
       )}
     >
@@ -397,7 +397,7 @@ function EngineRoster() {
       {(engines.data ?? []).slice(0, 6).map((engine) => (
         <div
           key={engine.id}
-          className="flex items-center gap-2.5 rounded-md px-2 py-[0.4375rem] text-[0.8125rem] text-soft"
+          className="flex items-center gap-2.5 rounded-md px-2 py-[0.4375rem] text-lead text-soft"
           title={engine.path}
         >
           <StatusDot tone={engine.enabled ? 'healthy' : 'away'} className="mx-1" />
@@ -405,7 +405,7 @@ function EngineRoster() {
         </div>
       ))}
       {engines.data?.length === 0 ? (
-        <div className="px-2 py-[0.4375rem] text-[0.75rem] text-dim-2">
+        <div className="px-2 py-[0.4375rem] text-data text-dim-2">
           <Trans>No engines configured</Trans>
         </div>
       ) : null}
@@ -476,7 +476,7 @@ function SavedFilters({ search }: { search: string }) {
         <SavedFilterRow key={filter.id} {...filter} search={search} />
       ))}
       {filters.length === 0 ? (
-        <div className="px-2 py-[0.4375rem] text-[0.75rem] text-dim-2">
+        <div className="px-2 py-[0.4375rem] text-data text-dim-2">
           <Trans>No saved filters yet</Trans>
         </div>
       ) : null}
@@ -510,7 +510,7 @@ function YourLines({ search }: { search: string }) {
         </DotRow>
       ))}
       {games.isPending || lines.length > 0 ? null : (
-        <div className="px-2 py-[0.4375rem] text-[0.75rem] text-dim-2">
+        <div className="px-2 py-[0.4375rem] text-data text-dim-2">
           <Trans>No openings on record yet</Trans>
         </div>
       )}
@@ -907,7 +907,7 @@ export function NavDrawer({ open, onClose }: { open: boolean; onClose: () => voi
         className="relative flex h-full w-[17rem] max-w-[85vw] flex-col gap-px overflow-y-auto border-r border-edge-strong bg-panel shadow-[0_0_2rem_var(--bb-shadow)] outline-none select-none duration-200 animate-in slide-in-from-left pt-[max(0.875rem,env(safe-area-inset-top,0rem))] pr-2.5 pb-[max(0.875rem,env(safe-area-inset-bottom,0rem))] pl-[max(0.625rem,env(safe-area-inset-left,0rem))]"
       >
         <div className="flex flex-none items-center justify-between pb-1">
-          <span className="pl-2 text-[0.8125rem] font-semibold tracking-[-0.01em] text-ink">
+          <span className="pl-2 text-lead font-semibold tracking-[-0.01em] text-ink">
             Blunderbase
           </span>
           <button

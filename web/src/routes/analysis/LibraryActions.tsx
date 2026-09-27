@@ -67,15 +67,15 @@ function ActionCard({
     <section className="flex flex-col gap-2.5 rounded-xl border border-line bg-panel p-3.5">
       <header className="flex items-center gap-2">
         <Icon className="size-3.5 flex-none text-faint" aria-hidden />
-        <h3 className="text-xs font-semibold text-ink">{title}</h3>
+        <h3 className="text-data font-semibold text-ink">{title}</h3>
       </header>
 
-      <p className="flex-1 text-[0.6875rem] leading-[1.5] text-dim">{blurb}</p>
+      <p className="flex-1 text-label leading-[1.5] text-dim">{blurb}</p>
 
       <div className="flex items-baseline gap-2 border-t border-hairline pt-2.5">
-        <span className="font-mono text-[0.75rem] tabular text-soft">{figure}</span>
+        <span className="font-mono text-data tabular text-soft">{figure}</span>
         <div className="flex-1" />
-        <span className="font-mono text-[0.6875rem] tabular text-dim-2">{estimate ?? ''}</span>
+        <span className="font-mono text-label tabular text-dim-2">{estimate ?? ''}</span>
       </div>
 
       <div className="flex flex-col gap-2">{children}</div>
@@ -124,7 +124,7 @@ function BackfillCard({
       footer={
         <>
           {receipt ? (
-            <p role="status" className="text-[0.6875rem] leading-[1.5] text-dim">
+            <p role="status" className="text-label leading-[1.5] text-dim">
               {receipt.queued === 0
                 ? t`Nothing to queue — every game already has a pass.`
                 : t`Queued ${queued} ${plural(receipt.queued, {
@@ -137,7 +137,7 @@ function BackfillCard({
             </p>
           ) : null}
           {start.isError ? (
-            <p role="alert" className="text-[0.6875rem] leading-[1.5] text-blunder">
+            <p role="alert" className="text-label leading-[1.5] text-blunder">
               {start.error.message}
             </p>
           ) : null}
@@ -193,7 +193,7 @@ function MaiaFillCard({
       footer={
         <>
           {receipt ? (
-            <p role="status" className="text-[0.6875rem] leading-[1.5] text-dim">
+            <p role="status" className="text-label leading-[1.5] text-dim">
               {receipt.queued === 0
                 ? t`Nothing to queue — every analysed game already has every level.`
                 : t`Queued ${queued} ${plural(receipt.queued, {
@@ -206,7 +206,7 @@ function MaiaFillCard({
             </p>
           ) : null}
           {fill.isError ? (
-            <p role="alert" className="text-[0.6875rem] leading-[1.5] text-blunder">
+            <p role="alert" className="text-label leading-[1.5] text-blunder">
               {fill.error.message}
             </p>
           ) : null}
@@ -261,7 +261,7 @@ function ClearQueueCard() {
       footer={
         <>
           {receipt ? (
-            <p role="status" className="text-[0.6875rem] leading-[1.5] text-dim">
+            <p role="status" className="text-label leading-[1.5] text-dim">
               {t`Dropped ${dropped} ${plural(receipt.dropped, {
                 one: 'run',
                 other: 'runs',
@@ -272,7 +272,7 @@ function ClearQueueCard() {
             </p>
           ) : null}
           {clear.isError ? (
-            <p role="alert" className="text-[0.6875rem] leading-[1.5] text-blunder">
+            <p role="alert" className="text-label leading-[1.5] text-blunder">
               {clear.error.message}
             </p>
           ) : null}
@@ -311,7 +311,7 @@ export function LibraryActions({ coverage }: { coverage: AnalysisCoverage }) {
         />
         <ClearQueueCard />
       </div>
-      <p className="text-[0.625rem] leading-[1.5] text-dim-2">
+      <p className="text-meta leading-[1.5] text-dim-2">
         <Trans>
           Times are approximate: measured off this deployment&rsquo;s own finished runs at the
           budget configured now, including matching work already queued or running, over{' '}

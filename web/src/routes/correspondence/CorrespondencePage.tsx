@@ -87,13 +87,13 @@ function Due({ game }: { game: CorrespondenceGameSummary }) {
   const { i18n } = useLingui()
   const tone = dueTone(game)
   const phrase = duePhrase(game.days_left)
-  if (!phrase) return <span className="text-[0.6875rem] text-dim">—</span>
+  if (!phrase) return <span className="text-label text-dim">—</span>
   return (
     <span className="flex flex-col">
-      <span className={cn('text-[0.75rem]', DUE_CLASS[tone])}>
+      <span className={cn('text-data', DUE_CLASS[tone])}>
         {i18n._({ ...phrase.message, values: phrase.values })}
       </span>
-      <span className="mt-px font-mono text-[0.625rem] text-dim-2">
+      <span className="mt-px font-mono text-meta text-dim-2">
         {shortDate(game.reply_due, i18n.locale)}
       </span>
     </span>
@@ -142,7 +142,7 @@ function EngineChips({ game }: { game: CorrespondenceGameSummary }) {
                   : undefined
             }
             className={cn(
-              'inline-flex items-center gap-1.5 rounded-sm border px-1.5 py-px font-mono text-[0.625rem] text-body',
+              'inline-flex items-center gap-1.5 rounded-sm border px-1.5 py-px font-mono text-meta text-body',
               search.status === 'queued' ? 'border-dashed border-edge text-dim' : 'border-edge',
             )}
           >
@@ -179,22 +179,22 @@ function OngoingRow({ game }: { game: CorrespondenceGameSummary }) {
       <td className="py-2 pr-3 align-middle">
         <Link
           to={`/correspondence/${game.game_id}`}
-          className="flex items-center gap-2 text-[0.78125rem] font-medium text-ink hover:text-accent-link"
+          className="flex items-center gap-2 text-lead font-medium text-ink hover:text-accent-link"
           onClick={(event) => event.stopPropagation()}
         >
           <Side color={ownerColor(game)} />
           <span className="truncate">{opponentOf(game)}</span>
-          {rating ? <span className="font-mono text-[0.625rem] text-dim">{rating}</span> : null}
+          {rating ? <span className="font-mono text-meta text-dim">{rating}</span> : null}
         </Link>
-        <span className="mt-0.5 block text-[0.625rem] text-dim">
+        <span className="mt-0.5 block text-meta text-dim">
           {[game.event, number ? t`ICCF ${number}` : null].filter(Boolean).join(' · ') || '—'}
         </span>
       </td>
       <td className="py-2 pr-3 align-middle">
-        <span className="font-mono text-[0.71875rem] text-body">
+        <span className="font-mono text-data text-body">
           {last ? t`after ${last}` : t`no moves yet`}
         </span>
-        <span className="mt-0.5 block text-[0.625rem] text-dim">
+        <span className="mt-0.5 block text-meta text-dim">
           {game.to_move === 'white'
             ? t`move ${game.move_number}, White to play`
             : t`move ${game.move_number}, Black to play`}
@@ -206,7 +206,7 @@ function OngoingRow({ game }: { game: CorrespondenceGameSummary }) {
       <td className="py-2 pr-3 align-middle">
         <EngineChips game={game} />
       </td>
-      <td className="py-2 text-right align-middle font-mono text-[0.75rem] font-semibold text-body">
+      <td className="py-2 text-right align-middle font-mono text-data font-semibold text-body">
         {formatScore(game.root_eval ?? null)}
       </td>
     </tr>
@@ -224,7 +224,7 @@ function OngoingTable({
     <div className="overflow-x-auto">
       <table className="w-full border-collapse">
         <thead>
-          <tr className="text-[0.625rem] tracking-[0.1em] text-faint uppercase">
+          <tr className="text-meta tracking-[0.1em] text-faint uppercase">
             <th className="w-[38%] py-1.5 pr-3 text-left font-normal">
               <Trans>Game</Trans>
             </th>
@@ -258,10 +258,10 @@ function FinishedRow({ game }: { game: CorrespondenceGameSummary }) {
     <div className="flex items-center gap-3 border-t border-hairline py-2">
       <Side color={ownerColor(game)} />
       <span className="min-w-0 flex-1">
-        <span className="block truncate text-[0.78125rem] font-medium text-ink">
+        <span className="block truncate text-lead font-medium text-ink">
           {opponentOf(game)}
         </span>
-        <span className="mt-0.5 flex flex-wrap items-baseline gap-x-1.5 text-[0.625rem] text-dim">
+        <span className="mt-0.5 flex flex-wrap items-baseline gap-x-1.5 text-meta text-dim">
           {game.event ? <span>{game.event} ·</span> : null}
           <span className="font-mono">{game.result}</span>
           <span>
@@ -273,7 +273,7 @@ function FinishedRow({ game }: { game: CorrespondenceGameSummary }) {
       </span>
       <Link
         to={`/games/${game.game_id}`}
-        className="inline-flex items-center gap-1 text-[0.6875rem] text-accent-teal hover:text-accent-link"
+        className="inline-flex items-center gap-1 text-label text-accent-teal hover:text-accent-link"
       >
         <Trans>Open in Games</Trans>
         <ArrowRight className="size-3" aria-hidden />
@@ -283,7 +283,7 @@ function FinishedRow({ game }: { game: CorrespondenceGameSummary }) {
 }
 
 function Empty({ children }: { children: ReactNode }) {
-  return <p className="py-4 text-[0.75rem] text-dim">{children}</p>
+  return <p className="py-4 text-data text-dim">{children}</p>
 }
 
 export function CorrespondencePage() {
@@ -384,10 +384,10 @@ export function CorrespondencePage() {
       {games.isPending ? <Skeleton className="h-24 w-full" data-testid="correspondence-loading" /> : null}
       {games.error ? (
         <div className="rounded-md border border-blunder/28 bg-blunder/5 px-3 py-2.5">
-          <p className="text-[0.75rem] text-blunder">
+          <p className="text-data text-blunder">
             <Trans>The correspondence games could not be read.</Trans>
           </p>
-          <p className="mt-1 font-mono text-[0.6875rem] text-blunder/80">{games.error.message}</p>
+          <p className="mt-1 font-mono text-label text-blunder/80">{games.error.message}</p>
           <Button
             type="button"
             variant="outline"
@@ -405,7 +405,7 @@ export function CorrespondencePage() {
           <Section
             title={<Trans>Your move</Trans>}
             detail={t`by due date`}
-            end={<span className="font-mono text-[0.6875rem] text-dim">{cut.yourMove.length}</span>}
+            end={<span className="font-mono text-label text-dim">{cut.yourMove.length}</span>}
           >
             {cut.yourMove.length === 0 ? (
               <Empty>
@@ -418,7 +418,7 @@ export function CorrespondencePage() {
 
           <Section
             title={<Trans>Waiting for the opponent</Trans>}
-            end={<span className="font-mono text-[0.6875rem] text-dim">{cut.waiting.length}</span>}
+            end={<span className="font-mono text-label text-dim">{cut.waiting.length}</span>}
           >
             {cut.waiting.length === 0 ? (
               <Empty>
@@ -432,7 +432,7 @@ export function CorrespondencePage() {
           <Section
             title={<Trans>Running now</Trans>}
             detail={t`every engine on every game`}
-            end={<span className="font-mono text-[0.6875rem] text-dim">{rows.length}</span>}
+            end={<span className="font-mono text-label text-dim">{rows.length}</span>}
           >
             <RunningNow searches={rows} games={games.data.games} hosts={hosts} now={now} />
           </Section>

@@ -83,7 +83,7 @@ function Scrim({ hole, viewport }: { hole: Box; viewport: Size }) {
 }
 
 const BUTTON =
-  'rounded-md border border-input bg-elevated px-2.5 py-[0.3125rem] text-[0.6875rem] text-soft transition-colors hover:border-edge-hover hover:text-ink'
+  'rounded-md border border-input bg-elevated px-2.5 py-[0.3125rem] text-label text-soft transition-colors hover:border-edge-hover hover:text-ink'
 
 export function TourCoachmark() {
   const { step, position, total, anchor, next, back, dismiss } = useTour()
@@ -200,17 +200,17 @@ export function TourCoachmark() {
         )}
         style={at ? { left: at.left, top: at.top } : { left: 0, top: 0 }}
       >
-        <p id="tour-title" className="text-[0.8125rem] font-semibold text-ink">
+        <p id="tour-title" className="text-lead font-semibold text-ink">
           {i18n._(step.title)}
         </p>
-        <p className="text-[0.75rem] leading-relaxed text-soft">{i18n._(step.body)}</p>
+        <p className="text-data leading-relaxed text-soft">{i18n._(step.body)}</p>
         <div className="mt-1 flex items-center gap-2">
-          <span className="font-mono text-[0.625rem] tabular text-faint">
+          <span className="font-mono text-meta tabular text-faint">
             <Trans>
               {position} of {total}
             </Trans>
           </span>
-          <button type="button" onClick={dismiss} className="text-[0.6875rem] text-dim hover:text-ink">
+          <button type="button" onClick={dismiss} className="text-label text-dim hover:text-ink">
             <Trans>Skip</Trans>
           </button>
           <span className="flex-1" />
@@ -222,7 +222,7 @@ export function TourCoachmark() {
           <button
             type="button"
             onClick={last ? dismiss : next}
-            className="rounded-md bg-accent-teal px-2.5 py-[0.3125rem] text-[0.6875rem] font-semibold text-accent-ink transition-colors hover:bg-accent-hover"
+            className="rounded-md bg-accent-teal px-2.5 py-[0.3125rem] text-label font-semibold text-accent-ink transition-colors hover:bg-accent-hover"
           >
             {last ? <Trans>Done</Trans> : <Trans>Next</Trans>}
           </button>

@@ -29,7 +29,7 @@ import { TopBar } from './TopBar'
  */
 const TOAST_CLASSES = {
   toast:
-    'flex items-center gap-2.5 rounded-md border border-edge-strong bg-panel px-3.5 py-3 text-[0.78125rem] text-ink shadow-[0_0.5rem_1.5rem_var(--bb-shadow)]',
+    'flex items-center gap-2.5 rounded-md border border-edge-strong bg-panel px-3.5 py-3 text-data text-ink shadow-[0_0.5rem_1.5rem_var(--bb-shadow)]',
   // The text column gives way and the action does not: a toast with an action is a row,
   // and the button is the one thing in it that must not wrap its label into two lines.
   content: 'min-w-0 flex-1',
@@ -178,7 +178,7 @@ export function AppShell() {
         <ShortcutsOverlayProvider>
           <a
             href="#main-content"
-            className="fixed top-2 left-2 z-[80] -translate-y-16 rounded-md bg-accent-teal px-3 py-2 text-xs font-semibold text-accent-ink transition-transform focus:translate-y-0"
+            className="fixed top-2 left-2 z-[80] -translate-y-16 rounded-md bg-accent-teal px-3 py-2 text-data font-semibold text-accent-ink transition-transform focus:translate-y-0"
           >
             <Trans>Skip to content</Trans>
           </a>
@@ -197,7 +197,7 @@ export function AppShell() {
                   fallback={
                     <div
                       role="status"
-                      className="flex flex-1 items-center justify-center text-xs text-dim"
+                      className="flex flex-1 items-center justify-center text-data text-dim"
                     >
                       <Trans>Loading…</Trans>
                     </div>

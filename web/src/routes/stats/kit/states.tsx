@@ -58,12 +58,12 @@ export function StatCard({
         <h2
           className={cn(
             'font-semibold text-ink',
-            compact ? 'text-[0.71875rem]' : 'text-[0.78125rem]',
+            compact ? 'text-lead' : 'text-heading',
           )}
         >
           {title}
         </h2>
-        {hint ? <span className="text-[0.6875rem] text-dim-2">{hint}</span> : null}
+        {hint ? <span className="text-label text-dim-2">{hint}</span> : null}
         <div className="flex-1" />
         {aside}
       </header>
@@ -75,8 +75,8 @@ export function StatCard({
           className={cn(
             'border-t border-hairline text-dim-2',
             compact
-              ? 'pt-1.5 text-[0.65625rem] leading-snug'
-              : 'pt-2.5 text-[0.71875rem] leading-relaxed',
+              ? 'pt-1.5 text-label leading-snug'
+              : 'pt-2.5 text-data leading-relaxed',
           )}
         >
           {footer}
@@ -152,7 +152,7 @@ export function EmptyBlock({
       )}
       data-testid="empty"
     >
-      <p className="max-w-[34ch] text-[0.71875rem] leading-relaxed text-dim-2">{children}</p>
+      <p className="max-w-[34ch] text-data leading-relaxed text-dim-2">{children}</p>
       {action}
     </div>
   )
@@ -178,17 +178,17 @@ export function ErrorBlock({
       data-testid="error"
       role="alert"
     >
-      <p className="text-[0.71875rem] font-medium text-blunder">
+      <p className="text-data font-medium text-blunder">
         <Trans>Could not load this.</Trans>
       </p>
-      <p className="max-w-[38ch] font-mono text-[0.65625rem] leading-relaxed break-words text-dim-2">
+      <p className="max-w-[38ch] font-mono text-label leading-relaxed break-words text-dim-2">
         {error?.message ?? t`the request failed`}
       </p>
       {onRetry ? (
         <button
           type="button"
           onClick={onRetry}
-          className="rounded-md border border-edge-strong px-2.5 py-1 text-[0.6875rem] text-soft transition-colors hover:border-edge-hover hover:text-ink"
+          className="rounded-md border border-edge-strong px-2.5 py-1 text-label text-soft transition-colors hover:border-edge-hover hover:text-ink"
         >
           <Trans>Try again</Trans>
         </button>
@@ -262,7 +262,7 @@ export function MeterRow({
     <div className={cn('flex flex-col', compact ? 'gap-0.5' : 'gap-1.5')} title={title}>
       <div className="flex items-baseline gap-2">
         <span
-          className={cn('flex-1 truncate text-body', compact ? 'text-[0.6875rem]' : 'text-xs')}
+          className={cn('flex-1 truncate text-body', compact ? 'text-label' : 'text-data')}
         >
           {label}
           {sub ? <span className="ml-1.5 text-dim-2">{sub}</span> : null}
@@ -270,7 +270,7 @@ export function MeterRow({
         <span
           className={cn(
             'font-mono tabular',
-            compact ? 'text-[0.6875rem]' : 'text-xs',
+            compact ? 'text-label' : 'text-data',
             emphasis ? 'text-ink' : 'text-soft',
           )}
         >
@@ -279,7 +279,7 @@ export function MeterRow({
         <span
           className={cn(
             'text-right font-mono tabular',
-            compact ? 'w-8 text-[0.625rem]' : 'w-9 text-[0.6875rem]',
+            compact ? 'w-8 text-meta' : 'w-9 text-label',
           )}
           style={{ color: emphasis ? color : undefined }}
         >
@@ -323,7 +323,7 @@ export function StatTile({
         className,
       )}
     >
-      <span className="text-[0.6875rem] text-dim-2">{label}</span>
+      <span className="text-label text-dim-2">{label}</span>
       {/* On a half-width phone tile the number and its unit are a few pixels too wide to
           share a line, and the unit broke mid-phrase — "60.5% of the / point". Stacked,
           the caption gets a line of its own and stays one readable clause. */}
@@ -359,7 +359,7 @@ export function DeltaText({
   className?: string
 }) {
   return (
-    <span className={cn('font-mono text-[0.6875rem] tabular', DELTA_TONE[tone], className)}>
+    <span className={cn('font-mono text-label tabular', DELTA_TONE[tone], className)}>
       {children}
     </span>
   )

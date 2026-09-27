@@ -27,7 +27,7 @@ function ownerAccount(accounts: AccountSummary[]): AccountSummary | undefined {
 }
 
 const ITEM =
-  'flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-[0.6875rem] text-soft transition-colors hover:bg-raised hover:text-ink'
+  'flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-label text-soft transition-colors hover:bg-raised hover:text-ink'
 
 /**
  * The 24px avatar square every design frame ends the titlebar with, now that there is
@@ -88,7 +88,7 @@ export function AccountMenu() {
         aria-label={t`Account — ${label}`}
         title={label}
         onClick={() => setOpen((was) => !was)}
-        className="flex size-6 items-center justify-center rounded-md border border-edge-strong bg-avatar text-[0.625rem] font-semibold text-soft transition-colors hover:border-edge-hover hover:text-ink"
+        className="flex size-6 items-center justify-center rounded-md border border-edge-strong bg-avatar text-meta font-semibold text-soft transition-colors hover:border-edge-hover hover:text-ink"
       >
         <User className="size-3" aria-hidden />
       </button>
@@ -106,10 +106,10 @@ export function AccountMenu() {
           <div className="flex flex-col gap-1 px-2 pb-1 pt-1.5">
             {accounts.length === 0 ? (
               <>
-                <p className="truncate text-[0.6875rem] font-medium text-ink">
+                <p className="truncate text-label font-medium text-ink">
                   <Trans>No account connected</Trans>
                 </p>
-                <p className="truncate text-[0.625rem] text-dim">
+                <p className="truncate text-meta text-dim">
                   {capabilities.read_only
                     ? t`read-only demo library`
                     : capabilities.password_auth
@@ -121,15 +121,15 @@ export function AccountMenu() {
               accounts.map((connected) => (
                 <div key={connected.id} className="flex items-baseline gap-2">
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-[0.6875rem] font-medium text-ink">
+                    <p className="truncate text-label font-medium text-ink">
                       {nameOf(connected)}
                     </p>
-                    <p className="truncate text-[0.625rem] text-dim">
+                    <p className="truncate text-meta text-dim">
                       {connected.platform}
                       {connected.is_owner ? t` · owner` : ''}
                     </p>
                   </div>
-                  <span className="font-mono text-[0.625rem] tabular text-dim-2">
+                  <span className="font-mono text-meta tabular text-dim-2">
                     {connected.games === undefined ? '—' : connected.games.toLocaleString()}
                   </span>
                 </div>
@@ -188,7 +188,7 @@ export function AccountMenu() {
             <Trans>Show the tour again</Trans>
           </button>
           <div className="my-0.5 h-px bg-hairline" />
-          <div className="flex items-center gap-2 px-2 py-1.5 text-[0.6875rem] text-soft">
+          <div className="flex items-center gap-2 px-2 py-1.5 text-label text-soft">
             <Languages className="size-3.5" aria-hidden />
             <span className="flex-1">
               <Trans>Language</Trans>
@@ -206,7 +206,7 @@ export function AccountMenu() {
                   aria-pressed={option === locale}
                   onClick={() => void setLocale(option)}
                   className={cn(
-                    'px-1.5 py-0.5 text-[0.625rem] transition-colors',
+                    'px-1.5 py-0.5 text-meta transition-colors',
                     index > 0 && 'border-l border-edge',
                     option === locale
                       ? 'bg-selected text-ink'

@@ -74,10 +74,10 @@ export function OpponentMoveDialog({
         className="bb-card bb-rise-in flex w-full max-w-[24rem] flex-col gap-3.5 px-5 py-5 shadow-[0_1rem_3rem_var(--bb-shadow)]"
       >
         <div className="flex flex-col gap-1.5">
-          <h2 id="correspondence-move-title" className="text-[0.875rem] font-semibold text-ink">
+          <h2 id="correspondence-move-title" className="text-heading font-semibold text-ink">
             <Trans>The move that arrived</Trans>
           </h2>
-          <p className="text-[0.75rem] leading-[1.65] text-dim">
+          <p className="text-data leading-[1.65] text-dim">
             <Trans>
               Written the way the move mail writes it, or as UCI. It is appended to the game
               and becomes the line the tree hangs off.
@@ -99,14 +99,14 @@ export function OpponentMoveDialog({
             onChange={(event) => setText(event.target.value)}
           />
           {typedButWrong ? (
-            <span className="text-[0.625rem] text-blunder">
+            <span className="text-meta text-blunder">
               <Trans>Not a legal move in this position.</Trans>
             </span>
           ) : null}
         </div>
         {tip.children.length > 0 ? (
           <div className="flex flex-col gap-1.5">
-            <span className="text-[0.625rem] tracking-[0.06em] text-faint uppercase">
+            <span className="text-meta tracking-[0.06em] text-faint uppercase">
               <Trans>Already in the tree</Trans>
             </span>
             <div className="flex flex-wrap gap-1.5">
@@ -116,7 +116,7 @@ export function OpponentMoveDialog({
                   type="button"
                   disabled={pending}
                   onClick={() => child.uci && onPlay(child.uci)}
-                  className="rounded-md border border-edge px-2 py-1 font-mono text-[0.6875rem] text-body hover:border-edge-hover hover:text-ink"
+                  className="rounded-md border border-edge px-2 py-1 font-mono text-label text-body hover:border-edge-hover hover:text-ink"
                 >
                   {notate(child.san ?? child.uci ?? '')}
                 </button>
@@ -127,7 +127,7 @@ export function OpponentMoveDialog({
         {error ? (
           <p
             role="alert"
-            className="rounded-md border border-blunder/28 bg-blunder/5 px-2.5 py-2 text-[0.75rem] text-blunder"
+            className="rounded-md border border-blunder/28 bg-blunder/5 px-2.5 py-2 text-data text-blunder"
           >
             {error}
           </p>
@@ -180,10 +180,10 @@ export function FinishDialog({
         className="bb-card bb-rise-in flex w-full max-w-[24rem] flex-col gap-3.5 px-5 py-5 shadow-[0_1rem_3rem_var(--bb-shadow)]"
       >
         <div className="flex flex-col gap-1.5">
-          <h2 id="correspondence-finish-title" className="text-[0.875rem] font-semibold text-ink">
+          <h2 id="correspondence-finish-title" className="text-heading font-semibold text-ink">
             <Trans>Finish this game</Trans>
           </h2>
-          <p className="text-[0.75rem] leading-[1.65] text-dim">
+          <p className="text-data leading-[1.65] text-dim">
             <Trans>
               It becomes a library game: its analysis pass is queued, it counts in the
               statistics, and the tree stays attached to it — read-only from here on.
@@ -202,7 +202,7 @@ export function FinishDialog({
                 aria-pressed={result === option}
                 onClick={() => setResult(option)}
                 className={cn(
-                  'flex-1 rounded-md border px-2 py-1.5 font-mono text-[0.75rem] transition-colors',
+                  'flex-1 rounded-md border px-2 py-1.5 font-mono text-data transition-colors',
                   result === option
                     ? 'border-accent-teal/40 bg-selected text-ink'
                     : 'border-edge text-dim hover:border-edge-hover hover:text-ink',
@@ -228,7 +228,7 @@ export function FinishDialog({
         {error ? (
           <p
             role="alert"
-            className="rounded-md border border-blunder/28 bg-blunder/5 px-2.5 py-2 text-[0.75rem] text-blunder"
+            className="rounded-md border border-blunder/28 bg-blunder/5 px-2.5 py-2 text-data text-blunder"
           >
             {error}
           </p>
@@ -278,14 +278,14 @@ export function GameHeader({
   return (
     <header className="flex flex-none flex-wrap items-center gap-4 border-b border-edge-strong bg-surface px-4 py-2">
       <div className="min-w-0">
-        <h1 className="flex min-w-0 flex-wrap items-baseline gap-1.5 text-[1rem] leading-[1.15] font-semibold text-ink">
+        <h1 className="flex min-w-0 flex-wrap items-baseline gap-1.5 text-heading font-semibold text-ink">
           <span className="truncate">{game.white}</span>
           {game.owner_color === 'white' ? <YouBadge label={you} /> : null}
           <span className="font-normal text-dim">–</span>
           <span className="truncate">{game.black}</span>
           {game.owner_color === 'black' ? <YouBadge label={you} /> : null}
         </h1>
-        <p className="mt-0.5 flex flex-wrap items-baseline gap-1.5 text-[0.6875rem] text-dim">
+        <p className="mt-0.5 flex flex-wrap items-baseline gap-1.5 text-label text-dim">
           {game.event ? <span>{game.event}</span> : null}
           {number ? <span>· {t`ICCF game ${number}`}</span> : null}
           {game.time_control ? <span>· {game.time_control}</span> : null}
@@ -304,12 +304,12 @@ export function GameHeader({
       </div>
 
       {game.finished ? (
-        <span className="rounded-md border border-edge px-2 py-1 font-mono text-[0.6875rem] text-body">
+        <span className="rounded-md border border-edge px-2 py-1 font-mono text-label text-body">
           {game.result}
           {game.termination ? <span className="ml-1.5 text-dim">{game.termination}</span> : null}
         </span>
       ) : (
-        <div className="flex items-center gap-2 rounded-md border border-edge px-2.5 py-1 text-[0.6875rem] whitespace-nowrap">
+        <div className="flex items-center gap-2 rounded-md border border-edge px-2.5 py-1 text-label whitespace-nowrap">
           <strong className="font-semibold text-ink">
             {game.your_move ? <Trans>Your move</Trans> : <Trans>Their move</Trans>}
           </strong>
@@ -321,7 +321,7 @@ export function GameHeader({
             type="date"
             aria-label={t`Reply due`}
             value={dateInputValue(game.reply_due)}
-            className="h-6 w-[8.5rem] font-mono text-[0.6875rem]"
+            className="h-6 w-[8.5rem] font-mono text-label"
             onChange={(event) => onDue(dateInputToIso(event.target.value))}
           />
         </div>
@@ -369,7 +369,7 @@ export function GameHeader({
 
 function YouBadge({ label }: { label: string }) {
   return (
-    <span className="rounded-sm border border-edge px-1.5 py-px align-[0.0625rem] font-mono text-[0.625rem] font-normal text-dim">
+    <span className="rounded-sm border border-edge px-1.5 py-px align-[0.0625rem] font-mono text-meta font-normal text-dim">
       {label}
     </span>
   )

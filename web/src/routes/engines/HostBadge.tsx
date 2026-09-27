@@ -24,12 +24,12 @@ export function HostBadge({ host, className }: { host?: EngineHost; className?: 
   return (
     <span className={cn('inline-flex flex-none items-center gap-1.5', className)}>
       {host.runnerId === null ? (
-        <span className="rounded-sm border border-edge bg-elevated px-1.5 py-px font-mono text-[0.59375rem] text-dim">
+        <span className="rounded-sm border border-edge bg-elevated px-1.5 py-px font-mono text-meta text-dim">
           <Trans>local</Trans>
         </span>
       ) : (
         <span
-          className="inline-flex items-center gap-1 rounded-sm border border-edge bg-elevated px-1.5 py-px text-[0.59375rem] text-soft"
+          className="inline-flex items-center gap-1 rounded-sm border border-edge bg-elevated px-1.5 py-px text-meta text-soft"
           title={host.connected ? undefined : t`${runnerName} is not connected`}
         >
           <StatusDot tone={host.connected ? 'healthy' : 'away'} className="size-1" />
@@ -38,7 +38,7 @@ export function HostBadge({ host, className }: { host?: EngineHost; className?: 
       )}
       {queueOnly ? (
         <span
-          className="rounded-sm border border-mistake/28 bg-mistake/8 px-1.5 py-px text-[0.59375rem] text-mistake"
+          className="rounded-sm border border-mistake/28 bg-mistake/8 px-1.5 py-px text-meta text-mistake"
           title={host.streamsReason ?? undefined}
         >
           <Trans>queue only</Trans>

@@ -42,17 +42,17 @@ export function DemoEngines() {
       <SetPageChrome breadcrumb={[{ label: t`Engines` }]} manual="operate/engines" />
       <div className="flex max-w-2xl flex-col gap-5">
         <section className="rounded-xl border border-edge bg-panel p-5">
-          <h2 className="text-sm font-semibold text-ink">
+          <h2 className="text-heading font-semibold text-ink">
             <Trans>Browser Stockfish</Trans>
           </h2>
-          <p className="mt-1.5 text-[0.78125rem] leading-[1.6] text-dim">
+          <p className="mt-1.5 text-data leading-[1.6] text-dim">
             <Trans>
               The analysis pass, Analyse… and continuous analysis, all in this tab. Nothing is
               saved.
             </Trans>
           </p>
           {state.ready ? (
-            <p role="status" className="mt-4 text-[0.78125rem] font-medium text-accent-teal">
+            <p role="status" className="mt-4 text-data font-medium text-accent-teal">
               <Trans>Stockfish is ready in this browser.</Trans>
             </p>
           ) : (
@@ -61,20 +61,20 @@ export function DemoEngines() {
             </Button>
           )}
           {!support.supported ? (
-            <p className="mt-3 text-[0.78125rem] text-blunder">{support.reason}</p>
+            <p className="mt-3 text-data text-blunder">{support.reason}</p>
           ) : null}
           {error ? (
-            <p role="alert" className="mt-3 text-[0.78125rem] text-blunder">
+            <p role="alert" className="mt-3 text-data text-blunder">
               {error}
             </p>
           ) : null}
         </section>
 
         <section className="rounded-xl border border-dashed border-edge-strong bg-panel/60 p-5">
-          <h2 className="text-sm font-semibold text-ink">
+          <h2 className="text-heading font-semibold text-ink">
             <Trans>In your own Blunderbase</Trans>
           </h2>
-          <ul className="mt-3 flex flex-col gap-2 text-[0.78125rem] leading-[1.5] text-dim">
+          <ul className="mt-3 flex flex-col gap-2 text-data leading-[1.5] text-dim">
             <li className="flex items-baseline gap-2.5">
               <Server className="size-3.5 flex-none translate-y-[0.15rem] text-faint" aria-hidden />
               <span>
@@ -106,7 +106,7 @@ export function DemoEngines() {
               </span>
             </li>
           </ul>
-          <p className="mt-4 text-[0.71875rem] text-dim">
+          <p className="mt-4 text-label text-dim">
             <Trans>
               Free and self-hosted —{' '}
               <a

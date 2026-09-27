@@ -114,7 +114,7 @@ export function NoteItem({
         ) : null}
         {note.source && SOURCE_LABELS[note.source] ? (
           <span
-            className="text-[0.625rem] text-faint"
+            className="text-meta text-faint"
             title={i18n._(SOURCE_TITLES[note.source] ?? SOURCE_LABELS[note.source]!)}
           >
             {i18n._(SOURCE_LABELS[note.source]!)}
@@ -122,7 +122,7 @@ export function NoteItem({
         ) : null}
         <span className="flex-1" />
         <span
-          className="font-mono text-[0.625rem] text-dim-2"
+          className="font-mono text-meta text-dim-2"
           title={t`written ${when}`}
         >
           {relative(note.created_at)}
@@ -160,7 +160,7 @@ export function NoteItem({
     ) : (
       <p
         className={cn(
-          'text-[0.78125rem] leading-[1.55] text-body-2',
+          'text-data leading-[1.55] text-body-2',
           // Clamped in the sheet and never in the stream, and that is the trade the two
           // views are: a tile is a way in, a row is the place you read.
           sheet ? 'line-clamp-5 whitespace-pre-wrap' : 'whitespace-pre-wrap',
@@ -207,7 +207,7 @@ export function NoteItem({
   ) : sheet ? (
     // A tile with no position would otherwise be a hole in the pattern. It says what it is
     // instead, which is also the only honest thing to draw: some notes are about no board.
-    <div className="grid aspect-square place-items-center rounded-md border border-dashed border-edge bg-elevated/40 text-[0.6875rem] text-faint">
+    <div className="grid aspect-square place-items-center rounded-md border border-dashed border-edge bg-elevated/40 text-label text-faint">
       <Trans>no position</Trans>
     </div>
   ) : null
@@ -284,7 +284,7 @@ function Provenance({ note, move }: { note: NoteResponse; move: string | null })
   if (!line && !origin && !explorer) return null
 
   return (
-    <div className="flex flex-col gap-1 border-t border-line pt-1.5 text-[0.6875rem]">
+    <div className="flex flex-col gap-1 border-t border-line pt-1.5 text-label">
       {line ? (
         <p className="truncate font-mono text-soft-2" title={line}>
           {line}

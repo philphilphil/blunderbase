@@ -44,7 +44,7 @@ export function SyncCheckbox({
       >
         <Check className="size-2.5" strokeWidth={3} />
       </span>
-      <span className={cn('text-[0.6875rem]', checked ? 'text-soft' : 'text-dim')}>{label}</span>
+      <span className={cn('text-label', checked ? 'text-soft' : 'text-dim')}>{label}</span>
     </button>
   )
 }
