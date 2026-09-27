@@ -374,6 +374,20 @@ describe('GamesPage — the keyboard, and the run it hands on', () => {
     expect(box).toHaveValue('')
   })
 
+  it('leaves the search box on Esc, keeping what was typed', async () => {
+    const user = userEvent.setup()
+    draw()
+    await loaded()
+
+    const box = screen.getByLabelText('Search games')
+    await user.keyboard('/')
+    await user.keyboard('berlin')
+    await user.keyboard('{Escape}')
+
+    expect(document.activeElement).not.toBe(box)
+    expect(box).toHaveValue('berlin')
+  })
+
   it('hands the query it was showing to the game it opens', async () => {
     resetTrail()
     const user = userEvent.setup()

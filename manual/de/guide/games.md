@@ -30,6 +30,7 @@ Seite; bei ihnen steht nur der Name.
 ## In der Tabelle suchen { #search-the-table }
 
 `/` setzt den Cursor ins Suchfeld. Gesucht wird in Gegnername, ECO-Code und im Text des PGN.
+**Esc** holt den Cursor wieder heraus; die Suche bleibt stehen.
 
 ## Einen Filter speichern { #save-a-filter }
 

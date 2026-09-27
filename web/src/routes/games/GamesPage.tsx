@@ -315,6 +315,11 @@ export function GamesPage() {
                 placeholder={t`Opponent, ECO, PGN text…`}
                 value={filters.text ?? ''}
                 onCommit={(value) => setFilters({ ...filters, text: value || undefined })}
+                // `/` puts the cursor here, so Esc takes it back out — the rows' arrow keys
+                // and `/` itself are dead while it is in a text box. The text stays.
+                onKeyDown={(event) => {
+                  if (event.key === 'Escape') event.currentTarget.blur()
+                }}
                 className="h-7 w-[13.75rem] max-md:w-auto max-md:flex-1"
               />
             </>

@@ -29,7 +29,7 @@ no page anywhere, and their source is just a name.
 ## Search the table
 
 `/` puts the cursor in the search box, which matches an opponent, an ECO code and the text
-of the PGN.
+of the PGN. **Esc** takes the cursor back out and leaves the search as it is.
 
 ## Save a filter
 
