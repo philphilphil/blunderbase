@@ -9,6 +9,7 @@ import { Providers } from '@/app/Providers'
 import type { EngineResponse } from '@/lib/api/types'
 import { hostByEngineId } from '@/lib/engines/hosts'
 import { RuntimeCapabilitiesProvider } from '@/lib/runtime/RuntimeCapabilitiesProvider'
+import { ChromeActions } from '@/test/chrome'
 
 import { EngineDetail } from './EngineDetail'
 import { EnginesPage } from './EnginesPage'
@@ -35,7 +36,10 @@ function renderPage(ui: ReactNode, at = '/compute/engines') {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   return render(
     <Providers client={client}>
-      <MemoryRouter initialEntries={[at]}>{ui}</MemoryRouter>
+      <MemoryRouter initialEntries={[at]}>
+        {ui}
+        <ChromeActions />
+      </MemoryRouter>
     </Providers>,
   )
 }

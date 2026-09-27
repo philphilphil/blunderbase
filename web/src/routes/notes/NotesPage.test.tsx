@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { Providers } from '@/app/Providers'
 import type { NoteResponse, TagCount } from '@/lib/api/types'
+import { ChromeActions } from '@/test/chrome'
 
 import { NotesPage } from './NotesPage'
 import { NOTE_VIEW_KEY, resetNoteView } from './viewMode'
@@ -135,6 +136,7 @@ function draw(entry = '/notes') {
     <Providers client={client}>
       <MemoryRouter initialEntries={[entry]}>
         <NotesPage />
+        <ChromeActions />
       </MemoryRouter>
     </Providers>,
   )

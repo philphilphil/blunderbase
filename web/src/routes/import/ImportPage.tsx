@@ -1,11 +1,10 @@
 import { useLingui } from '@lingui/react/macro'
 import { keepPreviousData } from '@tanstack/react-query'
 import { useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
 
 import { SetPageChrome } from '@/components/shell/PageChrome'
-import { PageBody, PageHeader } from '@/components/shell/PageHeader'
-import { useGames, useImportJobs, useProfile } from '@/lib/api/queries'
+import { PageBody } from '@/components/shell/PageHeader'
+import { useImportJobs, useProfile } from '@/lib/api/queries'
 import type { ImportJob, Source } from '@/lib/api/types'
 
 import { SourcesPanel } from './SourcesPanel'
@@ -46,13 +45,11 @@ export function ImportPage() {
   // identically to the first page's, so standing there is one request rather than two.
   const latest = useImportJobs({ limit: HISTORY_PAGE, offset: 0 })
   const profile = useProfile()
-  const games = useGames({ limit: 1 })
   const progress = useImportProgress()
 
   const history = useMemo(() => newestFirst(jobs.data?.jobs), [jobs.data])
   const front = useMemo(() => newestFirst(latest.data?.jobs), [latest.data])
   const accounts = profile.data?.accounts ?? []
-  const total = games.data?.total
   const syncs = jobs.data?.total ?? 0
   const pageCount = Math.max(1, Math.ceil(syncs / HISTORY_PAGE))
   // A history that shrank under the reader — a wipe takes the sync rows with it — must not
@@ -61,7 +58,6 @@ export function ImportPage() {
   if (jobs.data && page > pageCount) setPage(pageCount)
 
   const latestOf = (source: Source) => front?.find((job) => job.source === source)
-  const count = total?.toLocaleString()
 
   return (
     <PageBody>
@@ -69,22 +65,6 @@ export function ImportPage() {
         breadcrumb={[{ label: t`Library`, to: '/library' }, { label: t`Import` }]}
         manual="guide/library#import"
       />
-      <PageHeader
-        title={t`Import`}
-        description={
-          count === undefined
-            ? t`Connect an account, sync it, or upload a PGN export.`
-            : t`${count} games in the database. Every import is deduplicated on the way in.`
-        }
-        actions={
-          total ? (
-            <Link to="/games" className="text-[0.6875rem] text-accent-teal hover:text-accent-link">
-              {t`all ${count}`}
-            </Link>
-          ) : null
-        }
-      />
-
       <SourcesPanel accounts={accounts} latestOf={latestOf} progress={progress} />
 
       <SyncHistory

@@ -29,7 +29,7 @@ import { Link } from 'react-router-dom'
 import { Toggle } from '@/components/analysis/AnalysisControls'
 import { SaveRow, SettingField, type SettingSpec } from '@/components/settings/SettingField'
 import { SetPageChrome } from '@/components/shell/PageChrome'
-import { PageBody, PageHeader } from '@/components/shell/PageHeader'
+import { PageBody } from '@/components/shell/PageHeader'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -61,18 +61,11 @@ export function CorrespondenceSettingsPage() {
       manual="guide/analysis#correspondence"
     />
   )
-  const heading = (
-    <PageHeader
-      title={t`Correspondence`}
-      description={t`Games played over weeks, with a tree of positions the engines keep working on.`}
-    />
-  )
 
   if (!settings.data) {
     return (
       <PageBody>
         {chrome}
-        {heading}
         {settings.isPending ? (
           <Skeleton className="h-28 w-full max-w-3xl" data-testid="settings-loading" />
         ) : (
@@ -160,7 +153,6 @@ export function CorrespondenceSettingsPage() {
   return (
     <PageBody>
       {chrome}
-      {heading}
       <form noValidate onSubmit={submit} className="flex max-w-3xl flex-col gap-3">
         <Card>
           <CardHeader className="flex-col items-stretch gap-1">

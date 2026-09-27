@@ -4,7 +4,7 @@ import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 
 import { SetPageChrome } from '@/components/shell/PageChrome'
-import { PageBody, PageHeader } from '@/components/shell/PageHeader'
+import { PageBody } from '@/components/shell/PageHeader'
 import type { McpKeyCreated } from '@/lib/api/types'
 import { MCP_SERVER_NAME } from '@/lib/mcp/status'
 
@@ -65,11 +65,6 @@ export function McpPage() {
     <PageBody>
       <SetPageChrome breadcrumb={[{ label: t`Assistant` }]} manual="guide/coach" />
       <div className="flex max-w-4xl flex-col gap-4">
-        <PageHeader
-          title={t`Connect your assistant`}
-          description={t`Every game you import is a fact the coach can query over MCP.`}
-        />
-
         <McpKeys minted={minted} onMinted={setMinted} onDismiss={() => setMinted(null)} />
 
         <section data-tour="assistant" className="flex flex-col rounded-xl border border-line bg-panel">

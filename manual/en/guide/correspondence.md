@@ -27,8 +27,8 @@ point of view whichever colour you have. It also carries a chip per engine at wo
 game, with the depth or the node count it is at, so the list says at a glance where your
 machine's attention is.
 
-Under the heading is the **capacity strip**, and the title bar offers **New game**, **Import
-PGN** and **Pause all**.
+At the top of the page is the **capacity strip**, and the title bar offers **New game**,
+**Import PGN** and **Pause all**.
 
 ## Start a game
 
@@ -334,7 +334,7 @@ worked on, with the engine, the machine that engine lives on and the node budget
 queued with. A task streams nothing while it waits, so it carries no depth — what it can say
 about its size is what it will spend.
 
-The **capacity strip** under the page heading counts the same work over the whole
+The **capacity strip** at the top of the page counts the same work over the whole
 installation: how many of this machine's engine slots searches are holding, searches
 waiting for one, engines parked warm and the memory they hold, how many tasks are out and
 how many of them an engine has already, and a line per remote host. Tasks are counted

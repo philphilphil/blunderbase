@@ -35,7 +35,6 @@ import {
   toGameQuery,
   type LibraryFilters,
 } from './filters'
-import { formatCount } from './format'
 import { rememberTrail } from './gameTrail'
 import {
   FALLBACK_FIT_ROWS,
@@ -279,69 +278,48 @@ export function GamesPage() {
 
   const active = filterCount(filters)
   const loaded = rows.length
-  const totalGames = formatCount(library.total)
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <SetPageChrome breadcrumb={[{ label: t`Games`, to: '/games' }]} manual="guide/games" />
-
-      <div className="flex flex-none flex-col gap-3 border-b border-hairline px-5 pt-4 pb-3 max-md:px-3 max-md:pt-3">
-        {/* Below `md` the search box takes a line of its own: at 375px it and the title
-            cannot share one, and shrinking a box you type an opponent's name into is the
-            wrong half to give up. The two buttons wrap under it. */}
-        <div className="flex items-end gap-3 max-md:flex-wrap max-md:gap-y-2.5">
-          <div className="flex flex-col gap-[0.1875rem]">
-            <h1 className="text-title text-ink">
-              <Trans>Games</Trans>
-            </h1>
-            {/* One `Trans` per case rather than a count swapped inside a shared frame: the
-                sentence is what a translator needs whole, and the mono count is part of it. */}
-            <p className="text-data text-dim">
-              {library.status === 'pending' ? (
-                t`Counting…`
-              ) : active === 1 ? (
-                <Trans>
-                  <span className="font-mono text-body">{totalGames}</span> of your games match this
-                  filter
-                </Trans>
-              ) : active > 0 ? (
-                <Trans>
-                  <span className="font-mono text-body">{totalGames}</span> of your games match
-                  these {active} filters
-                </Trans>
-              ) : (
-                <Trans>
-                  <span className="font-mono text-body">{totalGames}</span> games in the database
-                </Trans>
-              )}
-            </p>
-          </div>
-
-          <div className="flex-1" />
-
-          <DebouncedInput
-            id={SEARCH_ID}
-            aria-label={t`Search games`}
-            placeholder={t`Opponent, ECO, PGN text…`}
-            value={filters.text ?? ''}
-            onCommit={(value) => setFilters({ ...filters, text: value || undefined })}
-            className="w-[13.75rem] max-md:w-full"
-          />
-
-          {active > 0 ? (
-            <Button type="button" size="sm" variant="outline" onClick={() => setFilters({})}>
-              <Trans>Clear {active}</Trans>
-            </Button>
-          ) : null}
-
-          <Button asChild size="sm" variant="outline">
+      {/* No heading of its own: the titlebar's crumb names the page and carries Import, and
+          the count is the footer's ("1–50 of 312") and the rail's. What is left is the one
+          toolbar — whose games, the filters, then Clear and the search at its right end. */}
+      <SetPageChrome
+        breadcrumb={[{ label: t`Games`, to: '/games' }]}
+        manual="guide/games"
+        actions={
+          <Button asChild size="sm" variant="secondary">
             <Link to="/library/import">
               <Trans>Import</Trans>
             </Link>
           </Button>
-        </div>
+        }
+      />
 
-        <FilterBar filters={filters} onChange={setFilters} />
+      <div className="flex-none border-b border-hairline px-5 py-3 max-md:px-3">
+        <FilterBar
+          filters={filters}
+          onChange={setFilters}
+          trailing={
+            <>
+              {active > 0 ? (
+                <Button type="button" size="sm" variant="outline" onClick={() => setFilters({})}>
+                  <Trans>Clear {active}</Trans>
+                </Button>
+              ) : null}
+              {/* On a phone it takes the rest of its own line: shrinking a box you type an
+                  opponent's name into is the wrong half to give up. */}
+              <DebouncedInput
+                id={SEARCH_ID}
+                aria-label={t`Search games`}
+                placeholder={t`Opponent, ECO, PGN text…`}
+                value={filters.text ?? ''}
+                onCommit={(value) => setFilters({ ...filters, text: value || undefined })}
+                className="h-7 w-[13.75rem] max-md:w-auto max-md:flex-1"
+              />
+            </>
+          }
+        />
       </div>
 
       <GamesTable

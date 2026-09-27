@@ -740,7 +740,9 @@ msgstr "Connected accounts"
 msgid "Assistant"
 msgstr "Assistant"
 
+#. Rail footer link to the manual
 #: src/components/shell/AccountMenu.tsx
+#: src/components/shell/SideNav.tsx
 msgid "Manual"
 msgstr "Manual"
 
@@ -829,7 +831,6 @@ msgid "the last games and what went wrong"
 msgstr "the last games and what went wrong"
 
 #: src/components/shell/CommandPalette.tsx
-#: src/routes/analysis/AnalysisPage.tsx
 msgid "the library"
 msgstr "the library"
 
@@ -953,7 +954,6 @@ msgid "lichess, chess.com, FICS and PGN"
 msgstr "lichess, chess.com, FICS and PGN"
 
 #: src/components/shell/CommandPalette.tsx
-#: src/routes/import/LibraryManagePage.tsx
 msgid "Manage Library"
 msgstr "Manage Library"
 
@@ -1196,11 +1196,6 @@ msgid "No saved filters yet"
 msgstr "No saved filters yet"
 
 #: src/components/shell/SideNav.tsx
-#: src/routes/stats/StatsPage.tsx
-msgid "both colours"
-msgstr "both colours"
-
-#: src/components/shell/SideNav.tsx
 #: src/routes/explorer/ExplorerPage.tsx
 #: src/routes/live/SessionMeta.tsx
 #: src/routes/stats/StatsPage.tsx
@@ -1213,6 +1208,10 @@ msgstr "white"
 #: src/routes/stats/StatsPage.tsx
 msgid "black"
 msgstr "black"
+
+#: src/components/shell/SideNav.tsx
+msgid "both colours"
+msgstr "both colours"
 
 #: src/components/shell/SideNav.tsx
 msgid "Your lines · {scopeLabel}"
@@ -1246,6 +1245,14 @@ msgstr "connecting to /events"
 #: src/routes/live/LivePage.tsx
 msgid "offline — retrying"
 msgstr "offline — retrying"
+
+#: src/components/shell/SideNav.tsx
+msgid "Open the manual for this page"
+msgstr "Open the manual for this page"
+
+#: src/components/shell/SideNav.tsx
+msgid "Open the manual"
+msgstr "Open the manual"
 
 #: src/components/shell/SideNav.tsx
 msgid "Expand the navigation"
@@ -1331,10 +1338,6 @@ msgstr "Demo"
 #: src/components/shell/TopBar.tsx
 msgid "· read-only"
 msgstr "· read-only"
-
-#: src/components/shell/TopBar.tsx
-msgid "Open the manual for this page"
-msgstr "Open the manual for this page"
 
 #: src/components/shell/TopBar.tsx
 msgid "Search everything (⌘K)"
@@ -1817,14 +1820,6 @@ msgid "Forward, back down the line you just left"
 msgstr "Forward, back down the line you just left"
 
 #: src/routes/analysis/AnalysisPage.tsx
-msgid "{analysed} of {games} games have had an engine over them."
-msgstr "{analysed} of {games} games have had an engine over them."
-
-#: src/routes/analysis/AnalysisPage.tsx
-msgid "What the library has been analysed with, and what finishing it would cost."
-msgstr "What the library has been analysed with, and what finishing it would cost."
-
-#: src/routes/analysis/AnalysisPage.tsx
 msgid "The coverage could not be read."
 msgstr "The coverage could not be read."
 
@@ -1917,10 +1912,6 @@ msgid "The analysis configuration could not be read."
 msgstr "The analysis configuration could not be read."
 
 #: src/routes/analysis/AnalysisSettings.tsx
-msgid "How much work the analysis pass does, and how its results become move labels."
-msgstr "How much work the analysis pass does, and how its results become move labels."
-
-#: src/routes/analysis/AnalysisSettings.tsx
 msgid "Analysis pass"
 msgstr "Analysis pass"
 
@@ -1962,10 +1953,6 @@ msgid "Add"
 msgstr "Add"
 
 #: src/routes/analysis/AnalysisSettings.tsx
-msgid "Which human levels the analysis asks about and when it asks them."
-msgstr "Which human levels the analysis asks about and when it asks them."
-
-#: src/routes/analysis/AnalysisSettings.tsx
 msgid "Human levels"
 msgstr "Human levels"
 
@@ -1984,10 +1971,6 @@ msgstr "Choose whether passes pay for human-move predictions and whose moves the
 #: src/routes/analysis/AnalysisSettings.tsx
 msgid "Changed the levels? <0>Fill missing levels</0> from Analysis overview."
 msgstr "Changed the levels? <0>Fill missing levels</0> from Analysis overview."
-
-#: src/routes/analysis/CorrespondenceSettings.tsx
-msgid "Games played over weeks, with a tree of positions the engines keep working on."
-msgstr "Games played over weeks, with a tree of positions the engines keep working on."
 
 #: src/routes/analysis/CorrespondenceSettings.tsx
 msgid "Lines per search"
@@ -2544,10 +2527,6 @@ msgstr "{0, plural, one {1 move} other {# moves}}"
 #: src/routes/correspondence/CorrespondencePage.tsx
 msgid "Open in Games"
 msgstr "Open in Games"
-
-#: src/routes/correspondence/CorrespondencePage.tsx
-msgid "{ongoing, plural, =0 {No games running} one {1 game running} other {# games running}}"
-msgstr "{ongoing, plural, =0 {No games running} one {1 game running} other {# games running}}"
 
 #: src/routes/correspondence/CorrespondencePage.tsx
 msgid "Resume all"
@@ -3501,26 +3480,6 @@ msgid "{engine} finished on {where}."
 msgstr "{engine} finished on {where}."
 
 #: src/routes/dashboard/DashboardPage.tsx
-msgid "The backend is not answering. Nothing below will be current."
-msgstr "The backend is not answering. Nothing below will be current."
-
-#: src/routes/dashboard/DashboardPage.tsx
-msgid "Reading the database…"
-msgstr "Reading the database…"
-
-#: src/routes/dashboard/DashboardPage.tsx
-msgid "Nothing imported yet. Start with a sync or a PGN."
-msgstr "Nothing imported yet. Start with a sync or a PGN."
-
-#: src/routes/dashboard/DashboardPage.tsx
-msgid "{gameCount} games in the database."
-msgstr "{gameCount} games in the database."
-
-#: src/routes/dashboard/DashboardPage.tsx
-msgid "{gameCount} games in the database. {blunders, plural, one {{blunderCount} blunder} other {{blunderCount} blunders}} on the record."
-msgstr "{gameCount} games in the database. {blunders, plural, one {{blunderCount} blunder} other {{blunderCount} blunders}} on the record."
-
-#: src/routes/dashboard/DashboardPage.tsx
 #: src/routes/stats/reports.ts
 msgid "Overview"
 msgstr "Overview"
@@ -4034,10 +3993,6 @@ msgid "Copied"
 msgstr "Copied"
 
 #: src/routes/engines/DemoEngines.tsx
-msgid "The demo server runs none. Analysis happens in your tab."
-msgstr "The demo server runs none. Analysis happens in your tab."
-
-#: src/routes/engines/DemoEngines.tsx
 msgid "Browser Stockfish"
 msgstr "Browser Stockfish"
 
@@ -4365,10 +4320,6 @@ msgid "Remote runner"
 msgstr "Remote runner"
 
 #: src/routes/engines/EnginesPage.tsx
-msgid "What is installed, how each engine is set up, and which job it does."
-msgstr "What is installed, how each engine is set up, and which job it does."
-
-#: src/routes/engines/EnginesPage.tsx
 msgid "Every configured engine, where it runs, and what it costs per process."
 msgstr "Every configured engine, where it runs, and what it costs per process."
 
@@ -4420,14 +4371,6 @@ msgid "{0, plural, one {# engine} other {# engines}}"
 msgstr "{0, plural, one {# engine} other {# engines}}"
 
 #: src/routes/engines/MachinesPage.tsx
-msgid "Where engines run, how much runs at once, and what is running now."
-msgstr "Where engines run, how much runs at once, and what is running now."
-
-#: src/routes/engines/MachinesPage.tsx
-msgid "How much this computer runs at once, and what is running now."
-msgstr "How much this computer runs at once, and what is running now."
-
-#: src/routes/engines/MachinesPage.tsx
 msgid "How remote runners work"
 msgstr "How remote runners work"
 
@@ -4444,8 +4387,8 @@ msgid "A runner is a small process on another machine that connects outward to t
 msgstr "A runner is a small process on another machine that connects outward to this Blunderbase deployment. Registering one mints a token shown once and a paste-ready <0>runner.yaml</0>. Copy both to that machine, set its engine paths in the yaml, and start the runner. Its advertised engines then appear on Engines; their paths and options remain read-only here because the yaml on that machine is the source of truth."
 
 #: src/routes/engines/MachinesPage.tsx
-msgid "The manual chapter behind the (?) in the titlebar has the setup and the troubleshooting."
-msgstr "The manual chapter behind the (?) in the titlebar has the setup and the troubleshooting."
+msgid "The manual chapter behind Manual, at the foot of the rail, has the setup and the troubleshooting."
+msgstr "The manual chapter behind Manual, at the foot of the rail, has the setup and the troubleshooting."
 
 #: src/routes/engines/OptionsEditor.tsx
 msgid "set per analysis"
@@ -4859,12 +4802,10 @@ msgid "both"
 msgstr "both"
 
 #: src/routes/explorer/ExplorerPage.tsx
-#: src/routes/stats/StatsPage.tsx
 msgid "as white"
 msgstr "as white"
 
 #: src/routes/explorer/ExplorerPage.tsx
-#: src/routes/stats/StatsPage.tsx
 msgid "as black"
 msgstr "as black"
 
@@ -5914,20 +5855,9 @@ msgid "{deleted, plural, one {# game} other {# games}} deleted"
 msgstr "{deleted, plural, one {# game} other {# games}} deleted"
 
 #: src/routes/games/GamesPage.tsx
-msgid "Counting…"
-msgstr "Counting…"
-
-#: src/routes/games/GamesPage.tsx
-msgid "<0>{totalGames}</0> of your games match this filter"
-msgstr "<0>{totalGames}</0> of your games match this filter"
-
-#: src/routes/games/GamesPage.tsx
-msgid "<0>{totalGames}</0> of your games match these {active} filters"
-msgstr "<0>{totalGames}</0> of your games match these {active} filters"
-
-#: src/routes/games/GamesPage.tsx
-msgid "<0>{totalGames}</0> games in the database"
-msgstr "<0>{totalGames}</0> games in the database"
+#: src/routes/notes/components/NoteFilterBar.tsx
+msgid "Clear {active}"
+msgstr "Clear {active}"
 
 #: src/routes/games/GamesPage.tsx
 msgid "Search games"
@@ -5936,11 +5866,6 @@ msgstr "Search games"
 #: src/routes/games/GamesPage.tsx
 msgid "Opponent, ECO, PGN text…"
 msgstr "Opponent, ECO, PGN text…"
-
-#: src/routes/games/GamesPage.tsx
-#: src/routes/notes/components/NoteFilterBar.tsx
-msgid "Clear {active}"
-msgstr "Clear {active}"
 
 #: src/routes/games/GamesPage.tsx
 msgid "Nothing matches these filters"
@@ -6545,18 +6470,6 @@ msgstr "Forget the deletion of {white} vs {black}"
 msgid "Forget"
 msgstr "Forget"
 
-#: src/routes/import/ImportPage.tsx
-msgid "Connect an account, sync it, or upload a PGN export."
-msgstr "Connect an account, sync it, or upload a PGN export."
-
-#: src/routes/import/ImportPage.tsx
-msgid "{count} games in the database. Every import is deduplicated on the way in."
-msgstr "{count} games in the database. Every import is deduplicated on the way in."
-
-#: src/routes/import/ImportPage.tsx
-msgid "all {count}"
-msgstr "all {count}"
-
 #: src/routes/import/JobProgress.tsx
 msgid "Stopping"
 msgstr "Stopping"
@@ -6601,10 +6514,6 @@ msgstr "{failed} failed"
 #: src/routes/import/JobProgress.tsx
 msgid "and {extra} more — see the sync history"
 msgstr "and {extra} more — see the sync history"
-
-#: src/routes/import/LibraryManagePage.tsx
-msgid "Export a portable copy or reset the imported data in this installation."
-msgstr "Export a portable copy or reset the imported data in this installation."
 
 #: src/routes/import/LibraryManagement.tsx
 msgid "Estimated backup size: about {size}."
@@ -7051,14 +6960,6 @@ msgid "Create"
 msgstr "Create"
 
 #: src/routes/mcp/McpPage.tsx
-msgid "Connect your assistant"
-msgstr "Connect your assistant"
-
-#: src/routes/mcp/McpPage.tsx
-msgid "Every game you import is a fact the coach can query over MCP."
-msgstr "Every game you import is a fact the coach can query over MCP."
-
-#: src/routes/mcp/McpPage.tsx
 msgid "Connect a client"
 msgstr "Connect a client"
 
@@ -7111,26 +7012,6 @@ msgid "Nothing to query yet? <0>Import some games</0> first — the coach only k
 msgstr "Nothing to query yet? <0>Import some games</0> first — the coach only knows what the database holds."
 
 #: src/routes/notes/NotesPage.tsx
-msgid "{total, plural, one {# note} other {# notes}} (the newest page)"
-msgstr "{total, plural, one {# note} other {# notes}} (the newest page)"
-
-#: src/routes/notes/NotesPage.tsx
-msgid "{total, plural, one {# note} other {# notes}}"
-msgstr "{total, plural, one {# note} other {# notes}}"
-
-#: src/routes/notes/NotesPage.tsx
-msgid "Nothing written matches that."
-msgstr "Nothing written matches that."
-
-#: src/routes/notes/NotesPage.tsx
-msgid "Nothing written down yet."
-msgstr "Nothing written down yet."
-
-#: src/routes/notes/NotesPage.tsx
-msgid "What you and the coach have written down."
-msgstr "What you and the coach have written down."
-
-#: src/routes/notes/NotesPage.tsx
 msgid "The notes could not be read."
 msgstr "The notes could not be read."
 
@@ -7141,6 +7022,10 @@ msgstr "The note you followed"
 #: src/routes/notes/NotesPage.tsx
 msgid "outside the filters below"
 msgstr "outside the filters below"
+
+#: src/routes/notes/NotesPage.tsx
+msgid "These are the newest {LIMIT} notes. Narrow the filters to reach older ones."
+msgstr "These are the newest {LIMIT} notes. Narrow the filters to reach older ones."
 
 #: src/routes/notes/NotesPage.tsx
 msgid "Stream"
@@ -7563,24 +7448,12 @@ msgid "has a comment"
 msgstr "has a comment"
 
 #: src/routes/stats/StatsPage.tsx
-msgid "{analysedCount} analysed of {gameCount} games · {period} · {colours}"
-msgstr "{analysedCount} analysed of {gameCount} games · {period} · {colours}"
-
-#: src/routes/stats/StatsPage.tsx
-msgid "{analysedCount} analysed of {gameCount} games · {period} · {colours} · {speedList} only"
-msgstr "{analysedCount} analysed of {gameCount} games · {period} · {colours} · {speedList} only"
-
-#: src/routes/stats/StatsPage.tsx
 msgid "Window"
 msgstr "Window"
 
 #: src/routes/stats/StatsPage.tsx
 msgid "Count {speedWord} games"
 msgstr "Count {speedWord} games"
-
-#: src/routes/stats/StatsPage.tsx
-msgid "Reading the aggregations…"
-msgstr "Reading the aggregations…"
 
 #: src/routes/stats/StatsPage.tsx
 msgid "Show every number against the equally long window before this one"

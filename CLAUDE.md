@@ -106,7 +106,7 @@ Full reasoning in `docs/ARCHITECTURE.md`. The short version:
   how the app is used.
   `tests/test_manual_content.py` fails when a setting or a command is undocumented, and
   `make docs` (`--strict`) fails on a broken link. A page also carries a `manual` on its
-  `SetPageChrome`, which is the (?) in the titlebar — a new screen names its chapter.
+  `SetPageChrome`, which the rail's Manual link opens — a new screen names its chapter.
 - Edit files with the Edit tool; never rewrite an existing file with a script. Development
   is mostly on macOS and sometimes on a Windows checkout with `core.autocrlf=true`, where a
   whole-file rewrite flips line endings and shows up as a bogus diff. `*.sh` is forced to

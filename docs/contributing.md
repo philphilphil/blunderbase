@@ -36,8 +36,8 @@ they appear on it — nothing from another screen is described there, only linke
 German is written as German, not translated sentence by sentence — the first attempt at
 that read like nonsense and was thrown out. A German page keeps the same headings in the
 same order, and each is pinned to the English heading's slug with attr_list
-(`## Verwalten { #manage }`), so a link to an anchor — from the manual or from the (?) in
-the app — lands on the same section in either language. The build validates anchors, so a
+(`## Verwalten { #manage }`), so a link to an anchor — from the manual or from the app's
+Manual link — lands on the same section in either language. The build validates anchors, so a
 missing one fails `make docs`. Should a German page ever be missing, the i18n plugin falls
 back to the English one.
 

@@ -4,7 +4,7 @@
  * The app's webview has no tabs, and a `target="_blank"` link or a `window.open` is a
  * request for one. Left to the webview, that request goes nowhere: the shell's handler
  * for it (`on_new_window` in `lib.rs`) is in place, but on macOS WebKit never called it
- * for the links the app has, and the (?) in the titlebar and "Create one on lichess.org"
+ * for the links the app has, and the rail's Manual link and "Create one on lichess.org"
  * were dead in the desktop build. So while the native bridge is there the page does not
  * leave it to the webview: a click on such a link is taken over here and handed to the
  * shell, which opens the manual in a second window of the app and everything else in the

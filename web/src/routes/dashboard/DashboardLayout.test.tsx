@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { PageChromeProvider } from '@/components/shell/PageChrome'
 import { setEngineHidden } from '@/lib/ui/engineVisibility'
+import { ChromeActions } from '@/test/chrome'
 
 import { DashboardPage } from './DashboardPage'
 
@@ -36,6 +37,7 @@ function draw() {
     <PageChromeProvider>
       <MemoryRouter>
         <DashboardPage />
+        <ChromeActions />
       </MemoryRouter>
     </PageChromeProvider>,
   )

@@ -5,7 +5,7 @@
 import type { I18n, MessageDescriptor } from '@lingui/core'
 import { msg } from '@lingui/core/macro'
 import { Trans, useLingui } from '@lingui/react/macro'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -32,6 +32,8 @@ import { FilterPopover, OptionButton, OptionRow, PopoverLabel, TriState } from '
 export interface FilterBarProps {
   filters: LibraryFilters
   onChange: (next: LibraryFilters) => void
+  /** The page's own end of the row — its search box — pushed to the right edge. */
+  trailing?: ReactNode
 }
 
 /**
@@ -54,7 +56,7 @@ function isoDay(offsetDays: number): string {
   return date.toISOString().slice(0, 10)
 }
 
-export function FilterBar({ filters, onChange }: FilterBarProps) {
+export function FilterBar({ filters, onChange, trailing }: FilterBarProps) {
   const { i18n } = useLingui()
   const patch = (next: Partial<LibraryFilters>) => onChange(prune({ ...filters, ...next }))
 
@@ -85,6 +87,10 @@ export function FilterBar({ filters, onChange }: FilterBarProps) {
       ))}
 
       <SaveFilter filters={filters} />
+
+      {trailing ? (
+        <div className="ml-auto flex items-center gap-[0.4375rem] max-md:w-full">{trailing}</div>
+      ) : null}
     </div>
   )
 }

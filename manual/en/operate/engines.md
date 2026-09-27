@@ -23,7 +23,7 @@ costs; how many processes a machine runs at once is not decided here but on
 
 ## Adding an engine
 
-**Add an engine**, top right on the Engines page, asks for three things. A path-based
+**Add an engine**, in the title bar of the Engines page, asks for three things. A path-based
 engine is always this server's: a [remote runner](runners.md)'s engines come from its own
 yaml, and the engine in your browser is a one-press install on Machines.
 

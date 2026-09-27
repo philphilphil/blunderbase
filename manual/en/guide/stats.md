@@ -18,8 +18,8 @@ PGN without those tags, keeps the rating you brought to it.
 
 ## Which games are counted?
 
-Your own games, and only those an engine has been over — the line under the title says how
-many of the games in the window are analysed. Games marked as not yours count in nothing.
+Your own games, and only those an engine has been over — the **Games** tile says how many
+of the games in the window are analysed. Games marked as not yours count in nothing.
 If a report looks thin, check **Analysis → Coverage**.
 
 ## Narrow the window

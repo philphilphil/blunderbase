@@ -7,6 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { Providers } from '@/app/Providers'
 import { RuntimeCapabilitiesProvider } from '@/lib/runtime/RuntimeCapabilitiesProvider'
+import { ChromeActions } from '@/test/chrome'
 
 import { MachinesPage } from './MachinesPage'
 import {
@@ -28,7 +29,10 @@ function renderPage(ui: ReactNode = <MachinesPage />) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   return render(
     <Providers client={client}>
-      <MemoryRouter initialEntries={['/compute/machines']}>{ui}</MemoryRouter>
+      <MemoryRouter initialEntries={['/compute/machines']}>
+        {ui}
+        <ChromeActions />
+      </MemoryRouter>
     </Providers>,
   )
 }
@@ -171,9 +175,6 @@ describe('MachinesPage — this server', () => {
         <MachinesPage />
       </RuntimeCapabilitiesProvider>,
     )
-    expect(
-      await screen.findByText('How much this computer runs at once, and what is running now.'),
-    ).toBeInTheDocument()
     expect((await screen.findAllByText('This computer')).length).toBeGreaterThan(0)
     expect(screen.queryByRole('button', { name: /remote runner/i })).not.toBeInTheDocument()
     expect(screen.queryByText('This browser')).not.toBeInTheDocument()

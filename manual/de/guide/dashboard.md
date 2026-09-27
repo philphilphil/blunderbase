@@ -1,8 +1,8 @@
 # Übersicht
 
 Der erste Bildschirm: was in der Bibliothek liegt, was zuletzt schiefgegangen ist und was
-die Engines gerade tun. Die Zeile unter dem Titel zählt deine Partien und die groben Patzer,
-die sich noch niemand angesehen hat.
+die Engines gerade tun. Wie jeder Bildschirm hat sie keine eigene Überschrift: Ihr Name
+steht in der Titelleiste, ihre Schaltflächen stehen gleich daneben.
 
 ## Alle Konten synchronisieren { #sync-all-accounts }
 

@@ -6,6 +6,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { Providers } from '@/app/Providers'
 import type { CorrespondenceGameSummary } from '@/lib/api/types'
+import { ChromeActions } from '@/test/chrome'
 
 import { CorrespondencePage } from './CorrespondencePage'
 
@@ -226,6 +227,7 @@ function draw() {
     <Providers client={client}>
       <MemoryRouter>
         <CorrespondencePage />
+        <ChromeActions />
       </MemoryRouter>
     </Providers>,
   )

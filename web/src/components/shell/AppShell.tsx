@@ -12,10 +12,12 @@ import { NativeFeedback } from '@/lib/desktop/NativeFeedback'
 import { PgnDropOverlay } from '@/lib/desktop/PgnDropOverlay'
 import { useRuntimeCapabilities } from '@/lib/runtime/capabilities'
 import { TourProvider } from '@/lib/tour/TourProvider'
+import { useIsMobile } from '@/lib/ui/media'
 import { useCorrespondenceSearchToasts } from '@/routes/correspondence/useSearchToasts'
 
 import { CommandPaletteProvider } from './CommandPalette'
 import { ShortcutsOverlayProvider } from './ShortcutsOverlay'
+import { usePageChrome } from './PageChrome'
 import { NavDrawer, SideNav } from './SideNav'
 import { TitleTooltips } from './TitleTooltips'
 import { TopBar } from './TopBar'
@@ -40,6 +42,24 @@ const TOAST_CLASSES = {
   success: 'border-good/30',
   error: 'border-blunder/30',
   info: 'border-info/30',
+}
+
+/**
+ * A page's own buttons on a phone. The titlebar is the page's heading and carries them from
+ * `md` up (`SetPageChrome`'s `actions`), but at 375px it has no room left beside the rail
+ * button, the queue, search and the account — so below `md` they stand in one row of their
+ * own under it, on the page's canvas. Rendered here or in the titlebar, never both: a button
+ * mounted twice would be two sets of ids and two of whatever state it keeps.
+ */
+function PhoneActions() {
+  const { actions } = usePageChrome()
+  const mobile = useIsMobile()
+  if (!mobile || !actions) return null
+  return (
+    <div className="flex flex-none flex-wrap items-center justify-end gap-2 border-b border-hairline px-4 py-2">
+      {actions}
+    </div>
+  )
 }
 
 /**
@@ -169,6 +189,7 @@ export function AppShell() {
                 tabIndex={-1}
                 className="flex min-w-0 flex-1 flex-col overflow-hidden outline-none"
               >
+                <PhoneActions />
                 <Suspense
                   fallback={
                     <div

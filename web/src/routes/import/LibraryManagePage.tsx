@@ -1,7 +1,7 @@
 import { useLingui } from '@lingui/react/macro'
 
 import { SetPageChrome } from '@/components/shell/PageChrome'
-import { PageBody, PageHeader } from '@/components/shell/PageHeader'
+import { PageBody } from '@/components/shell/PageHeader'
 
 import { LibraryManagement } from './LibraryManagement'
 
@@ -17,10 +17,6 @@ export function LibraryManagePage() {
       <SetPageChrome
         breadcrumb={[{ label: t`Library`, to: '/library' }, { label: t`Manage` }]}
         manual="guide/library#manage"
-      />
-      <PageHeader
-        title={t`Manage Library`}
-        description={t`Export a portable copy or reset the imported data in this installation.`}
       />
       <LibraryManagement />
     </PageBody>

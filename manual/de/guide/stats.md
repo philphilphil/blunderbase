@@ -19,7 +19,7 @@ Wertung, mit der du in sie gegangen bist.
 
 ## Welche Partien zählen?
 
-Nur deine eigenen, und davon nur die analysierten. Die Zeile unter dem Titel sagt, wie viele
+Nur deine eigenen, und davon nur die analysierten. Die Kachel **Partien** sagt, wie viele
 Partien des Zeitraums analysiert sind. Als fremd markierte Partien zählen nirgends. Wirkt
 ein Bericht dünn, sieh unter **Analyse → Abdeckung** nach.
 

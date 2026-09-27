@@ -2,44 +2,11 @@ import { forwardRef, type ReactNode } from 'react'
 
 import { cn } from '@/lib/utils'
 
-/**
- * The page heading: the type scale's `title` (19 design px, its weight and tracking come
- * with it) with a `data` line under it and the page's own actions pushed to the right, over
- * a minimum height so the row does not jump as a subtitle resolves from "Reading the
- * database…" to a sentence about the library. The title is a step down from the 21px it
- * was, so every page header and the games page's own h1 agree on one size.
- *
- * Below `md` the row is allowed to wrap: a title and a pair of buttons do not share 375px,
- * and a second line is better than either half being squeezed out of legibility. The
- * spacer keeps the actions on the right whenever they still fit on the first.
+/*
+ * There is no page heading. A screen's name is the titlebar's last crumb and its buttons
+ * follow it in that bar (`TopBar`, `SetPageChrome`); an in-page title under it
+ * repeated the crumb and the rail's highlighted row.
  */
-export function PageHeader({
-  title,
-  description,
-  actions,
-  className,
-}: {
-  title: ReactNode
-  description?: ReactNode
-  actions?: ReactNode
-  className?: string
-}) {
-  return (
-    <div
-      className={cn(
-        'flex min-h-[2.75rem] flex-none items-end gap-4 max-md:min-h-0 max-md:flex-wrap',
-        className,
-      )}
-    >
-      <div className="flex min-w-0 flex-col gap-[0.125rem]">
-        <h1 className="text-title leading-none text-ink">{title}</h1>
-        {description ? <p className="text-data text-dim">{description}</p> : null}
-      </div>
-      <div className="flex-1" />
-      {actions}
-    </div>
-  )
-}
 
 /**
  * The scrolling canvas every page sits on: 18px/20px padding, 16px column gap.

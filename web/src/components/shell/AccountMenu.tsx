@@ -154,8 +154,8 @@ export function AccountMenu() {
             </Link>
           ) : null}
           {/*
-            The manual's front page, in the language the app is in. The titlebar's (?) goes
-            to the chapter for the screen you are on; this is the way in when the question
+            The manual's front page, in the language the app is in. The rail's Manual link
+            goes to the chapter for the screen you are on; this is the way in when the question
             is not about the screen in front of you. A new tab, because the manual is a
             separate site served beside the app and the reader is mid-task.
           */}

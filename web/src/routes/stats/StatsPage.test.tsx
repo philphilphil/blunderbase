@@ -1,5 +1,5 @@
 import { QueryClient } from '@tanstack/react-query'
-import { render, screen } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { UseQueryResult } from '@tanstack/react-query'
 import { MemoryRouter } from 'react-router-dom'
@@ -146,8 +146,8 @@ describe('CSV export', () => {
 })
 
 /**
- * The filter bar scopes every card on the page, so it belongs on the page — under the
- * header it qualifies, at every width. It used to live in the titlebar on a desktop and
+ * The filter bar scopes every card on the page, so it belongs on the page — above the
+ * cards it qualifies, at every width. It used to live in the titlebar on a desktop and
  * come down into the body on a phone; nobody looked at it up there, and a control that
  * moves depending on the window is a control that has to be found twice.
  *
@@ -209,11 +209,18 @@ describe('StatsPage — the filter bar', () => {
   it.each([
     ['a desktop', false],
     ['a phone', true],
-  ])('draws every filter on the page and nothing in the titlebar on %s', (_name, mobile) => {
+  ])('draws every filter on the page and only the page’s two buttons in the titlebar on %s', (_name, mobile) => {
     stubViewport(mobile)
     draw()
 
-    expect(screen.getByTestId('titlebar')).toBeEmptyDOMElement()
+    // The titlebar carries the page's verbs (the shell moves them under it on a phone) and
+    // none of its filters.
+    const titlebar = screen.getByTestId('titlebar')
+    expect(within(titlebar).getAllByRole('button').map((button) => button.textContent)).toEqual([
+      'vs previous',
+      'Export CSV',
+    ])
+    expect(within(titlebar).queryByRole('group')).not.toBeInTheDocument()
     expect(screen.getByRole('group', { name: 'Window' })).toBeInTheDocument()
     expect(screen.getByRole('group', { name: 'Colour' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'bullet' })).toBeInTheDocument()

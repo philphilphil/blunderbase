@@ -1,13 +1,11 @@
 import { Trans, useLingui } from '@lingui/react/macro'
-import { Link } from 'react-router-dom'
 
 import { SetPageChrome } from '@/components/shell/PageChrome'
-import { PageBody, PageHeader } from '@/components/shell/PageHeader'
+import { PageBody } from '@/components/shell/PageHeader'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useCoverage } from '@/lib/api/queries'
 import { QueueCard } from '@/routes/dashboard/QueueCard'
-import { formatCount } from '@/routes/games/format'
 
 import { CoverageSplit } from './CoverageSplit'
 import { FailedRuns } from './FailedRuns'
@@ -36,31 +34,12 @@ export function AnalysisPage() {
   const { t } = useLingui()
   const coverage = useCoverage()
 
-  // Named locals rather than expressions in the template: the identifier is what a
-  // translator sees as the placeholder.
-  const analysed = coverage.data ? formatCount(coverage.data.analysed) : undefined
-  const games = coverage.data ? formatCount(coverage.data.total) : undefined
-
   return (
     <PageBody>
       <SetPageChrome
         breadcrumb={[{ label: t`Analysis`, to: '/analysis' }, { label: t`Coverage` }]}
         manual="guide/analysis#what-is-left-to-analyse"
       />
-      <PageHeader
-        title={t`Analysis`}
-        description={
-          coverage.data
-            ? t`${analysed} of ${games} games have had an engine over them.`
-            : t`What the library has been analysed with, and what finishing it would cost.`
-        }
-        actions={
-          <Link to="/games" className="text-[0.6875rem] text-accent-teal hover:text-accent-link">
-            <Trans>the library</Trans>
-          </Link>
-        }
-      />
-
       {coverage.isPending ? (
         <Skeleton className="h-28 w-full max-w-3xl" data-testid="coverage-loading" />
       ) : coverage.isError ? (

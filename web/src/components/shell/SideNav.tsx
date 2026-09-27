@@ -21,7 +21,7 @@
 import type { MessageDescriptor } from '@lingui/core'
 import { msg } from '@lingui/core/macro'
 import { Trans, useLingui } from '@lingui/react/macro'
-import { PanelLeftClose, PanelLeftOpen, X } from 'lucide-react'
+import { BookOpen, PanelLeftClose, PanelLeftOpen, X } from 'lucide-react'
 import {
   createContext,
   Fragment,
@@ -60,7 +60,9 @@ import {
 } from '@/lib/api/queries'
 import type { Color } from '@/lib/api/types'
 import { useEvents } from '@/lib/events/EventsProvider'
+import { useLocale } from '@/lib/i18n/I18nProvider'
 import { REPO_URL } from '@/lib/links'
+import { manualUrl } from '@/lib/manual'
 import { paramsFromFilters, toGameQuery } from '@/routes/games/filters'
 import {
   filterLabel,
@@ -73,6 +75,7 @@ import { cn } from '@/lib/utils'
 import { VERSION_LABEL } from '@/lib/version'
 
 import { LINE_SAMPLE, scoreTone, topLines } from './openingLines'
+import { usePageChrome } from './PageChrome'
 import { ThemeToggle } from './ThemeToggle'
 
 interface NavItem {
@@ -582,10 +585,41 @@ function ConnectionDot() {
 }
 
 /**
+ * The way into the manual, opened at the chapter the page names (`SetPageChrome`'s `manual`)
+ * or at its front page when it names none. It used to be a (?) beside the breadcrumb; it is
+ * the app's help rather than the page's command, so it sits with the app's other odds and
+ * ends — and as a word, because down here a bare question mark says nothing about what it
+ * opens.
+ *
+ * It opens a new tab. The manual is a separate site served beside the app, not a screen of
+ * it, and the reader is mid-task: they are looking something up about the page they are
+ * standing on and want to come back to it, not navigate away from it.
+ */
+function ManualLink({ iconOnly = false }: { iconOnly?: boolean }) {
+  const { manual } = usePageChrome()
+  const { locale } = useLocale()
+  const { t } = useLingui()
+  const label = manual ? t`Open the manual for this page` : t`Open the manual`
+  return (
+    <a
+      href={manualUrl(locale, manual ?? '')}
+      target="_blank"
+      rel="noreferrer"
+      aria-label={label}
+      title={label}
+      className="flex items-center gap-1 px-0.5 text-label text-dim transition-colors hover:text-ink"
+    >
+      <BookOpen className="size-3.5" aria-hidden />
+      {iconOnly ? null : <Trans comment="Rail footer link to the manual">Manual</Trans>}
+    </a>
+  )
+}
+
+/**
  * The pinned footer: the window's bottom edge, where a desktop app keeps its odds and ends
- * — the fold control, the source link, the live-connection dot and the build's version, and
- * below `md` the theme control, which is the titlebar's from `md` up and comes back here
- * because that is what the phone's drawer carries.
+ * — the fold control, the manual, the source link, the live-connection dot and the build's
+ * version, and below `md` the theme control, which is the titlebar's from `md` up and comes
+ * back here because that is what the phone's drawer carries.
  *
  * It used to lead with an "engine coverage" bar. That is gone: Analysis answers the same
  * question properly and at length (`/analysis/coverage`), the bar cost two `useGames`
@@ -619,6 +653,7 @@ function NavFooter({ collapsed, onToggle }: { collapsed: boolean; onToggle: () =
     return (
       <div className="flex flex-col items-center gap-1.5 border-t border-hairline px-1 pt-2 pb-1">
         {fold}
+        <ManualLink iconOnly />
         <ConnectionDot />
       </div>
     )
@@ -633,6 +668,7 @@ function NavFooter({ collapsed, onToggle }: { collapsed: boolean; onToggle: () =
           phone's, reached through the drawer, where the titlebar has no room for it.
         */}
         <ThemeToggle className="md:hidden" />
+        <ManualLink />
         <a
           href={REPO}
           target="_blank"

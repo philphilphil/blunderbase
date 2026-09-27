@@ -1,8 +1,8 @@
 # Dashboard
 
 The first screen: what the library holds, what has gone wrong lately, and what the engines
-are doing. The line under the title counts your games and the blunders nobody has looked
-at yet.
+are doing. Like every screen it has no heading of its own: its name is in the title bar,
+with its buttons right beside the name.
 
 ## Sync all accounts
 

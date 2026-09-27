@@ -50,8 +50,19 @@ directory are local snapshots pulled 2026-08-25.
     blunder/mistake keep their saturated hues. Token *names* are unchanged, so
     `accent-teal` is still the accent's class; only its value moved.
   - **The overview is sections, not cards**: a heading over a rule
-    (`components/shell/Section.tsx`), with the page's own heading and actions
-    spanning both columns above them.
+    (`components/shell/Section.tsx`).
+  - **The titlebar is the page's heading** (owner, 2026-09-27). A screen used to be
+    named three times: the rail's highlighted row, the titlebar crumb, and an in-page
+    `h1` with a subtitle under it. The `h1` and its subtitle are gone from every screen.
+    The last crumb is the page's name, a step brighter than the way there. The page's
+    buttons go through `SetPageChrome`'s `actions` and follow the crumb from `md` up, so
+    the bar reads in two halves: the page on the left, the app on the right. Below `md`
+    the shell puts them in one row under the bar (`AppShell`'s `PhoneActions`), and the
+    titlebar keeps only the last crumb. The (?) left the bar for the rail's footer, as
+    **Manual** beside the GitHub link: it is the app's help, not the page's command.
+    Subtitles that explained a page were dropped, since the manual is for that. Live facts went
+    where they belong: the games count is the table footer's, and a full notes page
+    says so under its last note. Only the game screen was already built this way.
   - **The game screen is one workspace**: a full-width `GameHeaderBar`, then the
     board flush left and a pane matrix to its right whose four title strips —
     Maia, the engine, Moves/Flagged, Book/Notes — sit on one line. The real
@@ -62,7 +73,7 @@ directory are local snapshots pulled 2026-08-25.
   the restrained direction above, not a new one: same panes, rail, tokens and
   components, with the ad-hoc sizes, the hand-copied button strings and the four
   different "selected" tints folded into the rules below.
-  - **Type scale.** Seven named sizes, defined once as `--text-*` in a plain
+  - **Type scale.** Six named sizes, defined once as `--text-*` in a plain
     `@theme` block in `web/src/index.css`, so Tailwind generates `text-<name>`.
     Sizes are design px; rendered size is × 1.2 (the root scale).
 
@@ -74,9 +85,10 @@ directory are local snapshots pulled 2026-08-25.
     | `text-lead` | 0.8125rem / 1.25rem (13, the body size) | 500–600 | `ink` | player names, move-list SAN, the note composer |
     | `text-heading` | 0.875rem / 1.25rem (14) | 600 | `ink` | a section's h2, the game header's opening, dialog titles |
     | `text-value` | 0.9375rem / 1.25rem (15) | 500 | `ink`, mono | key numbers: a chart's current rating, a trend's value |
-    | `text-title` | 1.1875rem / 1.5rem (19), −0.01em, 600 | 600 | `ink` | the page title (`PageHeader`, the games page) |
 
-    `web/src/lib/utils.ts` extends tailwind-merge with the same seven names. Without
+    There is no page-title size, because there is no page title (see "The titlebar is
+    the page's heading" below). `web/src/lib/utils.ts` extends tailwind-merge with the
+    same six names. Without
     that, `cn()` reads `text-meta` as a colour and silently drops it, or the colour
     beside it; `utils.test.ts` pins the merge. Do not name a size after a colour alias
     (`body`, `soft`, `line` …).

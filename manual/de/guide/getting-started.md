@@ -28,6 +28,6 @@ Bewertungen füllen sich also nach einer Synchronisierung von selbst. Die
 ## Wo du Hilfe findest
 
 Beim ersten Öffnen läuft eine Tour in fünf Schritten; **Tour erneut anzeigen** im Kontomenü
-startet sie noch einmal. Das **(?)** in der Titelleiste öffnet dieses Handbuch beim Kapitel
-zum aktuellen Bildschirm. Die Tastatur-Schaltfläche rechts in der Leiste oder die Taste `?`
+startet sie noch einmal. **Handbuch** unten in der Navigationsleiste öffnet dieses Handbuch
+beim Kapitel zum aktuellen Bildschirm. Die Tastatur-Schaltfläche rechts in der Leiste oder die Taste `?`
 zeigt, welche Tasten dort gelten.

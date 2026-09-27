@@ -21,7 +21,7 @@ import { useMemo, useState } from 'react'
 import { Navigate } from 'react-router-dom'
 
 import { SetPageChrome } from '@/components/shell/PageChrome'
-import { PageBody, PageHeader } from '@/components/shell/PageHeader'
+import { PageBody } from '@/components/shell/PageHeader'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useEngineRoles, useEngines, useRunnersStatus } from '@/lib/api/queries'
@@ -59,21 +59,12 @@ export function MachinesPage() {
       <SetPageChrome
         breadcrumb={[{ label: t`Compute`, to: '/compute' }, { label: t`Machines` }]}
         manual="operate/runners"
-      />
-      <PageHeader
-        className="max-w-5xl"
-        title={t`Machines`}
-        description={
-          remote
-            ? t`Where engines run, how much runs at once, and what is running now.`
-            : t`How much this computer runs at once, and what is running now.`
-        }
         actions={
           remote ? (
             <>
               <Button
                 type="button"
-                size="icon"
+                size="icon-sm"
                 variant="outline"
                 aria-label={t`How remote runners work`}
                 title={t`How remote runners work`}
@@ -192,7 +183,7 @@ function RemoteRunnerInfo() {
         </Trans>
       </p>
       <p className="mt-2 text-[0.65625rem] text-faint">
-        <Trans>The manual chapter behind the (?) in the titlebar has the setup and the troubleshooting.</Trans>
+        <Trans>The manual chapter behind Manual, at the foot of the rail, has the setup and the troubleshooting.</Trans>
       </p>
     </div>
   )

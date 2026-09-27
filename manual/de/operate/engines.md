@@ -25,7 +25,7 @@ daneben.
 
 ## Eine Engine hinzufügen { #adding-an-engine }
 
-**Engine hinzufügen**, rechts oben auf der Engines-Seite, fragt drei Dinge. Eine Engine
+**Engine hinzufügen**, in der Titelleiste der Engines-Seite, fragt drei Dinge. Eine Engine
 über ihren Pfad ist immer die dieses Servers: Die Engines eines [Remote
 Runners](runners.md) kommen aus dessen eigenem yaml, und die Engine in deinem Browser ist
 eine Installation mit einem Klick unter Maschinen.

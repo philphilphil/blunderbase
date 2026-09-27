@@ -21,7 +21,8 @@ import { useMemo, useState, type ReactNode } from 'react'
 import { useSearchParams } from 'react-router-dom'
 
 import { SetPageChrome } from '@/components/shell/PageChrome'
-import { PageBody, PageHeader } from '@/components/shell/PageHeader'
+import { PageBody } from '@/components/shell/PageHeader'
+import { Button } from '@/components/ui/button'
 import { FilterChip } from '@/components/ui/chip'
 import { useStatsDashboard } from '@/lib/api/queries'
 import { SPEEDS } from '@/lib/api/types'
@@ -38,7 +39,6 @@ import { TimeOfDayCard } from './cards/TimeOfDayCard'
 import {
   DEFAULT_WINDOWS,
   WINDOW_LABELS,
-  anchorOf,
   asPercent,
   deltaTone,
   formatCount,
@@ -48,7 +48,6 @@ import {
   precedingWindow,
   total,
   useCompare,
-  windowProse,
   type WindowKey,
 } from './kit/analytics'
 import { downloadCsv, exportRows, toCsv } from './kit/csv'
@@ -63,7 +62,6 @@ interface DeltaPayload {
   total?: StatsBucket
 }
 
-/** Chip labels. "correspondence" is twice the width of the bar's other five put together. */
 /** The same speeds as words in a sentence, where "corr." would not do. */
 const SPEED_WORDS: Record<Speed, MessageDescriptor> = {
   bullet: msg`bullet`,
@@ -73,6 +71,7 @@ const SPEED_WORDS: Record<Speed, MessageDescriptor> = {
   correspondence: msg`correspondence`,
 }
 
+/** Chip labels. "correspondence" is twice the width of the bar's other five put together. */
 const SPEED_LABELS: Record<Speed, MessageDescriptor> = {
   bullet: msg`bullet`,
   blitz: msg`blitz`,
@@ -125,11 +124,6 @@ export function StatsPage() {
     ...(allSpeeds ? {} : { speed: speeds }),
   })
 
-  // The server finds the anchor and calculates against it in the same request. The old
-  // profile-first path rendered six clock-anchored queries, then replaced all six when
-  // the newest-game timestamp arrived.
-  const anchor = useMemo(() => anchorOf(dashboard.data?.anchor ?? null), [dashboard.data?.anchor])
-
   // `speeds` is a fresh array on every toggle, so the memo keys off its content rather than
   // its identity — a filter object rebuilt each render is a new query key for every
   // comparison that reads it. Empty means "all of them", which is no filter at all.
@@ -167,23 +161,11 @@ export function StatsPage() {
 
   const games = numOr(speedTotal, 'games')
   const analysed = numOr(speedTotal, 'analyzed_games')
+  const analysedCount = formatCount(analysed)
   const score = asPercent(num(speedTotal, 'score'))
   const perGame = num(speedTotal, 'blunders_per_game')
   const winLoss = num(phaseTotal, 'avg_win_loss')
   const blunderRate = asPercent(num(phaseTotal, 'blunder_rate'))
-
-  // The subtitle is what the page counted; a speed left out changes that and has to be
-  // said, while the untouched bar leaves the sentence as it was. Both readings are whole
-  // sentences rather than a stem with a clause appended, so the order is a translator's to
-  // choose; the locals are named because an identifier is what they see as a placeholder.
-  const analysedCount = formatCount(analysed)
-  const gameCount = formatCount(games)
-  const period = windowProse(windowKey, anchor)
-  const colours = color === 'both' ? t`both colours` : color === 'white' ? t`as white` : t`as black`
-  const speedList = speeds.map((speed) => i18n._(SPEED_WORDS[speed])).join(', ')
-  const subtitle = allSpeeds
-    ? t`${analysedCount} analysed of ${gameCount} games · ${period} · ${colours}`
-    : t`${analysedCount} analysed of ${gameCount} games · ${period} · ${colours} · ${speedList} only`
 
   function download() {
     const csv = toCsv(
@@ -224,7 +206,7 @@ export function StatsPage() {
    * belongs above the whole page. In practice the titlebar is chrome — a breadcrumb and the
    * queue widget — and controls parked there are not looked at: the page under them says
    * "90 days · both colours" in its own subtitle and nothing points at what would change
-   * it. They sit on the page now, directly under the header they qualify, the way the
+   * it. They sit on the page now, at the top of the cards they qualify, the way the
    * explorer's speed and rating chips sit under the board they filter.
    *
    * Three filters, two shapes. Window and colour are one-of-N, so they are segmented
@@ -283,14 +265,13 @@ export function StatsPage() {
             : [{ label: t`Stats`, to: '/stats' }, { label: reportLabel }]
         }
         manual="guide/stats"
-      />
-      <PageHeader
-        title={t`Stats`}
-        description={speed.isPending ? t`Reading the aggregations…` : subtitle}
         actions={
-          <div className="flex items-center gap-2">
-            <button
+          <>
+            {/* Disabled, it still shows why: the title is the answer, so the hover stays. */}
+            <Button
               type="button"
+              size="sm"
+              variant="outline"
               disabled={!canCompare}
               aria-pressed={comparing && canCompare}
               onClick={() => setComparing((on) => !on)}
@@ -299,24 +280,20 @@ export function StatsPage() {
                   ? t`Show every number against the equally long window before this one`
                   : t`All time has nothing before it to compare against`
               }
-              className={cn(
-                'rounded-md border px-2.5 py-[0.3125rem] text-xs transition-colors disabled:cursor-not-allowed disabled:opacity-40',
-                comparing && canCompare
-                  ? 'border-accent-teal/30 bg-accent-teal/10 text-accent-teal'
-                  : 'border-input text-soft hover:border-edge-hover hover:text-ink',
-              )}
+              className="disabled:pointer-events-auto disabled:cursor-not-allowed"
             >
               <Trans>vs previous</Trans>
-            </button>
-            <button
+            </Button>
+            <Button
               type="button"
+              size="sm"
+              variant="outline"
               onClick={download}
               disabled={!speed.data}
-              className="rounded-md border border-input px-2.5 py-[0.3125rem] text-xs text-soft transition-colors hover:border-edge-hover hover:text-ink disabled:opacity-40"
             >
               <Trans>Export CSV</Trans>
-            </button>
-          </div>
+            </Button>
+          </>
         }
       />
 

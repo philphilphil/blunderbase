@@ -477,16 +477,17 @@
 }
 
 /*
- * The type scale (docs/design/README.md, "Type scale"): seven named steps, each a role
+ * The type scale (docs/design/README.md, "Type scale"): six named steps, each a role
  * rather than a size, so a component asks for "a label" or "a data cell" and the pixel
  * value is decided once, here. Rendered size is the design pixel × 1.2 (the root scale).
  *
- *   meta 10 · label 11 · data 12 · lead 13 · heading 14 · value 15 · title 19
+ *   meta 10 · label 11 · data 12 · lead 13 · heading 14 · value 15
  *
- * `meta` is the floor: nothing in the app is set smaller. A plain `@theme` rather than
- * `inline` because these are literal lengths, not references to another variable.
- * `lib/utils.ts` teaches tailwind-merge the same seven names — without that `cn()` takes
- * `text-meta` for a colour and drops it (or the colour) as a conflict.
+ * `meta` is the floor: nothing in the app is set smaller. There is no page-title step:
+ * pages print no heading of their own, the titlebar's crumb names them (`TopBar`). A plain
+ * `@theme` rather than `inline` because these are literal lengths, not references to
+ * another variable. `lib/utils.ts` teaches tailwind-merge the same six names — without that
+ * `cn()` takes `text-meta` for a colour and drops it (or the colour) as a conflict.
  */
 @theme {
   --text-meta: 0.625rem;
@@ -501,10 +502,6 @@
   --text-heading--line-height: 1.25rem;
   --text-value: 0.9375rem;
   --text-value--line-height: 1.25rem;
-  --text-title: 1.1875rem;
-  --text-title--line-height: 1.5rem;
-  --text-title--letter-spacing: -0.01em;
-  --text-title--font-weight: 600;
 }
 
 @layer base {

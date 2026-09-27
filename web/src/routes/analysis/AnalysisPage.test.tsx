@@ -120,12 +120,12 @@ describe('AnalysisPage', () => {
     expect(screen.getByText('382')).toBeInTheDocument()
   })
 
-  it('says how much of the library an engine has been over', async () => {
+  it('says how much of the library an engine has been over, once, in the coverage split', async () => {
     draw()
 
-    expect(
-      await screen.findByText('835 of 7,714 games have had an engine over them.'),
-    ).toBeInTheDocument()
+    // The page has no subtitle repeating it: the split is where the numbers are.
+    expect(await screen.findByText('7,714 games')).toBeInTheDocument()
+    expect(screen.queryByText(/games have had an engine over them/)).not.toBeInTheDocument()
   })
 
   it('offers all three library-wide actions', async () => {

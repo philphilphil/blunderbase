@@ -29,7 +29,7 @@ welche Farbe du auch hast. Dazu ein Chip je Engine, die an dieser Partie arbeite
 Tiefe oder Knotenzahl, bei der sie steht – so sagt die Liste auf einen Blick, wohin die
 Rechenzeit deines Rechners geht.
 
-Unter der Überschrift steht die **Kapazitätsleiste**; in der Titelleiste stehen **Neue
+Oben auf der Seite steht die **Kapazitätsleiste**; in der Titelleiste stehen **Neue
 Partie**, **PGN importieren** und **Alles pausieren**.
 
 ## Eine Partie anlegen { #start-a-game }

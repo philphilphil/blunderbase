@@ -24,7 +24,7 @@ import { Toggle } from '@/components/analysis/AnalysisControls'
 import { SETTINGS_SELECT } from '@/components/analysis/LinePreviewSettings'
 import { SaveRow, SettingField, type SettingSpec } from '@/components/settings/SettingField'
 import { SetPageChrome } from '@/components/shell/PageChrome'
-import { PageBody, PageHeader } from '@/components/shell/PageHeader'
+import { PageBody } from '@/components/shell/PageHeader'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -198,10 +198,6 @@ export function EnginePassesPage() {
       <SetPageChrome
         breadcrumb={[{ label: t`Analysis`, to: '/analysis' }, { label: t`Engine passes` }]}
         manual="guide/analysis#how-much-work-does-a-pass-do"
-      />
-      <PageHeader
-        title={t`Engine passes`}
-        description={t`How much work the analysis pass does, and how its results become move labels.`}
       />
       <LoadingOrError pending={settings.isPending} error={settings.error} retry={() => void settings.refetch()} />
       {settings.data ? (
@@ -377,7 +373,6 @@ export function MaiaSettingsPage() {
           breadcrumb={[{ label: t`Analysis`, to: '/analysis' }, { label: 'Maia' }]}
           manual="guide/analysis#what-is-maia-asked"
         />
-        <PageHeader title="Maia" description={t`Which human levels the analysis asks about and when it asks them.`} />
         <LoadingOrError pending={settings.isPending} error={settings.error} retry={() => void settings.refetch()} />
       </PageBody>
     )
@@ -409,7 +404,6 @@ export function MaiaSettingsPage() {
         breadcrumb={[{ label: t`Analysis`, to: '/analysis' }, { label: 'Maia' }]}
         manual="guide/analysis#what-is-maia-asked"
       />
-      <PageHeader title="Maia" description={t`Which human levels the analysis asks about and when it asks them.`} />
       <form noValidate onSubmit={submit} className="flex max-w-3xl flex-col gap-3">
         <Card>
           <CardHeader className="flex-col items-stretch gap-1">

@@ -28,14 +28,14 @@
  * open, and it rings itself and scrolls into view.
  */
 import type { MessageDescriptor } from '@lingui/core'
-import { msg, plural } from '@lingui/core/macro'
+import { msg } from '@lingui/core/macro'
 import { Trans, useLingui } from '@lingui/react/macro'
 import { Download, FileText, LayoutGrid, Loader2, Rows3, StickyNote } from 'lucide-react'
 import { useCallback, useMemo } from 'react'
 import { useSearchParams } from 'react-router-dom'
 
 import { SetPageChrome } from '@/components/shell/PageChrome'
-import { PageBody, PageHeader } from '@/components/shell/PageHeader'
+import { PageBody } from '@/components/shell/PageHeader'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { saveDownload } from '@/lib/api/client'
@@ -123,33 +123,18 @@ export function NotesPage() {
 
   const list = view === 'sheet' ? SHEET : STREAM
 
-  // A full page is worth saying so, and it is one sentence rather than a count with a
-  // parenthesis appended: the two are different things to translate.
-  const counted =
-    total === LIMIT
-      ? t`${plural(total, { one: '# note', other: '# notes' })} (the newest page)`
-      : t`${plural(total, { one: '# note', other: '# notes' })}`
-
   return (
     <PageBody>
-      <SetPageChrome breadcrumb={[{ label: t`Notes` }]} manual="guide/notes" />
-
-      <PageHeader
-        title={t`Notes`}
-        description={
-          notes.isSuccess
-            ? total === 0
-              ? filterCount(filters) > 0
-                ? t`Nothing written matches that.`
-                : t`Nothing written down yet.`
-              : counted
-            : t`What you and the coach have written down.`
-        }
+      {/* The titlebar's crumb is the page's name and carries the exports; an empty list says
+          so itself (`Empty`), and a full page says so under its last note. */}
+      <SetPageChrome
+        breadcrumb={[{ label: t`Notes` }]}
+        manual="guide/notes"
         actions={<ExportButtons filters={filters} disabled={total === 0} />}
       />
 
       {/*
-        The view selector leads the filter row rather than sitting in the header's actions:
+        The view selector leads the filter row rather than sitting in the titlebar's actions:
         it belongs to the list under it, not to the page's verbs. `basis-[20rem]` on the bar
         is what makes that behave on a phone — there is no room for a 20rem filter bar beside
         the selector on a 375px screen, so the bar takes the next line whole.
@@ -219,6 +204,12 @@ export function NotesPage() {
               </div>
             </section>
           ))}
+
+          {total === LIMIT ? (
+            <p className="text-label text-dim">
+              <Trans>These are the newest {LIMIT} notes. Narrow the filters to reach older ones.</Trans>
+            </p>
+          ) : null}
         </>
       )}
     </PageBody>

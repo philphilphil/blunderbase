@@ -1,12 +1,11 @@
 import { Trans, useLingui } from '@lingui/react/macro'
-import { CircleHelp, Menu, Search } from 'lucide-react'
+import { Menu, Search } from 'lucide-react'
 import { Fragment } from 'react'
 import { Link } from 'react-router-dom'
 
-import { useLocale } from '@/lib/i18n/I18nProvider'
 import { SITE_URL } from '@/lib/links'
-import { manualUrl } from '@/lib/manual'
 import { useRuntimeCapabilities } from '@/lib/runtime/capabilities'
+import { useIsMobile } from '@/lib/ui/media'
 import { cn } from '@/lib/utils'
 
 import { AccountMenu } from './AccountMenu'
@@ -18,15 +17,24 @@ import { ShortcutsButton } from './ShortcutsOverlay'
 import { ThemeToggle } from './ThemeToggle'
 
 /**
- * The 42px titlebar: brand, breadcrumb, then page actions / queue / theme / search /
- * shortcuts / account. Thin, flat and identical on every screen — it is the one strip of the window
- * that must never move, so it carries a strong bottom rule and the chrome surface rather
- * than a hairline over the canvas.
+ * The 42px titlebar: brand, breadcrumb and the page's buttons on the left; queue / engine /
+ * theme / search / shortcuts / account on the right. Thin, flat and identical on every
+ * screen — it is the one strip of the window that must never move, so it carries a strong
+ * bottom rule and the chrome surface rather than a hairline over the canvas.
+ *
+ * THE BREADCRUMB IS THE PAGE'S HEADING. Pages print no title of their own: the rail already
+ * says where you are, and a titlebar crumb over an in-page `h1` over the same word was the
+ * one name said three times. So the last crumb — the page you are on — is set a step
+ * brighter than the way there, and the page's own buttons (`SetPageChrome`'s `actions`)
+ * follow it, so the bar reads in two halves: this page on the left, the app on the right.
+ * The manual link is the app's too, and lives in the rail's footer (`SideNav`).
  *
  * On a phone the row has about 375px to spend and four things that must stay reachable —
- * the way back to the rail, the queue, search and the account — so the two that repeat
- * something already on screen give up their space first: the wordmark (the mark itself is
- * still the link home) and the breadcrumb (the page prints its own title under the bar).
+ * the way back to the rail, the queue, search and the account — so what repeats something
+ * gives up its space first: the wordmark (the mark itself is still the link home), every
+ * crumb but the last (the page's name stays, since nothing else on a phone says it), and
+ * the page's buttons, which the shell stands in a row of their own under the bar instead
+ * (`AppShell`'s `PhoneActions`).
  * The ⌘K chip keeps its button and drops the glyph for a magnifier, since a phone has no
  * ⌘ to press but still wants the search.
  *
@@ -41,22 +49,12 @@ import { ThemeToggle } from './ThemeToggle'
  * is in the titlebar because that is the one strip every screen shares, and it is a link
  * rather than a banner because a visitor who has understood it should not have to keep
  * reading it.
- *
- * The (?) sits with the breadcrumb rather than on a screen, because it is the same
- * question on every screen — "what is this page for" — and the breadcrumb is already the
- * bar's answer to "where am I". A page names its chapter (`SetPageChrome`'s `manual`) and
- * this turns it into the link; a page that names none has no (?), so the button never
- * points at something that does not answer the question in front of the reader.
- *
- * It opens a new tab. The manual is a separate site served beside the app, not a screen
- * of it, and the reader is mid-task: they are looking something up about the page they
- * are standing on and want to come back to it, not navigate away from it.
  */
 export function TopBar({ onOpenNav }: { onOpenNav: () => void }) {
-  const { breadcrumb, actions, manual } = usePageChrome()
+  const { breadcrumb, actions } = usePageChrome()
   const palette = useCommandPalette()
   const capabilities = useRuntimeCapabilities()
-  const { locale } = useLocale()
+  const mobile = useIsMobile()
   const { t } = useLingui()
 
   return (
@@ -101,48 +99,43 @@ export function TopBar({ onOpenNav }: { onOpenNav: () => void }) {
       <div className="h-[1.125rem] w-px bg-line max-md:hidden" />
 
       {breadcrumb.length > 0 ? (
-        <div className="flex min-w-0 items-center gap-[0.4375rem] text-data text-soft max-md:hidden">
-          {breadcrumb.map((crumb, index) => (
-            <Fragment key={index}>
-              {index > 0 ? <span className="text-faint-2">/</span> : null}
-              {crumb.to ? (
-                <Link
-                  to={crumb.to}
-                  className={cn('truncate text-soft hover:text-ink', crumb.mono && 'font-mono')}
-                >
-                  {crumb.label}
-                </Link>
-              ) : (
-                <span
-                  className={cn(
-                    'truncate',
-                    crumb.mono && 'font-mono',
-                    index === breadcrumb.length - 1 && 'text-body-3',
-                  )}
-                >
-                  {crumb.label}
-                </span>
-              )}
-            </Fragment>
-          ))}
+        <div className="flex min-w-0 items-center gap-[0.4375rem] text-data text-soft">
+          {breadcrumb.map((crumb, index) => {
+            const last = index === breadcrumb.length - 1
+            const tone = last ? 'font-medium text-ink' : 'text-soft hover:text-ink'
+            return (
+              <Fragment key={index}>
+                {index > 0 ? <span className="text-faint-2 max-md:hidden">/</span> : null}
+                {crumb.to ? (
+                  <Link
+                    to={crumb.to}
+                    className={cn('truncate', tone, crumb.mono && 'font-mono', !last && 'max-md:hidden')}
+                  >
+                    {crumb.label}
+                  </Link>
+                ) : (
+                  <span
+                    className={cn(
+                      'truncate',
+                      last ? tone : 'text-body-3',
+                      crumb.mono && 'font-mono',
+                      !last && 'max-md:hidden',
+                    )}
+                  >
+                    {crumb.label}
+                  </span>
+                )}
+              </Fragment>
+            )
+          })}
         </div>
       ) : null}
-      {manual ? (
-        <a
-          href={manualUrl(locale, manual)}
-          target="_blank"
-          rel="noreferrer"
-          aria-label={t`Open the manual for this page`}
-          title={t`Open the manual for this page`}
-          className="flex flex-none items-center rounded-md p-1 text-dim transition-colors hover:bg-raised hover:text-ink"
-        >
-          <CircleHelp className="size-3.5" aria-hidden />
-        </a>
+      {actions && !mobile ? (
+        <div className="ml-2 flex flex-none items-center gap-2">{actions}</div>
       ) : null}
 
       <div className="flex-1" />
 
-      {actions}
       <QueueIndicator />
       {/*
         Whether the engine is allowed to speak at all. In the titlebar because it is a mode

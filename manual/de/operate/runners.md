@@ -13,7 +13,7 @@ in dem Moment eine Maschine wird, in dem du die mitgelieferte Engine installiers
 **Remote Runner** mit seinen Slots und den Engines, die er anbietet. Ein Slot ist ein
 Engine-Auftrag oder ein Analysebrett.
 
-**Externer Runner** und **Wie externe Runner funktionieren** stehen oben auf der Seite.
+**Externer Runner** und **Wie externe Runner funktionieren** stehen in der Titelleiste.
 
 ## Wie viel gleichzeitig { #how-much-at-once }
 
@@ -93,7 +93,7 @@ engines:
       Threads: 8
 ```
 
-**Externer Runner** oben auf der Maschinen-Seite tut dasselbe und antwortet mit demselben
+**Externer Runner** in der Titelleiste der Maschinen-Seite tut dasselbe und antwortet mit demselben
 yaml. So
 oder so wird das Token einmal herausgegeben und nie wieder: Gespeichert wird nur sein
 SHA-256. Ein verlorenes Token heißt widerrufen und einen neuen Runner anlegen, und das kostet

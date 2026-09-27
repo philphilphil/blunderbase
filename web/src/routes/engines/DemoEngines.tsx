@@ -3,7 +3,7 @@ import { Network, Server, SlidersHorizontal } from 'lucide-react'
 import { useState } from 'react'
 
 import { SetPageChrome } from '@/components/shell/PageChrome'
-import { PageBody, PageHeader } from '@/components/shell/PageHeader'
+import { PageBody } from '@/components/shell/PageHeader'
 import { Button } from '@/components/ui/button'
 import { demoAnalysis, useDemoAnalysis } from '@/lib/demo/analysis'
 import { SITE_URL } from '@/lib/links'
@@ -40,12 +40,6 @@ export function DemoEngines() {
   return (
     <PageBody>
       <SetPageChrome breadcrumb={[{ label: t`Engines` }]} manual="operate/engines" />
-      <PageHeader
-        className="max-w-2xl"
-        title={t`Engines`}
-        description={t`The demo server runs none. Analysis happens in your tab.`}
-      />
-
       <div className="flex max-w-2xl flex-col gap-5">
         <section className="rounded-xl border border-edge bg-panel p-5">
           <h2 className="text-sm font-semibold text-ink">

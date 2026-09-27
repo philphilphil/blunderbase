@@ -3,7 +3,8 @@ import type { ReactNode } from 'react'
 import { createBrowserRouter, Link, Navigate } from 'react-router-dom'
 
 import { AppShell } from '@/components/shell/AppShell'
-import { PageBody, PageHeader } from '@/components/shell/PageHeader'
+import { SetPageChrome } from '@/components/shell/PageChrome'
+import { PageBody } from '@/components/shell/PageHeader'
 import { SETTING_DEFAULTS } from '@/lib/api/appSettings'
 import { useAppSettings } from '@/lib/api/queries'
 import { useRuntimeCapabilities } from '@/lib/runtime/capabilities'
@@ -35,8 +36,11 @@ function NotFound() {
   const { t } = useLingui()
   return (
     <PageBody>
-      <PageHeader title={t`Not found`} description={t`That route does not exist.`} />
-      <Link to="/" className="text-xs">
+      <SetPageChrome breadcrumb={[{ label: t`Not found` }]} />
+      <p className="text-data text-body">
+        <Trans>That route does not exist.</Trans>
+      </p>
+      <Link to="/" className="text-data">
         <Trans>Back to the dashboard</Trans>
       </Link>
     </PageBody>

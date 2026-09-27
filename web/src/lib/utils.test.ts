@@ -21,8 +21,8 @@ describe('cn', () => {
     expect(cn('text-xs', 'text-data')).toBe('text-data')
   })
 
-  it('knows all seven names', () => {
-    for (const size of ['meta', 'label', 'data', 'lead', 'heading', 'value', 'title']) {
+  it('knows all six names', () => {
+    for (const size of ['meta', 'label', 'data', 'lead', 'heading', 'value']) {
       expect(cn('text-ink', `text-${size}`)).toBe(`text-ink text-${size}`)
       expect(cn('text-xs', `text-${size}`)).toBe(`text-${size}`)
     }

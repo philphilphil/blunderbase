@@ -12,7 +12,7 @@ with what each is doing. Then **this browser**, which becomes a machine the mome
 install the engine that ships with the app, and each **remote runner** with its slots and
 the engines it advertised. A slot is one engine job or one analysis board.
 
-**Add a remote runner** and **How remote runners work** are at the top of the page.
+**Remote runner** and **How remote runners work** are in the title bar.
 
 ## How much at once
 
@@ -89,7 +89,7 @@ engines:
       Threads: 8
 ```
 
-**Remote runner** at the top of the Machines page does the same thing and answers with the
+**Remote runner** in the title bar of the Machines page does the same thing and answers with the
 same yaml. Either way the token is handed over once and never again: only its SHA-256 is stored.
 A lost token is a revoke and a new runner, which costs nothing.
 

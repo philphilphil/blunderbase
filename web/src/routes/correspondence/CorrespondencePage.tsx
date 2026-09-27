@@ -26,7 +26,7 @@ import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 
 import { SetPageChrome } from '@/components/shell/PageChrome'
-import { PageBody, PageHeader } from '@/components/shell/PageHeader'
+import { PageBody } from '@/components/shell/PageHeader'
 import { Section } from '@/components/shell/Section'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -328,8 +328,6 @@ export function CorrespondencePage() {
   })
 
   const cut = sections(games.data?.games ?? [])
-  const counts = games.data?.counts ?? {}
-  const ongoing = counts.ongoing ?? cut.yourMove.length + cut.waiting.length
   const rows = searches.data?.searches ?? []
   // What Pause all would move, and what Resume all would bring back. Tasks are left out of
   // both counts: they hold no slot and cannot be paused, so a queue full of them must not
@@ -340,22 +338,15 @@ export function CorrespondencePage() {
 
   return (
     <PageBody>
-      <SetPageChrome breadcrumb={[{ label: t`Correspondence` }]} manual="guide/correspondence" />
-      <PageHeader
-        title={t`Correspondence`}
-        description={
-          <Plural
-            value={ongoing}
-            _0="No games running"
-            one="1 game running"
-            other="# games running"
-          />
-        }
+      <SetPageChrome
+        breadcrumb={[{ label: t`Correspondence` }]}
+        manual="guide/correspondence"
         actions={
-          <div className="flex gap-2">
+          <>
             {parked > 0 && active === 0 ? (
               <Button
                 type="button"
+                size="sm"
                 variant="outline"
                 disabled={resumeAll.isPending}
                 onClick={() => resumeAll.mutate()}
@@ -366,6 +357,7 @@ export function CorrespondencePage() {
             ) : (
               <Button
                 type="button"
+                size="sm"
                 variant="outline"
                 disabled={active === 0 || pauseAll.isPending}
                 title={t`Every search gives its slot back and keeps its process`}
@@ -375,15 +367,15 @@ export function CorrespondencePage() {
                 <Trans>Pause all</Trans>
               </Button>
             )}
-            <Button type="button" variant="outline" onClick={() => setDialog('import')}>
+            <Button type="button" size="sm" variant="outline" onClick={() => setDialog('import')}>
               <FileText aria-hidden />
               <Trans>Import PGN</Trans>
             </Button>
-            <Button type="button" onClick={() => setDialog('new')}>
+            <Button type="button" size="sm" onClick={() => setDialog('new')}>
               <Plus aria-hidden />
               <Trans>New game</Trans>
             </Button>
-          </div>
+          </>
         }
       />
 

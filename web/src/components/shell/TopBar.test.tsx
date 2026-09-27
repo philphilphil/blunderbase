@@ -1,11 +1,12 @@
-import { i18n } from '@lingui/core'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import type { ReactNode } from 'react'
 import { MemoryRouter } from 'react-router-dom'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 
 import { SERVER_CAPABILITIES } from '@/lib/api/types'
 import { RuntimeCapabilitiesProvider } from '@/lib/runtime/RuntimeCapabilitiesProvider'
+import { MOBILE_QUERY } from '@/lib/ui/media'
 import { ThemeProvider } from '@/lib/ui/theme'
 
 import { CommandPaletteProvider } from './CommandPalette'
@@ -24,8 +25,8 @@ vi.mock('./AccountMenu', () => ({
 function draw({
   crumbs = false,
   demo = false,
-  manual,
-}: { crumbs?: boolean; demo?: boolean; manual?: string } = {}) {
+  actions,
+}: { crumbs?: boolean; demo?: boolean; actions?: ReactNode } = {}) {
   const onOpenNav = vi.fn()
   const capabilities = demo
     ? { ...SERVER_CAPABILITIES, password_auth: false, mcp: false, remote_runners: false, read_only: true }
@@ -36,10 +37,13 @@ function draw({
         <MemoryRouter>
           <PageChromeProvider>
             <CommandPaletteProvider>
-              {crumbs || manual ? (
+              {crumbs || actions ? (
                 <SetPageChrome
-                  breadcrumb={crumbs ? [{ label: 'Library', to: '/games' }] : undefined}
-                  manual={manual}
+                  breadcrumb={
+                    crumbs ? [{ label: 'Library', to: '/games' }, { label: 'Import' }] : undefined
+                  }
+                  manual="guide/library"
+                  actions={actions}
                 />
               ) : null}
               <TopBar onOpenNav={onOpenNav} />
@@ -87,43 +91,36 @@ describe('the titlebar', () => {
     expect(screen.getByRole('group', { name: 'Theme' })).toHaveClass('max-md:hidden')
   })
 
-  it('drops the breadcrumb below md, where the page prints its own title', () => {
+  it('names the page with its last crumb at every width, and drops the way there below md', () => {
     draw({ crumbs: true })
 
-    expect(screen.getByRole('link', { name: 'Library' }).parentElement).toHaveClass('max-md:hidden')
-  })
-})
-
-describe('the manual link', () => {
-  afterEach(() => {
-    i18n.loadAndActivate({ locale: 'en', messages: {} })
+    // Pages print no title of their own, so the last crumb is the page's name everywhere.
+    const page = screen.getByText('Import')
+    expect(page).toHaveClass('text-ink')
+    expect(page).not.toHaveClass('max-md:hidden')
+    expect(screen.getByRole('link', { name: 'Library' })).toHaveClass('max-md:hidden')
   })
 
-  it('points at the chapter the page named, in a tab of its own', () => {
-    draw({ manual: 'guide/analysis' })
-
-    const link = screen.getByRole('link', { name: 'Open the manual for this page' })
-    expect(link).toHaveAttribute('href', '/manual/guide/analysis/')
-    expect(link).toHaveAttribute('target', '_blank')
-    expect(link).toHaveAttribute('rel', 'noreferrer')
+  it('carries the page’s own buttons from md up, and no manual link of its own', () => {
+    // The page names a chapter; the link to it is the rail footer's now, not the bar's.
+    draw({ actions: <button type="button">Sync all</button> })
+    expect(screen.getByRole('button', { name: 'Sync all' })).toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: /manual/i })).not.toBeInTheDocument()
   })
 
-  it('follows the language the app is in', () => {
-    i18n.loadAndActivate({ locale: 'de', messages: {} })
-    draw({ manual: 'guide/explorer#build-a-repertoire' })
-
-    expect(screen.getByRole('link', { name: 'Open the manual for this page' })).toHaveAttribute(
-      'href',
-      '/manual/de/guide/explorer/#build-a-repertoire',
+  it('does not draw the page’s buttons on a phone', () => {
+    vi.stubGlobal(
+      'matchMedia',
+      vi.fn((query: string) => ({
+        matches: query === MOBILE_QUERY,
+        media: query,
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+      })),
     )
-  })
-
-  it('is absent on a page that names no chapter', () => {
-    draw({ crumbs: true })
-
-    expect(
-      screen.queryByRole('link', { name: 'Open the manual for this page' }),
-    ).not.toBeInTheDocument()
+    draw({ actions: <button type="button">Sync all</button> })
+    expect(screen.queryByRole('button', { name: 'Sync all' })).not.toBeInTheDocument()
+    vi.unstubAllGlobals()
   })
 })
 

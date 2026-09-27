@@ -45,7 +45,7 @@ page under a different heading.
 ## The two pages
 
 A rail heading **Compute** with two rows, the way Library and Analysis already work: a page
-per row, its own URL, its own (?) chapter, its own palette entry. No tabs; the app has none
+per row, its own URL, its own manual chapter, its own palette entry. No tabs; the app has none
 on a settings screen and a hint like "give this deployment an engine of its own to search
 with" needs a page to link to.
 

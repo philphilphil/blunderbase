@@ -1,14 +1,17 @@
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 
+import { i18n } from '@lingui/core'
 import { cleanup, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import type { ReactNode } from 'react'
 import { MemoryRouter } from 'react-router-dom'
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import type { ConnectionStatus } from '@/lib/events/EventsProvider'
 import { ThemeProvider } from '@/lib/ui/theme'
 
+import { PageChromeProvider, SetPageChrome } from './PageChrome'
 import { NavDrawer, SideNav } from './SideNav'
 
 const {
@@ -40,6 +43,18 @@ vi.mock('@/lib/events/EventsProvider', () => ({ useEvents }))
 
 const pending = { data: undefined, isPending: true }
 
+/** What the rail stands in: a theme, and the page chrome the footer's manual link reads. */
+function Shell({ children, manual }: { children: ReactNode; manual?: string }) {
+  return (
+    <ThemeProvider>
+      <PageChromeProvider>
+        {manual ? <SetPageChrome manual={manual} /> : null}
+        {children}
+      </PageChromeProvider>
+    </ThemeProvider>
+  )
+}
+
 /** Everything the rail asks the API for, answered with "still loading". */
 function stub(status: ConnectionStatus, reconnects: number) {
   useEngines.mockReturnValue(pending)
@@ -56,18 +71,20 @@ function draw({
   status = 'open' as ConnectionStatus,
   reconnects = 0,
   path = '/',
+  manual,
 }: {
   status?: ConnectionStatus
   reconnects?: number
   path?: string
+  manual?: string
 } = {}) {
   stub(status, reconnects)
   return render(
-    <ThemeProvider>
+    <Shell manual={manual}>
       <MemoryRouter initialEntries={[path]}>
         <SideNav />
       </MemoryRouter>
-    </ThemeProvider>,
+    </Shell>,
   )
 }
 
@@ -85,11 +102,11 @@ describe('the rail footer', () => {
     }))
 
     render(
-      <ThemeProvider>
+      <Shell>
         <MemoryRouter>
           <SideNav />
         </MemoryRouter>
-      </ThemeProvider>,
+      </Shell>,
     )
 
     // The footer's "engine coverage" bar is gone: `/analysis/coverage` answers the same
@@ -145,6 +162,41 @@ describe('the rail footer', () => {
   })
 })
 
+describe('the manual link', () => {
+  afterEach(() => {
+    i18n.loadAndActivate({ locale: 'en', messages: {} })
+  })
+
+  it('points at the chapter the page named, in a tab of its own', () => {
+    draw({ manual: 'guide/analysis' })
+
+    const link = screen.getByRole('link', { name: 'Open the manual for this page' })
+    expect(link).toHaveAttribute('href', '/manual/guide/analysis/')
+    expect(link).toHaveAttribute('target', '_blank')
+    expect(link).toHaveAttribute('rel', 'noreferrer')
+    expect(link).toHaveTextContent('Manual')
+  })
+
+  it('follows the language the app is in', () => {
+    i18n.loadAndActivate({ locale: 'de', messages: {} })
+    draw({ manual: 'guide/explorer#build-a-repertoire' })
+
+    expect(screen.getByRole('link', { name: 'Open the manual for this page' })).toHaveAttribute(
+      'href',
+      '/manual/de/guide/explorer/#build-a-repertoire',
+    )
+  })
+
+  it('opens the manual’s front page on a page that names no chapter', () => {
+    draw()
+
+    expect(screen.getByRole('link', { name: 'Open the manual' })).toHaveAttribute(
+      'href',
+      '/manual/',
+    )
+  })
+})
+
 describe('the analysis navigation', () => {
   it('folds its pages away everywhere else', () => {
     draw({ path: '/games' })
@@ -184,11 +236,11 @@ describe('the correspondence entry', () => {
       isPending: false,
     })
     render(
-      <ThemeProvider>
+      <Shell>
         <MemoryRouter>
           <SideNav />
         </MemoryRouter>
-      </ThemeProvider>,
+      </Shell>,
     )
   }
 
@@ -238,11 +290,11 @@ describe('the correspondence entry', () => {
     })
     useCorrespondenceStatus.mockReturnValue({ data, isPending: false })
     render(
-      <ThemeProvider>
+      <Shell>
         <MemoryRouter>
           <SideNav />
         </MemoryRouter>
-      </ThemeProvider>,
+      </Shell>,
     )
   }
 
@@ -291,11 +343,11 @@ function drawDrawer({ open = true, path = '/' }: { open?: boolean; path?: string
   stub('open', 0)
   const onClose = vi.fn()
   render(
-    <ThemeProvider>
+    <Shell>
       <MemoryRouter initialEntries={[path]}>
         <NavDrawer open={open} onClose={onClose} />
       </MemoryRouter>
-    </ThemeProvider>,
+    </Shell>,
   )
   return onClose
 }

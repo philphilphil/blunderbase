@@ -4,7 +4,7 @@ import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 
 import { SetPageChrome } from '@/components/shell/PageChrome'
-import { PageBody, PageHeader } from '@/components/shell/PageHeader'
+import { PageBody } from '@/components/shell/PageHeader'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useEngineRoles, useEngines, useRunnersStatus } from '@/lib/api/queries'
@@ -57,11 +57,6 @@ export function EnginesPage() {
       <SetPageChrome
         breadcrumb={[{ label: t`Compute`, to: '/compute' }, { label: t`Engines` }]}
         manual="operate/engines"
-      />
-      <PageHeader
-        className="max-w-5xl"
-        title={t`Engines`}
-        description={t`What is installed, how each engine is set up, and which job it does.`}
         actions={
           <Button
             type="button"

@@ -21,8 +21,8 @@ export interface PageChromeValue {
   actions: ReactNode
   /**
    * The manual page this screen is written up in — `guide/analysis`, or
-   * `guide/explorer#build-a-repertoire` for a heading inside one. The titlebar turns it
-   * into the (?) beside the breadcrumb; a page that sets nothing simply has no (?).
+   * `guide/explorer#build-a-repertoire` for a heading inside one. The rail's Manual link
+   * (`SideNav`) opens it; a page that sets nothing gets the manual's front page.
    */
   manual: string | null
 }

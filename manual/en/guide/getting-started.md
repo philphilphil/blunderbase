@@ -27,6 +27,6 @@ behind a sync. The [Dashboard](dashboard.md) shows what is waiting and what is r
 ## Where to find help
 
 A five-step tour runs the first time the app is opened; **Show the tour again** in the
-account menu replays it. The **(?)** in the title bar opens this manual at the chapter for
-the screen you are on. The keyboard button at the right of the bar, or the `?` key, lists
+account menu replays it. **Manual**, at the foot of the navigation rail, opens this manual
+at the chapter for the screen you are on. The keyboard button at the right of the bar, or the `?` key, lists
 the keys that work there.
