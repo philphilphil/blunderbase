@@ -4,6 +4,18 @@ One line per change, newest first. Written by hand when a release is cut — see
 
 ## Unreleased
 
+## v1.9.0 — 2026-09-30
+
+- Changed the app's look to a cleaner, clearer design
+- Added collections to group games, with rules for new imports
+- Added a list view and more filters to Notes
+- Added one date filter for the explorer, games and notes
+- Changed space to play the engine's move, replacing autoplay
+- Fixed Lichess sync missing long correspondence games
+- Fixed Chess960 and set-up games replaying from the wrong position
+- Fixed PGN files in Windows-1252 losing their names
+- Fixed many smaller bugs across import, stats and the library
+
 ## v1.8.2 — 2026-09-26
 
 - Fixed the board's buttons falling off screen on iPad
