@@ -9,6 +9,7 @@ import {
   duePhrase,
   dueTone,
   iccfNumber,
+  neighbours,
   rowAsWhite,
   opponentOf,
   ownerColor,
@@ -63,6 +64,26 @@ describe('sections', () => {
     const cut = sections([game({ finished: true, your_move: true })])
     expect(cut.yourMove).toHaveLength(0)
     expect(cut.finished).toHaveLength(1)
+  })
+})
+
+describe('neighbours', () => {
+  const list = [
+    game({ game_id: 1, your_move: true }),
+    game({ game_id: 2, your_move: false }),
+    game({ game_id: 3, finished: true, state: 'finished' }),
+    game({ game_id: 4, your_move: true }),
+  ]
+
+  it('walks Your move and then Waiting, the order the list reads in', () => {
+    expect(neighbours(list, 1)).toEqual({ previous: null, next: 4 })
+    expect(neighbours(list, 4)).toEqual({ previous: 1, next: 2 })
+    expect(neighbours(list, 2)).toEqual({ previous: 4, next: null })
+  })
+
+  it('leaves the finished games out of the walk', () => {
+    expect(neighbours(list, 3)).toBeNull()
+    expect(neighbours(list, 99)).toBeNull()
   })
 })
 

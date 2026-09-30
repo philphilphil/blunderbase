@@ -35,7 +35,7 @@ import {
   Trash2,
 } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
-import { useParams } from 'react-router-dom'
+import { useNavigate, useParams } from 'react-router-dom'
 
 import { Board, type BoardArrow, type Square } from '@/components/board/Board'
 import { Frame } from '@/components/engine-dialog/DialogFrame'
@@ -52,6 +52,7 @@ import {
   useAppSettings,
   useCancelCorrespondenceTask,
   useCorrespondenceGame,
+  useCorrespondenceGames,
   useCorrespondenceStatus,
   useDeleteCorrespondenceNode,
   useExpandCorrespondenceNode,
@@ -87,7 +88,7 @@ import { NotesPane, type NotesTab } from './components/NotesPane'
 import { SearchDialog } from './components/SearchDialog'
 import { TaskDialog } from './components/TaskDialog'
 import { TreePane } from './components/TreePane'
-import { opponentOf } from './format'
+import { neighbours, opponentOf } from './format'
 import { destsFor, uciFor } from './moves'
 import { countPruned, prunableNodes } from './searches'
 import {
@@ -138,10 +139,25 @@ function PaneTitle({
 }
 
 export function CorrespondenceGamePage() {
+  const params = useParams<{ id: string }>()
+  // Keyed on the game: stepping to the next one with `[` or `]` must not carry this one's
+  // selection, flip, open dialog or hovered line over to a tree they mean nothing in.
+  return <CorrespondenceGameView key={params.id} />
+}
+
+function CorrespondenceGameView() {
   const { t } = useLingui()
   const params = useParams<{ id: string }>()
   const gameId = Number(params.id)
   const detail = useCorrespondenceGame(Number.isFinite(gameId) ? gameId : null)
+  const navigate = useNavigate()
+  // The list, for the games either side of this one. The same query the list page reads,
+  // so coming from there it is already in the cache.
+  const games = useCorrespondenceGames()
+  const walk = useMemo(
+    () => (games.data?.games ? neighbours(games.data.games, gameId) : null),
+    [games.data, gameId],
+  )
   const mobile = useIsMobile()
   const prefs = useLinePreviewPrefs()
 
@@ -273,6 +289,23 @@ export function CorrespondenceGamePage() {
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [index])
+
+  /** `[` and `]` step through the list, as they step through the library on a game. */
+  const previousGame = walk?.previous ?? null
+  const nextGame = walk?.next ?? null
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (event.metaKey || event.ctrlKey || event.altKey) return
+      if (isTyping(event.target) || event.defaultPrevented) return
+      if (document.querySelector('[role="dialog"]')) return
+      const to = event.key === '[' ? previousGame : event.key === ']' ? nextGame : null
+      if (to === null) return
+      event.preventDefault()
+      void navigate(`/correspondence/${to}`)
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [previousGame, nextGame, navigate])
 
   /**
    * One move into the tree from the selected node. The child that is already there is
@@ -645,6 +678,17 @@ export function CorrespondenceGamePage() {
         onPlay={(uci) => playMove.mutate({ gameId: game.game_id, uci })}
         onUndo={() => undoMove.mutate(game.game_id)}
         onFinish={() => setDialog('finish')}
+        walk={
+          walk
+            ? {
+                onPrevious:
+                  walk.previous !== null
+                    ? () => void navigate(`/correspondence/${walk.previous}`)
+                    : null,
+                onNext: walk.next !== null ? () => void navigate(`/correspondence/${walk.next}`) : null,
+              }
+            : null
+        }
       />
 
       {writeError ? (

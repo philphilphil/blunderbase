@@ -3448,6 +3448,26 @@ msgid "you · White"
 msgstr "du · Weiß"
 
 #: src/routes/correspondence/components/GameHeader.tsx
+msgid "Correspondence games"
+msgstr "Fernschachpartien"
+
+#: src/routes/correspondence/components/GameHeader.tsx
+msgid "Previous correspondence game"
+msgstr "Vorherige Fernschachpartie"
+
+#: src/routes/correspondence/components/GameHeader.tsx
+msgid "No correspondence game before this one"
+msgstr "Keine Fernschachpartie vor dieser"
+
+#: src/routes/correspondence/components/GameHeader.tsx
+msgid "Next correspondence game"
+msgstr "Nächste Fernschachpartie"
+
+#: src/routes/correspondence/components/GameHeader.tsx
+msgid "No correspondence game after this one"
+msgstr "Keine Fernschachpartie nach dieser"
+
+#: src/routes/correspondence/components/GameHeader.tsx
 msgid "ICCF game {number}"
 msgstr "ICCF-Partie {number}"
 

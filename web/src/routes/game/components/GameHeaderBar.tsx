@@ -210,9 +210,10 @@ export function GameHeaderBar({
 /**
  * One end of the run: a cell of the pair, the same attached faces as the board's transport.
  * A spent end drops its face (the one disabled look) and keeps a title saying why, so the
- * pair keeps its outline and the reader learns the run has ended there.
+ * pair keeps its outline and the reader learns the run has ended there. The correspondence
+ * game's header walks its list with the same pair.
  */
-function StepButton({
+export function StepButton({
   label,
   hint,
   spent,

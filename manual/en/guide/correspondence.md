@@ -30,6 +30,11 @@ machine's attention is.
 At the top of the page is the **capacity strip**, and the title bar offers **Pause all**,
 **Import PGN…** and **New game…**.
 
+A game opened from the list has two arrows at the start of its header that step to the
+previous and next game in the list (`[` and `]`), down **Your move** and on into **Waiting
+for the opponent**, so the games that came in together can be worked through without going
+back each time. The walk stops at the finished games, which open in your library instead.
+
 ## Start a game
 
 **New game…** asks for what a correspondence game is:

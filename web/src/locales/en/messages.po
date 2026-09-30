@@ -3448,6 +3448,26 @@ msgid "you · White"
 msgstr "you · White"
 
 #: src/routes/correspondence/components/GameHeader.tsx
+msgid "Correspondence games"
+msgstr "Correspondence games"
+
+#: src/routes/correspondence/components/GameHeader.tsx
+msgid "Previous correspondence game"
+msgstr "Previous correspondence game"
+
+#: src/routes/correspondence/components/GameHeader.tsx
+msgid "No correspondence game before this one"
+msgstr "No correspondence game before this one"
+
+#: src/routes/correspondence/components/GameHeader.tsx
+msgid "Next correspondence game"
+msgstr "Next correspondence game"
+
+#: src/routes/correspondence/components/GameHeader.tsx
+msgid "No correspondence game after this one"
+msgstr "No correspondence game after this one"
+
+#: src/routes/correspondence/components/GameHeader.tsx
 msgid "ICCF game {number}"
 msgstr "ICCF game {number}"
 

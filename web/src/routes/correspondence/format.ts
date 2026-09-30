@@ -41,6 +41,29 @@ export function sections(games: readonly CorrespondenceGameSummary[]): Correspon
   return { yourMove, waiting, finished }
 }
 
+/**
+ * The games either side of this one, walking the list the way it reads: **Your move**, then
+ * **Waiting for the opponent**. The finished games are not in the walk, because the list
+ * opens those in the library rather than here. Null for a game the walk does not hold.
+ *
+ * Asked of the list as it is now, not as it was when the game was opened: playing a move
+ * moves the game from one section to the other, and "next" is whatever the list would put
+ * below it after that.
+ */
+export function neighbours(
+  games: readonly CorrespondenceGameSummary[],
+  gameId: number,
+): { previous: number | null; next: number | null } | null {
+  const cut = sections(games)
+  const walk = [...cut.yourMove, ...cut.waiting]
+  const at = walk.findIndex((game) => game.game_id === gameId)
+  if (at < 0) return null
+  return {
+    previous: walk[at - 1]?.game_id ?? null,
+    next: walk[at + 1]?.game_id ?? null,
+  }
+}
+
 /** The other player — the one the row is named after. */
 export function opponentOf(game: CorrespondenceGameSummary): string {
   return game.owner_color === 'black' ? game.white : game.black

@@ -167,6 +167,8 @@ let payload: CorrespondenceGameDetail
 let posted: { path: string; method: string; body: unknown }[]
 /** When set, every search write is refused with this sentence, as the service would. */
 let refuseSearch: string | null
+/** The list page's games, in its order; empty unless a test walks it. */
+let listed: CorrespondenceGameSummary[]
 
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -179,6 +181,7 @@ beforeEach(() => {
   payload = detail()
   posted = []
   refuseSearch = null
+  listed = []
   vi.mocked(toast.error).mockClear()
   vi.stubGlobal('WebSocket', FakeSocket)
   vi.stubGlobal(
@@ -197,7 +200,8 @@ beforeEach(() => {
         }
         return json({ ...payload, queued_runs: [] })
       }
-      if (path.includes('/correspondence/games/7')) return json(payload)
+      if (/\/correspondence\/games\/\d+$/.test(path)) return json(payload)
+      if (/\/correspondence\/games(\?|$)/.test(path)) return json({ games: listed })
       if (path.includes('/correspondence/status')) return json(STATUS)
       if (path.includes('/notes')) return json([])
       if (path.includes('/reference/token')) return json({ configured: true })
@@ -535,5 +539,30 @@ describe('the correspondence game view: tasks and expansion', () => {
     draw()
     expect(await screen.findByText('Kowalski, Marek')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Expand…' })).toBeDisabled()
+  })
+
+  it('steps to the games either side of this one in the list, by button and by key', async () => {
+    const other = (game_id: number, your_move: boolean) => ({ ...payload.game, game_id, your_move })
+    listed = [other(5, true), payload.game, other(9, false)]
+    draw()
+    const next = await screen.findByRole('button', { name: 'Next correspondence game' })
+    await waitFor(() => expect(next).toBeEnabled())
+    expect(screen.getByRole('button', { name: 'Previous correspondence game' })).toBeEnabled()
+
+    const asked = () => vi.mocked(fetch).mock.calls.map(([input]) => String(input))
+    await userEvent.keyboard(']')
+    await waitFor(() =>
+      expect(asked().some((path) => path.endsWith('/correspondence/games/9'))).toBe(true),
+    )
+  })
+
+  it('offers no walk on a game the list does not open here', async () => {
+    payload = detail({ finished: true, state: 'finished', result: '1-0' })
+    listed = [payload.game]
+    draw()
+    expect(await screen.findByText('Kowalski, Marek')).toBeInTheDocument()
+    expect(
+      screen.queryByRole('button', { name: 'Next correspondence game' }),
+    ).not.toBeInTheDocument()
   })
 })

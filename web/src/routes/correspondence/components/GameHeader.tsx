@@ -10,11 +10,12 @@
  * one primary and stands last; the rest are secondary faces.
  */
 import { Trans, useLingui } from '@lingui/react/macro'
-import { Flag, Inbox, Loader2, Send, Undo2 } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Flag, Inbox, Loader2, Send, Undo2 } from 'lucide-react'
 import { useState, type FormEvent } from 'react'
 
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { ButtonGroup } from '@/components/ui/button-group'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Segmented } from '@/components/ui/segmented'
@@ -25,6 +26,7 @@ import type {
   Result,
 } from '@/lib/api/types'
 import { useNotation } from '@/lib/chess/notationPrefs'
+import { StepButton } from '@/routes/game/components/GameHeaderBar'
 
 import { dateInputToIso, dateInputValue, duePhrase, dueTone, iccfNumber } from '../format'
 import { parseMoveText } from '../moves'
@@ -263,6 +265,7 @@ export function GameHeader({
   onUndo,
   onFinish,
   busy,
+  walk,
 }: {
   game: CorrespondenceGameSummary
   /** The candidate the tree is standing on, when it is one this game could play now. */
@@ -273,6 +276,11 @@ export function GameHeader({
   onUndo: () => void
   onFinish: () => void
   busy: boolean
+  /**
+   * The games either side of this one in the list (`neighbours`), `[` and `]`. Null on a
+   * finished game, which the list does not open here.
+   */
+  walk?: { onPrevious: (() => void) | null; onNext: (() => void) | null } | null
 }) {
   const { i18n, t } = useLingui()
   const notate = useNotation()
@@ -284,6 +292,26 @@ export function GameHeader({
 
   return (
     <header className="flex flex-none flex-wrap items-center gap-4 border-b border-edge-strong bg-surface px-4 py-2">
+      {/* The game screen's pair, first on the line as it is there: a few games come round at
+          once, and going back to the list between each was the whole of the walk. */}
+      {walk ? (
+        <ButtonGroup label={t`Correspondence games`} className="flex-none">
+          <StepButton
+            label={t`Previous correspondence game`}
+            hint="["
+            spent={t`No correspondence game before this one`}
+            onClick={walk.onPrevious}
+            icon={ChevronLeft}
+          />
+          <StepButton
+            label={t`Next correspondence game`}
+            hint="]"
+            spent={t`No correspondence game after this one`}
+            onClick={walk.onNext}
+            icon={ChevronRight}
+          />
+        </ButtonGroup>
+      ) : null}
       {/* The players are the content's name, not a second page title: the bar's last crumb
           is the page's one heading. */}
       <div className="min-w-0">

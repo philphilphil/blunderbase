@@ -32,6 +32,12 @@ Rechenzeit deines Rechners geht.
 Oben auf der Seite steht die **Kapazitätsleiste**; in der Titelleiste stehen **Alle
 pausieren**, **PGN importieren…** und **Neue Partie…**.
 
+Eine geöffnete Partie hat vorn in ihrer Kopfzeile zwei Pfeile, die zur vorigen und zur
+nächsten Partie der Liste springen (`[` und `]`): erst durch **Du bist am Zug**, dann weiter
+durch **Warten auf den Gegner**. So arbeitest du die Partien, die zusammen hereingekommen
+sind, nacheinander ab, ohne jedes Mal zur Liste zurückzugehen. Bei den beendeten Partien
+endet der Weg; die öffnen sich ohnehin in deiner Bibliothek.
+
 ## Eine Partie anlegen { #start-a-game }
 
 **Neue Partie…** fragt ab, was eine Fernschachpartie ausmacht:
