@@ -28,7 +28,7 @@
  */
 import { Plural, Trans, useLingui } from '@lingui/react/macro'
 import { FileText, Pause, Play, Plus, RefreshCw } from 'lucide-react'
-import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useMemo, useState, type ReactNode } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 
 import { StatusDot } from '@/components/badges/StatusDot'
@@ -59,6 +59,7 @@ import { CapacityStrip } from './components/CapacityStrip'
 import { ImportPgnDialog, NewGameDialog } from './components/NewGameDialog'
 import { RunningNow } from './components/RunningNow'
 import { isInfinite, isLive, isTask, isWarm } from './searches'
+import { useSearchClock } from './useSearchClock'
 import {
   duePhrase,
   dueTone,
@@ -311,14 +312,9 @@ export function CorrespondencePage() {
   }, [runners.data])
 
   // One clock for the section rather than one per card: the only thing on this page that
-  // moves on its own is "2d 4h", and it moves once a minute.
+  // moves on its own is "2d 4h".
   const running = (searches.data?.searches ?? []).some(isLive)
-  const [now, setNow] = useState(() => Date.now())
-  useEffect(() => {
-    if (!running) return
-    const timer = setInterval(() => setNow(Date.now()), 30_000)
-    return () => clearInterval(timer)
-  }, [running])
+  const now = useSearchClock(running)
 
   const opened = (gameId: number) => {
     setDialog(null)

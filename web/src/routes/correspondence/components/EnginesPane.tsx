@@ -13,15 +13,14 @@
  *
  * The clock ticks here rather than in each pane: a running search's "2d 4h" is the only
  * thing on the column that moves on its own, and one interval for the stack is one
- * re-render a minute instead of one per engine.
+ * re-render per tick instead of one per engine.
  */
 import { Trans } from '@lingui/react/macro'
-import { useEffect, useState } from 'react'
-
 import type { CorrespondenceTreeNode } from '@/lib/api/types'
 import type { HoveredLine } from '@/lib/board/useLinePreview'
 
 import { enginePanes, isLive } from '../searches'
+import { useSearchClock } from '../useSearchClock'
 import { EnginePane } from './EnginePane'
 
 export interface EnginesPaneProps {
@@ -37,9 +36,6 @@ export interface EnginesPaneProps {
   busy?: boolean
 }
 
-/** A minute: the coarsest unit `formatSpan` prints under a day, so nothing lags visibly. */
-const TICK_MS = 30_000
-
 export function EnginesPane({
   node,
   previewLine,
@@ -53,13 +49,7 @@ export function EnginesPane({
 }: EnginesPaneProps) {
   const panes = enginePanes(node)
   const running = panes.some((pane) => pane.search && isLive(pane.search))
-  const [now, setNow] = useState(() => Date.now())
-
-  useEffect(() => {
-    if (!running) return
-    const timer = setInterval(() => setNow(Date.now()), TICK_MS)
-    return () => clearInterval(timer)
-  }, [running])
+  const now = useSearchClock(running)
 
   if (!node || panes.length === 0) {
     return (
