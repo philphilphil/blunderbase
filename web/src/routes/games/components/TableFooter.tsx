@@ -11,32 +11,39 @@
  * no deeper pass to queue over a selection: asking for more is a choice about one game, made
  * in its Analyse dialog while looking at it.
  *
- * The three actions are real buttons rather than the bare words they were: they sit in a
- * strip beside two counts and a pager, and a word with nothing around it reads as a label
- * of the row it is in. `size="sm"` is 28px inside the 46px line, which leaves the strip its
- * breathing room, and the delete is outlined in the blunder colour rather than filled with
- * it — a filled red button on a strip that appears every time a row is ticked is a warning
- * about the page, not about the action. The filled one is in the confirmation.
+ * The selection half follows the control grammar (docs/design/README.md, "Controls"): the
+ * count is data ("2 selected" in ink, not accent, which is for links), then Clear selection
+ * as a tool button with its ×, a rule, and the commands in the order a selection is made
+ * for them. "Add to ⌄" opens a menu, so it ends in the menu chevron; "Queue analysis" is the
+ * region's one filled primary, last of the everyday commands; Delete… stands apart after a
+ * gap as the red-outlined command, never the filled red: a filled red button on a strip
+ * that appears every time a row is ticked is a warning about the page, not about the
+ * action. The filled one is in the confirmation, which is also why its label ends in "…".
+ * `size="sm"` is 28px inside the 46px line, which leaves the strip its breathing room.
  *
  * Below `md` the 46px line becomes as many lines as it needs. Nothing here shortens on a
  * phone: "Queue analysis" is what the button does, and a second line costs less than
  * guessing which word the owner would still recognise it by.
  *
- * "Add to…" comes first among the actions because it is the one a selection is most often
+ * "Add to" comes first among the actions because it is the one a selection is most often
  * made for, and it opens the shared collection checklist (`CollectionChecklist`) above
  * itself — the footer is pinned to the bottom, so a panel below it would open off screen.
  * With the Collection filter set the footer also offers "Remove from collection": the
  * checklist can do the same, but in a list narrowed to one collection taking games out is
  * the everyday act and deserves a button.
  * Both make the one line wider, so the words the pager implies leave earlier than they did.
+ *
+ * The paging half is the app's pickers and pager: Rows is a `PickerSelect` ("Rows: Fit
+ * (13)", a value from a list, ⇅), and ‹ › are the `Pager`'s faces around a flat readout.
  */
 import { Trans, useLingui } from '@lingui/react/macro'
-import { ChevronLeft, ChevronRight } from 'lucide-react'
-import type * as React from 'react'
+import { ChevronDown, FolderMinus, Play, Trash2, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 
 import { CollectionChecklist, type ChecklistGame } from '@/components/collections/CollectionChecklist'
 import { Button } from '@/components/ui/button'
+import { PickerSelect } from '@/components/ui/native-select'
+import { Pager } from '@/components/ui/pager'
 
 import { formatCount } from '../format'
 import { pageRange, PAGE_SIZE_OPTIONS, type PageSizeChoice } from '../paging'
@@ -111,21 +118,26 @@ export function TableFooter({
     <div className="@container flex h-[2.875rem] flex-none items-center gap-3 border-t border-hairline bg-panel px-5 max-md:h-auto max-md:flex-wrap max-md:gap-x-3 max-md:gap-y-1.5 max-md:px-3 max-md:py-2.5">
       {selectedCount > 0 ? (
         <>
-          <span className="flex-none font-mono text-data tabular text-accent-teal">
+          <span className="flex-none text-data font-medium tabular text-ink">
             <Trans>{selected} selected</Trans>
           </span>
-          <span className="h-4 w-px bg-line" />
+          <Button type="button" size="sm" variant="secondary" onClick={onClearSelection}>
+            <X aria-hidden />
+            <Trans>Clear selection</Trans>
+          </Button>
+          <span aria-hidden className="h-4 w-px flex-none bg-hairline max-md:hidden" />
           <AddTo games={selectedGames} onNew={onNewCollection} />
           {inCollection && onRemoveFromCollection ? (
             <Button
               type="button"
               size="sm"
-              variant="outline"
+              variant="secondary"
               disabled={removing}
               onClick={onRemoveFromCollection}
               aria-label={t`Remove from collection`}
             >
-              {/* The long form where there is room; "Remove", with the Collection chip set
+              <FolderMinus aria-hidden />
+              {/* The long form where there is room; "Remove", with the Collection picker set
                   over the table, says the same thing where there is not. */}
               <span className="md:@max-[60rem]:hidden">
                 <Trans>Remove from collection</Trans>
@@ -135,27 +147,20 @@ export function TableFooter({
               </span>
             </Button>
           ) : null}
-          <Button
-            type="button"
-            size="sm"
-            variant="secondary"
-            disabled={queueing}
-            onClick={onQueue}
-          >
+          <Button type="button" size="sm" disabled={queueing} onClick={onQueue}>
+            <Play aria-hidden />
             <Trans>Queue analysis</Trans>
           </Button>
           <Button
             type="button"
             size="sm"
-            variant="outline"
+            variant="destructive-outline"
             disabled={deleting}
             onClick={onDelete}
-            className="border-blunder/35 text-blunder hover:border-blunder hover:text-blunder"
+            className="ml-2 max-md:ml-0"
           >
-            <Trans context="button">Delete</Trans>
-          </Button>
-          <Button type="button" size="sm" variant="ghost" onClick={onClearSelection}>
-            <Trans>Clear selection</Trans>
+            <Trash2 aria-hidden />
+            <Trans context="button">Delete…</Trans>
           </Button>
         </>
       ) : (
@@ -188,48 +193,28 @@ export function TableFooter({
         room against it and a footer that wrapped when rows were selected would page the
         selection away. So where the games area is narrow — a laptop with the rail open, or
         German labels — the words that the controls already imply leave instead: the range
-        text first, then the "Rows" caption. The phone wraps (`max-md:`) and keeps both.
+        text first. The phone wraps (`max-md:`) and keeps it.
       */}
-      <label className="flex flex-none items-center gap-1.5 text-label text-dim">
-        <span className="md:@max-[56rem]:sr-only">
-          <Trans>Rows</Trans>
-        </span>
-        <select
-          aria-label={t`Rows per page`}
-          value={String(pageSize)}
-          onChange={(event) => {
-            const value = event.target.value
-            onPageSizeChange(value === 'fit' ? 'fit' : Number(value))
-          }}
-          className="h-7 rounded-md border border-edge-input bg-elevated px-1.5 font-mono text-label text-body focus-visible:border-edge-hover focus-visible:outline-none"
-        >
-          {PAGE_SIZE_OPTIONS.map((option) => (
-            <option key={String(option)} value={String(option)}>
-              {option === 'fit' ? t`Fit (${fitRows})` : option}
-            </option>
-          ))}
-        </select>
-      </label>
+      <PickerSelect
+        label={t`Rows`}
+        title={t`Rows per page`}
+        value={String(pageSize)}
+        options={PAGE_SIZE_OPTIONS.map((option) => ({
+          value: String(option),
+          label: option === 'fit' ? t`Fit (${fitRows})` : String(option),
+        }))}
+        onChange={(value) => onPageSizeChange(value === 'fit' ? 'fit' : Number(value))}
+        className="flex-none"
+      />
 
-      <div className="flex flex-none items-center gap-1">
-        <PageStep
-          label={t`Previous page`}
-          disabled={page <= 1}
-          onClick={() => onPageChange(page - 1)}
-        >
-          <ChevronLeft className="size-3.5" aria-hidden />
-        </PageStep>
-        <span className="font-mono text-label tabular text-body" aria-live="polite">
-          {formatCount(page)} / {formatCount(pageCount)}
-        </span>
-        <PageStep
-          label={t`Next page`}
-          disabled={page >= pageCount}
-          onClick={() => onPageChange(page + 1)}
-        >
-          <ChevronRight className="size-3.5" aria-hidden />
-        </PageStep>
-      </div>
+      <Pager
+        label={t`Pages`}
+        page={page}
+        pages={pageCount}
+        onPrev={() => onPageChange(page - 1)}
+        onNext={() => onPageChange(page + 1)}
+        className="flex-none"
+      />
 
       <span className="flex-none font-mono text-label tabular text-dim md:@max-[64rem]:hidden">
         <Trans>
@@ -241,10 +226,14 @@ export function TableFooter({
 }
 
 /**
- * "Add to…" and the checklist it opens. The checklist does the writing and keeps its own
+ * "Add to ⌄" and the checklist it opens. The checklist does the writing and keeps its own
  * ticks honest (`CollectionChecklist`); this is only the button and the panel around it,
  * which closes on Escape, on a click outside and when "+ New collection…" hands over to the
  * dialog.
+ *
+ * The trigger is drawn as an `ActionMenu`'s (a face ending in ⌄, sunk to `raised` while
+ * open, never blue), but the panel is a checklist rather than a list of commands: a tick
+ * says where the games stand as well as changing it, which a menu item cannot.
  */
 function AddTo({ games, onNew }: { games: readonly ChecklistGame[]; onNew?: () => void }) {
   const { t } = useLingui()
@@ -276,8 +265,10 @@ function AddTo({ games, onNew }: { games: readonly ChecklistGame[]; onNew?: () =
         aria-haspopup="dialog"
         aria-expanded={open}
         onClick={() => setOpen((current) => !current)}
+        className="aria-expanded:bg-raised aria-expanded:shadow-none aria-expanded:hover:bg-raised"
       >
-        <Trans>Add to…</Trans>
+        <Trans>Add to</Trans>
+        <ChevronDown aria-hidden className="-mr-0.5 size-3 text-dim" />
       </Button>
       {open ? (
         <div
@@ -299,28 +290,5 @@ function AddTo({ games, onNew }: { games: readonly ChecklistGame[]; onNew?: () =
         </div>
       ) : null}
     </div>
-  )
-}
-
-/**
- * One step of the pager: a square of the same 28px the actions are, disabled at either end
- * of the library rather than hidden, so the pager does not change width at the ends.
- */
-function PageStep({
-  label,
-  children,
-  ...props
-}: React.ComponentProps<'button'> & { label: string }) {
-  return (
-    <Button
-      type="button"
-      size="sm"
-      variant="outline"
-      aria-label={label}
-      className="size-7 p-0"
-      {...props}
-    >
-      {children}
-    </Button>
   )
 }

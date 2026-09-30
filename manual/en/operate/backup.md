@@ -1,6 +1,6 @@
 # Backup and restore
 
-Two different things live under **Library → Manage**, and they are not substitutes.
+Two different things live under **Library › Manage**, and they are not substitutes.
 
 | | PGN export | Database backup |
 |---|---|---|
@@ -11,14 +11,14 @@ Two different things live under **Library → Manage**, and they are not substit
 
 ## Export PGN
 
-**Library → Manage → Export PGN** downloads every stored game in one
+**Library › Manage › Export PGN** downloads every stored game in one
 `blunderbase-library.pgn`.
 
 This is the copy you give to another program. It is not an application backup.
 
 ## Download a backup
 
-**Library → Manage → Download backup** creates the lossless, integrity-checked SQLite copy.
+**Library › Manage › Download backup** creates the lossless, integrity-checked SQLite copy.
 The download appears once Blunderbase has prepared a consistent snapshot.
 
 You may take a backup while Blunderbase is running. SQLite's online backup interface
@@ -90,6 +90,6 @@ keeps the runner rows and the runners reconnect with the tokens they already hav
 ## Deleting instead
 
 Removing games is [Games](../guide/games.md#delete-games) and
-[Library](../guide/library.md#manage), not this page. **Library → Manage →
+[Library](../guide/library.md#manage), not this page. **Library › Manage ›
 Reset imported Library** deletes the imported games and everything attached to them; take a
 backup first if you might want them again.

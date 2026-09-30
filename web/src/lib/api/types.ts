@@ -314,6 +314,8 @@ export interface GameCard extends GameSummary {
   analyzed: boolean
   /** A run somebody asked for — whole game or a window — is done over this game. */
   requested: boolean
+  /** An analysis run over this game is waiting in the queue or running now. */
+  queued?: boolean
   eval_curve: EvalPoint[]
   worst_moments: WorstMoment[]
 }
@@ -715,6 +717,8 @@ export interface Collection extends Extra {
   name: string
   color: CollectionColor
   description: string | null
+  /** Whether the rail shows it under Collections. */
+  pinned: boolean
   rule: CollectionRule | null
   game_count: number
   created_at: string
@@ -751,6 +755,7 @@ export interface CollectionCreate {
   name: string
   color?: CollectionColor
   description?: string | null
+  pinned?: boolean
   rule?: CollectionRule | null
   /** Run the rule over the games already in the library, once. */
   apply_to_existing?: boolean
@@ -763,6 +768,7 @@ export interface CollectionUpdate {
   name?: string
   color?: CollectionColor
   description?: string | null
+  pinned?: boolean
   rule?: CollectionRule | null
 }
 

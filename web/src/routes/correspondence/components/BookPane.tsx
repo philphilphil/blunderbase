@@ -26,6 +26,8 @@
 import { Trans, useLingui } from '@lingui/react/macro'
 
 import { ConnectLichessButton } from '@/components/lichess/ConnectLichess'
+import { COLUMN_HEAD, ROW } from '@/components/ui/row'
+import { Segmented } from '@/components/ui/segmented'
 import { Skeleton } from '@/components/ui/skeleton'
 import { usePositionBook, useReferenceExplorer, useReferenceToken } from '@/lib/api/queries'
 import type { CorrespondenceTreeNode, ReferenceMove } from '@/lib/api/types'
@@ -46,7 +48,8 @@ const MOVES = 10
  * flips between do not jump.
  */
 const GRID = 'grid grid-cols-[3.625rem_2.75rem_minmax(0,1fr)] items-center gap-2'
-const ROW = cn(GRID, 'h-[1.625rem] rounded-[0.3125rem] px-1.5 font-mono text-label tabular')
+/** A book row is the app's clickable row (`ui/row.ts`): hover lifts it to `raised`. */
+const BOOK_ROW = cn(GRID, ROW, 'h-[1.625rem] rounded-[0.3125rem] px-1.5 font-mono text-label tabular')
 
 /**
  * `12.` before a White move, `12…` before a Black one — the tree's own labelling, one move
@@ -131,10 +134,7 @@ function Masters({
     >
       <div
         role="row"
-        className={cn(
-          GRID,
-          'h-5 border-b border-hairline px-1.5 text-meta tracking-[.06em] text-faint uppercase',
-        )}
+        className={cn(GRID, COLUMN_HEAD, 'h-5 border-b border-hairline px-1.5')}
       >
         <span>
           <Trans>Move</Trans>
@@ -159,7 +159,7 @@ function Masters({
             onFocus={() => onPreview([move.uci])}
             onBlur={() => onPreview(null)}
             title={move.name ?? undefined}
-            className={cn(ROW, 'text-left transition-colors hover:bg-elevated')}
+            className={cn(BOOK_ROW, 'text-left')}
           >
             <span className="text-body-3">
               {label(node)}
@@ -221,34 +221,21 @@ export function BookPane({
   onPreview: (line: string[] | null) => void
 }) {
   const { t } = useLingui()
-  const sources: { key: BookSource; label: string }[] = [
-    { key: 'masters', label: t`Masters` },
-    { key: 'mine', label: t`Your games` },
-  ]
 
   return (
     <div className="flex min-h-0 flex-col">
-      <div
-        role="group"
-        aria-label={t`Which book`}
-        className="flex flex-none items-center gap-1 border-b border-hairline px-2.5 py-1.5"
-      >
-        {sources.map((entry) => (
-          <button
-            key={entry.key}
-            type="button"
-            aria-pressed={source === entry.key}
-            onClick={() => onSourceChange(entry.key)}
-            className={cn(
-              'rounded-md border px-2 py-px text-meta transition-colors',
-              source === entry.key
-                ? 'border-accent-teal/40 bg-selected text-ink'
-                : 'border-edge text-soft hover:border-edge-hover hover:text-ink',
-            )}
-          >
-            {entry.label}
-          </button>
-        ))}
+      {/* Which of the two books: one of two values, so the one-of-N control. */}
+      <div className="flex flex-none items-center border-b border-hairline px-2.5 py-1.5">
+        <Segmented<BookSource>
+          label={t`Which book`}
+          size="xs"
+          value={source}
+          onChange={onSourceChange}
+          options={[
+            { value: 'masters', label: t`Masters` },
+            { value: 'mine', label: t`Your games` },
+          ]}
+        />
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto">
         {source === 'masters' ? (

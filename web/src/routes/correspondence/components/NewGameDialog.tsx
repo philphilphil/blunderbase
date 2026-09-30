@@ -23,6 +23,8 @@ import { Field, Frame } from '@/components/engine-dialog/DialogFrame'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Segmented } from '@/components/ui/segmented'
+import { Textarea } from '@/components/ui/textarea'
 import type {
   Color,
   CorrespondenceGameCreate,
@@ -38,7 +40,12 @@ function text(value: string): string | null {
   return trimmed === '' ? null : trimmed
 }
 
-/** The one control with no default: which of the two names is you. */
+/**
+ * The one control with no default: which of the two names is you. One of two values, so
+ * the app's one-of-N control (`Segmented`), with neither option chosen until the owner
+ * picks. Each option carries the side's dot and the name typed above it, cut short rather
+ * than wrapped, because a segment never wraps.
+ */
 function WhichIsYou({
   value,
   onChange,
@@ -51,40 +58,39 @@ function WhichIsYou({
   black: string
 }) {
   const { t } = useLingui()
-  const option = (color: Color, label: string) => (
-    <button
-      key={color}
-      type="button"
-      aria-pressed={value === color}
-      onClick={() => onChange(color)}
-      className={cn(
-        'flex min-w-0 flex-1 items-center gap-2 rounded-md border px-2.5 py-1.5 text-data transition-colors',
-        value === color
-          ? 'border-accent-teal/40 bg-selected text-ink'
-          : 'border-edge text-dim hover:border-edge-hover hover:text-ink',
-      )}
-    >
-      <span
-        aria-hidden
-        className={cn(
-          'size-2.5 flex-none rounded-full border',
-          color === 'white'
-            ? 'border-side-white-edge bg-side-white'
-            : 'border-side-black-edge bg-side-black',
-        )}
-      />
-      <span className="truncate">{label || (color === 'white' ? t`White` : t`Black`)}</span>
-    </button>
-  )
+  const option = (color: Color, label: string) => ({
+    value: color,
+    label: (
+      <span className="flex min-w-0 items-center gap-2">
+        <span
+          aria-hidden
+          className={cn(
+            'size-2.5 flex-none rounded-full border',
+            color === 'white'
+              ? 'border-side-white-edge bg-side-white'
+              : 'border-side-black-edge bg-side-black',
+          )}
+        />
+        <span className="max-w-[12rem] truncate">
+          {label || (color === 'white' ? t`White` : t`Black`)}
+        </span>
+      </span>
+    ),
+  })
   return (
     <div className="flex flex-col gap-1.5">
       <Label>
         <Trans>Which one is you</Trans>
       </Label>
-      <div role="group" aria-label={t`Which one is you`} className="flex gap-2">
-        {option('white', white)}
-        {option('black', black)}
-      </div>
+      <Segmented<Color | ''>
+        label={t`Which one is you`}
+        value={value ?? ''}
+        onChange={(chosen) => {
+          if (chosen) onChange(chosen)
+        }}
+        options={[option('white', white), option('black', black)]}
+        className="self-start"
+      />
     </div>
   )
 }
@@ -236,10 +242,14 @@ export function NewGameDialog({
           </p>
         ) : null}
         <div className="flex justify-end gap-2">
-          <Button type="button" variant="outline" onClick={onClose}>
+          <Button type="button" variant="secondary" onClick={onClose}>
             <Trans>Cancel</Trans>
           </Button>
-          <Button type="submit" disabled={!ready || pending}>
+          <Button
+            type="submit"
+            disabled={!ready || pending}
+            title={ready ? undefined : t`Fill in both names and say which one is you`}
+          >
             {pending ? <Loader2 className="animate-spin" aria-hidden /> : null}
             <Trans>Create game</Trans>
           </Button>
@@ -300,7 +310,7 @@ export function ImportPgnDialog({
           <Label htmlFor="correspondence-pgn">
             <Trans>PGN</Trans>
           </Label>
-          <textarea
+          <Textarea
             id="correspondence-pgn"
             value={pgn}
             autoFocus
@@ -308,7 +318,7 @@ export function ImportPgnDialog({
             spellCheck={false}
             onChange={(changed) => setPgn(changed.target.value)}
             placeholder={'[Event "WS/M/168"]\n[White "…"]\n\n1. e4 c5 2. Nf3 d6'}
-            className="w-full resize-y rounded-md border border-input bg-elevated px-2.5 py-2 font-mono text-label leading-[1.6] text-ink outline-none placeholder:text-faint focus-visible:border-accent-teal/50"
+            className="resize-y font-mono text-label leading-[1.6]"
           />
         </div>
         <WhichIsYou
@@ -368,10 +378,14 @@ export function ImportPgnDialog({
           </p>
         ) : null}
         <div className="flex justify-end gap-2">
-          <Button type="button" variant="outline" onClick={onClose}>
+          <Button type="button" variant="secondary" onClick={onClose}>
             <Trans>Cancel</Trans>
           </Button>
-          <Button type="submit" disabled={!ready || pending}>
+          <Button
+            type="submit"
+            disabled={!ready || pending}
+            title={ready ? undefined : t`Paste the PGN and say which side is you`}
+          >
             {pending ? <Loader2 className="animate-spin" aria-hidden /> : null}
             <Trans>Import game</Trans>
           </Button>

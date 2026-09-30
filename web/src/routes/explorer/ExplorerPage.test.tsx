@@ -305,7 +305,7 @@ describe('ExplorerPage sources', () => {
     // games in this line and their own tree's table. The colour scope is the exception —
     // it stays in place beside the source control, inert.
     expect(screen.queryByText('Games in this line')).not.toBeInTheDocument()
-    expect(screen.getByText('as white')).toBeDisabled()
+    expect(screen.getByRole('radio', { name: 'as white' })).toBeDisabled()
     expect(screen.queryByText('1.e4')).not.toBeInTheDocument()
     // The note on the position stays — it is about the board, not about a database.
     expect(screen.getByTestId('position-notes')).toBeInTheDocument()
@@ -323,7 +323,7 @@ describe('ExplorerPage sources', () => {
     renderPage('/explorer?source=masters')
 
     await screen.findByText('1.d4')
-    await userEvent.click(screen.getByText('my games'))
+    await userEvent.click(screen.getByRole('radio', { name: 'my games' }))
 
     expect(await screen.findByText('1.e4')).toBeInTheDocument()
     expect(screen.getByText('Games in this line')).toBeInTheDocument()
@@ -340,12 +340,11 @@ describe('ExplorerPage sources', () => {
     expect(asked).toContain('source=lichess')
     expect(asked).toContain('speeds=blitz')
     expect(asked).toContain('ratings=2000%2C2200')
-    // The chips are on screen and say what is on.
-    expect(screen.getByRole('button', { name: 'blitz' })).toHaveAttribute(
-      'aria-pressed',
-      'true',
-    )
-    expect(screen.getByRole('button', { name: 'rapid' })).toHaveAttribute(
+    // The pickers are on screen and say what is on: the speed picker names its speeds, and
+    // the rating chips are pressed for the bands in force.
+    expect(screen.getByRole('button', { name: /^Speed/ })).toHaveTextContent('Speed: Blitz')
+    expect(screen.getByRole('button', { name: '2000' })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByRole('button', { name: '1600' })).toHaveAttribute(
       'aria-pressed',
       'false',
     )
@@ -365,12 +364,11 @@ describe('ExplorerPage sources', () => {
       expect(asked).toContain('speed=blitz')
       expect(asked).toContain(since)
     }
-    expect(screen.getByRole('button', { name: 'blitz' })).toHaveAttribute('aria-pressed', 'true')
-    expect(screen.getByRole('button', { name: 'correspondence' })).toHaveAttribute(
-      'aria-pressed',
-      'false',
-    )
-    expect(screen.getByRole('button', { name: 'Date' })).toHaveTextContent('Last 90 days')
+    expect(screen.getByRole('button', { name: /^Speed/ })).toHaveTextContent('Speed: Blitz')
+    await userEvent.click(screen.getByRole('button', { name: /^Speed/ }))
+    expect(screen.getByRole('checkbox', { name: 'Blitz' })).toBeChecked()
+    expect(screen.getByRole('checkbox', { name: 'Correspondence' })).not.toBeChecked()
+    expect(screen.getByRole('button', { name: /^Date/ })).toHaveTextContent('Last 90 days')
 
     vi.unstubAllGlobals()
   })
@@ -381,7 +379,7 @@ describe('ExplorerPage sources', () => {
     renderPage('/explorer?period=90d')
 
     await screen.findByText('1.e4')
-    await user.click(screen.getByRole('button', { name: 'Date' }))
+    await user.click(screen.getByRole('button', { name: /^Date/ }))
     // The pick in force is lit, and the fields say what it means.
     expect(screen.getByRole('button', { name: '90d' })).toHaveAttribute('aria-pressed', 'true')
     expect(screen.getByLabelText('Played from')).toHaveValue(localDay(90))
@@ -394,11 +392,11 @@ describe('ExplorerPage sources', () => {
     })
     // A pick is a finished choice: the popover is gone, and the chip says what is on.
     expect(screen.queryByLabelText('Played from')).not.toBeInTheDocument()
-    await user.click(screen.getByRole('button', { name: 'Date' }))
+    await user.click(screen.getByRole('button', { name: /^Date/ }))
     expect(screen.getByRole('button', { name: 'Today' })).toHaveAttribute('aria-pressed', 'true')
     expect(screen.getByRole('button', { name: '90d' })).toHaveAttribute('aria-pressed', 'false')
     expect(screen.getByLabelText('Played from')).toHaveValue(today)
-    expect(screen.getByRole('button', { name: 'Date' })).toHaveTextContent('Today')
+    expect(screen.getByRole('button', { name: /^Date/ })).toHaveTextContent('Today')
 
     // A date typed by hand is a range of its own: no pick is lit any more.
     await user.clear(screen.getByLabelText('Played from'))
@@ -409,22 +407,22 @@ describe('ExplorerPage sources', () => {
         'false',
       ),
     )
-    expect(screen.getByRole('button', { name: 'Date' })).toHaveTextContent('from 2026-01-01')
+    expect(screen.getByRole('button', { name: /^Date/ })).toHaveTextContent('from 2026-01-01')
 
     // Clear is inside the panel too, and closes it on every game.
     await user.click(screen.getByRole('button', { name: 'Clear' }))
     expect(screen.queryByLabelText('Played from')).not.toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Date' })).toHaveTextContent('All games')
+    expect(screen.getByRole('button', { name: /^Date/ })).toHaveTextContent('All games')
 
     vi.unstubAllGlobals()
   })
 
-  it('offers no speed or rating chips for the masters database', async () => {
+  it('offers no speed picker or rating chips for the masters database', async () => {
     stubSources()
     renderPage('/explorer?source=masters')
 
     await screen.findByText('1.d4')
-    expect(screen.queryByRole('button', { name: 'blitz' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /^Speed/ })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: '2500+' })).not.toBeInTheDocument()
 
     vi.unstubAllGlobals()

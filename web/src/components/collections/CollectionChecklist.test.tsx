@@ -21,6 +21,7 @@ function collection(id: number, name: string, overrides: Partial<Collection> = {
     name,
     color: 'accent',
     description: null,
+    pinned: false,
     rule: null,
     game_count: 0,
     created_at: '2026-09-26T10:00:00Z',

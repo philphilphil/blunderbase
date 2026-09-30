@@ -13,7 +13,7 @@ describe('ruleParts', () => {
   })
 
   it('joins several speeds into one phrase', () => {
-    expect(ruleParts({ speed: ['blitz', 'rapid'] }, i18n)).toEqual(['blitz · rapid'])
+    expect(ruleParts({ speed: ['blitz', 'rapid'] }, i18n)).toEqual(['Blitz · Rapid'])
   })
 
   it('says casual for rated=false, and names side, opening and opponent', () => {

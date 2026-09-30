@@ -116,12 +116,19 @@ export function useEngineSetup() {
           </Dialog.Description>
           {!support.supported ? <p className="mt-3 text-heading text-blunder">{support.reason}</p> : null}
           {failure ? <p role="alert" className="mt-3 text-heading text-blunder">{failure}</p> : null}
-          <div className="mt-5 flex flex-wrap gap-2">
-            <Button asChild variant="outline"><Link to="/compute/machines" onClick={decline}><Trans>Go to Machines</Trans></Link></Button>
-            <Button disabled={busy || !support.supported} onClick={() => void install()}>
+          {/* The dialog footer's order: the way elsewhere on its own at the left, then Cancel
+              (secondary) and the one primary last, right-aligned. */}
+          <div className="mt-5 flex flex-wrap items-center gap-2">
+            <Button asChild variant="secondary"><Link to="/compute/machines" onClick={decline}><Trans>Go to Machines</Trans></Link></Button>
+            <span className="flex-1" />
+            <Dialog.Close asChild><Button variant="secondary"><Trans>Cancel</Trans></Button></Dialog.Close>
+            <Button
+              disabled={busy || !support.supported}
+              title={!support.supported ? (support.reason ?? undefined) : undefined}
+              onClick={() => void install()}
+            >
               {busy ? <Trans>Setting up Stockfish…</Trans> : <Trans>Set up browser engine</Trans>}
             </Button>
-            <Dialog.Close asChild><Button variant="ghost"><Trans>Cancel</Trans></Button></Dialog.Close>
           </div>
         </Dialog.Content>
       </Dialog.Portal>

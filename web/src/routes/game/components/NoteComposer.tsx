@@ -3,6 +3,8 @@ import { Loader2, Trash2, X } from 'lucide-react'
 import { useMemo, useState } from 'react'
 
 import { Button } from '@/components/ui/button'
+import { FIELD } from '@/components/ui/input'
+import { Textarea } from '@/components/ui/textarea'
 import { commitsOnEnter } from '@/lib/ui/shortcuts'
 import { cn } from '@/lib/utils'
 
@@ -213,7 +215,8 @@ export function NoteComposer({
         if (dirty && ready) save()
       }}
     >
-      <textarea
+      {/* The one multi-line field (`Textarea`): sunk, so it cannot be taken for a button. */}
+      <Textarea
         id={COMPOSER_TEXT_ID}
         value={text}
         onChange={(event) => setText(event.target.value)}
@@ -238,7 +241,7 @@ export function NoteComposer({
         // The box is what gives way when the column is short: `min-h-0`, so what shrinks is
         // the writing and never the row under it, and no resize handle — the slot decides
         // the height now.
-        className="min-h-0 w-full flex-1 resize-none rounded-md border border-input bg-raised px-2.5 py-1.5 text-lead text-ink outline-none placeholder:text-faint focus-visible:border-accent-teal/50"
+        className="min-h-0 flex-1 resize-none px-2.5 text-lead text-ink"
       />
 
       {/*
@@ -341,13 +344,23 @@ export function NoteComposer({
           }}
           placeholder={t`tag…`}
           aria-label={t`Tags`}
-          className="h-6 w-24 min-w-[4rem] flex-1 rounded-md border border-input bg-raised px-2 font-mono text-label text-ink outline-none placeholder:text-faint focus-visible:border-accent-teal/50"
+          // A field like the text box above it (FIELD: sunk, its own fill), at the row's h-6.
+          className={cn(FIELD, 'h-6 w-24 min-w-[4rem] flex-1 px-2 font-mono text-label text-ink')}
         />
 
         {/* The standard buttons at the control row's size: Save is the region's one
-            primary action, so the filled accent (dimmed until there is something to save);
-            Delete is the quiet bordered square beside it, red only under the pointer. */}
-        <Button type="button" size="sm" disabled={!ready} onClick={save}>
+            primary action, so the filled accent (the one disabled look — no face — until
+            there is something to save, with a title saying so); Delete is the tool button's
+            square beside it, red only under the pointer. */}
+        <Button
+          type="button"
+          size="sm"
+          disabled={!ready}
+          title={
+            pending ? t`Saving the note…` : ready ? t`Save this note (Enter)` : t`Write something to save`
+          }
+          onClick={save}
+        >
           {pending ? <Loader2 className="animate-spin" aria-hidden /> : null}
           <Trans>Save note</Trans>
         </Button>
@@ -356,12 +369,12 @@ export function NoteComposer({
         {editing !== null && onDelete ? (
           <Button
             type="button"
-            variant="outline"
+            variant="secondary"
             size="icon-sm"
             onClick={() => onDelete(editing)}
             aria-label={t`Delete this note`}
             title={t`Delete this note`}
-            className="text-soft hover:border-blunder/40 hover:text-blunder"
+            className="text-soft hover:not-disabled:border-blunder/40 hover:not-disabled:text-blunder"
           >
             <Trash2 className="size-3.5" aria-hidden />
           </Button>

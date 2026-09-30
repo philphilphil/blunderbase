@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react'
 
 import { ThemeToggle } from '@/components/shell/ThemeToggle'
-import { cn } from '@/lib/utils'
+import { Input } from '@/components/ui/input'
 
 /**
  * The frame both doors share: the brand mark over one `bb-card` on the app's own ground,
@@ -48,7 +48,11 @@ export function AuthScreen({
   )
 }
 
-/** One field, labelled, in the stack spacing the rest of the app's forms use. */
+/**
+ * One field, labelled, in the stack spacing the rest of the app's forms use. It is the
+ * app's own `Input` (FIELD: sunk, the accent border and the ring on focus, the blunder
+ * border when invalid), so the first field anyone meets reads like every field after it.
+ */
 export function PasswordField({
   id,
   label,
@@ -71,7 +75,7 @@ export function PasswordField({
       <label htmlFor={id} className="text-label font-medium text-soft">
         {label}
       </label>
-      <input
+      <Input
         id={id}
         name={id}
         type="password"
@@ -80,20 +84,18 @@ export function PasswordField({
         autoFocus={autoFocus}
         aria-invalid={invalid || undefined}
         onChange={(event) => onChange(event.target.value)}
-        className={cn(
-          'h-8 w-full min-w-0 rounded-md border border-input bg-elevated px-2.5 text-data text-ink outline-none transition-colors',
-          'placeholder:text-faint focus-visible:border-accent-teal/50',
-          'aria-invalid:border-blunder',
-        )}
       />
     </div>
   )
 }
 
-/** Whatever went wrong, in the one place a form says so. */
+/**
+ * Whatever went wrong, in the one place a form says so: `.bb-error`, the app's one error
+ * box, under the fields whose border has already turned red.
+ */
 export function FormError({ children }: { children: ReactNode }) {
   return (
-    <p role="alert" className="text-label leading-[1.55] text-blunder">
+    <p role="alert" className="bb-error leading-[1.55]">
       {children}
     </p>
   )

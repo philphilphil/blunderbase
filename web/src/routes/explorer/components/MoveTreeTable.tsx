@@ -25,6 +25,10 @@
  * footnote to the other: `Opening` is what the vendored book calls the position the move
  * reaches, `Note` is what the owner wrote about that same position. Both are flex columns
  * sharing what the fixed ones leave, and both truncate with the whole text in `title`.
+ * They are drawn only when the table's own width has room for them (a container query,
+ * `OPTIONAL`): the tree pane is 530px on a 1440 screen, and two text columns squeezed into
+ * nothing had pushed the header off the pane at "AVG DRO…". Where they are hidden, the
+ * row's `title` still carries the opening and the note.
  *
  * A name is reported only when the position the move reaches is itself named in the
  * vendored book, never inherited from the parent's name, so it reads as "this move enters
@@ -55,14 +59,23 @@
  * next. The row height itself is the dense one that squeeze produced at the start position,
  * which read better than the design's 38px rows; the cap is fifteen of them, so the table
  * takes about the space it did before.
+ *
+ * The header is a plain ruled row of column caps (`COLUMN_HEAD`), not a rounded box: a box
+ * read as one more control above the rows. Rows are the shared `ROW` (hover `raised`, never
+ * the selected blue: hover must not preview "chosen"). No row is ever drawn selected — a
+ * click plays the move and the table moves on to the next position — so the main line,
+ * which used to wear a tinted outline before anything was chosen, is data: its move is
+ * bold, and nothing else about the row changes.
  */
 import type { MessageDescriptor } from '@lingui/core'
 import { msg } from '@lingui/core/macro'
 import { Trans, useLingui } from '@lingui/react/macro'
 
+import { COLUMN_HEAD, ROW } from '@/components/ui/row'
 import { Skeleton } from '@/components/ui/skeleton'
 import type { ExplorerMove, ExplorerResponse } from '@/lib/api/types'
 import { useNotation } from '@/lib/chess/notationPrefs'
+import { FADE_RIGHT, useMoreRight } from '@/lib/ui/useMoreRight'
 import { cn } from '@/lib/utils'
 
 import { plyLabel } from '../line'
@@ -70,27 +83,41 @@ import { sharePercent } from '../reference'
 import { dropTone, formatAvgDrop, scorePercent, scoreTone, splitOf } from '../stats'
 import { SPLIT_WIDTH, ScoreBar } from './ScoreBar'
 
-const COLUMNS: { id: string; label: MessageDescriptor; width: number | 'flex'; align?: 'right' }[] =
-  [
-    { id: 'move', label: msg`Move`, width: 78 },
-    { id: 'games', label: msg`Games`, width: 46, align: 'right' },
-    { id: 'share', label: msg`Share`, width: 44, align: 'right' },
-    { id: 'split', label: msg`Score`, width: SPLIT_WIDTH },
-    { id: 'score', label: msg`Score%`, width: 52, align: 'right' },
-    { id: 'drop', label: msg`Avg drop`, width: 66, align: 'right' },
-    {
-      id: 'blunders',
-      label: msg({ message: 'Blund', comment: 'Column heading, short for “blunders”.' }),
-      width: 44,
-      align: 'right',
-    },
-    { id: 'opening', label: msg`Opening`, width: 'flex' },
-    { id: 'note', label: msg`Note`, width: 'flex' },
-  ]
+const COLUMNS: {
+  id: string
+  label: MessageDescriptor
+  width: number | 'flex'
+  align?: 'right'
+  optional?: boolean
+}[] = [
+  { id: 'move', label: msg`Move`, width: 64 },
+  { id: 'games', label: msg`Games`, width: 46, align: 'right' },
+  { id: 'share', label: msg`Share`, width: 40, align: 'right' },
+  { id: 'split', label: msg`Score`, width: SPLIT_WIDTH },
+  { id: 'score', label: msg`Score%`, width: 50, align: 'right' },
+  { id: 'drop', label: msg`Avg drop`, width: 62, align: 'right' },
+  {
+    id: 'blunders',
+    label: msg({ message: 'Blund', comment: 'Column heading, short for “blunders”.' }),
+    width: 40,
+    align: 'right',
+  },
+  { id: 'opening', label: msg`Opening`, width: 'flex', optional: true },
+  { id: 'note', label: msg`Note`, width: 'flex', optional: true },
+]
 
 function style(width: number | 'flex') {
   return width === 'flex' ? { flex: 1, minWidth: 0 } : { width, flex: 'none' as const }
 }
+
+/**
+ * The two text columns appear once the table is wide enough to give each a readable share:
+ * the fixed columns' 27.5rem (442px of columns, six `gap-2`s and the `px-3` padding, at the
+ * app's 120% root size) plus two more gaps and 8rem apiece ≈ 44.5rem. Measured on the
+ * table (`@container` on its root), not on the window, because the pane's width depends on
+ * the rail and the board as well.
+ */
+const OPTIONAL = 'hidden @min-[44.5rem]:block'
 
 /**
  * How tall the rows are and how many of them are on screen at once, in the one place the
@@ -103,17 +130,14 @@ const VISIBLE_ROWS = 15
 const ROWS_HEIGHT = `${VISIBLE_ROWS * ROW_HEIGHT_REM + (VISIBLE_ROWS - 1) * ROW_GAP_REM}rem`
 
 /**
- * Seven of the nine columns are fixed pixel widths — 500px of them — and the last two are
- * flexible, so below `md` the table scrolls sideways inside itself rather than shrinking.
- * Dropping columns instead would take away the numbers the screen exists to compare.
- *
- * The minimum is what the fixed columns need plus a readable share for the two flexible
- * ones, since flex alone would let `Opening` and `Note` crush each other to nothing on a
- * phone: 500px fixed + 8 gaps of 12px + 24px of padding + 2 × 8rem of text = 876px ≈ 55rem.
- * It is on the header and on the rows so the two stay in step, and the horizontal scroll is
- * on the element wrapping both, so the header travels with the rows.
+ * Seven of the nine columns are fixed widths — 27.5rem with their gaps and padding, which
+ * the 530px pane of a 1440 screen just holds — and the numbers are what the screen exists
+ * to compare, so a table narrower than that (a phone, the 370px pane of a 1280 screen)
+ * scrolls sideways inside itself rather than dropping one. The minimum is on the header
+ * and on the rows so the two stay in step, and the horizontal scroll is on the element
+ * wrapping both, so the header travels with the rows.
  */
-const MIN_TABLE = 'max-md:min-w-[55rem]'
+const MIN_TABLE = 'min-w-[27.5rem]'
 
 export function MoveTreeTable({
   tree,
@@ -141,17 +165,22 @@ export function MoveTreeTable({
   const mainLine = tree?.main_line?.[0]?.uci
   const { i18n, t } = useLingui()
   const notate = useNotation()
+  // At 1280 the pane is narrower than the table: the Games table's fade says there is more.
+  const { ref: frame, onScroll, moreRight } = useMoreRight<HTMLDivElement>(moves.length)
 
   return (
     <div
-      className="flex flex-col gap-3.5 max-md:overflow-x-auto"
+      ref={frame}
+      onScroll={onScroll}
+      className={cn('@container flex flex-col gap-1 overflow-x-auto', moreRight && FADE_RIGHT)}
       role="table"
       aria-label={t`Continuations`}
     >
       <div
         role="row"
         className={cn(
-          'flex h-[1.875rem] flex-none items-center gap-3 rounded-[0.4375rem] border border-line bg-panel px-3 text-meta tracking-[.06em] text-dim-2 uppercase',
+          'flex h-7 flex-none items-center gap-2 border-b border-line px-3 whitespace-nowrap',
+          COLUMN_HEAD,
           MIN_TABLE,
         )}
       >
@@ -159,7 +188,7 @@ export function MoveTreeTable({
           <span
             key={column.id}
             style={style(column.width)}
-            className={cn(column.align === 'right' && 'text-right')}
+            className={cn(column.align === 'right' && 'text-right', column.optional && OPTIONAL)}
           >
             {i18n._(column.label)}
           </span>
@@ -176,10 +205,14 @@ export function MoveTreeTable({
             <div
               key={index}
               style={{ opacity: 1 - index * 0.15 }}
-              className="flex h-[1.5rem] flex-none items-center gap-3 px-3"
+              className="flex h-[1.5rem] flex-none items-center gap-2 px-3"
             >
               {COLUMNS.map((column) => (
-                <span key={column.id} style={style(column.width)}>
+                <span
+                  key={column.id}
+                  style={style(column.width)}
+                  className={cn(column.optional && OPTIONAL)}
+                >
                   <Skeleton className="h-2.5" />
                 </span>
               ))}
@@ -214,6 +247,8 @@ export function MoveTreeTable({
             const percent = scorePercent(move.score)
             const main = move.uci === mainLine
             const note = move.note?.text ?? null
+            // What the two optional columns say, for when the table is too narrow to show them.
+            const words = [move.name, note].filter(Boolean).join(' — ')
             return (
               <button
                 key={move.uci}
@@ -224,16 +259,19 @@ export function MoveTreeTable({
                 onFocus={() => onPreview?.([move.uci])}
                 onBlur={() => onPreview?.(null)}
                 role="row"
+                title={words || undefined}
+                data-main={main ? '' : undefined}
                 className={cn(
-                  'flex h-[1.5rem] flex-none items-center gap-3 rounded-[0.4375rem] px-3 text-left transition-colors',
-                  main
-                    ? 'bg-accent-teal/7 shadow-[inset_0_0_0_0.0625rem_color-mix(in_srgb,var(--bb-accent)_28%,transparent)]'
-                    : 'hover:bg-elevated-2',
+                  ROW,
+                  'flex h-[1.5rem] flex-none items-center gap-2 rounded-sm px-3 text-left',
                 )}
               >
                 <span
-                  style={style(78)}
-                  className={cn('text-lead', main ? 'text-bright' : 'text-body')}
+                  style={style(64)}
+                  className={cn(
+                    'truncate text-lead',
+                    main ? 'font-semibold text-bright' : 'text-body',
+                  )}
                 >
                   {plyLabel(ply)}
                   {notate(move.san)}
@@ -241,23 +279,23 @@ export function MoveTreeTable({
                 <span style={style(46)} className="text-right text-body">
                   {move.games}
                 </span>
-                <span style={style(44)} className="text-right text-dim">
+                <span style={style(40)} className="text-right text-dim">
                   {share === null ? '—' : `${share}%`}
                 </span>
                 <span style={style(SPLIT_WIDTH)}>
                   <ScoreBar split={split} className="w-full" />
                 </span>
-                <span style={style(52)} className={cn('text-right', scoreTone(move.score))}>
+                <span style={style(50)} className={cn('text-right', scoreTone(move.score))}>
                   {percent === null ? '—' : percent.toFixed(1)}
                 </span>
                 <span
-                  style={style(66)}
+                  style={style(62)}
                   className={cn('text-right', dropTone(move.avg_win_loss))}
                 >
                   {formatAvgDrop(move.avg_win_loss)}
                 </span>
                 <span
-                  style={style(44)}
+                  style={style(40)}
                   className={cn(
                     'text-right',
                     (move.blunders ?? 0) > 0 ? 'text-blunder' : 'text-dim-2',
@@ -267,14 +305,14 @@ export function MoveTreeTable({
                 </span>
                 <span
                   style={style('flex')}
-                  className="truncate font-sans text-data text-soft-2"
+                  className={cn('truncate font-sans text-data text-soft-2', OPTIONAL)}
                   title={move.name ?? undefined}
                 >
                   {move.name}
                 </span>
                 <span
                   style={style('flex')}
-                  className="truncate font-sans text-data text-dim-2"
+                  className={cn('truncate font-sans text-data text-dim-2', OPTIONAL)}
                   title={note ?? undefined}
                 >
                   {note}

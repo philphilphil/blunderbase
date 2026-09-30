@@ -158,8 +158,15 @@ describe('CSV export', () => {
 describe('StatsPage — the filter bar', () => {
   /** Renders whatever the page put in the titlebar, which the shell would otherwise draw. */
   function Titlebar() {
-    const { actions } = usePageChrome()
-    return <div data-testid="titlebar">{actions}</div>
+    const { actions, breadcrumb } = usePageChrome()
+    return (
+      <>
+        <div data-testid="titlebar">{actions}</div>
+        <div data-testid="crumbs">
+          {breadcrumb.map((crumb) => `${crumb.label}${crumb.to ? `@${String(crumb.to)}` : ''}`).join(' › ')}
+        </div>
+      </>
+    )
   }
 
   /** `EventsProvider` dials one of these; nothing here cares what it says. */
@@ -218,21 +225,63 @@ describe('StatsPage — the filter bar', () => {
   it.each([
     ['a desktop', false],
     ['a phone', true],
-  ])('draws every filter on the page and only the page’s two buttons in the titlebar on %s', (_name, mobile) => {
+  ])('draws every filter on the page and only the page’s one command in the titlebar on %s', (_name, mobile) => {
     stubViewport(mobile)
     draw()
 
-    // The titlebar carries the page's verbs (the shell moves them under it on a phone) and
-    // none of its filters.
+    // The titlebar carries the page's verb (the shell moves it under the bar on a phone)
+    // and none of its filters or modes.
     const titlebar = screen.getByTestId('titlebar')
     expect(within(titlebar).getAllByRole('button').map((button) => button.textContent)).toEqual([
-      'vs previous',
       'Export CSV',
     ])
-    expect(within(titlebar).queryByRole('group')).not.toBeInTheDocument()
-    expect(screen.getByRole('group', { name: 'Window' })).toBeInTheDocument()
-    expect(screen.getByRole('group', { name: 'Colour' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'bullet' })).toBeInTheDocument()
+    expect(within(titlebar).queryByRole('radiogroup')).not.toBeInTheDocument()
+    expect(within(titlebar).queryByRole('switch')).not.toBeInTheDocument()
+    expect(screen.getByRole('radiogroup', { name: 'Window' })).toBeInTheDocument()
+    expect(screen.getByRole('radiogroup', { name: 'Colour' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /^Speed:\s*All$/ })).toBeInTheDocument()
+    expect(screen.getByRole('switch', { name: 'vs previous window' })).toBeInTheDocument()
+  })
+
+  it('names the report as the title, under a Stats that goes back to the overview', () => {
+    stubViewport(false)
+    draw('/stats')
+    expect(screen.getByTestId('crumbs')).toHaveTextContent('Stats@/stats › Overview')
+  })
+
+  it('names another report the same way, keeping the collection on the way back', () => {
+    stubViewport(false)
+    draw('/stats?report=blunders&collection=3')
+    expect(screen.getByTestId('crumbs')).toHaveTextContent(
+      'Stats@/stats?report=overview&collection=3 › Blunder taxonomy',
+    )
+  })
+
+  it('turns the comparison on with the switch, and disables it with a reason under All', async () => {
+    stubViewport(false)
+    // A window with dates has one before it; all time answers with none.
+    useStatsDashboard.mockImplementation((filters: { days?: number }) =>
+      result({
+        data: {
+          since: filters.days ? '2026-06-01T00:00:00Z' : null,
+          until: filters.days ? '2026-08-30T00:00:00Z' : null,
+          dimensions: {},
+        } as never,
+      }),
+    )
+    draw()
+
+    const compare = screen.getByRole('switch', { name: 'vs previous window' })
+    expect(compare).toHaveAttribute('aria-checked', 'false')
+    await userEvent.click(compare)
+    expect(compare).toHaveAttribute('aria-checked', 'true')
+
+    await userEvent.click(
+      within(screen.getByRole('radiogroup', { name: 'Window' })).getByRole('radio', { name: 'All' }),
+    )
+    expect(compare).toBeDisabled()
+    expect(compare).toHaveAttribute('aria-checked', 'false')
+    expect(compare).toHaveAttribute('title', 'All time has nothing before it to compare against')
   })
 
   it('loads the page through one anchored dashboard query', () => {
@@ -247,17 +296,18 @@ describe('StatsPage — the filter bar', () => {
     stubViewport(false)
     draw()
 
-    // Every chip on is the same question as no speed filter, and it is sent as none.
+    // Every speed on is the same question as no speed filter, and it is sent as none.
     expect(useStatsDashboard).toHaveBeenCalledWith({ days: 90 })
 
-    await userEvent.click(screen.getByRole('button', { name: 'bullet' }))
+    await userEvent.click(screen.getByRole('button', { name: /^Speed:\s*All$/ }))
+    await userEvent.click(screen.getByRole('checkbox', { name: 'Bullet' }))
 
     expect(useStatsDashboard).toHaveBeenLastCalledWith({
       days: 90,
       speed: ['blitz', 'rapid', 'classical', 'correspondence'],
     })
-    expect(screen.getByRole('button', { name: 'bullet' })).toHaveAttribute(
-      'aria-pressed',
+    expect(screen.getByRole('checkbox', { name: 'Bullet' })).toHaveAttribute(
+      'aria-checked',
       'false',
     )
   })
@@ -266,11 +316,12 @@ describe('StatsPage — the filter bar', () => {
     stubViewport(false)
     draw()
 
-    for (const speed of ['bullet', 'blitz', 'rapid', 'classical', 'correspondence']) {
-      await userEvent.click(screen.getByRole('button', { name: speed }))
+    await userEvent.click(screen.getByRole('button', { name: /^Speed:\s*All$/ }))
+    for (const speed of ['Bullet', 'Blitz', 'Rapid', 'Classical', 'Correspondence']) {
+      await userEvent.click(screen.getByRole('checkbox', { name: speed }))
     }
 
-    // The last chip cannot be switched off: an empty set counts no games, and a page
+    // The last speed cannot be switched off: an empty set counts no games, and a page
     // answering "nothing here" because of it reads as broken rather than as filtered.
     expect(useStatsDashboard).toHaveBeenLastCalledWith({ days: 90, speed: ['correspondence'] })
   })

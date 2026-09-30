@@ -48,8 +48,10 @@ export function SourceBadge({
         className,
       )
     : cn(
-        'inline-flex items-center rounded-sm border',
-        size === 'sm' ? 'gap-1 px-1.5 py-px text-meta' : 'gap-1.5 px-2 py-[0.1875rem] text-label',
+        // No border (the clarity pass): a readout is a tint at most, so it cannot be taken
+        // for a control. The source's own tint and text colour are unchanged.
+        'inline-flex items-center rounded-sm',
+        size === 'sm' ? 'gap-1 px-1.5 py-px text-meta' : 'gap-1.5 px-2 py-0.5 text-label',
         style.chipClass,
         href && 'hover:brightness-125',
         className,

@@ -30,6 +30,13 @@ describe('RunBadge', () => {
     expect(screen.getByText(/500k/)).not.toHaveClass('text-deep')
   })
 
+  // A readout wears no border (the clarity pass), or it reads as a button beside real ones.
+  it('draws the chip as a tint without a frame', () => {
+    render(<RunBadge run={{ nodes: 500_000, multipv: 2, requested: true }} />)
+    expect(screen.getByText(/500k/)).not.toHaveClass('border')
+    expect(screen.getByText(/500k/)).toHaveClass('bg-deep/10')
+  })
+
   it('keeps the requested colour as plain text and leaves the plain import pass quiet', () => {
     const { rerender } = render(
       <RunBadge plain run={{ nodes: 500_000, multipv: 2, requested: true }} />,

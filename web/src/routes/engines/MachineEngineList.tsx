@@ -6,10 +6,15 @@
  * same row without a `RunnerResponse` to hang it off. Roles are deliberately absent: a role
  * is a fact about the deployment's policy (which engine analyses, which predicts human moves),
  * not about a machine, and belongs to the role strip at the top of the page.
+ *
+ * Every line is readout: a status dot, the name, a borderless kind tint and, where it
+ * applies, a borderless `queue only` warning. Nothing here is pressable, so nothing lifts
+ * under the pointer.
  */
 import { Trans, useLingui } from '@lingui/react/macro'
 
 import { StatusDot } from '@/components/badges/StatusDot'
+import { Badge } from '@/components/ui/badge'
 import type { RunnerEngine } from '@/lib/api/types'
 
 import { KindBadge } from './EngineBadges'
@@ -61,7 +66,8 @@ function MachineEngineRow({
   const queueOnly = connected && !(engine.streams && streamable)
   const { t } = useLingui()
   return (
-    <div className="flex items-center gap-2 rounded-[0.3125rem] px-1 py-1.5 hover:bg-raised">
+    // No hover: the line is a fact about the machine, not something to press.
+    <div className="flex items-center gap-2 px-1 py-1.5">
       <StatusDot tone={engine.enabled ? 'healthy' : 'away'} />
       {/* The name is what the row is read for, so the path gives way first: a `m…` beside
           forty characters of path was the row saying the least important thing. */}
@@ -70,8 +76,9 @@ function MachineEngineRow({
       </span>
       <KindBadge kind={engine.kind} />
       {queueOnly ? (
-        <span
-          className="flex-none rounded-sm border border-mistake/28 bg-mistake/8 px-1.5 py-px text-meta text-mistake"
+        <Badge
+          variant="warn"
+          className="flex-none"
           title={
             engine.streams
               ? t`this link takes queue work but cannot open an analysis board`
@@ -79,7 +86,7 @@ function MachineEngineRow({
           }
         >
           <Trans>queue only</Trans>
-        </span>
+        </Badge>
       ) : null}
       <span className="min-w-0 flex-1 truncate text-right font-mono text-label text-faint">
         {engine.path}

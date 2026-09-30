@@ -20,33 +20,51 @@
  *
  * Nothing here is ever written down. A row plays its move into the line the same way the
  * owner's own table does, and that line is a URL; the counts behind it stay upstream.
+ *
+ * Header, rows and the narrow-table rule are `MoveTreeTable`'s: a plain ruled row of
+ * column caps, `ROW` rows, and the one text column (`Opening`) drawn only once the table
+ * has room to give it a readable width, with the row's `title` naming it otherwise.
  */
 import type { MessageDescriptor } from '@lingui/core'
 import { msg, plural } from '@lingui/core/macro'
 import { Trans, useLingui } from '@lingui/react/macro'
 
+import { COLUMN_HEAD, ROW } from '@/components/ui/row'
 import { Skeleton } from '@/components/ui/skeleton'
 import type { ReferenceExplorerResponse, ReferenceMove } from '@/lib/api/types'
 import { useNotation } from '@/lib/chess/notationPrefs'
+import { FADE_RIGHT, useMoreRight } from '@/lib/ui/useMoreRight'
 import { cn } from '@/lib/utils'
 
 import { plyLabel } from '../line'
 import { formatCount, sharePercent } from '../reference'
 import { SPLIT_WIDTH, SidesBar } from './ScoreBar'
 
-const COLUMNS: { id: string; label: MessageDescriptor; width: number | 'flex'; align?: 'right' }[] =
-  [
-    { id: 'move', label: msg`Move`, width: 78 },
-    { id: 'games', label: msg`Games`, width: 62, align: 'right' },
-    { id: 'share', label: msg`Share`, width: 44, align: 'right' },
-    { id: 'split', label: msg`White / draw / black`, width: SPLIT_WIDTH },
-    { id: 'rating', label: msg`Avg elo`, width: 56, align: 'right' },
-    { id: 'opening', label: msg`Opening`, width: 'flex' },
-  ]
+const COLUMNS: {
+  id: string
+  label: MessageDescriptor
+  width: number | 'flex'
+  align?: 'right'
+  optional?: boolean
+}[] = [
+  { id: 'move', label: msg`Move`, width: 64 },
+  { id: 'games', label: msg`Games`, width: 62, align: 'right' },
+  { id: 'share', label: msg`Share`, width: 40, align: 'right' },
+  { id: 'split', label: msg`White / draw / black`, width: SPLIT_WIDTH },
+  { id: 'rating', label: msg`Avg elo`, width: 56, align: 'right' },
+  { id: 'opening', label: msg`Opening`, width: 'flex', optional: true },
+]
 
 function style(width: number | 'flex') {
   return width === 'flex' ? { flex: 1, minWidth: 0 } : { width, flex: 'none' as const }
 }
+
+/**
+ * `Opening` appears once the table can give it 6rem: 22.5rem of fixed columns, gaps and
+ * padding (at the app's 120% root size), one more gap and 6rem ≈ 29rem. The 530px pane of a
+ * 1440 screen is just short of that, so there the row's `title` names the opening.
+ */
+const OPTIONAL = 'hidden @min-[29rem]:block'
 
 /**
  * The same arithmetic `MoveTreeTable` does: fifteen rows plus the gaps between them, and used
@@ -59,12 +77,11 @@ const VISIBLE_ROWS = 15
 const ROWS_HEIGHT = `${VISIBLE_ROWS * ROW_HEIGHT_REM + (VISIBLE_ROWS - 1) * ROW_GAP_REM}rem`
 
 /**
- * 410px of fixed columns — the bar's among them, at the shared `SPLIT_WIDTH` — plus the
- * gaps, the padding and a readable minimum for the opening name: 410 + 5 gaps of 12px +
- * 24px of padding + 8rem of text ≈ 39rem. It still scrolls sideways rather than crushing
- * the name to nothing on a phone.
+ * 362px of fixed columns — the bar's among them, at the shared `SPLIT_WIDTH` — plus four
+ * `gap-2`s and the `px-3` padding: about 430px, 22.5rem at the app's 120% root size.
+ * Narrower than that (a phone) it scrolls sideways rather than dropping a number.
  */
-const MIN_TABLE = 'max-md:min-w-[39rem]'
+const MIN_TABLE = 'min-w-[22.5rem]'
 
 export function ReferenceMoveTable({
   data,
@@ -85,17 +102,22 @@ export function ReferenceMoveTable({
   const total = data?.totals.games ?? 0
   const { i18n, t } = useLingui()
   const notate = useNotation()
+  // At 1280 the pane is narrower than the table: the Games table's fade says there is more.
+  const { ref: frame, onScroll, moreRight } = useMoreRight<HTMLDivElement>(moves.length)
 
   return (
     <div
-      className="flex flex-col gap-3.5 max-md:overflow-x-auto"
+      ref={frame}
+      onScroll={onScroll}
+      className={cn('@container flex flex-col gap-1 overflow-x-auto', moreRight && FADE_RIGHT)}
       role="table"
       aria-label={t`Reference continuations`}
     >
       <div
         role="row"
         className={cn(
-          'flex h-[1.875rem] flex-none items-center gap-3 rounded-[0.4375rem] border border-line bg-panel px-3 text-meta tracking-[.06em] text-dim-2 uppercase',
+          'flex h-7 flex-none items-center gap-2 border-b border-line px-3 whitespace-nowrap',
+          COLUMN_HEAD,
           MIN_TABLE,
         )}
       >
@@ -103,7 +125,7 @@ export function ReferenceMoveTable({
           <span
             key={column.id}
             style={style(column.width)}
-            className={cn(column.align === 'right' && 'text-right')}
+            className={cn(column.align === 'right' && 'text-right', column.optional && OPTIONAL)}
           >
             {i18n._(column.label)}
           </span>
@@ -120,10 +142,14 @@ export function ReferenceMoveTable({
             <div
               key={index}
               style={{ opacity: 1 - index * 0.15 }}
-              className="flex h-[1.5rem] flex-none items-center gap-3 px-3"
+              className="flex h-[1.5rem] flex-none items-center gap-2 px-3"
             >
               {COLUMNS.map((column) => (
-                <span key={column.id} style={style(column.width)}>
+                <span
+                  key={column.id}
+                  style={style(column.width)}
+                  className={cn(column.optional && OPTIONAL)}
+                >
                   <Skeleton className="h-2.5" />
                 </span>
               ))}
@@ -162,9 +188,13 @@ export function ReferenceMoveTable({
                 onFocus={() => onPreview?.([move.uci])}
                 onBlur={() => onPreview?.(null)}
                 role="row"
-                className="flex h-[1.5rem] flex-none items-center gap-3 rounded-[0.4375rem] px-3 text-left transition-colors hover:bg-elevated-2"
+                title={move.name ?? undefined}
+                className={cn(
+                  ROW,
+                  'flex h-[1.5rem] flex-none items-center gap-2 rounded-sm px-3 text-left',
+                )}
               >
-                <span style={style(78)} className="text-lead text-body">
+                <span style={style(64)} className="truncate text-lead text-body">
                   {plyLabel(ply)}
                   {notate(move.san)}
                 </span>
@@ -175,7 +205,7 @@ export function ReferenceMoveTable({
                 >
                   {formatCount(move.games)}
                 </span>
-                <span style={style(44)} className="text-right text-dim">
+                <span style={style(40)} className="text-right text-dim">
                   {share === null ? '—' : `${share}%`}
                 </span>
                 <span style={style(SPLIT_WIDTH)}>
@@ -191,7 +221,7 @@ export function ReferenceMoveTable({
                 </span>
                 <span
                   style={style('flex')}
-                  className="truncate font-sans text-data text-soft-2"
+                  className={cn('truncate font-sans text-data text-soft-2', OPTIONAL)}
                   title={move.name ?? undefined}
                 >
                   {move.name}

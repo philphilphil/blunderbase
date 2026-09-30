@@ -20,8 +20,13 @@ import { estimateLabel } from './estimate'
  * long — so a pass that turned out to be forty hours was one click away from an owner who
  * thought it was twenty minutes. That button is gone; this is where it went. Every card here shows the same two numbers: how many
  * games the press would queue, and what this deployment's own finished runs say that
- * costs. The estimate sits *on* the button rather than in a footnote because the moment it
- * is worth reading is the moment before the click.
+ * costs. The estimate sits in the button's row rather than in a footnote because the moment
+ * it is worth reading is the moment before the click.
+ *
+ * The buttons are secondary faces, right-aligned at the end of that row, and none is
+ * filled: the three are peers, and the page is a report before it is a control panel. They
+ * had been full-width outlines, and a card-wide disabled bar read as a banner, not as a
+ * button that has nothing to do. Disabled, a button says why in its title.
  *
  * Starting a backfill queues ordinary runs and nothing more: the press POSTs and the pass
  * sits in the same queue an import's passes sit in, watched from the titlebar's queue
@@ -58,7 +63,7 @@ function ActionCard({
   figure: string
   /** The wall-clock cost, or null where nothing has been measured yet. */
   estimate: string | null
-  /** The button. */
+  /** The button, at the end of the figure's row. */
   children: ReactNode
   /** A receipt or a refusal, under the button. */
   footer?: ReactNode
@@ -72,13 +77,14 @@ function ActionCard({
 
       <p className="flex-1 text-label leading-[1.5] text-dim">{blurb}</p>
 
-      <div className="flex items-baseline gap-2 border-t border-hairline pt-2.5">
+      <div className="flex flex-wrap items-center gap-x-2.5 gap-y-2 border-t border-hairline pt-2.5">
         <span className="font-mono text-data tabular text-soft">{figure}</span>
+        {estimate ? (
+          <span className="font-mono text-label tabular text-dim-2">{estimate}</span>
+        ) : null}
         <div className="flex-1" />
-        <span className="font-mono text-label tabular text-dim-2">{estimate ?? ''}</span>
+        {children}
       </div>
-
-      <div className="flex flex-col gap-2">{children}</div>
       {footer}
     </section>
   )
@@ -146,9 +152,10 @@ function BackfillCard({
     >
       <Button
         type="button"
-        variant="outline"
+        variant="secondary"
         size="sm"
         disabled={start.isPending || pending === 0}
+        title={pending === 0 ? t`Every game already has a pass` : undefined}
         onClick={() => start.mutate()}
       >
         {start.isPending ? <Loader2 className="animate-spin" aria-hidden /> : <Zap aria-hidden />}
@@ -215,9 +222,10 @@ function MaiaFillCard({
     >
       <Button
         type="button"
-        variant="outline"
+        variant="secondary"
         size="sm"
         disabled={fill.isPending || missing === 0}
+        title={missing === 0 ? t`Every analysed game already has every level` : undefined}
         onClick={() => fill.mutate(undefined)}
       >
         {fill.isPending ? <Loader2 className="animate-spin" aria-hidden /> : <Wand2 aria-hidden />}
@@ -281,9 +289,10 @@ function ClearQueueCard() {
     >
       <Button
         type="button"
-        variant="outline"
+        variant="secondary"
         size="sm"
         disabled={clear.isPending || queued === 0}
+        title={queued === 0 ? t`Nothing is queued` : undefined}
         onClick={() => clear.mutate()}
       >
         {clear.isPending ? <Loader2 className="animate-spin" aria-hidden /> : <ListX aria-hidden />}

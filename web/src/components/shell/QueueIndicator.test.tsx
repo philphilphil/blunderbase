@@ -69,6 +69,33 @@ describe('QueueIndicator', () => {
     expect((meter.children[1] as HTMLElement).style.width).toBe(`${(825 / 829) * 100}%`)
   })
 
+  it('reads as a readout, not a control: no box, and no meter while idle', async () => {
+    routes['GET /api/analysis/queue'] = () => json(200, queue(0, 0))
+    draw()
+    const word = await screen.findByText('Idle')
+    expect(screen.queryByRole('img')).not.toBeInTheDocument()
+    expect(screen.getByText('0/0')).toHaveClass('font-mono', 'text-dim-2')
+    // Nothing up the tree from the word draws a border: the old widget was a bordered box.
+    for (let node: HTMLElement | null = word; node; node = node.parentElement) {
+      expect(node.className).not.toMatch(/(^|\s)border(\s|$)/)
+    }
+  })
+
+  it('shows the meter and a spinner while work runs, and the word Paused when stopped', async () => {
+    draw()
+    await screen.findByRole('img', { name: '4 running, 825 queued' })
+    expect(screen.getByText('4/829')).toHaveClass('text-ink')
+    expect(document.querySelector('.animate-spin')).not.toBeNull()
+  })
+
+  it('says Paused, in the warning colour, with no meter', async () => {
+    routes['GET /api/analysis/queue'] = () => json(200, queue(825, 4, true))
+    draw()
+    const word = await screen.findByText('Paused')
+    expect(word.closest('.text-mistake')).not.toBeNull()
+    expect(screen.queryByRole('img')).not.toBeInTheDocument()
+  })
+
   it('offers no Clear while nothing is queued', async () => {
     routes['GET /api/analysis/queue'] = () => json(200, queue(0, 0))
     draw()
@@ -105,6 +132,13 @@ describe('QueueIndicator', () => {
     )
   })
 
+  it('offers Clear on a paused queue with work still in it', async () => {
+    routes['GET /api/analysis/queue'] = () => json(200, queue(825, 0, true))
+    draw()
+    await screen.findByText('Paused')
+    expect(screen.getByTestId('clear-queue')).toHaveTextContent('Clear')
+  })
+
   it('resumes a paused queue on a single click', async () => {
     routes['GET /api/analysis/queue'] = () => json(200, queue(825, 4, true))
     draw()
@@ -120,6 +154,8 @@ describe('QueueIndicator', () => {
   it('asks once, with the count, and clears on the second click only', async () => {
     draw()
     const button = await screen.findByTestId('clear-queue')
+    // At rest a tool button with its word, named in full for what it does.
+    expect(button).toHaveAccessibleName('Clear the analysis queue')
     expect(button).toHaveTextContent('Clear')
 
     await userEvent.click(button)

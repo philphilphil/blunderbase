@@ -1,12 +1,13 @@
-import { Check } from 'lucide-react'
-
-import { cn } from '@/lib/utils'
+import { Checkbox } from '@/components/ui/checkbox'
 
 /**
- * One switch in the strip above the sources table — what the next sync is told.
+ * One option on the Import page: what the next sync is told ("From the beginning", "Skip
+ * evaluation") or whether a box takes part in Sync all ("Include in sync").
  *
- * The box and the label are one hit target rather than a checkbox with a label beside it:
- * nothing here is nested, and the whole control toggles.
+ * The app's one `Checkbox`, at the `label` size these option rows are set in: a checkbox
+ * because each is an option ticked for what comes next, not a mode that holds from now on
+ * (that is "Sync automatically", a `Switch`). The box and the label are one hit target, and
+ * the label names it.
  */
 export function SyncCheckbox({
   label,
@@ -23,28 +24,13 @@ export function SyncCheckbox({
   disabled?: boolean
 }) {
   return (
-    <button
-      type="button"
-      role="checkbox"
-      aria-checked={checked}
-      aria-label={label}
+    <Checkbox
+      checked={checked}
+      onCheckedChange={(next) => onChange(next)}
+      label={label}
       title={title}
       disabled={disabled}
-      onClick={() => onChange(!checked)}
-      className="group flex items-center gap-2 rounded-md text-left outline-none disabled:opacity-50"
-    >
-      <span
-        aria-hidden
-        className={cn(
-          'flex size-3.5 flex-none items-center justify-center rounded-sm border transition-colors',
-          checked
-            ? 'border-accent-teal/40 bg-accent-teal/15 text-accent-teal'
-            : 'border-edge text-transparent group-hover:border-edge-hover',
-        )}
-      >
-        <Check className="size-2.5" strokeWidth={3} />
-      </span>
-      <span className={cn('text-label', checked ? 'text-soft' : 'text-dim')}>{label}</span>
-    </button>
+      className="text-label"
+    />
   )
 }

@@ -45,7 +45,9 @@ export function CopyButton({ text, label }: { text: string; label?: string }) {
 /**
  * A titled, copyable block: a line of prose saying what it is for, the text in mono, and a
  * `CopyButton` for exactly that text. The three connect commands and the JSON config are
- * all this shape, so the page reads as one list of things to paste.
+ * all this shape, so the page reads as one list of things to paste. The text sits sunk
+ * like a field (text to take away) and the button is a secondary face with the Copy icon,
+ * so a page of four of them has no filled button competing with the keys' Create.
  */
 export function Snippet({
   title,
@@ -66,7 +68,7 @@ export function Snippet({
         <CopyButton text={text} label={copyLabel} />
       </div>
       {children ? <p className="text-label leading-[1.5] text-dim">{children}</p> : null}
-      <pre className="overflow-x-auto rounded-lg border border-hairline bg-elevated px-3 py-2.5 font-mono text-label leading-[1.6] text-soft">
+      <pre className="overflow-x-auto rounded-md border border-edge-input bg-field px-3 py-2.5 font-mono text-label leading-[1.6] text-soft shadow-field">
         {text}
       </pre>
     </div>

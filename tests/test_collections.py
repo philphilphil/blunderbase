@@ -135,6 +135,7 @@ def test_a_collection_is_made_and_listed_by_name_regardless_of_case(session: Ses
         "name": "45-45 League",
         "color": "accent",
         "description": "Tuesdays",
+        "pinned": False,
         "rule": LEAGUE_RULE,
         "game_count": 0,
         "created_at": league.created_at.isoformat(),
@@ -990,6 +991,29 @@ def test_a_rule_set_before_the_stamp_existed_is_dated_by_its_collection(
     assert stamped[0] == stamped[1]
 
 
+def test_the_upgrade_pins_no_collection_the_rail_never_showed(
+    settings: Settings,
+) -> None:
+    upgrade_to_head(settings)
+    config = alembic_config(settings)
+    command.downgrade(config, "0034_game_ply_offset")
+    engine = get_engine(settings)
+    with engine.begin() as connection:
+        for name in ("club", "Archive", "League"):
+            connection.exec_driver_sql(
+                "INSERT INTO collections (name, color, rule_set_at, created_at) "
+                f"VALUES ('{name}', 'accent', '2026-09-20 18:00:00', '2026-09-20 18:00:00')"
+            )
+
+    command.upgrade(config, "head")
+
+    with engine.connect() as connection:
+        pinned = connection.exec_driver_sql(
+            "SELECT name FROM collections WHERE pinned ORDER BY name"
+        ).scalars()
+        assert list(pinned) == []
+
+
 # --- the HTTP surface ----------------------------------------------------------------------
 
 
@@ -1085,8 +1109,14 @@ def test_the_api_patches_only_what_it_is_sent(api: tuple[TestClient, list[int]])
     assert renamed["description"] == "Tuesdays"
     assert renamed["rule"] == LEAGUE_RULE
 
+    assert renamed["pinned"] is False
+    pinned = client.patch(f"/collections/{made['id']}", json={"pinned": True}).json()
+    assert pinned["pinned"] is True
+    assert pinned["name"] == "Liga"
+
     cleared = client.patch(f"/collections/{made['id']}", json={"rule": None}).json()
     assert cleared["rule"] is None
+    assert cleared["pinned"] is True
     assert client.post(f"/collections/{made['id']}/apply-rule").json()["error"] == "no_rule"
 
     assert client.delete(f"/collections/{made['id']}").status_code == 204

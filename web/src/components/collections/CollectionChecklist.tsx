@@ -6,8 +6,10 @@
  * lost league round is in "45-45 League" and in "Tough losses". Each row's box says where
  * the games in hand stand — ticked when all of them are in, half-ticked when only some
  * are, empty when none — and a click settles it for all of them: a ticked row takes them
- * out, anything else puts them all in. The half state is the one a plain checkbox cannot
- * draw, which is why the box is drawn here rather than native.
+ * out, anything else puts them all in. The half state is the one a native checkbox cannot
+ * draw, which is why each row is the app's `Checkbox` (mixed = the minus), the same box the
+ * games table ticks rows with, with the whole row as its hit area. While a row's write is
+ * out it says so with a spinner at its end rather than greying every row.
  *
  * What the rows show comes from the games' own `collections` ids, which only change when
  * the games query comes back after a write. So the answer of a click is held locally until
@@ -15,9 +17,10 @@
  * between.
  */
 import { Plural, Trans, useLingui } from '@lingui/react/macro'
-import { Check, Loader2, Minus, Plus } from 'lucide-react'
+import { Loader2, Plus } from 'lucide-react'
 import { useState } from 'react'
 
+import { Checkbox } from '@/components/ui/checkbox'
 import { useAddToCollection, useCollections, useRemoveFromCollection } from '@/lib/api/queries'
 import type { Collection } from '@/lib/api/types'
 import { membershipOf, type MembershipState } from '@/lib/collections'
@@ -127,25 +130,33 @@ export function CollectionChecklist({
         <ul role="list" className="flex flex-col">
           {states.map(({ collection, state, inCount }) => (
             <li key={collection.id}>
-              <button
-                type="button"
-                role="checkbox"
-                aria-checked={state === 'all' ? true : state === 'some' ? 'mixed' : false}
-                disabled={busy !== null || count === 0}
-                onClick={() => void toggle(collection, state)}
-                className="flex w-full items-center gap-2 rounded-sm px-[0.4375rem] py-[0.3125rem] text-left whitespace-nowrap transition-colors hover:bg-raised hover:text-ink disabled:cursor-wait"
-              >
-                <TickBox state={state} busy={busy === collection.id} />
-                <CollectionSwatch color={collection.color} />
-                <span className="min-w-0 truncate">{collection.name}</span>
-                <span className="ml-auto pl-3.5 text-meta tabular text-dim-2">
-                  {state === 'some' && inCount !== null ? (
-                    <Trans>
-                      {inCount} of {count}
-                    </Trans>
-                  ) : null}
-                </span>
-              </button>
+              <Checkbox
+                checked={state === 'all' ? true : state === 'some' ? 'mixed' : false}
+                disabled={count === 0}
+                aria-disabled={busy !== null || undefined}
+                aria-busy={busy === collection.id || undefined}
+                onCheckedChange={() => void toggle(collection, state)}
+                className={cn(
+                  'w-full rounded-sm px-[0.4375rem] py-[0.3125rem] whitespace-nowrap text-soft transition-colors hover:bg-raised hover:text-ink focus-visible:outline-offset-[-0.125rem]',
+                  busy !== null && 'cursor-wait',
+                  '[&>span:last-child]:flex [&>span:last-child]:min-w-0 [&>span:last-child]:flex-1 [&>span:last-child]:items-center [&>span:last-child]:gap-2',
+                )}
+                label={
+                  <>
+                    <CollectionSwatch color={collection.color} />
+                    <span className="min-w-0 truncate">{collection.name}</span>
+                    <span className="ml-auto flex items-center pl-3.5 text-meta tabular text-dim-2">
+                      {busy === collection.id ? (
+                        <Loader2 className="size-3 animate-spin text-dim" aria-hidden />
+                      ) : state === 'some' && inCount !== null ? (
+                        <Trans>
+                          {inCount} of {count}
+                        </Trans>
+                      ) : null}
+                    </span>
+                  </>
+                }
+              />
             </li>
           ))}
         </ul>
@@ -157,7 +168,7 @@ export function CollectionChecklist({
           <button
             type="button"
             onClick={onNew}
-            className="flex items-center gap-2 rounded-sm px-[0.4375rem] py-[0.3125rem] text-left text-dim transition-colors hover:bg-raised hover:text-ink"
+            className="flex items-center gap-2 rounded-sm px-[0.4375rem] py-[0.3125rem] text-left whitespace-nowrap text-dim transition-colors hover:bg-raised hover:text-ink focus-visible:outline-offset-[-0.125rem]"
           >
             <Plus className="size-3" aria-hidden />
             {newLabel ?? (
@@ -183,24 +194,5 @@ export function CollectionChecklist({
         )}
       </p>
     </div>
-  )
-}
-
-/** The design's 13px box in its three states, with a spinner while its write is out. */
-function TickBox({ state, busy }: { state: MembershipState; busy: boolean }) {
-  if (busy) return <Loader2 className="size-[0.8125rem] flex-none animate-spin text-dim" aria-hidden />
-  return (
-    <span
-      aria-hidden
-      className={cn(
-        'flex size-[0.8125rem] flex-none items-center justify-center rounded-[0.1875rem] border',
-        state === 'none'
-          ? 'border-edge-strong'
-          : 'border-accent-teal bg-accent-teal text-accent-ink',
-      )}
-    >
-      {state === 'all' ? <Check className="size-2.5" strokeWidth={3} /> : null}
-      {state === 'some' ? <Minus className="size-2.5" strokeWidth={3} /> : null}
-    </span>
   )
 }

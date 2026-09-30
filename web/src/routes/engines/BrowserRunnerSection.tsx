@@ -42,6 +42,10 @@ import { MachineRow } from './MachineRow'
  * **The name is proposed, not owned.** Runner names are unique, so a second browser on the
  * same machine would collide; the install retries with a numbered suffix rather than making
  * the owner type a name for something that should be one press.
+ *
+ * Its controls follow the app's grammar: Install is the card's one primary; Start and Stop
+ * are secondary faces; Uninstall… is the red outline, set apart after them, and only its
+ * confirm (after Cancel) is the filled red.
  */
 export function BrowserRunnerSection({
   runner,
@@ -131,7 +135,7 @@ export function BrowserRunnerSection({
           </Button>
         ) : confirmRemove ? (
           <>
-            <Button type="button" size="sm" variant="ghost" onClick={() => setConfirmRemove(false)}>
+            <Button type="button" size="sm" variant="secondary" onClick={() => setConfirmRemove(false)}>
               <Trans>Cancel</Trans>
             </Button>
             <Button
@@ -151,21 +155,27 @@ export function BrowserRunnerSection({
               <Button
                 type="button"
                 size="sm"
-                variant="outline"
+                variant="secondary"
                 onClick={() => browserRunner.resume()}
               >
                 <Play aria-hidden />
                 <Trans>Start</Trans>
               </Button>
             ) : (
-              <Button type="button" size="sm" variant="outline" onClick={() => browserRunner.stop()}>
+              <Button type="button" size="sm" variant="secondary" onClick={() => browserRunner.stop()}>
                 <Square aria-hidden />
                 <Trans>Stop</Trans>
               </Button>
             )}
-            <Button type="button" size="sm" variant="ghost" onClick={() => setConfirmRemove(true)}>
+            <Button
+              type="button"
+              size="sm"
+              variant="destructive-outline"
+              className="ml-2"
+              onClick={() => setConfirmRemove(true)}
+            >
               <Trash2 aria-hidden />
-              <Trans>Uninstall</Trans>
+              <Trans>Uninstall…</Trans>
             </Button>
           </>
         )
@@ -190,14 +200,15 @@ export function BrowserRunnerSection({
         ) : (
           <div className="flex flex-col gap-3">
             {hasEngine(state) ? (
-              <div className="flex items-center gap-2 rounded-md border border-edge bg-elevated px-3 py-2">
+              // A fact, so no box around it: the dot and the engine it names.
+              <div className="flex items-center gap-2">
                 <StatusDot tone="healthy" />
                 <span className="truncate font-mono text-label text-body">
                   {engineLabel(state)}
                 </span>
               </div>
             ) : (
-              <p className="rounded-md border border-edge bg-elevated px-3 py-2 text-label text-dim">
+              <p className="text-label text-dim">
                 <Trans>
                   The engine has not started yet. It lives in this browser rather than at a path —
                   there is nothing on a filesystem to point at.

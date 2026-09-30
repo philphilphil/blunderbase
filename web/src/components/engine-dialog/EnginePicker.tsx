@@ -1,5 +1,6 @@
 /**
- * The engine chips every engine dialog chooses from — one list, two modes.
+ * The engines every engine dialog chooses from — one list, three modes, drawn as the one
+ * one-of-N control (`Segmented`), where they had been pressed chips in the selection blue.
  *
  * `GET /correspondence/status` answers with every enabled UCI engine the deployment has,
  * this host's and the runners', and says per engine why a *search* could not run on it
@@ -12,15 +13,15 @@
  * `GET /analysis/engines`, where `search_trouble` instead says why a *run* would be
  * refused (a local binary gone, Maia on another host). It picks in `run` mode, which greys
  * those the way `search` mode greys its own — an engine the press would only bounce off is
- * not one to preselect — and the dialog spells the reasons out under the chips.
+ * not one to preselect — and the dialog spells the reasons out under the picker.
  *
  * The engine flagged `default` is the analysis role's, and every mode opens on it where the
  * mode allows — the modes must never suggest different engines for one position.
  */
 import { Trans, useLingui } from '@lingui/react/macro'
 
+import { Segmented } from '@/components/ui/segmented'
 import type { CorrespondenceSearchEngine } from '@/lib/api/types'
-import { cn } from '@/lib/utils'
 
 export type EngineMode = 'search' | 'task' | 'run'
 
@@ -55,42 +56,40 @@ export function EnginePicker({
     return (
       <p className="text-data text-mistake">
         <Trans>
-          No engine is switched on that speaks UCI. Add one under Analysis → Engines.
+          No engine is switched on that speaks UCI. Add one under Compute › Engines.
         </Trans>
       </p>
     )
   }
+  // One engine out of a few, all on screen: the one `Segmented` (a sunken track, the chosen
+  // engine a raised thumb), so this reads as "pick one of these" and never as a row of
+  // buttons that each do something. It wraps where a deployment has many engines.
   return (
-    <div role="group" aria-label={t`Engine`} className="flex flex-wrap gap-2">
-      {engines.map((engine) => {
+    <Segmented
+      label={t`Engine`}
+      value={value === null ? '' : String(value)}
+      onChange={(next) => onChange(Number(next))}
+      className="h-auto min-h-7 max-w-full flex-wrap"
+      options={engines.map((engine) => {
         const usable = allowed(engine, mode)
-        return (
-          <button
-            key={engine.engine_id}
-            type="button"
-            aria-pressed={value === engine.engine_id}
-            disabled={!usable}
-            title={usable ? undefined : (engine.search_trouble ?? undefined)}
-            onClick={() => onChange(engine.engine_id)}
-            className={cn(
-              'flex min-w-0 items-center gap-2 rounded-md border px-2.5 py-1.5 text-data transition-colors',
-              value === engine.engine_id
-                ? 'border-accent-teal/40 bg-selected text-ink'
-                : 'border-edge text-dim hover:border-edge-hover hover:text-ink',
-              !usable && 'cursor-not-allowed opacity-45 hover:border-edge hover:text-dim',
-            )}
-          >
-            <span className="truncate">{engine.name}</span>
-            {engine.runner_id !== null && engine.runner_id !== undefined ? (
-              <span className="truncate text-meta text-dim-2">· {engine.host}</span>
-            ) : engine.hash_mb ? (
-              <span className="font-mono text-meta text-dim-2">
-                {t`${engine.hash_mb} MB`}
-              </span>
-            ) : null}
-          </button>
-        )
+        return {
+          value: String(engine.engine_id),
+          disabled: !usable,
+          title: usable ? undefined : (engine.search_trouble ?? undefined),
+          label: (
+            <span className="inline-flex min-w-0 items-center gap-1.5 py-0.5">
+              <span className="truncate">{engine.name}</span>
+              {engine.runner_id !== null && engine.runner_id !== undefined ? (
+                <span className="truncate text-meta text-dim-2">· {engine.host}</span>
+              ) : engine.hash_mb ? (
+                <span className="font-mono text-meta text-dim-2">
+                  {t`${engine.hash_mb} MB`}
+                </span>
+              ) : null}
+            </span>
+          ),
+        }
       })}
-    </div>
+    />
   )
 }

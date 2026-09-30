@@ -26,6 +26,10 @@
  * Unassigned is drawn calmly — dashed and dim, not red. A deployment that has not chosen a
  * human-move model has one fewer column, not a fault. A role that *is* assigned and cannot
  * run is the red one, and it always names the engine that was chosen.
+ *
+ * The pickers are the form's `NativeSelect` (a sunk field, like every select in a form),
+ * and the heading is a section heading in sentence case, the same weight as "Engines" under
+ * it: it had been spaced caps, which is what a column head looks like.
  */
 import type { I18n } from '@lingui/core'
 import { msg } from '@lingui/core/macro'
@@ -34,6 +38,7 @@ import { Trans, useLingui } from '@lingui/react/macro'
 import { Skeleton } from '@/components/ui/skeleton'
 import { StatusDot } from '@/components/badges/StatusDot'
 import { Label } from '@/components/ui/label'
+import { NativeSelect } from '@/components/ui/native-select'
 import { useSetEngineRoles } from '@/lib/api/queries'
 import {
   ENGINE_ROLES,
@@ -127,12 +132,12 @@ function RolePicker({
         />
         <Label htmlFor={id}>{roleName(status.role)}</Label>
       </div>
-      <select
+      <NativeSelect
         id={id}
         value={assigned === null ? '' : String(assigned)}
         disabled={pending}
         onChange={(event) => onAssign(event.target.value === '' ? null : Number(event.target.value))}
-        className="h-8 w-full min-w-0 rounded-md border border-input bg-elevated px-2 text-data text-ink outline-none transition-colors hover:border-edge-hover focus-visible:border-accent-teal/50 disabled:opacity-50"
+        className="h-8 w-full min-w-0"
       >
         <option value="">{t`Nothing assigned`}</option>
         {missing ? (
@@ -143,7 +148,7 @@ function RolePicker({
             {optionLabel(engine, hosts.get(engine.id), i18n)}
           </option>
         ))}
-      </select>
+      </NativeSelect>
       {error ? (
         <p className="text-label leading-[1.5] text-blunder">{error.message}</p>
       ) : status.available ? null : status.reason ? (
@@ -204,7 +209,8 @@ export function RolesForm({
 
   return (
     <section className="flex flex-col gap-1.5">
-      <h2 className="text-meta tracking-[0.1em] text-faint uppercase">
+      {/* A section heading in sentence case: spaced caps are for column heads only. */}
+      <h2 className="text-data font-semibold text-ink">
         <Trans>What runs what</Trans>
       </h2>
       <p className="text-label leading-[1.5] text-dim">

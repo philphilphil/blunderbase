@@ -1,9 +1,9 @@
 import { Plural, Trans, useLingui } from '@lingui/react/macro'
-import { ExternalLink } from 'lucide-react'
 import type { ReactNode } from 'react'
-import { Link } from 'react-router-dom'
 
 import { SourceBadge } from '@/components/badges/SourceBadge'
+import { Badge, Readout } from '@/components/ui/badge'
+import { TextLink } from '@/components/ui/text-link'
 import type { GameSummary, LiveState } from '@/lib/api/types'
 import { cn } from '@/lib/utils'
 
@@ -21,6 +21,10 @@ function Row({ label, children }: { label: string; children: ReactNode }) {
 /**
  * What the live board is: the game and ply it follows, the moves played past it, and the
  * marks currently drawn on it.
+ *
+ * Everything here is a fact, so it is drawn as one (docs/design/README.md, "Controls"):
+ * the viewer count a flat readout, the moves played past the game borderless tints, the
+ * followed game a link and nothing else. Boxed moves had read as buttons nobody could press.
  */
 export function SessionMeta({
   state,
@@ -44,21 +48,17 @@ export function SessionMeta({
           <Trans>Session</Trans>
         </span>
         <div className="flex-1" />
-        <span className="font-mono text-meta text-dim tabular">
+        <Readout num>
           <Plural value={state.viewer_count} one="# viewer" other="# viewers" />
-        </span>
+        </Readout>
       </div>
 
       <div className="flex flex-col px-3.5 py-2">
         <Row label={t`Board`}>
           {state.game_id ? (
-            <Link
-              to={`/games/${state.game_id}`}
-              className="inline-flex items-center gap-1.5 text-accent-teal hover:text-accent-link"
-            >
+            <TextLink to={`/games/${state.game_id}`}>
               {game ? `${game.white ?? '?'} — ${game.black ?? '?'}` : t`game ${followed}`}
-              <ExternalLink className="size-3" aria-hidden />
-            </Link>
+            </TextLink>
           ) : (
             <span className="text-soft">
               <Trans>ad-hoc position</Trans>
@@ -111,17 +111,14 @@ export function SessionMeta({
 
       {state.moves.length > 0 ? (
         <div className="flex flex-col gap-1.5 border-t border-hairline px-3.5 py-2.5">
-          <span className="text-meta tracking-[0.1em] text-faint uppercase">
+          <span className="text-label font-medium text-dim">
             {isVariation(state) ? t`Off the game` : t`Played`}
           </span>
           <div className="flex flex-wrap gap-1">
             {state.moves.map((move, index) => (
-              <span
-                key={`${move}-${index}`}
-                className="rounded-sm border border-edge bg-elevated px-1.5 py-px font-mono text-label text-soft"
-              >
+              <Badge key={`${move}-${index}`} className="font-mono text-soft">
                 {move}
-              </span>
+              </Badge>
             ))}
           </div>
         </div>

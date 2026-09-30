@@ -18,16 +18,20 @@ import { msg } from '@lingui/core/macro'
 import { useLingui } from '@lingui/react/macro'
 import { Eye, EyeOff } from 'lucide-react'
 
-import { buttonVariants } from '@/components/ui/button'
+import { Checkbox } from '@/components/ui/checkbox'
+import { FIELD } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { NativeSelect, PickerSelect } from '@/components/ui/native-select'
 import { cn } from '@/lib/utils'
 import type { LinePreviewPrefs, RowPreview } from '@/lib/board/linePreview'
 import { setLinePreviewPrefs, useLinePreviewPrefs } from '@/lib/board/linePreviewPrefs'
 
-/** The one select shape the board's settings dialog uses throughout, like `SettingsCheck`. */
-export const SETTINGS_SELECT =
-  'h-8 rounded-md border border-input bg-elevated px-2 text-data text-body outline-none'
-const SELECT = SETTINGS_SELECT
+/**
+ * The one select shape the settings forms use throughout, like `SettingsCheck`: a FIELD
+ * (sunk, `--bb-field`), the way `NativeSelect` draws it, at the forms' `h-8`. Kept as a
+ * class string for the settings pages that style a `<select>` of their own.
+ */
+export const SETTINGS_SELECT = cn(FIELD, 'h-8 px-2')
 
 const MODES: { value: RowPreview; label: MessageDescriptor }[] = [
   { value: 'arrows', label: msg`Layered arrows` },
@@ -60,7 +64,10 @@ export function Range({ id, label, value, min, max, step = 1, suffix = '', disab
   )
 }
 
-/** The one checkbox shape the board's settings dialog uses throughout. */
+/**
+ * The one checkbox shape the board's settings dialog uses throughout: the app's `Checkbox`
+ * (a field-drawn box, its label inside the hit area), not the browser's own blue one.
+ */
 export function SettingsCheck({ id, label, checked, disabled, onChange }: {
   id: string
   label: string
@@ -69,83 +76,91 @@ export function SettingsCheck({ id, label, checked, disabled, onChange }: {
   onChange: (checked: boolean) => void
 }) {
   return (
-    <label htmlFor={id} className={cn('inline-flex items-center gap-2 text-label text-soft', disabled && 'opacity-50')}>
-      <input id={id} type="checkbox" checked={checked} disabled={disabled} onChange={(event) => onChange(event.target.checked)} className="size-3 accent-accent-teal" />
-      {label}
-    </label>
+    <Checkbox
+      id={id}
+      checked={checked}
+      disabled={disabled}
+      onCheckedChange={(next) => onChange(next)}
+      label={label}
+      className="text-label text-soft enabled:hover:text-ink"
+    />
   )
 }
 
 const ROW_MODES: RowPreview[] = ['arrows', 'overlay', 'play', 'peek', 'off']
 
 /**
- * What each mode does, for the chip's `title` — the words, not the vocabulary.
+ * What each mode does, for the picker's `title` — the words, not the vocabulary.
  *
  * Whole sentences rather than the tail of one glued onto a shared opener: a language that
  * is not English does not necessarily put the clause in that order, and a translator given
  * "draws nothing" on its own has nothing to place it against.
  */
 const ROW_SAYS: Record<RowPreview, MessageDescriptor> = {
-  arrows: msg`Hovering a line draws the whole line as layered arrows. Click to cycle.`,
-  overlay: msg`Hovering a line shows where the pieces end up. Click to cycle.`,
-  play: msg`Hovering a line plays the line out on the board. Click to cycle.`,
-  peek: msg`Hovering a line opens a small board beside the row. Click to cycle.`,
-  off: msg`Hovering a line draws nothing. Click to cycle.`,
+  arrows: msg`Hovering a line draws the whole line as layered arrows.`,
+  overlay: msg`Hovering a line shows where the pieces end up.`,
+  play: msg`Hovering a line plays the line out on the board.`,
+  peek: msg`Hovering a line opens a small board beside the row.`,
+  off: msg`Hovering a line draws nothing.`,
 }
 
-/** The mode's own name, as the chip spells it beside the eye. */
+/** The mode's own name, as the picker spells it beside the eye. */
 const ROW_SHORT: Record<RowPreview, MessageDescriptor> = {
-  arrows: msg`arrows`,
-  overlay: msg`overlay`,
-  play: msg`play`,
-  peek: msg`peek`,
-  off: msg`off`,
+  arrows: msg`Arrows`,
+  overlay: msg`Overlay`,
+  play: msg`Playthrough`,
+  peek: msg`Peek`,
+  off: msg`Off`,
 }
 
 /**
- * The one-click cycler for what hovering a line does, next to the gear that opens the rest.
+ * What hovering an engine line does, picked where the lines are, next to the gear under
+ * the board that opens the rest.
  *
  * It lives here rather than in a panel because both panels that show engine lines read the
  * same preference, and it was previously declared in one of them — so the run panel and the
- * live panel each grew their own copy of the same control. Now the run panel's Stockfish
- * card carries the pair and the live panel carries neither; there is one place to change
- * the setting and one place to look for it.
+ * live panel each grew their own copy of the same control. Now the engine pane's strip
+ * carries it and the live panel does not; there is one place to change the setting and one
+ * place to look for it.
  *
- * DRESSED AS A CONTROL, NOT AS A READOUT. It sits in a header row whose other chips — `d20`,
- * `1.4M nodes`, `MPV 5` — are all facts about the run, and in their vocabulary (a bordered
- * mono chip) it read as a fourth fact rather than as the one thing on the row that can be
- * clicked. So it is the strip's `xs` ghost button, sans and `rounded-md` like every other
- * control, and not a bordered data badge. The eye says what the setting is about: open,
- * with the mode in the accent, while hovering a line draws something; struck through and
- * quiet while it draws nothing. The accent sits on the eye and the word only — a blue fill
- * is what a pressed toggle wears, and this is a cycler, not a toggle.
+ * A strip picker (`PickerSelect size="strip"`): a value picked from a list, so the ⇅, and no
+ * face at rest in a strip of quiet facts, the face arriving on hover and focus. It had been
+ * a click-to-cycle word in the accent, which read as a link and hid four of its five values
+ * behind repeated clicks. The eye says what the setting is about, struck through while
+ * hovering a line draws nothing.
  */
-export function LinePreviewRowChip() {
+export function LinePreviewRowChip({
+  compact = false,
+}: {
+  /**
+   * The eye and ⇅ alone, the mode kept for the title and the list: for a strip that also
+   * carries the live search's engine and line-count pickers and has no room for the word.
+   * `'narrow'` drops the word only while the strip (an `@container`) is under 22rem: the
+   * Run tab's strip at 1280, where the word would push the Analyse button off the pane.
+   */
+  compact?: boolean | 'narrow'
+}) {
   const { t, i18n } = useLingui()
   const prefs = useLinePreviewPrefs()
-  const on = prefs.row !== 'off'
-  const Icon = on ? Eye : EyeOff
-  const says = i18n._(ROW_SAYS[prefs.row])
+  const Icon = prefs.row !== 'off' ? Eye : EyeOff
   const mode = i18n._(ROW_SHORT[prefs.row])
   return (
-    <button
-      type="button"
-      aria-label={t`Line preview: ${mode}`}
-      onClick={() =>
-        setLinePreviewPrefs({
-          row: ROW_MODES[(ROW_MODES.indexOf(prefs.row) + 1) % ROW_MODES.length]!,
-        })
-      }
-      title={says}
+    <PickerSelect
+      label={t`Line preview`}
+      hideLabel
+      size="strip"
+      value={prefs.row}
+      options={ROW_MODES.map((row) => ({ value: row, label: i18n._(ROW_SHORT[row]) }))}
+      onChange={(row) => setLinePreviewPrefs({ row })}
+      title={compact ? `${mode}: ${i18n._(ROW_SAYS[prefs.row])}` : i18n._(ROW_SAYS[prefs.row])}
+      leading={<Icon className="size-3.5 flex-none text-soft" aria-hidden />}
       className={cn(
-        buttonVariants({ variant: 'ghost', size: 'xs' }),
         'flex-none',
-        on ? 'text-accent-teal hover:text-accent-link' : 'text-soft',
+        compact === 'narrow'
+          ? '@max-[22rem]:[&>span.font-medium]:sr-only'
+          : compact && '[&>span.font-medium]:sr-only',
       )}
-    >
-      <Icon className="size-3 flex-none" aria-hidden />
-      {mode}
-    </button>
+    />
   )
 }
 
@@ -162,9 +177,9 @@ export function LinePreviewFields() {
     <div className="flex flex-col gap-5">
       <div className="flex flex-col gap-1.5">
         <Label htmlFor="preview-mode">{t`Row hover`}</Label>
-        <select id="preview-mode" value={prefs.row} onChange={(event) => set({ row: event.target.value as RowPreview })} className={cn(SELECT, 'w-56')}>
+        <NativeSelect id="preview-mode" value={prefs.row} onChange={(event) => set({ row: event.target.value as RowPreview })} className="h-8 w-56">
           {MODES.map((mode) => <option key={mode.value} value={mode.value}>{i18n._(mode.label)}</option>)}
-        </select>
+        </NativeSelect>
       </div>
 
       <div className="flex flex-wrap gap-4">
@@ -181,10 +196,10 @@ export function LinePreviewFields() {
 
       <div className="flex flex-col gap-1.5">
         <Label htmlFor="preview-labels">{t`Badge label`}</Label>
-        <select id="preview-labels" value={prefs.labels} disabled={!prefs.badges} onChange={(event) => set({ labels: event.target.value as LinePreviewPrefs['labels'] })} className={cn(SELECT, 'w-48')}>
+        <NativeSelect id="preview-labels" value={prefs.labels} disabled={!prefs.badges} onChange={(event) => set({ labels: event.target.value as LinePreviewPrefs['labels'] })} className="h-8 w-48">
           <option value="move">{t`Move number`}</option>
           <option value="ply">{t`Ply count`}</option>
-        </select>
+        </NativeSelect>
       </div>
 
       {prefs.row === 'play' ? (

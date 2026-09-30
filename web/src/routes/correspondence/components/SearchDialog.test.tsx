@@ -69,6 +69,14 @@ const ENGINES = [
   },
 ]
 
+/**
+ * A choice in the engine or the limit picker (`components/engine-dialog`): both are the
+ * one-of-N `Segmented`, so each choice is a radio.
+ */
+function choice(name: string | RegExp): HTMLElement {
+  return screen.getByRole('radio', { name })
+}
+
 function draw(engines: CorrespondenceSearchEngine[] = ENGINES, onStart = vi.fn()) {
   render(
     <I18nProvider>
@@ -103,7 +111,7 @@ describe('SearchDialog', () => {
 
   it('shows a runner’s engine greyed with the reason, rather than hiding it', async () => {
     draw()
-    const remote = screen.getByRole('button', { name: /gpu-box/ })
+    const remote = choice(/gpu-box/)
     expect(remote).toBeDisabled()
     expect(remote).toHaveAttribute('title', expect.stringContaining('run on this host only'))
   })
@@ -119,7 +127,7 @@ describe('SearchDialog', () => {
 
   it('Nothing is a choice: no limit at all', async () => {
     const onStart = draw()
-    await userEvent.click(screen.getByRole('button', { name: 'Nothing' }))
+    await userEvent.click(choice('Nothing'))
     await userEvent.click(screen.getByRole('button', { name: /Start searching/ }))
     expect(onStart).toHaveBeenCalledWith(
       expect.objectContaining({ limit_depth: null, limit_nodes: null, limit_seconds: null }),
@@ -128,9 +136,9 @@ describe('SearchDialog', () => {
 
   it('carries the chosen engine, the line count and one limit', async () => {
     const onStart = draw()
-    await userEvent.click(screen.getByRole('button', { name: /Leela 0.31/ }))
+    await userEvent.click(choice(/Leela 0.31/))
     await userEvent.type(screen.getByLabelText('Lines'), '4')
-    await userEvent.click(screen.getByRole('button', { name: 'Depth' }))
+    await userEvent.click(choice('Depth'))
     expect(screen.getByLabelText('Limit')).toHaveValue(45)
     await userEvent.clear(screen.getByLabelText('Limit'))
     await userEvent.type(screen.getByLabelText('Limit'), '50')

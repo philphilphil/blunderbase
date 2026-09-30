@@ -40,6 +40,9 @@ function Pv({ line }: { line: EngineLine }) {
  * A UCI engine answers with an evaluation and its lines; a Maia model answers with the
  * moves a human of that rating would play, which is a different question and is drawn
  * differently — purple, per the palette.
+ *
+ * All of it is readout: the kind and the policy moves are borderless tints, and the best
+ * move is ink rather than accent, since accent text is kept for links.
  */
 export function SampleResult({ sample }: { sample: SampleResponse }) {
   const { t } = useLingui()
@@ -56,10 +59,8 @@ export function SampleResult({ sample }: { sample: SampleResponse }) {
         <span className="text-data font-medium text-ink">{sample.engine_name}</span>
         <span
           className={cn(
-            'rounded-sm border px-1.5 py-px text-meta',
-            sample.kind === 'maia'
-              ? 'border-deep/28 bg-deep/10 text-deep'
-              : 'border-edge bg-elevated text-soft',
+            'rounded-sm px-1.5 py-px text-meta',
+            sample.kind === 'maia' ? 'bg-deep/10 text-deep' : 'bg-chip-neutral text-soft',
           )}
         >
           {sample.kind}
@@ -86,7 +87,7 @@ export function SampleResult({ sample }: { sample: SampleResponse }) {
                 {moves.slice(0, 5).map((move, index) => (
                   <span
                     key={`${level}-${move.uci ?? index}`}
-                    className="inline-flex items-center gap-1.5 rounded-sm border border-deep/28 bg-deep/10 px-1.5 py-px font-mono text-label text-deep"
+                    className="inline-flex items-center gap-1.5 rounded-sm bg-deep/10 px-1.5 py-px font-mono text-label text-deep"
                   >
                     {move.san ? notate(move.san) : (move.uci ?? '—')}
                     {typeof move.p === 'number' ? (
@@ -114,7 +115,7 @@ export function SampleResult({ sample }: { sample: SampleResponse }) {
             </span>
             <div className="flex-1" />
             {sample.best_move ? (
-              <span className="font-mono text-data text-accent-teal">
+              <span className="font-mono text-data font-medium text-ink">
                 {sample.best_move.san ? notate(sample.best_move.san) : sample.best_move.uci}
               </span>
             ) : null}

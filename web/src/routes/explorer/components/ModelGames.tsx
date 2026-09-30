@@ -14,11 +14,12 @@
  * two lists occupy the same place under the table and read the same way whichever source
  * the page is on. The columns differ because the facts do: there is no `played_at` and no
  * outcome-for-the-owner here, so it is the two players with their ratings, the result, the
- * year, and (lichess only) the time control.
+ * year, and (lichess only) the time control. Rows are the shared `ROW`, as there.
  */
 import { Trans } from '@lingui/react/macro'
 import { useLocation, useNavigate } from 'react-router-dom'
 
+import { ROW } from '@/components/ui/row'
 import { Skeleton } from '@/components/ui/skeleton'
 import type { ReferenceSource, ReferenceTopGame } from '@/lib/api/types'
 import { cn } from '@/lib/utils'
@@ -80,7 +81,10 @@ export function ModelGames({
               key={game.id}
               type="button"
               onClick={() => navigate(`/reference/${source}/${game.id}`, { state: { from } })}
-              className="flex h-[1.8125rem] flex-none items-center gap-2.5 whitespace-nowrap rounded-[0.3125rem] px-2.5 text-left transition-colors hover:bg-elevated-2"
+              className={cn(
+                ROW,
+                'flex h-[1.8125rem] flex-none items-center gap-2.5 whitespace-nowrap rounded-sm px-2.5 text-left',
+              )}
             >
               <span
                 className={cn(

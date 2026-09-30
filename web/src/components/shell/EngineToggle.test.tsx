@@ -57,24 +57,38 @@ function draw() {
 }
 
 describe('EngineToggle', () => {
+  it('is a Hide engine switch, off by default, with its key in the title', () => {
+    draw()
+    const toggle = screen.getByRole('switch', { name: 'Hide engine' })
+    // Off is the engine speaking, which is where a reader starts: the unusual mode lights.
+    expect(toggle).toHaveAttribute('aria-checked', 'false')
+    expect(toggle).toHaveTextContent('Hide engine')
+    expect(toggle).toHaveAttribute('title', 'Hide engine evaluations, lines and flags (⇧E)')
+    // No glyph of a computer, which read as the theme's monitor.
+    expect(toggle.querySelector('.lucide-computer')).toBeNull()
+  })
+
   it('hides the engine and brings it back', async () => {
     const user = userEvent.setup()
     draw()
-    // Pressed is the engine speaking, which is where a reader starts.
-    const button = screen.getByRole('button', { name: /hide the engine/i })
-    expect(button).toHaveAttribute('aria-pressed', 'true')
+    const toggle = screen.getByRole('switch', { name: 'Hide engine' })
 
-    await user.click(button)
+    await user.click(toggle)
     expect(screen.getByTestId('mode')).toHaveTextContent('hidden')
-    expect(screen.getByRole('button', { name: /show the engine/i })).toHaveAttribute(
-      'aria-pressed',
-      'false',
-    )
-    // The button is its own answer; a toast for it would read its label back.
+    // Checked means hidden.
+    expect(toggle).toHaveAttribute('aria-checked', 'true')
+    // The switch is its own answer; a toast for it would read its label back.
     expect(toasts).toEqual([])
 
-    await user.click(screen.getByRole('button', { name: /show the engine/i }))
+    await user.click(toggle)
     expect(screen.getByTestId('mode')).toHaveTextContent('shown')
+    expect(toggle).toHaveAttribute('aria-checked', 'false')
+  })
+
+  it('drops its word on a phone but keeps it as the name', () => {
+    render(<EngineToggle compact />)
+    const toggle = screen.getByRole('switch', { name: 'Hide engine' })
+    expect(toggle).not.toHaveTextContent('Hide engine')
   })
 
   it('answers ⇧E from anywhere, and says which way it went', async () => {
@@ -99,12 +113,12 @@ describe('EngineToggle', () => {
     expect(screen.getByLabelText('a field')).toHaveValue('E')
   })
 
-  it('starts dark where the mode was already on', () => {
+  it('starts on where the mode was already on', () => {
     setEngineHidden(true)
     draw()
-    expect(screen.getByRole('button', { name: /show the engine/i })).toHaveAttribute(
-      'aria-pressed',
-      'false',
+    expect(screen.getByRole('switch', { name: 'Hide engine' })).toHaveAttribute(
+      'aria-checked',
+      'true',
     )
   })
 })

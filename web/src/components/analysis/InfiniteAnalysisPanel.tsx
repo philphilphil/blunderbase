@@ -1,11 +1,12 @@
 import type { MessageDescriptor } from '@lingui/core'
 import { msg } from '@lingui/core/macro'
 import { Trans, useLingui } from '@lingui/react/macro'
-import { ChevronDown } from 'lucide-react'
+import { Play } from 'lucide-react'
 import { Fragment, useEffect, useRef, useState } from 'react'
 
 import { MiniBoard } from '@/components/board/MiniBoard'
-import { buttonVariants } from '@/components/ui/button'
+import { Button } from '@/components/ui/button'
+import { PickerSelect } from '@/components/ui/native-select'
 import { Skeleton } from '@/components/ui/skeleton'
 import { formatNps, formatVariation, liveLineId, type StreamSessionApi } from '@/lib/analysis'
 import type { StreamEndReason, StreamLine } from '@/lib/api/types'
@@ -168,18 +169,22 @@ function reasonSentence(reason: StreamEndReason, where: string): MessageDescript
   }
 }
 
+/**
+ * Where the search runs: a readout, so a borderless tint at most (a border would make it a
+ * chip, and a chip is something to press).
+ */
 function HostChip({ runner }: { runner: string | null }) {
   return runner === null ? (
     <span
       data-testid="infinite-analysis-host"
-      className="flex-none rounded-sm border border-edge bg-elevated px-1.5 py-px text-meta text-dim"
+      className="flex-none rounded-sm bg-chip-neutral px-1.5 py-px text-meta text-dim"
     >
       <Trans comment="The live search runs on this server, not on a remote runner">local</Trans>
     </span>
   ) : (
     <span
       data-testid="infinite-analysis-host"
-      className="inline-flex min-w-0 items-center gap-1 rounded-sm border border-edge bg-elevated px-1.5 py-px text-meta text-soft"
+      className="inline-flex min-w-0 items-center gap-1 rounded-sm bg-chip-neutral px-1.5 py-px text-meta text-soft"
     >
       <span className="size-1 flex-none rounded-full bg-accent-teal" />
       <span className="truncate" title={runner}>{runner}</span>
@@ -225,40 +230,43 @@ export function LiveSearchStatus({
   stream: StreamSessionApi
   dot?: boolean
   /**
-   * The name is also the engine picker: a select laid over it, the way the Maia pane's
-   * level label is its picker. For the engine pane's title strip, which has no room for a
-   * select beside the name it would duplicate.
+   * The name is also the engine picker: a strip picker (⇅, a face on hover) with the native
+   * select laid over it, the way the Maia pane's level is its picker. For the engine pane's
+   * title strip, which has no room for a select beside the name it would duplicate.
    */
   pick?: boolean
 }) {
   const { t } = useLingui()
   const { phase, session } = stream
+  const label = session
+    ? displayEngine(session.engine, session.runner ?? null)
+    : pick
+      ? t`analysis engine`
+      : t`Live analysis`
   const name = (
     <span
       data-testid="infinite-analysis-engine"
       title={session?.engine}
       className={cn(
         // The same size as the stored run's engine name on the Run tab beside it.
-        'truncate text-label font-semibold text-ink',
-        pick ? 'min-w-0 max-w-[10rem] shrink' : 'max-w-[45%] flex-none',
+        'truncate text-label',
+        pick ? 'min-w-0 font-medium text-ink' : 'max-w-[45%] flex-none font-semibold text-ink',
       )}
     >
-      {session
-        ? displayEngine(session.engine, session.runner ?? null)
-        : pick
-          ? t`analysis engine`
-          : t`Live analysis`}
+      {label}
     </span>
   )
   const defaultLabel = useDefaultEngineLabel(stream)
   return (
     <>
       {dot ? (
+        // Green is alive (the status dot's grammar): running pulses, opening waits, an
+        // error is red, and off is the quiet edge.
         <span
           className={cn(
             'size-1.5 flex-none rounded-full',
             phase === 'running'
-              ? 'animate-pulse bg-accent-teal'
+              ? 'animate-pulse bg-good'
               : phase === 'opening'
                 ? 'bg-mistake'
                 : phase === 'error'
@@ -270,27 +278,21 @@ export function LiveSearchStatus({
       {pick ? (
         // Shrinks rather than holding its width: the name truncates before anything to its
         // right is pushed off a strip that has run out of room.
-        <span className="relative inline-flex min-w-0 shrink items-center gap-0.5 rounded-md hover:bg-raised">
-          {name}
-          <ChevronDown className="size-2.5 flex-none text-soft" aria-hidden />
-          <select
-            aria-label={t`Engine`}
-            value={stream.engineId === null ? '' : String(stream.engineId)}
-            onChange={(event) =>
-              stream.setEngineId(event.target.value === '' ? null : Number(event.target.value))
-            }
-            className="absolute inset-0 w-full cursor-pointer appearance-none opacity-0"
-          >
-            <option value="">{defaultLabel}</option>
-            {stream.engines
+        <PickerSelect
+          label={t`Engine`}
+          size="strip"
+          hideLabel
+          display={name}
+          value={stream.engineId === null ? '' : String(stream.engineId)}
+          options={[
+            { value: '', label: defaultLabel },
+            ...stream.engines
               .filter((host) => host.streams)
-              .map((host) => (
-                <option key={host.engineId} value={String(host.engineId)}>
-                  {engineOptionLabel(host)}
-                </option>
-              ))}
-          </select>
-        </span>
+              .map((host) => ({ value: String(host.engineId), label: engineOptionLabel(host) })),
+          ]}
+          onChange={(next) => stream.setEngineId(next === '' ? null : Number(next))}
+          className="min-w-0 shrink"
+        />
       ) : (
         name
       )}
@@ -344,6 +346,11 @@ export interface LiveSearchLinesProps extends Omit<InfiniteAnalysisPanelProps, '
   peek?: boolean
   /** A row the pointer entered or left, by its `liveLineId` — for a host that draws the peek. */
   onHovered?: (id: string, over: boolean) => void
+  /**
+   * Given, an idle pane offers a Start button beside its sentence: for a host whose pane is
+   * shown by a tab (the game's Live tab), where nothing else on the pane starts the search.
+   */
+  onStart?: () => void
   className?: string
 }
 
@@ -376,6 +383,7 @@ export function LiveSearchLines({
   orientation = 'white',
   peek: drawPeek = true,
   onHovered,
+  onStart,
   className,
 }: LiveSearchLinesProps) {
   const { t, i18n } = useLingui()
@@ -444,6 +452,22 @@ export function LiveSearchLines({
           <span className="text-data text-dim">
             <Trans>Analyse this position continuously.</Trans>
           </span>
+          {/* Where the pane itself is the way in (the game's Live tab): the one command it
+              has, a labelled face. The tab starts the search too; this is for a pane left
+              idle — the search stopped from elsewhere, or refused. */}
+          {onStart ? (
+            <Button
+              variant="secondary"
+              size="xs"
+              onClick={onStart}
+              disabled={!fen}
+              title={fen ? t`Start live analysis (E)` : t`Nothing is on the board to analyse`}
+              className="ml-auto"
+            >
+              <Play aria-hidden />
+              <Trans>Start</Trans>
+            </Button>
+          ) : null}
         </div>
         {note ? <p className="px-3 pb-2.5 text-label text-dim">{note}</p> : null}
       </div>
@@ -466,23 +490,20 @@ export function LiveSearchLines({
             {offer.candidates.map((host) => {
               const engine = host.name
               return (
-                <button
+                <Button
                   key={host.engineId}
-                  type="button"
+                  variant="secondary"
+                  size="xs"
                   onClick={() => stream.resume(host.engineId)}
-                  className={buttonVariants({ variant: 'secondary', size: 'xs' })}
                 >
                   <Trans>Resume on {engine}</Trans>
-                </button>
+                </Button>
               )
             })}
-            <button
-              type="button"
-              onClick={stream.dismissOffer}
-              className={buttonVariants({ variant: 'ghost', size: 'xs' })}
-            >
+            {/* A face too: a ghost *text* button is not a control the grammar allows. */}
+            <Button variant="secondary" size="xs" onClick={stream.dismissOffer}>
               <Trans>Dismiss</Trans>
-            </button>
+            </Button>
           </div>
         </div>
       ) : null}

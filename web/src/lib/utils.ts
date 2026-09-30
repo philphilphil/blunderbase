@@ -5,12 +5,15 @@ import { extendTailwindMerge } from 'tailwind-merge'
  * The type scale's six names (`index.css`'s `@theme` block). tailwind-merge knows the
  * stock sizes (`text-data` …) but reads any other `text-*` as a colour, so without this
  * `cn('text-dim', 'text-meta')` would drop one of the two as a conflict — silently, and in
- * whichever order the call site happened to write them.
+ * whichever order the call site happened to write them. The same goes for the control
+ * grammar's five shadow names (`index.css`): read as shadow colours, `cn('shadow-face',
+ * 'shadow-none')` would keep both and the override would lose.
  */
 const TEXT_SIZES = ['meta', 'label', 'data', 'lead', 'heading', 'value'] as const
+const SHADOWS = ['face', 'field', 'thumb', 'tab-on', 'row-bar'] as const
 
 const twMerge = extendTailwindMerge({
-  extend: { theme: { text: [...TEXT_SIZES] } },
+  extend: { theme: { text: [...TEXT_SIZES], shadow: [...SHADOWS] } },
 })
 
 export function cn(...inputs: ClassValue[]) {

@@ -1,3 +1,7 @@
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
+
+import { i18n } from '@lingui/core'
 import { QueryClient } from '@tanstack/react-query'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
@@ -8,7 +12,8 @@ import { AuthGate } from '@/app/AuthGate'
 import { Providers } from '@/app/Providers'
 import { TourProvider } from '@/lib/tour/TourProvider'
 
-import { AccountMenu } from './AccountMenu'
+import { PageChromeProvider, SetPageChrome } from './PageChrome'
+import { SettingsMenu } from './SettingsMenu'
 
 class FakeSocket {
   onopen: (() => void) | null = null
@@ -31,19 +36,23 @@ function json(status: number, body: unknown) {
 
 let routes: Record<string, () => Response>
 
-/** The chip lives in the titlebar, which only exists once there is a session — so it is
- * mounted behind the same gate here, and signing out has somewhere real to land. The tour
- * provider is here for the same reason: "Show the tour again" is one of the menu's items,
- * and the shell is what mounts the tour around the whole app. */
-function draw() {
+/** The row lives in the rail, which only exists once there is a session — so it is mounted
+ * behind the same gate here, and signing out has somewhere real to land. The tour provider
+ * is here for the same reason: "Show the tour again" is one of the menu's items, and the
+ * shell is what mounts the tour around the whole app. The page chrome is what names the
+ * manual's chapter for the page. */
+function draw({ manual }: { manual?: string } = {}) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   render(
     <Providers client={client}>
       <AuthGate>
         <MemoryRouter>
-          <TourProvider>
-            <AccountMenu />
-          </TourProvider>
+          <PageChromeProvider>
+            {manual ? <SetPageChrome manual={manual} /> : null}
+            <TourProvider>
+              <SettingsMenu />
+            </TourProvider>
+          </PageChromeProvider>
         </MemoryRouter>
       </AuthGate>
     </Providers>,
@@ -76,20 +85,112 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllGlobals())
 
 async function openMenu() {
-  await userEvent.click(await screen.findByRole('button', { name: /account/i }))
+  await userEvent.click(await screen.findByRole('button', { name: 'Settings' }))
 }
 
-describe('AccountMenu', () => {
-  it('carries the connected account and the two things an owner does to a session', async () => {
+describe('SettingsMenu', () => {
+  it('is the rail’s Settings row: a gear, the word, and a menu that opens upward', async () => {
     draw()
-    // The trigger is a person icon, never initials — the name it answers to is the owner's.
-    const trigger = await screen.findByRole('button', { name: /kn1ghtmare · lichess/i })
-    expect(trigger.textContent).toBe('')
-    expect(trigger.querySelector('svg')).not.toBeNull()
+    const trigger = await screen.findByRole('button', { name: 'Settings' })
+    // A gear, not a person: the app has no user of its own to put a name to.
+    expect(trigger).toHaveTextContent('Settings')
+    expect(trigger.querySelector('.lucide-settings')).not.toBeNull()
+    expect(trigger).not.toHaveTextContent('kn1ghtmare')
+    expect(trigger).toHaveAttribute('aria-haspopup', 'menu')
+    expect(trigger.querySelector('.lucide-chevron-up')).not.toBeNull()
+
+    await openMenu()
+    expect(trigger).toHaveAttribute('aria-expanded', 'true')
+    // Placed above the row, from its bottom edge, since the row is the column's last thing.
+    expect(screen.getByRole('menu').style.bottom).not.toBe('')
+    // No borrowed identity at its head either.
+    expect(screen.getByRole('menu')).not.toHaveTextContent('kn1ghtmare')
+  })
+
+  // Portalled to the end of the page, the menu is not next in the tab order after its
+  // trigger, so the focus has to be taken in and handed back.
+  it('takes the focus in when it opens, walks it with the arrows and hands it back on Escape', async () => {
+    draw()
+    const trigger = await screen.findByRole('button', { name: 'Settings' })
+    await openMenu()
+    const menu = screen.getByRole('menu')
+    expect(menu).toContainElement(document.activeElement as HTMLElement)
+
+    await userEvent.keyboard('{ArrowDown}')
+    expect(document.activeElement).toBe(
+      screen.getByRole('menuitem', { name: /Keyboard shortcuts/ }),
+    )
+
+    await userEvent.keyboard('{Escape}')
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument()
+    expect(document.activeElement).toBe(trigger)
+  })
+
+  it('opens the manual at the chapter the page names', async () => {
+    draw({ manual: 'guide/games' })
+    await openMenu()
+    const manual = screen.getByRole('menuitem', { name: 'Manual for this page' })
+    expect(manual).toHaveAttribute('href', '/manual/guide/games/')
+    expect(manual).toHaveAttribute('target', '_blank')
+    expect(manual).toHaveAttribute('rel', 'noreferrer')
+  })
+
+  it('follows the language the app is in', async () => {
+    i18n.loadAndActivate({ locale: 'de', messages: {} })
+    try {
+      draw({ manual: 'guide/explorer#build-a-repertoire' })
+      await userEvent.click(await screen.findByRole('button', { name: /Settings|Einstellungen/ }))
+      expect(screen.getByRole('menuitem', { name: /Manual|Handbuch/ })).toHaveAttribute(
+        'href',
+        '/manual/de/guide/explorer/#build-a-repertoire',
+      )
+    } finally {
+      i18n.loadAndActivate({ locale: 'en', messages: {} })
+    }
+  })
+
+  it('ends with the build’s version, what changed, and the source', async () => {
+    // Read off disk rather than restated, so a bump that misses Vite's `define` fails here.
+    const { version } = JSON.parse(
+      readFileSync(join(process.cwd(), 'package.json'), 'utf8'),
+    ) as { version: string }
+    draw()
+    await openMenu()
+    const changed = screen.getByRole('menuitem', { name: /What changed/ })
+    expect(changed).toHaveTextContent(`Blunderbase v${version} · What changed`)
+    expect(changed).toHaveAttribute('href', expect.stringContaining('CHANGELOG.md'))
+    expect(screen.getByRole('menuitem', { name: 'Blunderbase on GitHub' })).toHaveAttribute(
+      'href',
+      'https://github.com/philphilphil/blunderbase',
+    )
+  })
+
+  it('carries Appearance and Language as one-of choices, and the keyboard shortcuts', async () => {
+    const user = userEvent.setup()
+    draw()
     await openMenu()
 
-    expect(screen.getByRole('menu')).toHaveTextContent('kn1ghtmare')
-    expect(screen.queryByRole('menuitem', { name: /^settings$/i })).not.toBeInTheDocument()
+    const appearance = screen.getByRole('radiogroup', { name: 'Appearance' })
+    expect(
+      Array.from(appearance.querySelectorAll('[role="radio"]')).map((radio) => radio.textContent),
+    ).toEqual(['Dark', 'Light', 'System'])
+    expect(screen.getByRole('radiogroup', { name: 'Language' })).toHaveTextContent(
+      'EnglishDeutsch',
+    )
+
+    const light = screen.getByRole('radio', { name: 'Light' })
+    await user.click(light)
+    expect(light).toHaveAttribute('aria-checked', 'true')
+
+    const keys = screen.getByRole('menuitem', { name: /keyboard shortcuts/i })
+    // The row prints the key that opens the list from anywhere.
+    expect(keys.querySelector('kbd')).toHaveTextContent('?')
+  })
+
+  it('carries the ways into the installation and the two things an owner does to a session', async () => {
+    draw()
+    await openMenu()
+
     expect(screen.getByRole('menuitem', { name: /connected accounts/i })).toHaveAttribute(
       'href',
       '/library/import',
@@ -119,43 +220,6 @@ describe('AccountMenu', () => {
     expect(screen.queryByRole('menuitem', { name: /^assistant$/i })).not.toBeInTheDocument()
     expect(screen.queryByRole('menuitem', { name: /change password/i })).not.toBeInTheDocument()
     expect(screen.queryByRole('menuitem', { name: /sign out/i })).not.toBeInTheDocument()
-  })
-
-  it('heads the menu with every connected account, the owner marked', async () => {
-    routes['GET /api/stats/profile'] = () =>
-      json(200, {
-        accounts: [
-          { id: 1, platform: 'lichess', username: 'kn1ghtmare', is_owner: true, games: 1042 },
-          {
-            id: 2,
-            platform: 'chesscom',
-            username: 'sofia_g',
-            display_name: 'Sofia Grover',
-            games: 217,
-          },
-        ],
-      })
-    draw()
-    await screen.findByRole('button', { name: /kn1ghtmare · lichess/i })
-    await openMenu()
-    const menu = screen.getByRole('menu')
-
-    expect(menu).toHaveTextContent('kn1ghtmare')
-    expect(menu).toHaveTextContent('lichess · owner')
-    expect(menu).toHaveTextContent('1,042')
-    // The second account is not the owner's, so it is listed without the mark.
-    expect(menu).toHaveTextContent('Sofia Grover')
-    expect(menu).toHaveTextContent('217')
-    expect(screen.getByText('chesscom')).toBeInTheDocument()
-  })
-
-  it('says so when nothing is connected yet', async () => {
-    routes['GET /api/stats/profile'] = () => json(200, { accounts: [] })
-    draw()
-    await openMenu()
-
-    expect(await screen.findByText('No account connected')).toBeInTheDocument()
-    expect(screen.getByRole('menu')).toHaveTextContent('signed in as the owner')
   })
 
   it('signs out to the login screen and forgets what the session cached', async () => {

@@ -10,8 +10,10 @@ import type { Split } from '../stats'
  * The split column's width in both explorer tables, owned by the bar the column exists
  * for. One number rather than one per table because the two tables sit in the same spot
  * on the same page, and bars of two widths would make the same 60% read as two amounts.
+ * 140 rather than the 170 it was, so every numeric column of the owner's table fits the
+ * 530px tree pane of a 1440 screen (the header had been cut at "AVG DRO…").
  */
-export const SPLIT_WIDTH = 170
+export const SPLIT_WIDTH = 140
 
 /**
  * The skeleton both bars share: bordered, divided, and labelled inside its own segments.
@@ -20,7 +22,8 @@ export const SPLIT_WIDTH = 170
  * the panel's own luminance (white or good on light, black or blunder's ink on dark)
  * otherwise dissolves into the row it sits in. The percentages are printed inside their
  * segments, the way Lichess draws this bar, so the split can be *read* and not only
- * compared; a segment too narrow to hold its number (under ~12%) stays a silent sliver
+ * compared; a segment too narrow to hold its number (under 15% of `SPLIT_WIDTH`, about
+ * 21px) stays a silent sliver
  * rather than clipping digits, and the title still carries the exact counts.
  */
 function LabeledBar({
@@ -54,7 +57,7 @@ function LabeledBar({
             segment.className,
           )}
         >
-          {segment.share >= 12 ? `${Math.round(segment.share)}%` : null}
+          {segment.share >= 15 ? `${Math.round(segment.share)}%` : null}
         </span>
       ))}
     </span>

@@ -137,11 +137,11 @@ describe('<ThemeToggle>', () => {
       </ThemeProvider>,
     )
 
-  it('starts on the stored preference and marks it pressed', () => {
+  it('starts on the stored preference and marks it chosen', () => {
     stubMatchMedia(false)
     storage.setItem(THEME_STORAGE_KEY, 'light')
     renderToggle()
-    expect(screen.getByRole('button', { name: 'Light' })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByRole('radio', { name: 'Light' })).toHaveAttribute('aria-checked', 'true')
     expect(document.documentElement.classList.contains('light')).toBe(true)
   })
 
@@ -150,7 +150,7 @@ describe('<ThemeToggle>', () => {
     renderToggle()
     expect(document.documentElement.classList.contains('dark')).toBe(true)
 
-    await userEvent.click(screen.getByRole('button', { name: 'Light' }))
+    await userEvent.click(screen.getByRole('radio', { name: 'Light' }))
     expect(document.documentElement.classList.contains('light')).toBe(true)
     expect(storage.getItem(THEME_STORAGE_KEY)).toBe('light')
   })
@@ -159,7 +159,7 @@ describe('<ThemeToggle>', () => {
     const media = stubMatchMedia(false)
     renderToggle()
 
-    await userEvent.click(screen.getByRole('button', { name: 'Match the system' }))
+    await userEvent.click(screen.getByRole('radio', { name: 'System' }))
     expect(document.documentElement.classList.contains('dark')).toBe(true)
 
     media.set(true)
@@ -174,7 +174,7 @@ describe('<ThemeToggle>', () => {
     const media = stubMatchMedia(false)
     renderToggle()
 
-    await userEvent.click(screen.getByRole('button', { name: 'Dark' }))
+    await userEvent.click(screen.getByRole('radio', { name: 'Dark' }))
     media.set(true)
     expect(document.documentElement.classList.contains('dark')).toBe(true)
   })

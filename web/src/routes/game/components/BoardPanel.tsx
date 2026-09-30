@@ -18,7 +18,8 @@ import { SideDot } from '@/components/badges/SideDot'
 import { Board, type BoardArrow, type BoardSquare } from '@/components/board/Board'
 import { BoardSettingsButton } from '@/components/board/BoardSettings'
 import { AnalyseButton } from '@/components/analysis/AnalyseButton'
-import { buttonVariants } from '@/components/ui/button'
+import { Button, buttonVariants } from '@/components/ui/button'
+import { ButtonGroup, ButtonGroupItem } from '@/components/ui/button-group'
 import type { Color, GameRunSummary, GameSummary, MoveRow, RunResponse } from '@/lib/api/types'
 import { glyphFor } from '@/lib/chess/classification'
 import { formatScore, type Score } from '@/lib/chess/evaluation'
@@ -711,33 +712,35 @@ export function BoardPanel({
         {onNote ? (
           // A toggle while the composer is open, lit the one way every pressed toggle is
           // (`aria-pressed` on the tool button) rather than with a tint of its own.
-          <button
-            type="button"
+          <Button
+            variant="secondary"
+            size="sm"
             onClick={onNote}
             aria-pressed={noting}
             title={t`Write a note about this position (N)`}
-            className={cn(ROW_BUTTON, 'flex-none')}
+            className={ROW_BUTTON_EXTRA}
           >
             <StickyNote aria-hidden />
             <Trans comment="Button in the transport row that opens the note composer">Note</Trans>
-          </button>
+          </Button>
         ) : null}
 
         {inLine && onExitAnalysis ? (
           // The analysis line's own purple, the colour the score chip turns while a line is
           // walked: the one semantic one-off in the row, at the row's standard size.
-          <button
-            type="button"
+          <Button
+            variant="secondary"
+            size="sm"
             onClick={onExitAnalysis}
             title={t`Leave the analysis line and go back to the game (Esc)`}
             className={cn(
-              ROW_BUTTON,
-              'flex-none border-brilliant/40 bg-brilliant/10 text-brilliant hover:bg-brilliant/15 hover:text-brilliant',
+              ROW_BUTTON_EXTRA,
+              'border-brilliant/40 bg-brilliant/10 text-brilliant hover:not-disabled:not-aria-pressed:bg-brilliant/15 hover:not-disabled:text-brilliant',
             )}
           >
             <Undo2 aria-hidden />
             <Trans>Back to game</Trans>
-          </button>
+          </Button>
         ) : null}
 
         {actions}
@@ -765,7 +768,7 @@ export function BoardPanel({
         ) : null}
 
         <div className="flex flex-none items-center gap-2 max-md:order-first max-md:gap-1.5">
-          <div className={TRANSPORT_GROUP}>
+          <ButtonGroup label={t`Move navigation`} className={TRANSPORT_GROUP}>
             <TransportButton
               label={t`First`}
               hint="Home"
@@ -798,7 +801,7 @@ export function BoardPanel({
             >
               ⏭
             </TransportButton>
-          </div>
+          </ButtonGroup>
 
           {/*
             The flagged-move jumps, as their own group beside the transport, at every width.
@@ -812,7 +815,7 @@ export function BoardPanel({
             are a different question (where is the next mistake?) from the arrows (where is
             the next move?), and the gap between the two groups is what says so.
           */}
-          <div className={TRANSPORT_GROUP}>
+          <ButtonGroup label={t`Flagged moves`} className={TRANSPORT_GROUP}>
             <TransportButton
               label={t`Previous flagged move`}
               hint="↑"
@@ -835,7 +838,7 @@ export function BoardPanel({
                 <ChevronRight className="size-3.5" aria-hidden />
               </span>
             </TransportButton>
-          </div>
+          </ButtonGroup>
         </div>
       </div>
     </div>
@@ -982,29 +985,28 @@ function BoardTools({
 }) {
   const { t } = useLingui()
   /*
-   * One shape for all four, and a square one.
+   * Three tools that act on the board, then the one that opens something.
    *
-   * They are four buttons of equal weight sitting side by side, so anything that differs
-   * between them — a wider box, a smaller glyph, a text arrow beside three drawn icons —
-   * reads as a difference in kind that is not there. The compact box is the ghost `icon-xs`
-   * square, `size-6` — the player row's own `h-6`, so the four fill the row they ride
-   * rather than floating inside it. Ghost rather than bordered: four boxes on the name row
-   * were the busiest thing beside the board, and an icon on the row's own ground says
-   * "button" by its hover. The border, fill and padding `BoardSettingsButton` brings for the
-   * row it used to stand in are taken off (`border-0 bg-transparent p-0`).
+   * Flip, Hints and Type a move are buttons of equal weight side by side, so anything that
+   * differs between them — a wider box, a smaller glyph — reads as a difference in kind that
+   * is not there. The compact box is the ghost `icon-xs` square, `size-6` — the player
+   * row's own `h-6`, so they fill the row they ride rather than floating inside it. Ghost
+   * rather than faced: boxes on the name row were the busiest thing beside the board, and
+   * an icon on the row's own ground says "button" by its hover. On is `aria-pressed`, lit the
+   * one way every pressed toggle in the app is (`button.tsx`): the selected fill with the
+   * icon in the accent, and each title says which state it is in.
+   *
+   * The settings gear opens a dialog, so it goes last, after a rule, with a ⌄: the one icon
+   * here that opens something no longer shares the toggles' silhouette.
    *
    * In the control row (the phone, the explorer's stand-in) they are that row's tool
-   * buttons, and the gear and the keyboard are icon squares at the row's height (`p-0`
-   * again, so the gear's own padding does not push its icon out of the square). Below `md`
+   * buttons, and the gear and the keyboard are icon squares at the row's height. Below `md`
    * they take the row's `max-md:h-auto max-md:py-1.5` like every other button there, so the
    * phone's line of them keeps one thumb-sized height.
-   *
-   * On is `aria-pressed`, lit the one way every pressed toggle in the app is (`button.tsx`):
-   * the selected fill with the icon in the accent.
    */
   const icon = 'size-4'
   const shape = compact
-    ? cn(buttonVariants({ variant: 'ghost', size: 'icon-xs' }), 'flex-none border-0 bg-transparent p-0 max-md:p-0')
+    ? cn(buttonVariants({ variant: 'ghost', size: 'icon-xs' }), 'flex-none')
     : cn(ROW_BUTTON, 'flex-none')
   const square = compact
     ? shape
@@ -1015,8 +1017,6 @@ function BoardTools({
 
   return (
     <>
-      <BoardSettingsButton className={square} iconClassName={icon} />
-
       <button
         type="button"
         onClick={onFlip}
@@ -1026,9 +1026,11 @@ function BoardTools({
         className={shape}
       >
         {/* A drawn icon rather than the `⇅` this button used to carry: an arrow pair is a
-            *swap*, and what this does is turn the board over — the mirror the icon draws.
-            The row's button keeps the arrow, where it sits beside its own word. */}
-        {compact ? <FlipVertical2 className={icon} aria-hidden /> : <span>⇅ {t`Flip`}</span>}
+            *swap* (and the picker's mark), and what this does is turn the board over — the
+            mirror the icon draws. The same icon and the same word "Flip" on every board
+            (the game, the explorer, the repertoire, Live, correspondence). */}
+        <FlipVertical2 className={icon} aria-hidden />
+        {compact ? null : <span>{t`Flip`}</span>}
       </button>
 
       {/* While the engine is hidden the button's own title is a promise the screen has
@@ -1042,8 +1044,12 @@ function BoardTools({
         aria-label={compact ? t`Hints` : undefined}
         title={
           engineHidden
-            ? t`Hints (H): the standing arrows on the board. The engine is hidden anyway (⇧E).`
-            : t`Hints (H) — everything that answers the position: the board's arrows and marks, and the engine and Maia columns. Off, to read it yourself first.`
+            ? hints
+              ? t`Hints are on (H): the standing arrows on the board. The engine is hidden anyway (⇧E).`
+              : t`Hints are off (H): the standing arrows on the board. The engine is hidden anyway (⇧E).`
+            : hints
+              ? t`Hints are on (H): the board's arrows and marks, and the engine and Maia columns. Off, to read the position yourself first.`
+              : t`Hints are off (H): turn on the board's arrows and marks, and the engine and Maia columns.`
         }
         className={shape}
       >
@@ -1059,12 +1065,25 @@ function BoardTools({
           onClick={() => moveEntry.onOpenChange(!moveEntry.open)}
           aria-pressed={moveEntry.open}
           aria-label={t`Type a move (M)`}
-          title={t`Type a move (M) — Nf3, exd5, O-O — instead of dragging it`}
+          title={
+            moveEntry.open
+              ? t`Typing a move (M): close the box to go back to dragging`
+              : t`Type a move (M) — Nf3, exd5, O-O — instead of dragging it`
+          }
           className={square}
         >
           <Keyboard className={icon} aria-hidden />
         </button>
       ) : null}
+
+      {compact ? (
+        <>
+          <span aria-hidden className="mx-0.5 h-4 w-px flex-none bg-hairline" />
+          <BoardSettingsButton variant="ghost" size="xs" chevron className="h-6" iconClassName={icon} />
+        </>
+      ) : (
+        <BoardSettingsButton className={square} iconClassName={icon} />
+      )}
     </>
   )
 }
@@ -1114,13 +1133,12 @@ function Readouts({
           className={cn(
             // A size up from the ply beside it and semibold: the score is the one number on
             // the row that answers the position, the way an eval chip does everywhere else.
-            'rounded-sm border px-1.5 py-0.5 font-mono text-data font-semibold tabular',
+            // A readout, so its tint and no border: a border made it read as a button.
+            'rounded-sm px-1.5 py-0.5 font-mono text-data font-semibold tabular',
             // The analysis board's own purple, the colour "Back to game" is drawn in: the
             // reader is inside a line, and this number belongs to the line rather than to
             // the game.
-            scoreAlongLine
-              ? 'border-brilliant/35 bg-brilliant/10 text-brilliant'
-              : 'border-edge bg-chip-info text-ink',
+            scoreAlongLine ? 'bg-brilliant/10 text-brilliant' : 'bg-chip-info text-ink',
           )}
         >
           {formatScore(score)}
@@ -1135,18 +1153,14 @@ function Readouts({
  * `sm`, `h-7`) with the phone's thumb-sized height put back below `md` — the height the
  * phone's two-line `100dvh` budget was measured with.
  */
-const ROW_BUTTON = cn(
-  buttonVariants({ variant: 'secondary', size: 'sm' }),
-  'max-md:h-auto max-md:py-1.5',
-)
+const ROW_BUTTON_EXTRA = 'flex-none max-md:h-auto max-md:py-1.5'
+const ROW_BUTTON = cn(buttonVariants({ variant: 'secondary', size: 'sm' }), ROW_BUTTON_EXTRA)
 
 /**
- * A transport group: one bordered strip of cells, ruled between them by the group itself
- * (`divide-x`) rather than by each cell remembering whether it is the last. `h-7`, the row's
- * budgeted height, border included; below `md` the cells set the height instead.
+ * A transport group: the app's `ButtonGroup` (attached faces, "do one of these"), `h-7`, the
+ * row's budgeted height, border included; below `md` the cells set the height instead.
  */
-const TRANSPORT_GROUP =
-  'inline-flex h-7 flex-none divide-x divide-hairline overflow-hidden rounded-md border border-edge bg-elevated max-md:h-auto'
+const TRANSPORT_GROUP = 'max-md:h-auto'
 
 /**
  * The rule between two groups of the transport row. Decoration and nothing else, so it is
@@ -1159,10 +1173,11 @@ function Rule() {
 }
 
 /**
- * One cell of a transport group. `text-body` idle and the neutral `raised` hover: the cells
- * used to hover in the selection blue, which made every arrow under the pointer look like
- * the current move. Below `md` the cell grows into a thumb-sized target; it is the same
- * button.
+ * One cell of a transport group: a `ButtonGroupItem`, each cell carrying the face, so a
+ * spent cell (⏮ at the start of the game) drops its face and keeps a title, while its
+ * neighbours stay raised. Hover lifts the face; it used to hover in the selection blue,
+ * which made every arrow under the pointer look like the current move. Below `md` the cell
+ * grows into a thumb-sized target; it is the same button.
  */
 function TransportButton({
   children,
@@ -1180,15 +1195,14 @@ function TransportButton({
   onClick: () => void
 }) {
   return (
-    <button
-      type="button"
+    <ButtonGroupItem
       aria-label={label}
       title={hint ? `${label} (${hint})` : label}
       disabled={disabled}
       onClick={onClick}
-      className="grid min-w-8 place-items-center px-2 text-data text-body transition-colors hover:bg-raised hover:text-ink disabled:cursor-default disabled:text-faint-2 disabled:hover:bg-transparent max-md:px-3 max-md:py-1.5 max-md:text-heading"
+      className="text-data max-md:px-3 max-md:py-1.5 max-md:text-heading"
     >
       {children}
-    </button>
+    </ButtonGroupItem>
   )
 }

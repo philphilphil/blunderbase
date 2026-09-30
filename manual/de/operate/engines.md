@@ -11,14 +11,18 @@ ist in jedem Fall ein eigener Download.
 
 ## Die Engines-Seite { #the-engines-page }
 
-**Rechenleistung → Engines** ist, was installiert ist, in zwei Teilen von oben nach unten.
+**Rechenleistung › Engines** ist, was installiert ist, in zwei Teilen von oben nach unten.
 
 *Was läuft womit*: je eine Zeile für Analyse und Menschliche Züge, mit der Engine,
 die die Rolle hält, und, wenn sie nicht laufen kann, dem Grund in Worten.
 
 **Engines**: jede eingerichtete Engine – ihre Art, die Maschine, auf der sie läuft, ihre
 `Threads` und ihr `Hash`, welche Aufgaben sie hält und ob sie eingeschaltet ist. Ein Klick
-auf eine Zeile öffnet die Karte der Engine. `Threads` und `Hash` stehen auf der Zeile, weil
+auf eine Zeile öffnet darunter die Karte der Engine, und die offene Zeile ist hervorgehoben.
+Der Schalter **Aktiviert** auf der Karte schaltet die Engine ein und aus; **Änderungen
+speichern** übernimmt einen geänderten Namen, Pfad oder eine Option; **Engine entfernen …**,
+rot umrandet, fragt nach, bevor die Zeile gelöscht wird, und erst **Entfernen** an ihrer
+Stelle löscht sie. `Threads` und `Hash` stehen auf der Zeile, weil
 sie sind, was ein *Prozess* der Engine kostet; wie viele Prozesse eine Maschine gleichzeitig
 laufen lässt, wird nicht hier entschieden, sondern unter [Maschinen](runners.md), der Seite
 daneben.
@@ -49,10 +53,10 @@ bereits vergebene Rolle übernimmt sie nie.
 
 | Rolle | Was sie ausführt |
 |---|---|
-| Analyse | Den Durchlauf, den jede importierte Partie bekommt; außerdem schlagen **Analysieren** in einer Partie und die Auswahl im Fernschach diese Engine vor |
+| Analyse | Den Durchlauf, den jede importierte Partie bekommt; außerdem schlagen **Analysieren …** in einer Partie und die Auswahl im Fernschach diese Engine vor |
 | Menschliche Züge | Maia – was ein Spieler deiner Wertung gezogen hätte |
 
-Eine Analyse, die du mit **Analysieren** anforderst, darf jede eingeschaltete UCI-Engine
+Eine Analyse, die du mit **Analysieren …** anforderst, darf jede eingeschaltete UCI-Engine
 nehmen; die Rolle entscheidet nur, mit welcher der Dialog öffnet.
 
 Vergeben werden sie oben auf der Engines-Seite. **Es gibt keinen Ersatz.** Ist die Engine, die
@@ -70,7 +74,8 @@ Was jede Rolle kostet und wann sie läuft, steht unter [Analyse](../guide/analys
 Öffne auf der Karte einer Engine **Mehr Einstellungen**.
 
 - **Abfragen** liest die gemeldeten Optionen der Datei neu ein. Nimm das, nachdem die Engine
-  aktualisiert wurde.
+  aktualisiert wurde. Das Suchfeld über der Liste filtert nach Namen, und **Nur gesetzte**
+  zeigt nur die Optionen, die für diese Engine gespeichert sind.
 - **Testlauf** lässt diese Engine eine Stellung rechnen und zeigt, was zurückkam. Stell
   **Stellung**, **Knoten** und **Varianten** ein; eine Maia-Engine bietet stattdessen
   **Wertungen**.
@@ -133,7 +138,7 @@ Engine, die du für eine Aufgabe wählst – in **Aufgabe einreihen …**, **Erw
 **Teilbaum auffrischen …** –, darf also auf einem Runner liegen, und wo du einen Runner
 hast, gehört sie dorthin: Die Aufgaben gehen auf die andere Maschine, und diese behält ihre
 Kerne für die Suchen und die Durchläufe. Aufgaben stehen in der Mitte der Warteschlange, vor der
-Analyse jeder importierten Partie und hinter einer, die jemand mit **Analysieren**
+Analyse jeder importierten Partie und hinter einer, die jemand mit **Analysieren …**
 angefordert hat und auf die er wartet, und untereinander gilt: die nächste Frist zuerst. **Warteschlange leeren** auf der
 Analyseseite wirft die noch wartenden Aufgaben mit allem anderen hinaus, und jeder betroffene
 Knoten sagt es.
@@ -150,10 +155,10 @@ die Suchen mitgezählt sind.
 ## Die Engine im Browser { #the-engine-in-your-browser }
 
 Gibt es gar keine Engine, bietet der Partiebildschirm **Browser-Engine einrichten** an –
-anstelle des Dialogs **Analysieren…** und wenn du die fortlaufende Analyse einschaltest.
+anstelle des Dialogs **Analysieren …** und wenn du die fortlaufende Analyse einschaltest.
 Das richtet diesen Browser als Runner ein, wartet, bis sein Stockfish registriert ist, und
 gibt ihm die Rolle Analyse, falls sie noch frei ist. Die fortlaufende Analyse startet dann
-von selbst; für eine eigene Analyse öffnet sich der Dialog **Analysieren…** mit der neuen
+von selbst; für eine eigene Analyse öffnet sich der Dialog **Analysieren …** mit der neuen
 Engine, und eingereiht wird erst, wenn du darin **Analysieren** drückst. Du verlässt das
 Brett dabei nie.
 
@@ -182,7 +187,7 @@ So verwendest du es:
 3. Gib ihm die Rolle **Menschliche Züge**.
 
 Die Wertung, nach der Maia gefragt wird, ist eine einzige Einstellung der Anwendung,
-**Analyse → Maia**, und keine je Engine, damit nie nach zwei verschiedenen Spielern gefragt
+**Analyse › Maia**, und keine je Engine, damit nie nach zwei verschiedenen Spielern gefragt
 wird. Sie ist auf 1100–2000 begrenzt, und eine Engine, die eigene Grenzen meldet, engt das
 weiter ein.
 

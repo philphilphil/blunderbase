@@ -2,9 +2,9 @@
  * Design 2d — the aggregation dashboards.
  *
  * One filter set (window · colour · speed · collection) drives every card: the same `GameFilters`
- * vocabulary `/games` takes, forwarded to each `/stats/{dimension}`. The "vs previous"
- * control turns the KPI row into a comparison with the equally long window before it, over
- * `/stats/compare`.
+ * vocabulary `/games` takes, forwarded to each `/stats/{dimension}`. The "vs previous
+ * window" switch turns the KPI row into a comparison with the equally long window before
+ * it, over `/stats/compare`.
  *
  * The tile row is the design's five, at its anatomy, but two of its metrics do not exist:
  * `/stats` has no accuracy and no aggregate ACPL — `services.stats` aggregates win percentage
@@ -14,21 +14,22 @@
  * given away` (`avg_win_loss`, the average a move costs) and `Blunder rate` (the share of
  * moves that were one). Same question — how expensive are your moves — in real units.
  */
-import type { MessageDescriptor } from '@lingui/core'
-import { msg } from '@lingui/core/macro'
 import { Trans, useLingui } from '@lingui/react/macro'
+import { FileDown } from 'lucide-react'
 import { useMemo, useState, type ReactNode } from 'react'
 import { useSearchParams } from 'react-router-dom'
 
 import { CollectionSwatch } from '@/components/collections/CollectionChip'
+import { SpeedPicker } from '@/components/filters/SpeedPicker'
 import { SetPageChrome } from '@/components/shell/PageChrome'
 import { PageBody } from '@/components/shell/PageHeader'
 import { Button } from '@/components/ui/button'
-import { FilterChip } from '@/components/ui/chip'
+import { PickerSelect } from '@/components/ui/native-select'
+import { Segmented } from '@/components/ui/segmented'
+import { Switch } from '@/components/ui/switch'
 import { useCollections, useStatsDashboard } from '@/lib/api/queries'
 import { SPEEDS } from '@/lib/api/types'
 import type { Color, GameFilters, Speed, StatsBucket, StatsResponse } from '@/lib/api/types'
-import { toggleFilter } from '@/lib/filters'
 import { cn } from '@/lib/utils'
 
 import { BlundersByPhaseCard } from './cards/BlundersByPhaseCard'
@@ -54,7 +55,7 @@ import {
 } from './kit/analytics'
 import { downloadCsv, exportRows, toCsv } from './kit/csv'
 import { DEFAULT_REPORT, REPORTS, reportFrom, reportPath } from './reports'
-import { DeltaText, Segmented, StatTile, type StatsQuery } from './kit/states'
+import { DeltaText, StatTile, type StatsQuery } from './kit/states'
 
 type ColorChoice = 'both' | Color
 
@@ -62,27 +63,6 @@ type ColorChoice = 'both' | Color
 interface DeltaPayload {
   buckets?: StatsBucket[]
   total?: StatsBucket
-}
-
-/** The same speeds as words in a sentence, where "corr." would not do. */
-const SPEED_WORDS: Record<Speed, MessageDescriptor> = {
-  bullet: msg`bullet`,
-  blitz: msg`blitz`,
-  rapid: msg`rapid`,
-  classical: msg`classical`,
-  correspondence: msg`correspondence`,
-}
-
-/** Chip labels. "correspondence" is twice the width of the bar's other five put together. */
-const SPEED_LABELS: Record<Speed, MessageDescriptor> = {
-  bullet: msg`bullet`,
-  blitz: msg`blitz`,
-  rapid: msg`rapid`,
-  classical: msg`classical`,
-  correspondence: msg({
-    message: 'corr.',
-    comment: 'Short for "correspondence", the speed of a game played over days',
-  }),
 }
 
 const WINDOW_DAYS: Record<WindowKey, number | undefined> = {
@@ -147,16 +127,20 @@ export function StatsPage() {
   // `speeds` is a fresh array on every toggle, so the memo keys off its content rather than
   // its identity — a filter object rebuilt each render is a new query key for every
   // comparison that reads it. Empty means "all of them", which is no filter at all.
+  // The window's two ends as plain strings, so the memo keys off them and not off the whole
+  // response (which the compiler would otherwise infer, rebuilding on every refetch).
   const speedKey = allSpeeds ? '' : speeds.join(',')
+  const since = dashboard.data?.since
+  const until = dashboard.data?.until
   const filters = useMemo<GameFilters>(
     () => ({
-      ...(dashboard.data?.since ? { since: dashboard.data.since } : {}),
-      ...(dashboard.data?.until ? { until: dashboard.data.until } : {}),
+      ...(since ? { since } : {}),
+      ...(until ? { until } : {}),
       ...(color === 'both' ? {} : { color }),
       ...(speedKey ? { speed: speedKey.split(',') as Speed[] } : {}),
       ...(collection === null ? {} : { collection }),
     }),
-    [dashboard.data?.since, dashboard.data?.until, color, speedKey, collection],
+    [since, until, color, speedKey, collection],
   )
 
   const speed = dimensionQuery(dashboard, 'performance_by_speed')
@@ -221,25 +205,36 @@ export function StatsPage() {
   }
 
   /**
-   * The filter bar: what every card on the screen is counting.
+   * The scope row: what every card on the screen is counting.
    *
    * These lived in the 46px titlebar, on the theory that a control scoping the whole page
    * belongs above the whole page. In practice the titlebar is chrome — a breadcrumb and the
    * queue widget — and controls parked there are not looked at: the page under them says
    * "90 days · both colours" in its own subtitle and nothing points at what would change
-   * it. They sit on the page now, at the top of the cards they qualify, the way the
-   * explorer's speed and rating chips sit under the board they filter.
+   * it. They sit on the page now, at the top of the cards they qualify.
    *
-   * Three filters, two shapes. Window and colour are one-of-N, so they are segmented
-   * controls; speed is a set — "everything except bullet" is the ordinary question — so it
-   * is a row of chips, which is the same distinction the explorer draws.
+   * Each shape says what kind of choice it is (the clarity pass). Window and colour are
+   * one-of-N, so they are the app's one segmented control, a sentence-case name beside
+   * each. Speed is a set — "everything except bullet" is the ordinary question — so it is
+   * the one Speed picker the Dashboard and the Explorer use too ("Speed: All"); it had been
+   * a row of five lit chips, the loudest thing on the page while it narrowed nothing. The
+   * collection is one-of-N of a list the owner writes, any length and any name, so a picker
+   * over the native select ("Collection: All games"); it is only there once there is a
+   * collection to pick. The pickers name themselves, so they carry no separate label.
    *
-   * The fourth, the collection, is one-of-N as well but of a list the owner writes, which
-   * can run to any length and any name — a native select rather than a segmented control
-   * that would wrap the bar. It is only there once there is a collection to pick.
+   * A hairline rule stands between groups on a wide screen; on a phone the groups wrap and
+   * the rules go, since a rule at the start of a line would separate nothing.
+   *
+   * "vs previous window" sits at the row's far end as a switch. It had been a pressed
+   * button in the titlebar, where it read as a command beside Export CSV; it is a mode of
+   * the whole page, so it is a switch, and it lives with the other things that decide what
+   * the numbers are. Disabled under All, with a title saying why: all time has nothing
+   * before it.
    */
   const scope = (
-    <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
+    // `max-md:relative`: on a phone the Speed picker's panel spans this row rather than
+    // hanging off the picker's edge (`FilterPopover`).
+    <div className="flex flex-wrap items-center gap-x-2.5 gap-y-2 max-md:relative">
       <Field label={t`Window`}>
         <Segmented
           label={t`Window`}
@@ -251,6 +246,7 @@ export function StatsPage() {
           }))}
         />
       </Field>
+      <Rule />
       <Field label={t`Colour`}>
         <Segmented
           label={t`Colour`}
@@ -263,94 +259,71 @@ export function StatsPage() {
           ]}
         />
       </Field>
-      <Field label={t`Speed`}>
-        {SPEEDS.map((speedName) => {
-          const speedWord = i18n._(SPEED_WORDS[speedName])
-          return (
-            <FilterChip
-              key={speedName}
-              label={i18n._(SPEED_LABELS[speedName])}
-              name={speedName}
-              title={t`Count ${speedWord} games`}
-              on={speeds.includes(speedName)}
-              onClick={() => setSpeeds(toggleFilter(speeds, speedName, SPEEDS))}
-            />
-          )
-        })}
-      </Field>
+      <Rule />
+      <SpeedPicker speeds={SPEEDS} value={speeds} onChange={setSpeeds} />
       {collectionList?.length ? (
-        <Field label={t`Collection`}>
-          {inCollection ? <CollectionSwatch color={inCollection.color} /> : null}
-          <select
-            aria-label={t`Collection`}
+        <>
+          <Rule />
+          <PickerSelect
+            label={t`Collection`}
             value={inCollection ? String(inCollection.id) : ''}
-            onChange={(event) =>
-              setCollection(event.target.value === '' ? null : Number(event.target.value))
-            }
-            className={cn(
-              'h-[1.625rem] max-w-[14rem] rounded-md border bg-elevated px-1.5 text-label outline-none transition-colors focus-visible:border-accent-teal/50',
-              inCollection
-                ? 'border-accent-teal/30 text-ink'
-                : 'border-edge text-soft hover:text-ink',
-            )}
-          >
-            <option value="">{t`All games`}</option>
-            {collectionList.map((entry) => (
-              <option key={entry.id} value={String(entry.id)}>
-                {entry.name}
-              </option>
-            ))}
-          </select>
-        </Field>
+            set={inCollection !== null}
+            leading={inCollection ? <CollectionSwatch color={inCollection.color} /> : undefined}
+            onChange={(next) => setCollection(next === '' ? null : Number(next))}
+            options={[
+              { value: '', label: t`All games` },
+              ...collectionList.map((entry) => ({ value: String(entry.id), label: entry.name })),
+            ]}
+            className="max-w-[18rem]"
+          />
+        </>
       ) : null}
+      <Switch
+        label={t`vs previous window`}
+        checked={comparing && canCompare}
+        onCheckedChange={setComparing}
+        disabled={!canCompare}
+        title={
+          canCompare
+            ? t`Show every number against the equally long window before this one`
+            : windowKey === 'all'
+              ? t`All time has nothing before it to compare against`
+              : t`Waiting for the window's dates to compare against`
+        }
+        // Words before the track, like Hide engine in the bar: the row reads left to right
+        // and the switch ends it.
+        className="ml-auto flex-row-reverse max-md:ml-0"
+      />
     </div>
   )
 
   return (
     <PageBody className="gap-3.5">
       <SetPageChrome
-        breadcrumb={
-          report === 'overview'
-            ? [{ label: t`Stats` }]
-            : [
-                {
-                  label: t`Stats`,
-                  // Back to the overview of the same scope, not of the whole library.
-                  to: collection === null ? '/stats' : reportPath(DEFAULT_REPORT, params.toString()),
-                },
-                { label: reportLabel },
-              ]
-        }
+        // "Stats › Overview": the place, then the report as the title, on every report, so
+        // the bar names the same leaf the rail lights. Stats goes back to the overview of
+        // the same scope, not of the whole library.
+        breadcrumb={[
+          {
+            label: t`Stats`,
+            to: collection === null ? '/stats' : reportPath(DEFAULT_REPORT, params.toString()),
+          },
+          { label: reportLabel },
+        ]}
         manual="guide/stats"
         actions={
-          <>
-            {/* Disabled, it still shows why: the title is the answer, so the hover stays. */}
-            <Button
-              type="button"
-              size="sm"
-              variant="outline"
-              disabled={!canCompare}
-              aria-pressed={comparing && canCompare}
-              onClick={() => setComparing((on) => !on)}
-              title={
-                canCompare
-                  ? t`Show every number against the equally long window before this one`
-                  : t`All time has nothing before it to compare against`
-              }
-              className="disabled:pointer-events-auto disabled:cursor-not-allowed"
-            >
-              <Trans>vs previous</Trans>
-            </Button>
-            <Button
-              type="button"
-              size="sm"
-              variant="outline"
-              onClick={download}
-              disabled={!speed.data}
-            >
-              <Trans>Export CSV</Trans>
-            </Button>
-          </>
+          // The bar's one command. No "…": it downloads at once and asks nothing.
+          <Button
+            type="button"
+            size="sm"
+            variant="secondary"
+            onClick={download}
+            disabled={!speed.data}
+            title={speed.data ? undefined : t`Nothing is counted yet, so there is nothing to export`}
+          >
+            <FileDown aria-hidden />
+            <Trans>Export CSV</Trans>
+          </Button>
         }
       />
 
@@ -400,10 +373,13 @@ export function StatsPage() {
           read at about half height and hand the spare room to the charts underneath.
           The blunders report treats the phase card the same way: its stacked row is
           content-sized, and side by side on xl it self-starts against the piece chart,
-          whose Recharts container needs the row to keep its 1fr height. */}
+          whose Recharts container needs the row to keep its 1fr height.
+          On a phone the page scrolls instead of the frame being filled, so the grid takes
+          its content's height (`max-md:flex-none`): squeezed into what was left under the
+          tiles, the auto rows fell to their floor and the phase card showed one meter. */}
       <div
         className={cn(
-          'grid min-h-0 flex-1 gap-3 grid-cols-1 xl:grid-cols-2',
+          'grid min-h-0 flex-1 gap-3 grid-cols-1 xl:grid-cols-2 max-md:flex-none',
           report === 'progress'
             ? 'grid-rows-[minmax(15rem,1fr)] xl:grid-cols-1'
             : report === 'overview'
@@ -440,24 +416,26 @@ export function StatsPage() {
 }
 
 /**
- * One filter in the bar: a small uppercase name and the control that answers it.
+ * One segmented filter in the row: its name beside the control that answers it.
  *
- * The name is drawn rather than left to the control because the bar mixes shapes — two
- * segmented controls and a row of chips — and without names a reader has to work out from
- * the values which question each one is answering. `Segmented` carries the same string as
- * its `aria-label`, which is the group's accessible name; this span is what makes it
- * visible.
+ * The name is drawn because a segment's values ("both", "90d") do not say which question
+ * they answer; a picker says it itself ("Speed: All") and needs no Field. Sentence case in
+ * `label` size, not spaced caps: caps are for column heads, and the rail's section heads
+ * had made the two read alike. `Segmented` carries the same string as its `aria-label`,
+ * which is the group's accessible name; this span is what makes it visible.
  */
 function Field({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div className="flex items-center gap-1.5">
-      <span
-        aria-hidden
-        className="flex-none text-meta tracking-[.06em] text-dim-2 uppercase"
-      >
+      <span aria-hidden className="flex-none text-label text-dim">
         {label}
       </span>
       {children}
     </div>
   )
+}
+
+/** The hairline between two groups of the scope row; gone on a phone, where they wrap. */
+function Rule() {
+  return <span aria-hidden className="h-4 w-px flex-none bg-hairline max-md:hidden" />
 }

@@ -11,12 +11,16 @@ Leertaste, Leertaste, ↵ – erst die Idee der Engine nachspielen, dann mit der
 vollständige Tastenliste steht unter [Einstellungen](settings.md).
 
 Die Bedienelemente stehen rund um das Brett statt darunter. Die Zeile mit dem Namen deines
-Gegners, über dem Brett, trägt die vier Dinge, die ändern, was das Brett *zeigt*:
-Bretteinstellungen, drehen, Hinweise und die Tastatur zum Tippen eines Zuges. Die Zeile mit
-deinem eigenen Namen, darunter, trägt, wo du in der Partie stehst und was die Stellung wert
-ist. Die Zeile darunter ist das, was du mit der Partie machst – analysieren, notieren, üben –
-und ganz rechts die Schaltflächen, mit denen du durch sie gehst. Was eine Partie selten
-braucht, etwa der Weg zurück zum Explorer, liegt hinter dem **⋯**.
+Gegners, über dem Brett, trägt die drei Dinge, die ändern, was das Brett *zeigt* – drehen,
+Hinweise und die Tastatur zum Tippen eines Zuges, jedes hervorgehoben, solange es an ist –
+und zuletzt, hinter einem dünnen Strich, die Bretteinstellungen; ihr **⌄** sagt, dass sie
+ein Fenster öffnen. Die Zeile mit deinem eigenen Namen, unter dem Brett, trägt, wo du in der
+Partie stehst und was die Stellung wert ist. Die Zeile darunter ist das, was du mit der
+Partie machst – **Notiz**, **Üben …** –, und ganz rechts stehen zwei Gruppen
+zusammenhängender Schaltflächen: **⏮ ◀ ▶ ⏭** gehen durch die Partie, **‹⚐ ⚐›** springen zum
+vorigen und nächsten markierten Zug. Eine Schaltfläche, die nirgends hinführt (⏮ am
+Anfang), verliert ihre Fläche und sagt dir, warum, wenn du auf sie zeigst. Was eine Partie
+selten braucht, etwa der Weg zurück zum Explorer, liegt hinter dem **⋯**.
 
 Die Linie zwischen dem Brett und der Spalte rechts davon lässt sich ziehen; zeigst du auf
 sie, wird ihr Griff blau. Erreichst du sie mit Tab, verschieben die Pfeiltasten sie ein
@@ -24,30 +28,46 @@ Stück, und ein Doppelklick setzt sie auf den Anfang zurück. Die Breite merkt s
 Browser. Brett und Zugspalte behalten jeweils eine Mindestbreite, keins von beiden lässt
 sich also wegdrücken.
 
-Die Leiste oben nennt die Eröffnung, die Herkunft der Partie, ihre Bedenkzeit und den
-Ausgang. Bei einer Lichess- oder Chess.com-Partie ist die Quelle dort ein Link, der die
-Partie auf der Seite in einem neuen Tab öffnet; zeigst du darauf, erscheint ein kleiner
-Pfeil. Auf dem Telefon ist derselbe Link der Pfeil neben der PGN-Schaltfläche.
+Die Titelleiste sagt, woher die Partie kommt und wer sie gespielt hat: zuerst die Liste,
+aus der du sie geöffnet hast – **Partien**, ein gespeicherter Filter wie **Partien ›
+Niederlagen mit Schwarz** oder **Sammlungen › Liga 2026** –, dann als Titel der Seite die
+beiden Spieler. Ein Klick auf die Liste führt dorthin zurück, mit Filtern, Sortierung und
+Seite, wie du sie verlassen hast. Auf dem Telefon steht in der Leiste stattdessen
+**‹ Partien** (oder **‹ Sammlungen**).
+
+Die Zeile darunter beschreibt die Partie: die Eröffnung, ihr ECO-Kürzel, die Herkunft, die
+Bedenkzeit, das Datum, an dem sie gespielt wurde, und den Ausgang. Bei einer Lichess- oder
+Chess.com-Partie ist die Herkunft ein Link, erkennbar am **↗**, der die Partie auf der
+Seite in einem neuen Tab öffnet; auf dem Telefon ist derselbe Link der Pfeil neben der
+Schaltfläche **PGN kopieren**.
+Hast du die Partie aus einer Liste geöffnet, führen **‹ ›** am Anfang der Zeile zur
+vorigen und nächsten Partie dieser Liste (`[` und `]`); in einem breiten Fenster steht der
+Name der Liste daneben.
 Steckt die Partie in einer [Sammlung](collections.md), steht auch deren Chip dort
-und öffnet die Partienliste, auf diese Sammlung gefiltert. Wie die übrigen Angaben der Leiste weichen die Chips, wenn
+und öffnet die Partienliste, auf diese Sammlung gefiltert. Wie die übrigen Angaben der Zeile weichen die Chips, wenn
 das Fenster zu schmal für sie wird.
 
 Eine Chess960-Partie oder eine, die aus einer aufgebauten Stellung begann, beginnt auch auf
 dem Brett in dieser Stellung, und ihre Züge werden von dort an gezählt: Ist in der
-Ausgangsstellung Schwarz am Zug, und zwar im 12. Zug, beginnt die Zugliste mit `12…`. Die
-PGN-Schaltfläche schreibt die Ausgangsstellung mit in den Export (`SetUp` und `FEN`), damit
+Ausgangsstellung Schwarz am Zug, und zwar im 12. Zug, beginnt die Zugliste mit `12…`.
+**PGN kopieren** schreibt die Ausgangsstellung mit in den Export (`SetUp` und `FEN`), damit
 ein anderes Programm die Partie genauso wieder einliest.
 
 ## Was die Markierungen bedeuten { #what-the-badges-mean }
 
 Die Zugspalte kennzeichnet Züge mit `??`, `?`, `?!` oder `!` und färbt die betroffenen
-Zeilen ein. Der Reiter **Markiert** neben **Züge** zeigt nur diese. Wann ein Zug welche
-Markierung bekommt, steht unter [Analyse](analysis.md).
+Zeilen ein. Sie hat zwei Reiter, **Züge** und **Markiert**; **Markiert** zeigt nur diese
+Züge, ihre Zahl steht auf dem Reiter. Wann ein Zug welche Markierung bekommt, steht unter
+[Analyse](analysis.md). Dieselbe Leiste nennt die Zahl der Halbzüge und trägt ganz rechts
+**PGN kopieren** (das Kopiersymbol, oder `C`): Es legt die ganze Partie als PGN in die
+Zwischenablage, und das Symbol wird zum Haken, sobald das geklappt hat.
 
 ## Der Bewertungsverlauf { #read-the-evaluation-graph }
 
-Die Kurve unter dem Brett ist die Bewertung Zug für Zug; ein Klick darauf springt an die
-Stelle. Form und Markierungen der Kurve sind Bretteinstellungen.
+Die Kurve unter dem Brett ist die Bewertung Zug für Zug, auf dem Reiter **Bewertung**
+dieses Felds; ein Klick darauf springt an die Stelle. **nur meine**, rechts neben den
+Reitern, markiert auf der Kurve nur deine eigenen Fehler. Form und Markierungen der Kurve
+sind Bretteinstellungen.
 
 ## Die Bedenkzeit je Zug { #see-how-long-each-move-took }
 
@@ -70,11 +90,14 @@ wie beim Bewertungsverlauf. `T` öffnet diesen Reiter, `V` führt zurück zur **
 Die Varianten unter dem Brett stammen aus der gespeicherten Analyse, so viele, wie sie
 behalten hat: voreingestellt zwei bei der Analyse, die jede Partie beim Import bekommt, bei
 einer angeforderten so viele, wie du gewählt hast. Fahr mit der Maus über eine, und sie
-wird auf dem Brett gezeigt, so wie du es unter **Variantenvorschau** eingestellt hast.
+wird auf dem Brett gezeigt, so wie du es eingestellt hast: Das Auswahlfeld mit dem Auge in
+der Titelzeile des Felds (**Pfeile**, **Überlagerung**, **Abspielen**, **Vorschaubrett**
+oder **Aus**) legt das fest, alles Weitere steht unter **Variantenvorschau** in den
+Bretteinstellungen.
 
 ## Genauer hinsehen lassen { #ask-for-a-deeper-look }
 
-**Analysieren** rechts in der Titelzeile des Engine-Felds auf dem Reiter **Analyse**, oder
+**Analysieren …** rechts in der Titelzeile des Engine-Felds auf dem Reiter **Analyse**, oder
 `A`, öffnet einen Dialog, der eine eigene Analyse dieser Partie einreiht. Ist die Engine ausgeblendet, fehlt das Feld, und die
 Schaltfläche rückt in die Zeile unter dem Brett. Die Analyse zieht an jeder Importanalyse
 vorbei, die noch wartet, und die Schaltfläche dreht sich, bis sie fertig ist. Bis dahin
@@ -118,7 +141,7 @@ die Partie.
 
 ## Von einer Stellung aus üben { #practise-from-a-position }
 
-**Üben** in der Leiste unter dem Brett, oder `P`, spielt die Stellung auf dem Brett gegen
+**Üben …** in der Leiste unter dem Brett, oder `P`, spielt die Stellung auf dem Brett gegen
 den Computer aus. Der Dialog fragt drei Dinge:
 
 | | |
@@ -149,11 +172,12 @@ zurück, endet das Üben ebenfalls. Gespeichert wird nichts, solange du nichts a
 
 Das Engine-Feld hat zwei Reiter, **Analyse** und **Live**: was die gespeicherte Analyse
 gefunden hat, und was eine Engine jetzt gerade findet, ohne etwas zu speichern. Ein Klick
-auf **Live**, oder `E`, startet die Engine auf der aktuellen Stellung und wechselt dorthin.
-Solange sie rechnet, trägt der Reiter **Live** ein kleines Quadrat: ein Klick darauf, oder
-noch einmal `E`, hält die Suche an und wechselt zurück auf **Analyse**. Du kannst auch
-einfach auf **Analyse** klicken, um dir die gespeicherten Varianten anzusehen, während die
-Engine weiterrechnet – der Punkt auf dem Reiter **Live** pulsiert, bis du sie anhältst.
+auf **Live**, oder `E` von überall auf dem Bildschirm, lässt die Engine auf der aktuellen
+Stellung rechnen und wechselt auf **Live**. Solange sie rechnet, steht neben den Reitern ein
+Quadrat: Ein Klick darauf, oder noch einmal `E`, hält die Suche an und wechselt zurück auf
+**Analyse**. Du kannst auch einfach auf **Analyse** klicken, um dir die gespeicherten
+Varianten anzusehen, während die Engine weiterrechnet – der grüne Punkt auf dem Reiter
+**Live** pulsiert, bis du sie anhältst.
 
 Auf dem Reiter **Live** sind der Name der Engine und die Variantenzahl in der Titelzeile
 Auswahlfelder: Klick auf den Namen, um die Engine zu wählen, auf die Zahl, um
@@ -166,15 +190,16 @@ gesehen.
 
 Das Maia-Feld zeigt fünf Züge mit ihrer jeweiligen Wahrscheinlichkeit auf der gewählten
 Spielstärke, nicht den besten Zug. Eine Variante gibt es dazu nicht; warum, steht unter
-[Analyse](analysis.md). `L` stellt alle Spielstärken nebeneinander, ein zweiter Druck kehrt
-zur gewählten zurück.
+[Analyse](analysis.md). Die Stufe in der Titelzeile des Felds ist ein Auswahlfeld: Wähl dort
+eine andere Stufe, oder **Alle Stufen nebeneinander**, um alle Spielstärken nebeneinander zu
+sehen. `L` tut dasselbe, ein zweiter Druck kehrt zur gewählten zurück.
 
 ## Eine Partie ohne Engine lesen { #read-a-game-without-the-engine }
 
-`⇧E` oder der Computer in der Titelleiste nimmt jedes Engine-Urteil von diesem Bildschirm: den
+`⇧E` oder der Schalter **Engine ausblenden** in der Titelleiste nimmt jedes Engine-Urteil von diesem Bildschirm: den
 Bewertungsbalken und die Bewertung, die `??`-Markierungen und die eingefärbten Zeilen, den
 Verlauf, die Bereiche von Engine und Maia. Die Züge, die Uhren und deine Notizen bleiben,
-und ebenso **Analysieren**: Schreib erst auf, was deiner Meinung nach schiefging, dann
+und ebenso **Analysieren …**: Schreib erst auf, was deiner Meinung nach schiefging, dann
 lass rechnen und vergleiche. Der Modus bleibt an, bis du ihn wieder
 ausschaltest; alles dazu steht unter [Einstellungen](settings.md#hide-the-engine).
 

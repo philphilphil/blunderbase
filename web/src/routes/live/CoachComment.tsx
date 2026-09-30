@@ -1,5 +1,7 @@
 import { Trans } from '@lingui/react/macro'
 
+import { StatusDot } from '@/components/badges/StatusDot'
+import { Readout } from '@/components/ui/badge'
 import { relative } from '@/lib/mcp/status'
 import { cn } from '@/lib/utils'
 
@@ -8,6 +10,9 @@ import { cn } from '@/lib/utils'
  *
  * `annotate(text=…)` replaces it and `annotate(text="")` clears it, so this card is
  * either the current comment or an explicit note that there is none — never a stale one.
+ *
+ * "via MCP" is where the words come from: a status word with its green dot and no box, and
+ * the age a flat readout, so nothing in the card's head looks like something to press.
  */
 export function CoachComment({
   text,
@@ -24,12 +29,12 @@ export function CoachComment({
         <span className="text-data font-semibold text-ink">
           <Trans>Coach</Trans>
         </span>
-        <span className="inline-flex items-center gap-1.5 rounded-sm border border-edge px-1.5 py-px text-meta text-soft">
-          <span className="size-[0.3125rem] rounded-full bg-good" />
+        <span className="inline-flex items-center gap-1.5 text-label text-soft">
+          <StatusDot tone="healthy" />
           <Trans>via MCP</Trans>
         </span>
         <div className="flex-1" />
-        <span className="font-mono text-meta text-dim">{relative(updatedAt)}</span>
+        <Readout num>{relative(updatedAt)}</Readout>
       </div>
 
       <div className="px-3.5 py-3">

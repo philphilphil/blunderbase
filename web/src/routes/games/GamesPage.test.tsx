@@ -62,11 +62,18 @@ const GAMES = [11, 12, 13].map(
 let receipt: BatchAnalysisResponse
 
 function stubFetch() {
+  // What the server has queued so far: the library's cards say `queued` for these, the way
+  // the real `/games` does once a batch has committed.
+  const queued = new Set<number>()
   const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
     const path = String(input).split('?')[0]!
-    if (path.endsWith('/api/analysis/batch')) return json(202, receipt)
+    if (path.endsWith('/api/analysis/batch')) {
+      for (const run of receipt.queued) queued.add(run.game_id)
+      return json(202, receipt)
+    }
     if (path.endsWith('/api/games')) {
-      return json(200, { games: GAMES, total: GAMES.length, limit: 50, offset: 0 })
+      const games = GAMES.map((game) => (queued.has(game.id) ? { ...game, queued: true } : game))
+      return json(200, { games, total: GAMES.length, limit: 50, offset: 0 })
     }
     return json(404, { error: 'not_found', detail: path })
   })
@@ -127,7 +134,7 @@ describe('GamesPage — filtering analysis coverage', () => {
       const requests = vi.mocked(fetch).mock.calls.map(([input]) => String(input))
       expect(requests.some((request) => request.includes('analyzed=false'))).toBe(true)
     })
-    const chip = screen.getByRole('button', { name: /Analysis:unanalysed/ })
+    const chip = screen.getByRole('button', { name: /Analysis: unanalysed/ })
     // A set chip wears the one selected state, so a glance down the bar finds it.
     expect(chip.parentElement).toHaveClass('bg-selected')
     // `expanded`: the chip, not the Source column's sort button.
@@ -136,12 +143,19 @@ describe('GamesPage — filtering analysis coverage', () => {
     ).not.toHaveClass('bg-selected')
   })
 
-  it('keeps Mine / Others / All a labelled group of pressed buttons', async () => {
+  it('keeps Mine / Others / All a labelled one-of-three choice', async () => {
     draw()
     await loaded()
-    const group = screen.getByRole('group', { name: 'Whose games' })
+    const group = screen.getByRole('radiogroup', { name: 'Whose games' })
     expect(group).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'All' })).toHaveAttribute('aria-pressed')
+    expect(within(group).getByRole('radio', { name: 'Mine' })).toHaveAttribute(
+      'aria-checked',
+      'true',
+    )
+    expect(within(group).getByRole('radio', { name: 'All' })).toHaveAttribute(
+      'aria-checked',
+      'false',
+    )
   })
 })
 
@@ -183,11 +197,14 @@ describe('GamesPage — queueing analysis over a selection', () => {
     await loaded()
 
     const row = screen.getByLabelText('Select game 12').closest('[role="row"]') as HTMLElement
-    await user.click(within(row).getByRole('button', { name: 'analyse' }))
+    await user.click(within(row).getAllByRole('button', { name: 'Analyse' })[0]!)
 
     await waitFor(() => expect(postedTo('/analysis/batch')).toHaveLength(1))
     expect(postedTo('/analysis/batch')[0]).toEqual({ game_ids: [12] })
     expect(await screen.findByText('1 run queued')).toBeInTheDocument()
+    // Queued, the row says so rather than offering the button again.
+    expect(within(row).getAllByText('In queue')).toHaveLength(2)
+    expect(within(row).queryByRole('button', { name: 'Analyse' })).not.toBeInTheDocument()
   })
 
   it('counts a call that never landed as the whole selection refused', async () => {
@@ -252,7 +269,7 @@ describe('GamesPage — deleting games', () => {
 
     await user.click(screen.getByLabelText('Select game 11'))
     await user.click(screen.getByLabelText('Select game 12'))
-    await user.click(screen.getByRole('button', { name: 'Delete' }))
+    await user.click(screen.getByRole('button', { name: 'Delete…' }))
 
     // Nothing has gone yet: the dialog is the confirmation, and it names the count.
     expect(screen.getByRole('dialog')).toHaveTextContent('Delete 2 games')
@@ -344,7 +361,7 @@ describe('GamesPage — paging and ordering', () => {
     await user.click(screen.getByLabelText('Next page'))
     await screen.findByLabelText('Select game 26')
 
-    await user.selectOptions(screen.getByLabelText('Rows per page'), '100')
+    await user.selectOptions(screen.getByLabelText('Rows'), '100')
 
     await waitFor(() => expect(lastGamesQuery().get('limit')).toBe('100'))
     expect(lastGamesQuery().get('offset')).toBe('0')
@@ -546,23 +563,37 @@ describe('GamesPage — collections', () => {
     return new URL(last, 'http://localhost').searchParams
   }
 
-  it('is the library with one more filter: no title, record or buttons of its own', async () => {
+  it('is the library with one more filter, and the collection editable from the bar', async () => {
     stubCollections()
     draw('/games?collection=7&whose=all')
     await loaded()
 
-    // The chip names it once the list is in.
-    expect(await screen.findByRole('button', { name: /Collection:45-45 League/ })).toBeInTheDocument()
+    // The picker names it once the list is in.
+    expect(await screen.findByRole('button', { name: /Collection: 45-45 League/ })).toBeInTheDocument()
     expect(lastGamesQuery().get('collection')).toBe('7')
     expect(lastGamesQuery().get('whose')).toBe('all')
+    // The address a pinned rail row opens is that collection's place: the title says so, as
+    // the rail does (`useLibraryPlace`), with Collections as the way back.
     const crumbs = within(screen.getByTestId('crumbs'))
-    expect(crumbs.getByText('Games')).toBeInTheDocument()
-    expect(crumbs.queryByText('45-45 League')).not.toBeInTheDocument()
+    expect(crumbs.getByText('Collections')).toBeInTheDocument()
+    expect(await crumbs.findByText('45-45 League')).toBeInTheDocument()
     const titlebar = screen.getByTestId('titlebar')
-    expect(within(titlebar).getByRole('link', { name: 'Import' })).toBeInTheDocument()
-    expect(within(titlebar).queryByRole('button', { name: 'Edit' })).not.toBeInTheDocument()
+    expect(within(titlebar).getByRole('link', { name: 'Import games' })).toBeInTheDocument()
     expect(screen.queryByText(/Your games: score/)).not.toBeInTheDocument()
     expect(screen.queryByText('Lichess 45+45 League, this season')).not.toBeInTheDocument()
+
+    // The collection is the place, so it is edited from here as from its card.
+    await userEvent.click(within(titlebar).getByRole('button', { name: 'Edit collection…' }))
+    const dialog = await screen.findByRole('dialog')
+    expect(within(dialog).getByLabelText('Name')).toHaveValue('45-45 League')
+  })
+
+  it('offers no Edit collection… while the list is anything but one collection', async () => {
+    stubCollections()
+    draw('/games?collection=7&whose=all&color=black')
+    await loaded()
+    await screen.findByRole('button', { name: /Collection: 45-45 League/ })
+    expect(screen.queryByRole('button', { name: 'Edit collection…' })).not.toBeInTheDocument()
   })
 
   it('reads a collection over the owner’s own games unless the link says otherwise', async () => {
@@ -572,9 +603,9 @@ describe('GamesPage — collections', () => {
 
     expect(lastGamesQuery().get('collection')).toBe('7')
     expect(lastGamesQuery().get('whose')).toBeNull()
-    const whose = screen.getByRole('group', { name: 'Whose games' })
-    expect(within(whose).getByRole('button', { name: 'Mine' })).toHaveAttribute(
-      'aria-pressed',
+    const whose = screen.getByRole('radiogroup', { name: 'Whose games' })
+    expect(within(whose).getByRole('radio', { name: 'Mine' })).toHaveAttribute(
+      'aria-checked',
       'true',
     )
   })
@@ -612,7 +643,7 @@ describe('GamesPage — collections', () => {
     const user = userEvent.setup()
     draw('/games?collection=7&whose=all')
     await loaded()
-    await screen.findByRole('button', { name: /Collection:45-45 League/ })
+    await screen.findByRole('button', { name: /Collection: 45-45 League/ })
 
     await user.click(screen.getByLabelText('Select game 11'))
     await user.click(screen.getByRole('button', { name: 'Remove from collection' }))
@@ -628,7 +659,7 @@ describe('GamesPage — collections', () => {
     await loaded()
 
     await user.click(screen.getByLabelText('Select game 11'))
-    expect(screen.getByRole('button', { name: 'Add to…' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Add to' })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Remove from collection' })).not.toBeInTheDocument()
   })
 
@@ -642,8 +673,16 @@ describe('GamesPage — collections', () => {
     await user.click(await screen.findByRole('button', { name: /45-45 League/ }))
 
     await waitFor(() => expect(lastGamesQuery().get('collection')).toBe('7'))
-    expect(screen.getByRole('button', { name: /Collection:45-45 League/ })).toBeInTheDocument()
-    expect(within(screen.getByTestId('crumbs')).queryByText('45-45 League')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Collection: 45-45 League/ })).toBeInTheDocument()
+    // Picked alone, it writes the collection's own address, so the title names it.
+    expect(within(screen.getByTestId('crumbs')).getByText('45-45 League')).toBeInTheDocument()
+  })
+
+  it('titles a filtered library "Games (filtered)"', async () => {
+    stubCollections()
+    draw('/games?color=black')
+    await loaded()
+    expect(within(screen.getByTestId('crumbs')).getByText('Games (filtered)')).toBeInTheDocument()
   })
 
   it('filters on rated or casual under Time control', async () => {
@@ -656,7 +695,7 @@ describe('GamesPage — collections', () => {
     await user.click(screen.getByRole('button', { name: 'casual' }))
 
     await waitFor(() => expect(lastGamesQuery().get('rated')).toBe('false'))
-    expect(screen.getByRole('button', { name: /Time control:casual/ })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Time control: casual/ })).toBeInTheDocument()
   })
 
   it('offers to make a collection only from a filter a rule can hold', async () => {
@@ -664,12 +703,12 @@ describe('GamesPage — collections', () => {
     const user = userEvent.setup()
     draw('/games?since=2026-01-01')
     await loaded()
-    expect(screen.queryByRole('button', { name: 'Make a collection' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Make a collection…' })).not.toBeInTheDocument()
 
-    // The chip, not the column header that sorts by the same word.
-    await user.click(screen.getByRole('button', { name: /^Source\s*▾$/ }))
+    // The picker, not the column header that sorts by the same word.
+    await user.click(screen.getByRole('button', { name: /^Source$/, expanded: false }))
     await user.click(screen.getByRole('button', { name: 'Lichess' }))
-    await user.click(await screen.findByRole('button', { name: 'Make a collection' }))
+    await user.click(await screen.findByRole('button', { name: 'Make a collection…' }))
 
     expect(await screen.findByRole('dialog', { name: 'New collection' })).toBeInTheDocument()
   })
@@ -682,7 +721,7 @@ describe('GamesPage — collections', () => {
 
     await user.click(screen.getByLabelText('Select game 11'))
     await user.click(screen.getByLabelText('Select game 12'))
-    await user.click(screen.getByRole('button', { name: 'Add to…' }))
+    await user.click(screen.getByRole('button', { name: 'Add to' }))
     await user.click(await screen.findByRole('button', { name: /New collection from these 2 games/ }))
 
     expect(await screen.findByRole('dialog', { name: 'New collection' })).toBeInTheDocument()

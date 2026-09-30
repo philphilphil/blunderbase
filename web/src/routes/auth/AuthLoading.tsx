@@ -38,7 +38,7 @@ export function AuthLoading() {
               in to yet. It reconnects on its own once the backend is back.
             </Trans>
           </p>
-          <Button variant="outline" size="sm" onClick={recheck}>
+          <Button variant="secondary" size="sm" onClick={recheck}>
             <Trans>Try again</Trans>
           </Button>
         </div>

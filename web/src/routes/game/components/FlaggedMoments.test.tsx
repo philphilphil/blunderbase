@@ -53,8 +53,9 @@ describe('FlaggedMoments', () => {
     expect(blunder).toHaveClass('bg-selected')
     expect(inaccuracy).not.toHaveClass('bg-selected')
     // The selected row's accent bar down its left edge, the same as a selected game row.
-    expect(blunder!.className).toContain('shadow-[inset_0.125rem_0_0_var(--bb-accent)]')
-    expect(inaccuracy!.className).not.toContain('shadow-[inset')
+    // The row grammar's selected row: the blue fill and the inset accent bar.
+    expect(blunder).toHaveClass('bg-selected', 'shadow-row-bar')
+    expect(inaccuracy).not.toHaveClass('shadow-row-bar')
   })
 
   it('says so rather than drawing an empty list', () => {

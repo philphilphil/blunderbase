@@ -1,9 +1,9 @@
 import { Trans, useLingui } from '@lingui/react/macro'
-import { Pin, PinOff } from 'lucide-react'
+import { Check, Copy, Pin, PinOff, X } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 
 import { ClassificationBadge } from '@/components/badges/ClassificationBadge'
-import { buttonVariants } from '@/components/ui/button'
+import { ROW_CURSOR } from '@/components/ui/row'
 import type { Classification, MoveRow } from '@/lib/api/types'
 import { GLYPHS, glyphFor, isFlagged } from '@/lib/chess/classification'
 import { formatScore, formatWinLoss, type Score } from '@/lib/chess/evaluation'
@@ -12,7 +12,8 @@ import { cn } from '@/lib/utils'
 
 import { formatRemaining, moveNumberOf, type MovePair } from '../gameModel'
 import { usePlyLabel, usePlyNumbering, usePlyOffset } from '../plyNumbering'
-import { PANE_COUNT, TAB, TAB_ON, TAB_ROW } from './paneTabs'
+import { PANE_TOOL, STRIP_FACTS, STRIP_RULE, TAB_ROW } from './paneTabs'
+import { PaneTab, PaneTabList } from './PaneTabList'
 
 /**
  * The inline note design 1a puts under a flagged move: what it cost and what was better.
@@ -178,6 +179,7 @@ export function MoveList({
   showTabRow = true,
   className,
 }: MoveListProps) {
+  const { t } = useLingui()
   // Uncontrolled by default — the desktop column has never had anywhere else to put these
   // tabs. `openTab` takes over where a caller draws the strip itself; the internal state is
   // still kept in step, so handing control back would not jump the table to another tab.
@@ -281,19 +283,22 @@ export function MoveList({
       // `@container` on top of the shared strip: the ply count below hides by this row's own
       // width, which only a container query can read.
       <div className={cn(TAB_ROW, '@container')}>
-        <Tab active={tab === 'moves'} onClick={() => setTab('moves')}>
-          <Trans>Moves</Trans>
-        </Tab>
-        <Tab active={tab === 'flagged'} onClick={() => setTab('flagged')}>
-          <Trans>Flagged</Trans>
-          {flaggedCount > 0 ? (
-            <span className="font-mono text-meta text-blunder">{flaggedCount}</span>
-          ) : null}
-        </Tab>
+        <PaneTabList label={t`Moves and flagged moves`}>
+          <PaneTab selected={tab === 'moves'} onSelect={() => setTab('moves')}>
+            <Trans>Moves</Trans>
+          </PaneTab>
+          <PaneTab selected={tab === 'flagged'} onSelect={() => setTab('flagged')}>
+            <Trans>Flagged</Trans>
+            {/* The count keeps the blunder hue: it is the game's mistakes, a verdict. */}
+            {flaggedCount > 0 ? (
+              <span className="font-mono text-meta text-blunder">{flaggedCount}</span>
+            ) : null}
+          </PaneTab>
+        </PaneTabList>
         <div className="flex-1" />
         {/*
-          `flex-none`, so whatever else this row has to give up, the PGN affordance is never
-          the thing that gets clipped off the right edge.
+          The strip's order is tabs │ facts │ tools. `flex-none`, so whatever else this row
+          has to give up, the PGN tool is never the thing that gets clipped off the right edge.
 
           The ply total goes below `md`: the tabs, a count and this pair do not fit across a
           375px screen, and of everything here it is the one thing said elsewhere — the
@@ -302,12 +307,13 @@ export function MoveList({
           window; it is kept because that window is real and a clipped PGN button is not
           worth the two words.
         */}
-        <div className="flex flex-none items-center gap-1.5 whitespace-nowrap">
+        <div className="flex flex-none items-center gap-2 whitespace-nowrap">
           {/* And on a desktop whose track is at its 15.625rem floor, by the row's own width:
               German's "Markiert" and "Halbzüge" are longer than the words this was fitted to. */}
-          <span className={cn(PANE_COUNT, 'max-md:hidden @max-[16.5rem]:hidden')}>
+          <span className={cn(STRIP_FACTS, 'font-mono max-md:hidden @max-[16.5rem]:hidden')}>
             <Trans>{plyCount} plies</Trans>
           </span>
+          {pgn ? <span aria-hidden className={STRIP_RULE} /> : null}
           <PgnButton pgn={pgn} />
         </div>
       </div>
@@ -348,10 +354,14 @@ export function MoveList({
               : false
             return (
               <div key={pair.moveNumber} ref={isActivePair ? activeRow : undefined}>
+                {/* The pair under the cursor is `row-active` plus the inset accent bar
+                    (`ROW_CURSOR`): the tint alone sat 1.1:1 off the pane, and the bar makes
+                    the row findable at a glance without competing with the current move's
+                    own blue. */}
                 <div
                   className={cn(
                     'flex h-7 items-center rounded-md px-1.5',
-                    isActivePair ? 'bg-row-active' : 'hover:bg-raised',
+                    isActivePair ? ROW_CURSOR : 'hover:bg-raised',
                   )}
                 >
                   <span
@@ -443,9 +453,8 @@ function ClockCell({ seconds }: { seconds: number | undefined }) {
 /**
  * Design 1a's `PGN`, pinned to the right of the tab row. It copies rather than downloads:
  * the thing anyone wants a game's PGN for — pasting it into an analysis board, handing it
- * to the coach over MCP — starts with it on the clipboard.
- */
-/**
+ * to your assistant over MCP — starts with it on the clipboard.
+ *
  * The one PGN button on the screen, named so a key can press it.
  *
  * `c` copies the game, and it does it by pressing this rather than by copying the text a
@@ -483,29 +492,36 @@ export function PgnButton({ pgn }: { pgn?: string }) {
     timer.current = setTimeout(() => setState('idle'), 1_600)
   }
 
+  // The name stays "Copy PGN" whatever the flash says, so the key's target is findable;
+  // the flash is the glyph, the title and a polite announcement.
+  const said =
+    state === 'copied' ? t`PGN copied` : state === 'failed' ? t`No clipboard to copy to` : null
+  const Glyph = state === 'copied' ? Check : state === 'failed' ? X : Copy
   return (
-    <button
-      type="button"
-      id={PGN_BUTTON_ID}
-      onClick={() => void copy()}
-      title={t`Copy this game as PGN (C)`}
-      // The strip's own control size (a text button, so `xs` rather than the icon square
-      // `PANE_TOOL`), and idle in `soft` like every other control: it used to sit in `faint`
-      // with the ply count, which read as a caption rather than something to press.
-      className={cn(
-        buttonVariants({ variant: 'ghost', size: 'xs' }),
-        state === 'copied' ? 'text-accent-teal' : state === 'failed' ? 'text-blunder' : 'text-soft',
-      )}
-    >
-      {/* `PGN` is the format's name and stays in every language; the two flashes are prose. */}
-      {state === 'copied' ? (
-        <Trans>copied</Trans>
-      ) : state === 'failed' ? (
-        <Trans>no clipboard</Trans>
-      ) : (
-        'PGN'
-      )}
-    </button>
+    <>
+      <button
+        type="button"
+        id={PGN_BUTTON_ID}
+        onClick={() => void copy()}
+        aria-label={t`Copy PGN`}
+        aria-keyshortcuts="c"
+        title={said ?? t`Copy PGN (C)`}
+        // An icon tool in the strip's tools slot (`PANE_TOOL`), like the focus and compare
+        // tools beside it. It had been the ghost word "PGN", a text button without a face,
+        // which the grammar does not allow; a labelled face squeezed the ply count into the
+        // Flagged tab. The copy glyph turns into a check (or a cross) for the flash.
+        className={cn(
+          PANE_TOOL,
+          state === 'copied' && 'text-good',
+          state === 'failed' && 'text-blunder',
+        )}
+      >
+        <Glyph aria-hidden className="size-3.5" />
+      </button>
+      <span role="status" className="sr-only">
+        {said}
+      </span>
+    </>
   )
 }
 
@@ -814,30 +830,3 @@ function Annotation({ annotation }: { annotation: MoveAnnotation }) {
   )
 }
 
-function Tab({
-  active,
-  onClick,
-  children,
-}: {
-  active: boolean
-  onClick: () => void
-  children: React.ReactNode
-}) {
-  return (
-    <button
-      type="button"
-      // A pressed button rather than a `role="tab"`: these two switch what the pane below
-      // filters to, and there is no tablist here for a tab to belong to. Which one is on is
-      // said out loud either way — it is drawn as chrome, and chrome is invisible to a
-      // reader who is being read to.
-      aria-pressed={active}
-      onClick={onClick}
-      // The shared pane tab (`./paneTabs`): the selected tab is the pane's own surface pushed
-      // up into the chrome strip, so this strip and the notes and graph strips are one idiom
-      // rather than three hand-copied class strings.
-      className={cn(TAB, active && TAB_ON)}
-    >
-      {children}
-    </button>
-  )
-}

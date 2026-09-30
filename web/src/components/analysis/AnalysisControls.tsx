@@ -3,21 +3,23 @@ import { ApiError } from '@/lib/api/client'
 import { listEngineRoles } from '@/lib/api/endpoints'
 import { useEngineSetup } from './useEngineSetup'
 
-import { Plural, useLingui } from '@lingui/react/macro'
-import { ChevronDown } from 'lucide-react'
+import { plural } from '@lingui/core/macro'
+import { useLingui } from '@lingui/react/macro'
 
-import { buttonVariants } from '@/components/ui/button'
+import { PickerSelect } from '@/components/ui/native-select'
+import { Switch } from '@/components/ui/switch'
 import type { StreamSessionApi } from '@/lib/analysis'
 import type { EngineHost } from '@/lib/engines/hosts'
 import { cn } from '@/lib/utils'
 
 /**
- * The switch the Engines page uses, grown to the size a footer row can carry: the track is
- * what reads as on or off, and the button around it is a full row-height hit target so the
- * switch is no harder to hit than the pickers beside it.
+ * The live search's on/off, and the Maia-on-analysis setting: the app's one `Switch`
+ * (components/ui/switch.tsx) with its label kept for screen readers, since every row it
+ * sits in already says what it switches. A mode that persists is a switch, never a pressed
+ * button or a lit chip (docs/design/README.md, "Controls").
  *
- * Exported because the Maia configuration needs the same switch beside a label and a caption,
- * and a third spelling of an on/off track is a third thing to keep in step with the theme.
+ * Kept under its old name and API so the settings pages that import it need not change.
+ * The switch's focus is the global ring around its track, never a fill.
  */
 export function Toggle({
   checked,
@@ -32,39 +34,18 @@ export function Toggle({
   label: string
   disabled?: boolean
   title?: string
-  /** For a host whose row is shorter than the 2rem footer row this switch was sized for. */
   className?: string
 }) {
   return (
-    <button
-      type="button"
-      role="switch"
-      aria-checked={checked}
-      aria-label={label}
+    <Switch
+      checked={checked}
+      onCheckedChange={onChange}
+      label={label}
+      hideLabel
       disabled={disabled}
       title={title}
-      onClick={() => onChange(!checked)}
-      className={cn(
-        'inline-flex h-8 flex-none items-center rounded-md px-1.5 transition-colors',
-        'hover:bg-raised disabled:opacity-50 disabled:hover:bg-transparent',
-        'outline-none focus-visible:bg-raised',
-        className,
-      )}
-    >
-      <span
-        className={cn(
-          'inline-flex h-5 w-9 flex-none items-center rounded-full border p-px transition-colors',
-          checked ? 'border-accent-teal/50 bg-accent-teal/25' : 'border-edge-strong bg-elevated',
-        )}
-      >
-        <span
-          className={cn(
-            'size-4 rounded-full transition-transform',
-            checked ? 'translate-x-4 bg-accent-teal' : 'translate-x-0 bg-faint',
-          )}
-        />
-      </span>
-    </button>
+      className={className}
+    />
   )
 }
 
@@ -92,11 +73,14 @@ export function useDefaultEngineLabel(stream: StreamSessionApi): string {
   return name ? t`analysis engine — ${name}` : t`analysis engine`
 }
 
-// Pickers you can actually hit: a 2rem row (the switch beside them is sized to it), text at
-// the scale's data size, and room around it. Anything smaller was a target you had to aim
-// for. The value shown is the choice itself, so `body` rather than a control's idle `soft`.
-const SELECT_CLASS =
-  'h-8 rounded-md border border-input bg-elevated px-2 text-data text-body outline-none transition-colors hover:border-edge-hover focus-visible:border-accent-teal/50 disabled:opacity-50'
+/** The line counts a search can report, as picker options ("3 lines"). */
+function useLineOptions() {
+  const { t } = useLingui()
+  return [1, 2, 3, 4, 5].map((lines) => ({
+    value: String(lines),
+    label: t`${plural(lines, { one: '# line', other: '# lines' })}`,
+  }))
+}
 
 interface ControlProps {
   stream: StreamSessionApi
@@ -173,84 +157,68 @@ export function LiveSwitch({ stream, fen, className }: ControlProps) {
 /**
  * Which engine runs the search and how many lines it reports. Nothing here opens a search;
  * a change while one is running is applied to it, and before one the choice waits.
+ *
+ * Pickers (`PickerSelect`: the picker's face and ⇅ over the native select), because this
+ * is a control row and not a form: a toolbar shows one picker look whatever the list is.
  */
 export function LivePickers({ stream, fen, className }: ControlProps) {
   const { t } = useLingui()
   const idle = fen === null || fen === ''
   const defaultLabel = useDefaultEngineLabel(stream)
+  const lineOptions = useLineOptions()
+  const engineOptions = [
+    { value: '', label: defaultLabel },
+    ...stream.engines
+      .filter((host) => host.streams)
+      .map((host) => ({ value: String(host.engineId), label: engineOptionLabel(host) })),
+  ]
+  const why = idle ? t`Nothing is on the board to analyse` : undefined
 
   return (
     <div className={cn('flex min-w-0 flex-1 flex-wrap items-center gap-2', className)}>
-      <select
-        aria-label={t`Engine`}
+      <PickerSelect
+        label={t`Engine`}
         value={stream.engineId === null ? '' : String(stream.engineId)}
+        options={engineOptions}
         disabled={idle}
-        onChange={(event) =>
-          stream.setEngineId(event.target.value === '' ? null : Number(event.target.value))
-        }
+        title={why}
+        onChange={(value) => stream.setEngineId(value === '' ? null : Number(value))}
         // Engine names carry a host and sometimes a reason, so this one takes whatever the
-        // row has left, and never less than enough for a name to be read.
-        className={cn(SELECT_CLASS, 'min-w-40 flex-1 truncate')}
-      >
-        <option value="">{defaultLabel}</option>
-        {stream.engines
-          .filter((host) => host.streams)
-          .map((host) => (
-            <option key={host.engineId} value={String(host.engineId)}>
-              {engineOptionLabel(host)}
-            </option>
-          ))}
-      </select>
-
-      <select
-        aria-label={t`Lines`}
+        // row has left; the value truncates rather than wrapping the row.
+        className="min-w-0 max-w-full shrink [&>span]:truncate"
+      />
+      <PickerSelect
+        label={t`Lines`}
+        hideLabel
         value={String(stream.multipv)}
+        options={lineOptions}
         disabled={idle}
-        onChange={(event) => stream.setMultipv(Number(event.target.value))}
-        className={cn(SELECT_CLASS, 'w-[5.5rem] flex-none tabular')}
-      >
-        {[1, 2, 3, 4, 5].map((lines) => (
-          <option key={lines} value={String(lines)}>
-            <Plural value={lines} one="# line" other="# lines" />
-          </option>
-        ))}
-      </select>
+        title={why}
+        onChange={(value) => stream.setMultipv(Number(value))}
+      />
     </div>
   )
 }
 
 /**
- * How many lines the search reports, as a small control with the select laid over it, in
- * the place the run's own `MPV 3` readout stands on the other tab, because it is the same
- * fact about the other claim. A 2rem select beside three mono readouts was the one thing
- * on the engine pane's title that did not belong to it.
- *
- * It wears the strip's `xs` control (the outline button) rather than the readout's badge:
- * this one can be changed and `MPV 3` cannot, and a reader should see which is which.
+ * How many lines the search reports, on the engine pane's Live tab, where the run's own
+ * `MPV 3` readout stands on the other tab. It is the same fact about the other claim, but
+ * this one can be changed, so it is a strip picker (⇅, a face on hover) and `MPV 3` a flat
+ * readout: a reader should see which is which.
  */
 export function LiveLinesChip({ stream, className }: { stream: StreamSessionApi; className?: string }) {
   const { t } = useLingui()
-  // Named, so the message is the one the picker's options already carry ("{lines, …}").
-  const lines = stream.multipv
+  const lineOptions = useLineOptions()
   return (
-    <span
-      data-testid="live-lines-chip"
-      className={cn(buttonVariants({ variant: 'outline', size: 'xs' }), 'relative flex-none', className)}
-    >
-      <Plural value={lines} one="# line" other="# lines" />
-      <ChevronDown className="size-3 flex-none text-soft" aria-hidden />
-      <select
-        aria-label={t`Lines`}
+    <span data-testid="live-lines-chip" className={cn('inline-flex flex-none', className)}>
+      <PickerSelect
+        label={t`Lines`}
+        hideLabel
+        size="strip"
         value={String(stream.multipv)}
-        onChange={(event) => stream.setMultipv(Number(event.target.value))}
-        className="absolute inset-0 w-full cursor-pointer appearance-none opacity-0"
-      >
-        {[1, 2, 3, 4, 5].map((lines) => (
-          <option key={lines} value={String(lines)}>
-            <Plural value={lines} one="# line" other="# lines" />
-          </option>
-        ))}
-      </select>
+        options={lineOptions}
+        onChange={(value) => stream.setMultipv(Number(value))}
+      />
     </span>
   )
 }

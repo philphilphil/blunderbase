@@ -1,0 +1,100 @@
+/* ==========================================================================================
+ * Clarity pass: Stats (spec §5 "Stats"). Scoped to html.clarity like the core overlay; the
+ * faces, segments (Window, Colour), pickers and switch come from ../clarity.css. What is here
+ * is only what this screen's layout needs.
+ *
+ * Screen hooks added to screens/stats.html:
+ *   .cls-moved     the bar's "vs previous" toggle: it leaves the bar (hidden) and comes back
+ *                  as .cls-vsprev, a Switch "vs previous" at the far end of the scope row
+ *   .cls-scope     the scope row, one line at 1440:
+ *                  Window [seg] │ Colour [seg] │ Speed: All ⇅ │ Collection: All games ⇅ … vs previous ○
+ *                  the h-4 hairline between groups is each later group's ::before
+ *   .cls-speed / .cls-old   the Speed field: its caps label and five chips are hidden, and one
+ *                  shared Speed picker (.cl-new) takes their place (spec §3.6/§3.7: Speed is a
+ *                  picker on Dashboard, Stats and Explorer alike)
+ *   .cls-group / .cls-picker   the Collection picker, new markup shown only in collections-a
+ *                  (the demo has no collections; the rail's samples stand in). A picker carries
+ *                  its own "Label: value", so it has no separate label beside it
+ *   .cls-words     words set in mono in a card head ("score · blunders", "avg win % given
+ *                  away"): a readout of words is sans
+ *   .cls-row / .cls-busiest   the time-control table's rows: facts, so no hover; the most-played
+ *                  row's emphasis moves onto its Games figure, which is the reason for it
+ * The table head takes the core .cl-th (non-sortable column caps).
+ * ========================================================================================== */
+
+/* ---- the bar: "vs previous" is a mode of the whole page, not a command; it moves down. */
+html.clarity .cls-moved { display: none; }
+
+/* ---- the scope row: sentence-case labels beside their segments, pickers that name themselves,
+   a rule between groups. The rule is each later group's ::before, centred in the gap. The row
+   clips just outside its own box, so if a group ever wraps to the start of a line its rule falls
+   outside the row and is cut away: a rule only sits between two groups (the phone case). */
+html.clarity .cls-scope {
+  column-gap: 0.875rem;
+  overflow: clip;
+  overflow-clip-margin: 0.25rem; /* room for the focus ring, not for a rule 8px out */
+}
+html.clarity .cls-scope > * { position: relative; }
+html.clarity .cls-scope > * + *::before {
+  content: '';
+  position: absolute;
+  left: calc(-0.4375rem - 0.5px);
+  top: 50%;
+  width: 1px;
+  height: 1rem;
+  margin-top: -0.5rem;
+  background: var(--bb-hairline);
+  pointer-events: none;
+}
+html.clarity .cls-scope > div > span[aria-hidden=true]:first-child {
+  flex: none;
+  font-size: var(--text-label);
+  line-height: var(--text-label--line-height);
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--bb-dim);
+}
+html.clarity .cls-scope > div { gap: 0.375rem; }
+html.clarity .cls-group { display: flex; align-items: center; }
+
+/* Speed: the caps label and the chip row give way to the one Speed picker. */
+html.clarity .cls-speed > :is(.cls-old, button[aria-pressed]) { display: none; }
+
+/* The pickers (Speed, Collection): Button sm faces reading "Label: value ⇅". Narrowed, a picker
+   takes .is-set (the selected fill); here both show their default. */
+html.clarity .cls-picker {
+  height: 1.75rem;
+  padding: 0 0.5rem 0 0.625rem;
+  font-family: var(--font-sans);
+  font-size: var(--text-data);
+  line-height: var(--text-data--line-height);
+  font-weight: 400;
+  cursor: pointer;
+}
+
+/* The switch: a mode of the whole page, so it sits apart at the row's far end rather than as a
+   fourth filter; the space before it is the separation, so it has no rule. Its title keeps the
+   full wording ("Show every number against the equally long window before this one"). */
+html.clarity .cls-vsprev { margin-left: auto; padding: 0.25rem 0; }
+html.clarity .cls-scope > .cls-vsprev::before { display: none; }
+@media (max-width: 767px) {
+  html.clarity .cls-vsprev { margin-left: 0; }
+}
+
+/* ---- card heads: words are sans */
+html.clarity .cls-words {
+  font-family: var(--font-sans);
+  font-size: var(--text-label);
+  line-height: var(--text-label--line-height);
+  color: var(--bb-dim);
+}
+
+/* ---- the time-control table: a table of facts. No hover (nothing to click), no accent box.
+   Today the most-played row is boxed in accent with no word saying why. The emphasis goes onto
+   the figure that earns it: that row's Games count is set bright and semibold, the largest
+   number in its column made the loudest, and the row's title still says "Your most played time
+   control". */
+html.clarity .cls-row:hover { background: transparent; }
+html.clarity .cls-row.cls-busiest { background: transparent; box-shadow: none; }
+html.clarity .cls-row.cls-busiest > span:first-child { color: var(--bb-body); }
+html.clarity .cls-row.cls-busiest > span:nth-child(2) { font-weight: 600; color: var(--bb-text-bright); }

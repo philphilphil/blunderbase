@@ -1,5 +1,5 @@
 import { Trans, useLingui } from '@lingui/react/macro'
-import { ChevronDown, Columns3, Square, User } from 'lucide-react'
+import { Square, User } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 
 import { AnalyseButton, type AnalyseButtonProps } from '@/components/analysis/AnalyseButton'
@@ -11,6 +11,9 @@ import {
 } from '@/components/analysis/InfiniteAnalysisPanel'
 import { LinePreviewRowChip } from '@/components/analysis/LinePreviewSettings'
 import { MiniBoard } from '@/components/board/MiniBoard'
+import { Readout } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { PickerSelect, type PickerSelectOption } from '@/components/ui/native-select'
 import { liveLineId, type StreamSessionApi } from '@/lib/analysis'
 import type { GameRunSummary } from '@/lib/api/types'
 import {
@@ -34,6 +37,8 @@ import {
   type MaiaMove,
 } from '../gameModel'
 import { usePlyLabel, usePlyNumbering, usePlyOffset } from '../plyNumbering'
+import { STRIP_RULE } from './paneTabs'
+import { PaneTab, PaneTabList } from './PaneTabList'
 
 /** The human column's own colour — the purple `docs/design/README.md` gives Maia. */
 const MAIA_HUE = 'var(--bb-brilliant)'
@@ -336,11 +341,12 @@ export function MaiaPanel({
         // do not belong to the grid. So the gap becomes a rule and the cards lose their
         // borders — the band's own bottom rule is `GamePage`'s.
         //
-        // A quarter to Maia, three to the engine: Maia is single moves and a number, the
-        // engine is whole variations, and an even split left the one half-empty while the
-        // other wrapped. The quarter has a floor — a SAN, a percentage and a delta chip
-        // side by side are about 9rem — so in a narrow column the engine's lines wrap a row
-        // sooner rather than Maia's becoming ellipses. Below `md` a quarter of a phone is
+        // Under a quarter to Maia, the rest to the engine: Maia is single moves and a
+        // number, the engine is whole variations, and an even split left the one half-empty
+        // while the other wrapped. Maia's share has a floor — "Maia 1500 ⇅" on the strip, and
+        // a SAN, a percentage and a delta chip in a row, are about 8.25rem (it was 9rem while
+        // a compare toggle shared the strip) — so in a narrow column the engine's lines wrap
+        // a row sooner rather than Maia's becoming ellipses. Below `md` a quarter of a phone is
         // 90 pixels, so the split is dropped and the two panes stack, Maia first, which is
         // the order they are read in on a desktop.
         //
@@ -354,7 +360,7 @@ export function MaiaPanel({
         'relative grid max-h-[18rem] min-w-0 flex-none bg-surface max-md:max-h-none',
         comparing
           ? 'grid-cols-1'
-          : 'grid-cols-[minmax(9rem,1fr)_minmax(0,3fr)] max-md:grid-cols-1',
+          : 'grid-cols-[minmax(8.25rem,22%)_minmax(0,1fr)] max-md:grid-cols-1',
         className,
       )}
       data-testid="maia-panel"
@@ -367,31 +373,28 @@ export function MaiaPanel({
         as one instrument rather than as four boxes that happen to be adjacent.
       */}
       <section className="flex min-w-0 flex-col overflow-hidden">
-        {/* A container, because this column is usually at its 9rem floor: there the "live"
-            word leaves and the pulsing dot beside the level says it instead, so the compare
-            toggle at the end is never the thing pushed off. */}
-        <div className="bb-pane-title @container flex-nowrap">
-          <span
-            className={cn(
-              'size-1.5 flex-none rounded-full bg-brilliant',
-              showHuman && live?.pending && '@max-[12rem]:animate-pulse',
-            )}
-          />
+        {/* A container, because this column is usually at its floor: there the "live" word
+            leaves and the pulsing dot inside the level picker says it instead, so the picker
+            is never the thing pushed off. */}
+        <div className="bb-pane-title @container flex-nowrap gap-1 px-1.5">
           {/*
-            The visible label is the level itself, with the picker laid over it: the
-            header has room for one reading of who this column speaks for, and "Maia
-            1700" is that reading whether or not it can be changed.
+            The visible label is the level itself, as a strip picker: the header has room
+            for one reading of who this column speaks for, and "Maia 1700" is that reading
+            whether or not it can be changed. Comparing every level is one more value of
+            the same choice ("All levels, side by side"), not an unlabelled toggle beside it.
           */}
           <LevelLabel
             rating={rating}
-            levels={comparing ? [] : levels}
+            levels={levels}
             onSelectLevel={onSelectLevel}
+            // The setting, not whether a grid is drawn: with compare on and one level here the
+            // picker still says so, so the reader can see how to get back out of it.
+            compare={showHuman && compare}
+            onCompareChange={canCompare ? onCompareChange : undefined}
+            pulse={showHuman && !!live?.pending}
           />
           <div className="flex-1" />
           {showHuman && live ? <LivePill pending={live.pending} /> : null}
-          {canCompare && onCompareChange ? (
-            <CompareToggle on={compare} onChange={onCompareChange} />
-          ) : null}
         </div>
 
         <div className="flex min-h-0 flex-1 flex-col gap-1.5 overflow-y-auto px-[0.4375rem] py-1.5">
@@ -437,46 +440,56 @@ export function MaiaPanel({
           {/* A container, so the readouts on the strip can give way by the strip's own
               width rather than the window's: this pane is narrow at widths where the screen
               is not, and it is the switch at the end that must survive (`LiveSearchMeta`). */}
-          <div className="bb-pane-title @container">
+          {/* The strip's order is the grammar's: tabs │ facts … │ tools (spec §3.3). The
+              facts say what the pane is showing; the tools after the rule act on it. */}
+          <div className="bb-pane-title @container gap-1 pr-2">
             {search ? (
-              <EnginePaneTabs search={search} idle={!fen} />
-            ) : (
+              <>
+                <EnginePaneTabs search={search} hasRun={!!run} />
+                <span aria-hidden className={cn(STRIP_RULE, 'mx-1')} />
+              </>
+            ) : null}
+            {onLive && search ? (
+              // The name it draws is the engine picker, the way the Maia level is its own.
+              <LiveSearchStatus stream={search.stream} dot={false} pick />
+            ) : run && !run.engine ? null : (
+              // A fact about the pane, not a heading competing with the tabs: the run's
+              // engine in body, "No engine run" in the quieter soft. A run that names no
+              // engine says nothing here rather than "No engine run" over its own lines.
               <span
                 className={cn(
-                  'size-1.5 flex-none rounded-full',
-                  run ? 'bg-accent-teal' : 'bg-edge-strong',
+                  'min-w-0 shrink truncate text-label',
+                  run ? 'text-body' : 'text-soft',
                 )}
-              />
-            )}
-            {onLive && search ? (
-              // The tab carries the dot, so the status is asked to leave its own off; the
-              // name it draws is the engine picker, the way the Maia label is the level's.
-              <LiveSearchStatus stream={search.stream} dot={false} pick />
-            ) : (
-              <span className="truncate text-label font-semibold text-ink">
+              >
                 {run?.engine ?? t`No engine run`}
               </span>
             )}
+            {/* The run's MPV, a flat readout: a fact of the run that cannot be changed here.
+                It leaves a strip under 20rem (the pane at 1280), after the Arrows word, so
+                the Analyse button at the end is never the thing pushed off. */}
+            {!onLive && run?.multipv ? (
+              <Readout num className="ml-1 flex-none @max-[20rem]:hidden">
+                MPV {run.multipv}
+              </Readout>
+            ) : null}
             {/* The analysis board's own purple, the colour the score chip under the board
                 takes while it is reading the same line: these rows are the tail of a line
-                the run drew, not a new opinion about the position in front of you. */}
+                the run drew, not a new opinion about the position in front of you. A
+                readout, so a borderless tint. */}
             {alongLine && !onLive ? (
               <span
                 data-testid="maia-engine-along-line"
                 title={t`The rest of the line this run gave, from where the board now stands`}
-                className="flex-none rounded-sm border border-brilliant/35 bg-brilliant/10 px-[0.3125rem] py-px text-meta text-brilliant"
+                className="flex-none rounded-sm bg-brilliant/10 px-[0.3125rem] py-px text-meta text-brilliant"
               >
                 <Trans>along its line</Trans>
               </span>
             ) : null}
-            {/*
-              The label is the column's category, paired with the human column's own —
-              never the run's protocol kind, which lives on the engines page.
-            */}
             {/* The spacer and the readouts are one element, and the only one on the strip
                 that yields: it takes what is left and clips its own contents, so when the
-                pane runs out of width the numbers go and the chips and the switch after
-                them stay where a hand expects them. */}
+                pane runs out of width the numbers go and the tools after them stay where a
+                hand expects them. */}
             <div className="flex min-w-0 flex-1 items-center justify-end gap-2 overflow-hidden">
               {onLive && search ? (
                 <LiveSearchMeta stream={search.stream} />
@@ -484,42 +497,31 @@ export function MaiaPanel({
                 <>
                   {/* The limit the run stopped each move at, whichever of the three it was:
                       a run from the Analyse dialog carries one, an import pass nodes. */}
-                  {run?.depth ? (
-                    <span className="flex-none font-mono text-meta text-dim">
-                      d{run.depth}
-                    </span>
-                  ) : null}
+                  {run?.depth ? <Readout num className="flex-none">d{run.depth}</Readout> : null}
                   {run?.seconds ? (
-                    <span className="flex-none font-mono text-meta text-dim">
+                    <Readout num className="flex-none">
                       <Trans>{run.seconds}s a move</Trans>
-                    </span>
+                    </Readout>
                   ) : null}
                   {nodes !== '—' ? (
-                    <span className="flex-none font-mono text-meta text-dim @max-[30rem]:hidden">
+                    <Readout num className="flex-none @max-[30rem]:hidden">
                       <Trans>{nodes} nodes</Trans>
-                    </span>
+                    </Readout>
                   ) : null}
                 </>
               )}
             </div>
-            {onLive && search ? (
-              // The search's line count, where the run's `MPV` readout stands on the other
-              // tab: the same fact about the other claim, in the same place — but drawn as
-              // the control it is, since this one can be changed and that one cannot.
-              <LiveLinesChip stream={search.stream} />
-            ) : run?.multipv ? (
-              // A readout, not a control: a data badge (`rounded-sm`), never a button shape.
-              <span className="flex-none rounded-sm border border-edge px-[0.3125rem] py-px font-mono text-meta text-dim">
-                MPV {run.multipv}
-              </span>
+            {(onLive && search) || onHoverLine || (analyse && !onLive) ? (
+              <span aria-hidden className={cn(STRIP_RULE, 'mx-1')} />
             ) : null}
+            {/* The search's line count, on Live: a picker, since it can be changed. */}
+            {onLive && search ? <LiveLinesChip stream={search.stream} /> : null}
             {/*
-              The one-click cycler for what hovering a line does. The gear that held the
-              rest of those settings used to sit beside it and is now under the board
-              (`components/board/BoardSettings`), where a reader actually meets it; the
-              chip stays because it belongs to the rows right below it.
+              What hovering a line does. The gear that held the rest of those settings is
+              under the board (`components/board/BoardSettings`), where a reader actually
+              meets it; this stays because it belongs to the rows right below it.
             */}
-            {onHoverLine ? <LinePreviewRowChip /> : null}
+            {onHoverLine ? <LinePreviewRowChip compact={onLive || 'narrow'} /> : null}
             {/*
               The stored run's verb, on the Run tab only: on Live the readouts beside it are
               the search's, and a button there would seem to act on them.
@@ -547,6 +549,8 @@ export function MaiaPanel({
                 onHovered={(row, over) =>
                   setHovered((current) => (over ? row : current === row ? null : current))
                 }
+                // The Live tab starts the search; this is the way back in once it stopped.
+                onStart={() => search.stream.setEnabled(true)}
               />
             </>
           ) : /* Switched off, the column holds its place and says nothing at all — the same
@@ -603,93 +607,89 @@ export function MaiaPanel({
 }
 
 /**
- * Run | Live, at the head of the engine pane.
+ * Run | Live, the engine pane's tabs: the same folder tabs as every other pane strip
+ * (`PaneTabList`), sibling `role=tab` buttons with nothing else in the group.
  *
- * Each tab carries the dot its claim would have carried alone — the run's steady teal, the
- * search's pulse while it is running — so a reader on the Run tab can see the search is
- * still going without switching to it, and a reader on Live can see there is a run to go
- * back to.
+ * Each tab carries a dot only where the dot says something — the run's when there is a run
+ * to go back to, the search's green pulse while it runs — so a reader on the Run tab can see
+ * the search is still going without switching to it.
  *
- * The Live tab is also the search's switch, so the strip has one control for it rather than
- * a tab, a switch and an icon that all meant the same thing. Clicking Live with the search
- * off starts it (the page decides that, in `onTabChange`), since an idle Live tab has
- * nothing to show. While it runs, a stop square sits inside the tab — a sibling of the tab
- * button, not inside it, since a button cannot hold a button — reachable from either tab
- * the way the switch used to be. The setup dialog for a missing engine rides here too,
- * because this is where the search is started.
+ * Clicking Live starts the search when none is running (the host's `onTabChange`): a Live
+ * pane with nothing in it but a Start button only ever asked for a second click. Stopping
+ * is not a tab's job — that would make Run a stop, and the reader may want to read the
+ * stored lines while the search keeps going — so while it runs a Stop tool stands beside
+ * the tabs, reachable from either. The setup dialog for a missing engine rides here,
+ * because this strip is where the search's controls are.
  */
-function EnginePaneTabs({ search, idle }: { search: EnginePaneSearch; idle: boolean }) {
+function EnginePaneTabs({
+  search,
+  hasRun,
+}: {
+  search: EnginePaneSearch
+  /** Whether a stored run speaks for this game: only then does the Run tab carry its dot. */
+  hasRun: boolean
+}) {
   const { t } = useLingui()
   const dialog = useLiveSetup(search.stream)
   const { phase, enabled } = search.stream
-  const tabs: { tab: EnginePaneTab; label: string; dot: string }[] = [
-    { tab: 'run', label: t`Run`, dot: 'bg-accent-teal' },
-    {
-      tab: 'live',
-      label: t`Live`,
-      dot:
-        phase === 'running'
-          ? 'animate-pulse bg-accent-teal'
-          : phase === 'opening'
-            ? 'bg-mistake'
-            : phase === 'error'
-              ? 'bg-blunder'
-              : 'bg-edge-strong',
-    },
-  ]
+  // A status dot on a tab only where it says something: green (alive) while the search
+  // runs, orange while it opens, red on an error; nothing while it is off. The run's dot
+  // is the steady quiet one, and only when there is a run to go back to.
+  const liveDot =
+    phase === 'running'
+      ? 'animate-pulse bg-good'
+      : phase === 'opening'
+        ? 'bg-mistake'
+        : phase === 'error'
+          ? 'bg-blunder'
+          : null
   return (
-    <div role="tablist" aria-label={t`Engine`} className="-ml-1 flex flex-none items-center gap-0.5 select-none">
+    <>
       {dialog}
-      {tabs.map(({ tab, label, dot }) => {
-        const selected = search.tab === tab
-        const stoppable = tab === 'live' && enabled
-        const starts = tab === 'live' && !enabled
-        return (
-          <span
-            key={tab}
-            // The strip's `xs` control (h-6, `text-label`, `rounded-md`), drawn by hand rather
-            // than from `buttonVariants` because the pill is this wrapper, which also holds
-            // the stop square: the fill and the hover belong to it, not to either button.
-            // Selected is the app's one selected state, `--bb-selected` behind `ink`.
-            className={cn(
-              'inline-flex h-6 items-center rounded-md transition-colors',
-              selected ? 'bg-selected' : 'hover:bg-raised',
-            )}
-          >
-            <button
-              type="button"
-              role="tab"
-              aria-selected={selected}
-              data-testid={`engine-pane-tab-${tab}`}
-              disabled={starts && idle}
-              title={starts ? t`Analyse this position continuously` : undefined}
-              onClick={() => search.onTabChange(tab)}
-              className={cn(
-                'inline-flex h-6 items-center gap-1.5 rounded-md px-2 text-label font-medium',
-                'outline-none focus-visible:bg-raised disabled:opacity-50',
-                stoppable && 'pr-1',
-                selected ? 'text-ink' : 'text-soft hover:text-ink',
-              )}
-            >
-              <span className={cn('size-1.5 flex-none rounded-full', dot)} />
-              {label}
-            </button>
-            {stoppable ? (
-              <button
-                type="button"
-                aria-label={t`Stop live analysis`}
-                title={t`Stop live analysis`}
-                data-testid="engine-pane-live-stop"
-                onClick={() => search.stream.setEnabled(false)}
-                className="mr-0.5 inline-flex size-5 items-center justify-center rounded-md text-soft outline-none transition-colors hover:bg-raised hover:text-blunder focus-visible:bg-raised"
-              >
-                <Square className="size-2.5" fill="currentColor" strokeWidth={0} />
-              </button>
-            ) : null}
-          </span>
-        )
-      })}
-    </div>
+      <PaneTabList label={t`Engine`} className="-ml-2.5 flex-none">
+        <PaneTab
+          selected={search.tab === 'run'}
+          onSelect={() => search.onTabChange('run')}
+          data-testid="engine-pane-tab-run"
+          // A notch tighter than a plain pane tab: this is the tightest strip on the screen.
+          className="px-2"
+        >
+          {hasRun ? <span aria-hidden className="size-1.5 flex-none rounded-full bg-dim" /> : null}
+          {t`Run`}
+        </PaneTab>
+        <PaneTab
+          selected={search.tab === 'live'}
+          onSelect={() => search.onTabChange('live')}
+          data-testid="engine-pane-tab-live"
+          title={t`What the engine finds in this position now`}
+          className="px-2"
+        >
+          {liveDot ? (
+            <span aria-hidden className={cn('size-1.5 flex-none rounded-full', liveDot)} />
+          ) : null}
+          {t`Live`}
+        </PaneTab>
+      </PaneTabList>
+      {/*
+        Stop sits beside the tabs, not in one, and is here from either tab while the search
+        runs. Starting is the Live tab itself (and `E`), so an idle strip holds no ▷
+        between the tabs and the facts.
+      */}
+      {enabled ? (
+        <Button
+          variant="ghost"
+          size="icon-xs"
+          // Named in full: the practice bar has a Stop of its own on the same screen.
+          aria-label={t`Stop live analysis`}
+          title={t`Stop live analysis (E)`}
+          data-testid="engine-pane-live-stop"
+          onClick={() => search.stream.setEnabled(false)}
+          className="ml-0.5 self-center hover:text-blunder"
+        >
+          <Square className="size-3" fill="currentColor" strokeWidth={0} aria-hidden />
+        </Button>
+      ) : null}
+    </>
   )
 }
 
@@ -717,98 +717,112 @@ function HumanMark() {
   )
 }
 
+/** The level picker's value for "every level, side by side". */
+const COMPARE = 'compare'
+
 /**
- * Who the column speaks for, and the switch that changes it.
+ * Who the column speaks for, and the picker that changes it.
  *
- * A native `select` laid over the label rather than beside it: the header is one line at
- * 11px with a live pill and a compare toggle already on it, and a second visible control
- * would take the label's room. The label is what is read; the select is what is clicked,
- * and it brings the platform's own keyboard handling, its scroll and its disabled options
- * with it. A level the position has no data for is offered and disabled — the fix is a
- * fresh pass, and hiding it would make a level the owner configured look impossible.
+ * A strip picker (docs/design/README.md, "Controls"): the level is a value picked from a
+ * list, so it wears the picker's ⇅ and, in a strip of quiet text, no face until it is
+ * pointed at or focused. The native `select` is laid over it, so it brings the platform's
+ * own keyboard handling, its scroll and its disabled options with it. Maia's purple key dot
+ * sits inside the face, the way a collection's colour sits inside its picker.
+ *
+ * Comparing is a value of the same choice ("All levels, side by side"), because "which
+ * level" and "all of them" answer one question. It used to be a 26×18 bordered toggle
+ * beside the label that nobody could name; folding it in gives the Maia column its width
+ * back. A level the position has no data for is offered and disabled — the fix is a fresh
+ * pass, and hiding it would make a level the owner configured look impossible.
  */
 function LevelLabel({
   rating,
   levels,
   onSelectLevel,
+  compare,
+  onCompareChange,
+  pulse,
 }: {
   rating: string | null
   levels: MaiaLevelOption[]
   onSelectLevel?: (elo: number) => void
+  /** The column shows every level side by side. */
+  compare: boolean
+  /** Given, the list offers "All levels, side by side". */
+  onCompareChange?: (next: boolean) => void
+  /** The dot pulses while a live read of the position is in flight. */
+  pulse: boolean
 }) {
   const { t } = useLingui()
   // "Maia" is the model's name and the number is its level, so the label is the same in
   // every language — nothing here is a word.
   const label = rating ? `Maia ${rating}` : 'Maia'
-  const pickable = levels.length > 1 && onSelectLevel !== undefined
+  const pickLevels = levels.length > 1 && onSelectLevel !== undefined
+  const pickable = pickLevels || onCompareChange !== undefined
+  const dot = (
+    <span
+      aria-hidden
+      className={cn(
+        'size-1.5 flex-none rounded-full bg-brilliant',
+        pulse && '@max-[12rem]:animate-pulse',
+      )}
+    />
+  )
+  const shown = (
+    <span className="inline-flex items-center gap-1 whitespace-nowrap">
+      {compare ? t`All levels` : label}
+      <HumanMark />
+    </span>
+  )
   if (!pickable) {
     return (
-      <span className="inline-flex flex-none items-center gap-1 whitespace-nowrap text-label font-semibold text-ink">
-        {label}
-        <HumanMark />
+      <span className="inline-flex flex-none items-center gap-1.5 px-1.5 text-label font-medium text-ink">
+        {dot}
+        {shown}
       </span>
     )
   }
+  // A live answer from a fixed-weights build names no level; the box still has to have the
+  // value it is showing, or the platform picks one nobody asked for.
+  const options: PickerSelectOption<string>[] = rating === null ? [{ value: '', label: 'Maia' }] : []
+  if (pickLevels) {
+    for (const option of levels) {
+      // Named, because the number is the placeholder a translator sees in the message.
+      const elo = option.elo
+      options.push({
+        value: String(elo),
+        label: option.available ? `Maia ${elo}` : t`${elo} — re-analyse to add`,
+        disabled: !option.available,
+      })
+    }
+  } else if (rating !== null) {
+    options.push({ value: rating, label })
+  }
+  if (onCompareChange) options.push({ value: COMPARE, label: t`All levels, side by side` })
   return (
     // `flex-none` and no truncation: the label is four digits and a word, and it was the
     // one thing on this row that ellipsised ("Maia 20…") while the spacer beside it still
     // had room to give. What yields in a narrow column is the spacer, never the name.
-    <span
-      data-testid="maia-level-picker"
-      className="relative inline-flex flex-none items-center gap-0.5 rounded-md hover:bg-raised"
-    >
-      <span className="inline-flex items-center gap-1 whitespace-nowrap text-label font-semibold text-ink">
-        {label}
-        <HumanMark />
-      </span>
-      <ChevronDown className="size-2.5 flex-none text-soft" aria-hidden />
-      <select
-        aria-label={t`Maia level`}
-        title={t`Which level the human column speaks for`}
-        value={rating ?? ''}
-        onChange={(event) => onSelectLevel(Number(event.target.value))}
-        className="absolute inset-0 w-full cursor-pointer appearance-none opacity-0"
-      >
-        {/* A live answer from a fixed-weights build names no level; the box still has to
-            have the value it is showing, or the platform picks one nobody asked for. */}
-        {rating === null ? <option value="">Maia</option> : null}
-        {levels.map((option) => {
-          // Named, because the number is the placeholder a translator sees in the message.
-          const elo = option.elo
-          return (
-            <option key={elo} value={String(elo)} disabled={!option.available}>
-              {option.available ? String(elo) : t`${elo} — re-analyse to add`}
-            </option>
-          )
-        })}
-      </select>
-    </span>
-  )
-}
-
-/** One level, or all of them side by side. */
-function CompareToggle({ on, onChange }: { on: boolean; onChange: (next: boolean) => void }) {
-  const { t } = useLingui()
-  const label = on ? t`Read one level at a time` : t`Compare the levels side by side`
-  return (
-    <button
-      type="button"
-      data-testid="maia-compare-toggle"
-      aria-pressed={on}
-      title={label}
-      aria-label={label}
-      onClick={() => onChange(!on)}
-      className={cn(
-        // Lit in Maia's purple rather than the selected blue: what it switches on is the
-        // human column's own view, and purple is that column's colour everywhere.
-        'inline-flex flex-none items-center rounded-md border px-1 py-px',
-        on
-          ? 'border-brilliant/40 bg-brilliant/12 text-brilliant'
-          : 'border-edge text-soft hover:border-edge-hover hover:text-ink',
-      )}
-    >
-      <Columns3 className="size-3" aria-hidden />
-    </button>
+    <PickerSelect
+      testId="maia-level-picker"
+      label={t`Maia level`}
+      title={t`Which level the human column speaks for`}
+      size="strip"
+      hideLabel
+      leading={dot}
+      display={shown}
+      value={compare ? COMPARE : (rating ?? '')}
+      options={options}
+      onChange={(next) => {
+        if (next === COMPARE) {
+          onCompareChange?.(true)
+          return
+        }
+        if (compare) onCompareChange?.(false)
+        if (next !== '' && onSelectLevel) onSelectLevel(Number(next))
+      }}
+      className="flex-none"
+    />
   )
 }
 
@@ -925,7 +939,13 @@ function CompareRow({
         move.played ? null : 'border-transparent',
         onPlay ? 'hover:bg-raised' : 'cursor-default',
       )}
-      style={move.played ? { borderLeftColor: hue, background: tint(hue, 7) } : undefined}
+      // The played mark is the neutral edge `HumanRow` uses (an accent edge reads as a
+      // selected row); the verdict's hue stays in the faint tint behind it.
+      style={
+        move.played
+          ? { borderLeftColor: 'var(--bb-muted)', background: tint(hue, 7) }
+          : undefined
+      }
     >
       <span className="relative w-3 flex-none font-mono text-meta text-dim-2">
         {move.rank}
@@ -950,7 +970,7 @@ function LivePill({ pending }: { pending: boolean }) {
   return (
     <span
       data-testid="maia-live"
-      className="inline-flex flex-none items-center gap-1 rounded-sm border border-brilliant/30 bg-brilliant/10 px-1.5 py-px text-meta text-brilliant @max-[12rem]:hidden"
+      className="inline-flex flex-none items-center gap-1 rounded-sm bg-brilliant/10 px-1.5 py-px text-meta text-brilliant @max-[12rem]:hidden"
     >
       <span
         className={cn('size-1 rounded-full bg-brilliant', pending && 'animate-pulse')}
@@ -989,7 +1009,7 @@ function HumanRow({
   const { t } = useLingui()
   const notate = useNotation()
   const verdict = glyphStyle(move.classification)
-  const hue = verdict?.color ?? MAIA_HUE
+  const flagged = isFlagged(move.classification)
   const share = Math.min(100, Math.max(0, (move.probability ?? 0) * 100))
   const stop = `${share.toFixed(1)}%`
   const san = notate(move.san)
@@ -1013,14 +1033,19 @@ function HumanRow({
       )}
       style={{
         background: `linear-gradient(to right, ${tint(MAIA_HUE, 26)} 0 ${stop}, transparent ${stop})`,
-        ...(move.played ? { borderLeftColor: hue } : null),
+        // The played mark is a neutral edge. It had taken the verdict's hue, and for a best
+        // move that hue is the accent: an accent bar on a tinted row is exactly the
+        // selected-row mark, so the played move read as selected.
+        ...(move.played ? { borderLeftColor: 'var(--bb-muted)' } : null),
       }}
     >
       <span
         className={cn(
-          // A move nobody flagged is still the thing being read, so `body`, not `soft`.
+          // A move nobody flagged is still the thing being read, so `body`, not `soft`. The
+          // SAN takes a colour only for a flagged move (never the accent, which is a link
+          // or a selection); a good verdict lives in the `!` chip, as in the move list.
           'min-w-0 flex-1 truncate font-mono text-data',
-          verdict ? verdict.textClass : 'text-body',
+          verdict && flagged ? verdict.textClass : verdict ? 'text-ink' : 'text-body',
         )}
       >
         {san}
@@ -1195,18 +1220,15 @@ function EngineRow({
           })
         )}
       </div>
+      {/* A readout, flat: it states a fact about the row, and a border made it read as a
+          button. A flagged played move keeps its verdict's colour on the word. */}
       {line.played ? (
-        <span
-          className={cn(
-            'flex-none rounded-sm border px-1 py-px text-meta',
-            verdict ? '' : 'border-edge text-dim',
-          )}
-          style={
-            verdict ? { borderColor: tint(verdict.color, 35), color: verdict.color } : undefined
-          }
+        <Readout
+          className="flex-none"
+          style={verdict ? { color: verdict.color } : undefined}
         >
           <Trans comment="Chip marking the engine row for the move the game actually played">played</Trans>
-        </span>
+        </Readout>
       ) : null}
     </div>
   )

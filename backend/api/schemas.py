@@ -325,6 +325,8 @@ class GameCard(GameSummary):
     analyzed: bool = False
     # A run somebody asked for — whole game or a window — is done over this game.
     requested: bool = False
+    # An analysis run over this game is waiting in the queue or running now.
+    queued: bool = False
     eval_curve: list[dict[str, Any]] = Field(default_factory=list)
     worst_moments: list[dict[str, Any]] = Field(default_factory=list)
 
@@ -2574,6 +2576,8 @@ class CollectionResponse(Payload):
     name: str
     color: str
     description: str | None = None
+    # Whether the rail shows it under Collections.
+    pinned: bool = False
     rule: dict[str, Any] | None = None
     game_count: int = 0
     created_at: datetime
@@ -2617,6 +2621,7 @@ class CollectionCreate(Input):
     name: str = Field(max_length=200)
     color: str = "accent"
     description: str | None = None
+    pinned: bool = False
     rule: CollectionRule | None = None
     apply_to_existing: bool = False
     game_ids: list[int] = Field(default_factory=list, max_length=MAX_BATCH_GAMES)
@@ -2628,6 +2633,7 @@ class CollectionUpdate(Input):
     name: str | None = Field(default=None, max_length=200)
     color: str | None = None
     description: str | None = None
+    pinned: bool | None = None
     rule: CollectionRule | None = None
 
 

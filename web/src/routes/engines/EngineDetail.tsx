@@ -2,12 +2,14 @@ import { Plural, Trans, useLingui } from '@lingui/react/macro'
 import { useQuery } from '@tanstack/react-query'
 import { ChevronRight, Loader2, Play, RefreshCw, Trash2 } from 'lucide-react'
 import { useMemo, useState, type ReactNode } from 'react'
-import { Link } from 'react-router-dom'
 
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { ROW } from '@/components/ui/row'
 import { Skeleton } from '@/components/ui/skeleton'
+import { Switch } from '@/components/ui/switch'
+import { TextLink } from '@/components/ui/text-link'
 import { probeEngine } from '@/lib/api/endpoints'
 import {
   useDeleteEngine,
@@ -24,7 +26,6 @@ import { HostBadge } from './HostBadge'
 import { OptionsEditor } from './OptionsEditor'
 import { SampleResult } from './SampleResult'
 import { engineHashMb, engineThreads } from './capacity'
-import { Toggle } from './Toggle'
 import { declaredOptions, draftFrom, resolveDraft, type OptionDraft } from './options'
 import { NO_ROLES, roleLabel, type EngineRoles } from './roles'
 
@@ -52,7 +53,8 @@ function Section({
   return (
     <section className="flex flex-col gap-2.5 border-t border-hairline px-3.5 py-3.5 first:border-t-0">
       <div className="flex items-center gap-2.5">
-        <h3 className="text-meta tracking-[0.1em] text-faint uppercase">{title}</h3>
+        {/* Sentence case: spaced caps are for column heads, and only for them. */}
+        <h3 className="text-label font-medium text-dim">{title}</h3>
         <div className="flex-1" />
         {aside}
       </div>
@@ -82,6 +84,11 @@ function Section({
  * fetched the row — so there is a third state, `hostKnown === false`, while that read is in
  * flight or after it failed. Nothing that touches the binary happens in it: "not known to be
  * remote" is not the same claim as "local", and the probe is the difference between the two.
+ *
+ * Its controls follow the app's grammar: enabled is a `Switch` (a setting that holds), the
+ * fields are sunk inputs, Probe and Test run are secondary faces, and the footer's one
+ * primary is Save changes, last. Remove engine… is the red outline at the other end of the
+ * footer; the filled red is only its confirm, after Cancel.
  */
 export function EngineDetail({
   engine,
@@ -232,14 +239,14 @@ export function EngineDetail({
           </>
         )}
         <div className="flex-1" />
-        <span className="text-label text-dim">
-          {engine.enabled ? t`Enabled` : t`Disabled`}
-        </span>
-        <Toggle
-          label={engine.enabled ? t`Disable ${engineName}` : t`Enable ${engineName}`}
+        {/* One switch labelled with what it states, rather than a word that changed with
+            the state beside a bare track: the track already says on or off. */}
+        <Switch
+          label={t`Enabled`}
           checked={engine.enabled}
           disabled={locked || update.isPending}
-          onChange={(next) => update.mutate({ id: engine.id, body: { enabled: next } })}
+          title={locked ? t`Runner-owned settings are read-only here` : undefined}
+          onCheckedChange={(next) => update.mutate({ id: engine.id, body: { enabled: next } })}
         />
       </div>
 
@@ -350,9 +357,9 @@ export function EngineDetail({
               <Plural value={threadCount} one="thread" other="threads" /> and{' '}
               <span className="font-medium text-soft">{hash}</span> of hash. Both are UCI options
               under More settings; how many processes run at once is set on{' '}
-              <Link to="/compute/machines" className="text-accent-teal hover:text-accent-link">
+              <TextLink to="/compute/machines" placement="inline">
                 Machines
-              </Link>
+              </TextLink>
               .
             </Trans>
           </p>
@@ -363,7 +370,7 @@ export function EngineDetail({
         type="button"
         aria-expanded={moreSettings}
         onClick={() => setMoreSettings((open) => !open)}
-        className="flex w-full items-center gap-2.5 border-t border-hairline px-3.5 py-3 text-left transition-colors hover:bg-raised"
+        className={cn('flex w-full items-center gap-2.5 border-t border-hairline px-3.5 py-3 text-left', ROW)}
       >
         <span className="text-label font-medium text-soft">
           <Trans>More settings</Trans>
@@ -395,9 +402,10 @@ export function EngineDetail({
                   ) : null}
                   <Button
                     type="button"
-                    variant="outline"
+                    variant="secondary"
                     size="sm"
                     disabled={probe.isFetching || locked}
+                    title={probe.isFetching ? t`Probing the binary` : undefined}
                     onClick={() => {
                       setProbeAsked(true)
                       void probe.refetch()
@@ -528,8 +536,10 @@ export function EngineDetail({
                     decide.
                   </Trans>
                 </span>
+                {/* Secondary: the detail's one primary is Save changes in its footer. */}
                 <Button
                   type="button"
+                  variant="secondary"
                   size="sm"
                   disabled={locked || testRun.isPending}
                   onClick={run}
@@ -569,9 +579,9 @@ export function EngineDetail({
               <Trans>
                 Nothing here is editable. This row belongs to a browser tab — uninstall it under{' '}
                 <span className="font-medium text-soft">This browser</span> on{' '}
-                <Link to="/compute/machines" className="text-accent-teal hover:text-accent-link">
+                <TextLink to="/compute/machines" placement="inline">
                   Machines
-                </Link>
+                </TextLink>
                 , or revoke the runner there.
               </Trans>
             ) : (
@@ -579,9 +589,9 @@ export function EngineDetail({
                 Nothing here is editable. Change this engine in{' '}
                 <span className="font-mono text-soft">runner.yaml</span> on {runnerName}, or open{' '}
                 {runnerName} on{' '}
-                <Link to="/compute/machines" className="text-accent-teal hover:text-accent-link">
+                <TextLink to="/compute/machines" placement="inline">
                   Machines
-                </Link>{' '}
+                </TextLink>{' '}
                 to revoke it.
               </Trans>
             )}
@@ -593,7 +603,7 @@ export function EngineDetail({
             </span>
             <Button
               type="button"
-              variant="ghost"
+              variant="secondary"
               size="sm"
               onClick={() => setConfirmDelete(false)}
             >
@@ -611,14 +621,16 @@ export function EngineDetail({
           </>
         ) : (
           <>
+            {/* The red outline, first in the footer and away from Save: it only asks, and
+                the filled red is its confirm. */}
             <Button
               type="button"
-              variant="ghost"
+              variant="destructive-outline"
               size="sm"
               onClick={() => setConfirmDelete(true)}
             >
               <Trash2 aria-hidden />
-              <Trans context="button">Remove</Trans>
+              <Trans context="button">Remove engine…</Trans>
             </Button>
             {update.isError ? (
               <span className="min-w-0 flex-1 truncate text-label text-blunder" title={update.error.message}>
@@ -636,6 +648,13 @@ export function EngineDetail({
               type="button"
               size="sm"
               disabled={locked || !dirty || blocked || update.isPending}
+              title={
+                blocked
+                  ? t`Fix the options above first`
+                  : !dirty
+                    ? t`Nothing has changed`
+                    : undefined
+              }
               onClick={save}
             >
               {update.isPending ? <Loader2 className="animate-spin" aria-hidden /> : null}

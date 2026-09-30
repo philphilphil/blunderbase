@@ -30,8 +30,12 @@
  * evaluation can say that.
  */
 import { Trans, useLingui } from '@lingui/react/macro'
-import { Pause, Play, Square as StopIcon, X } from 'lucide-react'
+import { Pause, Pin, Play, Square as StopIcon, X } from 'lucide-react'
 import type { ReactNode } from 'react'
+
+import { StatusDot } from '@/components/badges/StatusDot'
+import { Button } from '@/components/ui/button'
+import { ROW } from '@/components/ui/row'
 
 import type {
   CorrespondenceSearch,
@@ -151,26 +155,28 @@ export function EnginePane({
           engine is doing and how far it has got sits under it. */}
       <div className="flex flex-none flex-col gap-0.5 border-b border-line bg-panel px-2.5 py-1.5 text-label">
         <div className="flex items-center gap-2">
-          <span
-            aria-hidden
-            className={cn(
-              'size-[0.4375rem] flex-none rounded-full',
+          <StatusDot
+            className="size-[0.4375rem]"
+            tone={
               tone === 'live'
-                ? 'animate-pulse bg-good'
+                ? 'working'
                 : tone === 'warm' || tone === 'away'
-                  ? 'bg-mistake'
+                  ? 'degraded'
                   : tone === 'queued'
-                    ? 'bg-accent-teal'
-                    : 'bg-edge-strong',
-            )}
+                    ? 'waiting'
+                    : 'away'
+            }
           />
           <strong className="truncate font-semibold text-ink" title={pane.engineName}>
             {pane.engineName}
           </strong>
 
+          {/* A toggle in a strip: a ghost button whose on state is the pressed fill. */}
           {onPin && pane.engineId !== null ? (
-            <button
+            <Button
               type="button"
+              variant="ghost"
+              size="xs"
               aria-pressed={pane.pinned}
               title={
                 pane.pinned
@@ -178,15 +184,11 @@ export function EnginePane({
                   : t`Make this engine's verdict the one the tree reads here`
               }
               onClick={() => onPin(pane.pinned ? null : pane.engineId)}
-              className={cn(
-                'ml-auto flex-none rounded-sm border px-1.5 py-px text-meta transition-colors',
-                pane.pinned
-                  ? 'border-accent-teal/40 bg-selected text-accent-teal'
-                  : 'border-transparent text-dim hover:bg-raised hover:text-ink',
-              )}
+              className="ml-auto h-5 flex-none px-1.5 text-meta"
             >
+              <Pin aria-hidden />
               {pane.pinned ? <Trans>Pinned</Trans> : <Trans>Pin</Trans>}
-            </button>
+            </Button>
           ) : null}
 
           {search && task ? (
@@ -196,6 +198,7 @@ export function EnginePane({
                 // A task an engine has already claimed finishes: there is no cancelled state
                 // for a run in flight, and the server says so rather than half-doing it.
                 disabled={busy || live || !onCancel}
+                why={live ? t`An engine has already taken this task; it runs to its end` : undefined}
                 onClick={() => onCancel?.(search.id)}
                 icon={<X aria-hidden />}
               />
@@ -206,6 +209,7 @@ export function EnginePane({
                 <PaneButton
                   label={t`Resume`}
                   disabled={busy || search.status === 'queued'}
+                  why={search.status === 'queued' ? t`It is waiting for a slot already` : undefined}
                   onClick={() => onResume(search.id)}
                   icon={<Play aria-hidden />}
                 />
@@ -230,7 +234,7 @@ export function EnginePane({
         <div className="flex items-center gap-2">
           {task ? (
             <span
-              className={cn('whitespace-nowrap', live ? 'text-good' : 'text-accent-teal')}
+              className={cn('whitespace-nowrap', live ? 'text-good' : 'text-dim')}
               title={t`A bounded look through the analysis queue, which may be running on another machine`}
             >
               {live ? <Trans>task running</Trans> : <Trans>task waiting in the queue</Trans>}
@@ -259,7 +263,7 @@ export function EnginePane({
               <Trans>paused, cold</Trans>
             </span>
           ) : tone === 'queued' ? (
-            <span className="whitespace-nowrap text-accent-teal">
+            <span className="whitespace-nowrap text-dim">
               <Trans>waiting for a slot</Trans>
             </span>
           ) : stopped ? (
@@ -332,7 +336,8 @@ export function EnginePane({
                 data-testid="engine-pane-line"
                 onMouseEnter={() => onHover({ line: id, ply: null, pv: line.pv })}
                 className={cn(
-                  'grid grid-cols-[3rem_minmax(0,1fr)] gap-2 border-b border-hairline px-2.5 py-1.5 hover:bg-raised',
+                  ROW,
+                  'grid grid-cols-[3rem_minmax(0,1fr)] gap-2 border-b border-hairline px-2.5 py-1.5',
                   previewLine === id && 'bg-raised',
                 )}
               >
@@ -441,27 +446,35 @@ function LimitWords({
   return <>{parts.join(' · ')}</>
 }
 
+/**
+ * An icon tool in the pane's head: the pane strip's ghost square (`PANE_TOOL`), named twice
+ * (`aria-label` and `title`). Disabled, its title says why rather than repeating the name.
+ */
 function PaneButton({
   label,
   icon,
   onClick,
   disabled,
+  why,
 }: {
   label: string
   icon: ReactNode
   onClick: () => void
   disabled?: boolean
+  /** Why it cannot be pressed now, shown on hover while disabled. */
+  why?: string
 }) {
   return (
-    <button
+    <Button
       type="button"
+      variant="ghost"
+      size="icon-xs"
       aria-label={label}
-      title={label}
+      title={disabled && why ? why : label}
       disabled={disabled}
       onClick={onClick}
-      className="flex size-5.5 items-center justify-center rounded-sm text-dim transition-colors hover:bg-raised hover:text-ink disabled:cursor-default disabled:opacity-40 [&_svg]:size-3"
     >
       {icon}
-    </button>
+    </Button>
   )
 }

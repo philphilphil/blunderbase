@@ -208,7 +208,8 @@ describe('ReferenceGamePage', () => {
     )
     renderPage()
 
-    await userEvent.click(await screen.findByRole('button', { name: '+ Add to library' }))
+    // The "+" became an icon in the clarity pass, so the name is the words alone.
+    await userEvent.click(await screen.findByRole('button', { name: /Add to library/ }))
 
     expect(await screen.findByText('library game')).toBeInTheDocument()
     expect(

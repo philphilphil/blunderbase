@@ -1,11 +1,17 @@
 /**
  * Design 2c's "games in this line": the games that actually reached this position, from
  * `/explorer/positions`, each one a link into the game view.
+ *
+ * The way to all of them is a `TextLink` named for where it goes, "Open in Games ›": it
+ * navigates, so it is a link (accent text is kept for links), and "library" was the old
+ * name of the Games page. Rows are the shared `ROW` so they hover like every list.
  */
 import { Trans } from '@lingui/react/macro'
 import { useNavigate } from 'react-router-dom'
 
+import { ROW } from '@/components/ui/row'
 import { Skeleton } from '@/components/ui/skeleton'
+import { TextLink } from '@/components/ui/text-link'
 import type { PositionOccurrence } from '@/lib/api/types'
 import { cn } from '@/lib/utils'
 
@@ -15,13 +21,14 @@ export function GamesInLine({
   games,
   loading,
   total,
-  onOpenLibrary,
+  libraryHref,
 }: {
   games: PositionOccurrence[]
   loading: boolean
   /** How many games the tree says reached here; the list itself is capped. */
   total: number
-  onOpenLibrary: (() => void) | null
+  /** The Games page filtered to this line, or null when there is no ECO to filter by. */
+  libraryHref: string | null
 }) {
   const navigate = useNavigate()
 
@@ -32,14 +39,10 @@ export function GamesInLine({
           <Trans>Games in this line</Trans>
         </span>
         <div className="flex-1" />
-        {onOpenLibrary && total > 0 ? (
-          <button
-            type="button"
-            onClick={onOpenLibrary}
-            className="text-label text-accent-teal hover:text-accent-link"
-          >
-            <Trans>open in library</Trans>
-          </button>
+        {libraryHref && total > 0 ? (
+          <TextLink to={libraryHref} className="text-label">
+            <Trans>Open in Games</Trans>
+          </TextLink>
         ) : null}
       </div>
 
@@ -62,7 +65,10 @@ export function GamesInLine({
               key={`${occurrence.game.id}-${occurrence.ply}`}
               type="button"
               onClick={() => navigate(`/games/${occurrence.game.id}`)}
-              className="flex h-[1.8125rem] flex-none items-center gap-2.5 whitespace-nowrap rounded-[0.3125rem] px-2.5 text-left transition-colors hover:bg-elevated-2"
+              className={cn(
+                ROW,
+                'flex h-[1.8125rem] flex-none items-center gap-2.5 whitespace-nowrap rounded-sm px-2.5 text-left',
+              )}
             >
               {/* `27 Dec 16` is nine mono glyphs — the cell has to hold them on one line. */}
               <span className="w-[4.25rem] flex-none text-soft">

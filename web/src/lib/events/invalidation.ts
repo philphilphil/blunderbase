@@ -29,23 +29,28 @@ export function invalidationsFor(event: AnyEvent): QueryKey[] {
     // queueing sixty games is sixty `queued` frames and sixty `running` frames, and each one
     // would send every loaded page of `/games?cards=true` plus the badge counts back out. The
     // queue widget is the live view of a run's lifecycle; the game's own badge catching up at
-    // `analysis.done` is soon enough.
+    // `analysis.done` is soon enough. The Games page's own Analyse refreshes the table once
+    // when its request answers (`useRequestAnalysisBatch`), which is what turns its rows to
+    // "In queue".
     case 'analysis.queued':
     case 'analysis.running':
-    // A run taken back wrote nothing, so only the queue and the game's run list moved.
-    case 'analysis.cancelled':
       return [queryKeys.analysis()]
+
+    // A run taken back wrote no evals, but its game's row said "In queue" and no longer
+    // should. One frame per run a person stopped by hand, so the table can afford it.
+    case 'analysis.cancelled':
+      return [queryKeys.analysis(), queryKeys.games()]
 
     // Nothing about a run row changes while it works, only how far along it is.
     case 'analysis.progress':
       return [queryKeys.queue()]
 
-    // A bulk enqueue, announced once for the whole operation rather than once per game.
-    // Queued work has produced no evals, so this is the same news as `analysis.queued` and
-    // stops at `['analysis']` for the same reason — the difference is only that one frame
-    // stands for ten thousand games, and the queue is how they are watched from here.
+    // A queue-wide write — a backfill, the backfill's stop, the queue cleared — announced
+    // once for the whole operation rather than once per game. No evals moved, but every
+    // affected row's "In queue" did, and one frame for ten thousand games is one refetch of
+    // the table, which is what the per-run frames above could not afford.
     case 'analysis.backfill':
-      return [queryKeys.analysis()]
+      return [queryKeys.analysis(), queryKeys.games()]
 
     // The button in the top bar, pressed here or in another tab. Narrower than the rest of
     // the analysis events on purpose: pausing changes nothing about any run row, only

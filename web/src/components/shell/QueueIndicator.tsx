@@ -1,7 +1,8 @@
 import { Trans, useLingui } from '@lingui/react/macro'
-import { Loader2, Pause, Play } from 'lucide-react'
+import { ListX, Loader2, Pause, Play } from 'lucide-react'
 import { useEffect, useState } from 'react'
 
+import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { useClearQueue, useQueueStatus, useSetQueuePaused } from '@/lib/api/queries'
 import { cn } from '@/lib/utils'
@@ -10,7 +11,22 @@ import { QueueDestinations } from './QueueDestinations'
 import { QueueMeter } from './QueueMeter'
 
 /**
- * The titlebar queue widget from the design: a label, a 64×3 meter and `3/7` in mono.
+ * The analysis queue as a readout at the right end of the titlebar: a state word, a meter
+ * while there is work, and `running/total` in mono, with its two controls after it.
+ *
+ * In the titlebar, not the rail foot. The clarity pass moved it down beside the engines
+ * ("what is the machine doing"), where the 200px foot had room for the figure and two
+ * 20px icons and nothing else: the word went under the spinner, and a paused queue's Clear
+ * was squeezed out of sight. Up here it has the width to say its state in words and to give
+ * Pause and Clear full-size toolbar faces.
+ *
+ * Unboxed (the clarity pass): a readout has no face and no border, because nothing about it
+ * is pressed — a bordered box made the number look like a field. The meter shows only while
+ * work is running: idle, `Idle 0/0` is the whole story, and an empty trough beside a number
+ * reads as a control (paused, the word says why nothing moves). Idle is `dim-2`, not
+ * `faint`, which is under 4.5:1 on the panel. The word and the meter give way below `lg`:
+ * the figure already says whether anything runs, and a tablet's bar has the page's actions
+ * to fit as well.
  *
  * `/analysis/queue` reports queued and running counts, so the meter fills its whole width
  * with the outstanding work and splits it into running and waiting segments. It cannot be
@@ -20,12 +36,14 @@ import { QueueMeter } from './QueueMeter'
  * The tooltip carries the same sentence the `title` attribute used to, plus the
  * per-destination split when there is more than one place the work can go.
  *
- * Two controls sit beside it, in the order the queue is thought about: pause first, then
- * Clear. Pause is shown while there is something to pause *or* while the queue is already
- * paused — the second half is not optional, because pausing and then letting the last
- * claimed run finish would otherwise leave a paused queue with no button to resume it.
- * Paused is a state of the widget too: the label says so, since a stopped queue that reads
- * `Idle` is a queue the owner will wait on forever.
+ * Two controls sit beside it, the toolbar's `sm` tool buttons, shown only when they have
+ * something to act on, in the order the queue is thought about: pause first, then Clear.
+ * Pause is shown while there is something to pause *or* while the queue is already paused
+ * — the second half is not optional, because pausing and then letting the last claimed run
+ * finish would otherwise leave a paused queue with no button to resume it. Clear is shown
+ * while anything is queued, paused or not. Paused is a state of the readout too: the word
+ * says so, since a stopped queue that reads `Idle` is a queue the owner will wait on
+ * forever.
  */
 export function QueueIndicator({ className }: { className?: string }) {
   const { data } = useQueueStatus()
@@ -34,6 +52,8 @@ export function QueueIndicator({ className }: { className?: string }) {
   const total = queued + running
   const paused = data?.paused ?? false
   const idle = total === 0 && !paused
+  // Work outstanding and the queue not stopped: the one state that draws the meter.
+  const working = total > 0 && !paused
   const destinations = data?.destinations ?? []
   const { t } = useLingui()
 
@@ -48,42 +68,28 @@ export function QueueIndicator({ className }: { className?: string }) {
         : t`${queued} queued, ${running} running — workers are not draining the queue`
 
   return (
-    <div className="flex items-center gap-1.5">
+    <div className={cn('flex flex-none items-center gap-1.5', className)}>
       <Tooltip>
         <TooltipTrigger asChild>
-          <div
-            className={cn(
-              'flex items-center gap-2 rounded-md border border-edge bg-elevated px-2.5 py-[0.3125rem]',
-              className,
-            )}
-          >
-            {/*
-              The word and the full-width bar are the first things to go on a phone: the
-              `3/7` beside them already says whether anything is running, and the titlebar
-              has four other things to fit into 375px. They go below `lg` rather than `md`,
-              because a tablet's titlebar with the queue busy — Pause and Clear beside this —
-              is where the account menu at the far end was being pushed off.
-            */}
+          <div className="flex items-center gap-2 text-label">
             <span
               className={cn(
-                'text-label max-lg:hidden',
+                'inline-flex items-center gap-1 max-lg:hidden',
                 paused ? 'text-mistake' : idle ? 'text-dim-2' : 'text-soft',
               )}
             >
+              {working ? <Loader2 className="size-3 animate-spin" aria-hidden /> : null}
               {paused ? t`Paused` : idle ? t`Idle` : t`Analysing`}
             </span>
-            <QueueMeter
-              queued={queued}
-              running={running}
-              stopped={paused || data?.workers === false}
-              className="h-[0.1875rem] w-16 max-lg:w-8"
-            />
-            <span
-              className={cn(
-                'font-mono text-label tabular',
-                idle ? 'text-faint' : 'text-ink',
-              )}
-            >
+            {working ? (
+              <QueueMeter
+                queued={queued}
+                running={running}
+                stopped={paused || data?.workers === false}
+                className="h-[0.1875rem] w-16 max-lg:hidden"
+              />
+            ) : null}
+            <span className={cn('font-mono tabular', total === 0 ? 'text-dim-2' : 'text-ink')}>
               {running}/{total}
             </span>
           </div>
@@ -122,9 +128,8 @@ export function QueueIndicator({ className }: { className?: string }) {
  * Stop the queue where it is, and start it again. One click each way, no arming: pausing
  * is undone by the next press, which is the whole difference between this and Clear.
  *
- * The paused state carries the same warning colour the bar takes when nothing is draining
- * the queue — it is a stopped queue rather than a neutral toggle, and it has to be findable
- * in a titlebar the owner is not looking at.
+ * Paused, the play glyph takes the warning colour the word beside it has — a stopped queue
+ * rather than a neutral toggle, and findable in a titlebar the owner is not looking at.
  */
 function PauseQueueButton({ paused }: { paused: boolean }) {
   const setPaused = useSetQueuePaused()
@@ -133,22 +138,17 @@ function PauseQueueButton({ paused }: { paused: boolean }) {
   const label = paused ? t`Resume the analysis queue` : t`Pause the analysis queue`
 
   return (
-    <button
-      type="button"
+    <Button
+      variant="secondary"
+      size="icon-sm"
       data-testid="pause-queue"
       disabled={pending}
       aria-label={label}
       title={label}
       onClick={() => setPaused.mutate(!paused)}
-      className={cn(
-        'flex items-center rounded-md border px-2.5 py-[0.3125rem] transition-colors disabled:opacity-60',
-        paused
-          ? 'border-mistake/40 bg-mistake/10 text-mistake hover:bg-mistake/20'
-          : 'border-edge text-dim hover:border-edge-hover hover:text-ink',
-      )}
+      className={cn(paused && 'text-mistake')}
     >
-      {/* The spinner is the icon's size, not the Clear button's: this one is icon-only,
-          and a narrower glyph mid-flight would jog the row it sits in. */}
+      {/* The spinner is the icon's size: a narrower glyph mid-flight would jog the row. */}
       {pending ? (
         <Loader2 className="size-3.5 animate-spin" aria-hidden />
       ) : paused ? (
@@ -156,7 +156,7 @@ function PauseQueueButton({ paused }: { paused: boolean }) {
       ) : (
         <Pause className="size-3.5" aria-hidden />
       )}
-    </button>
+    </Button>
   )
 }
 
@@ -180,9 +180,12 @@ function ClearQueueButton({ queued }: { queued: number }) {
   }, [armed])
 
   const pending = clear.isPending
+  // A tool button at rest; armed, the question with the count in it, red-outlined (the
+  // toolbar's red command), since the second press cannot be taken back.
   return (
-    <button
-      type="button"
+    <Button
+      variant={armed ? 'destructive-outline' : 'secondary'}
+      size="sm"
       data-testid="clear-queue"
       disabled={pending}
       aria-label={armed ? t`Clear ${queued} queued runs` : t`Clear the analysis queue`}
@@ -194,15 +197,13 @@ function ClearQueueButton({ queued }: { queued: number }) {
         }
         clear.mutate()
       }}
-      className={cn(
-        'flex items-center gap-1 rounded-md border px-2.5 py-[0.3125rem] font-mono text-label transition-colors disabled:opacity-60',
-        armed
-          ? 'border-blunder/40 bg-blunder/10 text-blunder hover:bg-blunder/20'
-          : 'border-edge text-dim hover:border-edge-hover hover:text-ink',
-      )}
     >
-      {pending ? <Loader2 className="size-3 animate-spin" aria-hidden /> : null}
+      {pending ? (
+        <Loader2 className="animate-spin" aria-hidden />
+      ) : (
+        <ListX aria-hidden />
+      )}
       {armed ? t`Clear ${queued}?` : t`Clear`}
-    </button>
+    </Button>
   )
 }

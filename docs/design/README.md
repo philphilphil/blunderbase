@@ -6,6 +6,69 @@ directory are local snapshots pulled 2026-08-25.
 
 ## Decisions
 
+- **Clarity pass (owner, 2026-09-29)** (`prototypes/clarity/`). The owner turned down an
+  Apple-look redesign but wanted its clarity in this design: "navigation is way more
+  clear, tabs are visible as tabs, buttons, everything is clear". Nothing of the look
+  moved (palette, type scale, density, the pane idiom, the board and the charts); the
+  control grammar did. The principles:
+  1. One mark means "you are here", and nothing else looks like it: accent text on a quiet
+     grey pill (`--bb-nav-current`). The blue fill is never location.
+  2. The page name is a title, and the page's commands stand apart from it.
+  3. A raised face means "press me", and only a pressable thing has one. A sunk field
+     means "type here"; a border alone is a chip; nothing at all is data.
+  4. Each kind of control has its own silhouette (tab, one-of-N, button group, picker,
+     menu, switch, chip, link, readout), so the shape tells the kind before the word.
+  5. Each state has its own channel (see "One state, one channel" below).
+  6. One filled button per region, last in its group; a disabled button loses its face.
+  7. The rail holds the app, the bar holds the page.
+  8. One name per place: the lit rail row, the title, the palette and the manual agree.
+  9. Keep the look: the new tokens are neutral greys and one shade.
+
+  The four taste decisions were all taken as **A**: a pane tab is a **folder tab** (the
+  pane's surface pushed into the strip with a 2px accent top edge, D1-A); a chosen segment
+  is a **neutral raised thumb** in a sunken track (D2-A); **the rail carries the app and
+  the bar carries the page** (D3-A); and **the collections the owner pins sit in the rail**
+  under Collections (D4-A). The spec with every contrast figure is the prototype's
+  `clarity.css`; the controls are described under "Controls" below.
+
+  What the pass settled on the game screen:
+  - **Maia's compare is a value of the level picker** ("All levels, side by side"), not the
+    26×18 bordered toggle that sat beside the label and that nobody could name: "which
+    level" and "all of them" answer one question, and folding it in gave the Maia column
+    its width back. A level the position has no data for is offered disabled.
+  - **Live is started from its own pane.** An idle Live tab offers Start in the pane, and
+    while the search runs a Stop tool stands *beside* the tabs, never in one: a tab only
+    shows a pane and never starts or stops anything.
+  - **The engine strip's order is tabs │ facts … │ tools.** The facts (engine, MPV, the
+    limit) say what the pane shows and are the only part that yields; the tools after the
+    rule (Arrows, **Analyse…**) keep their place. Under 22rem of strip (the pane at 1280)
+    the Arrows picker drops its word and then the MPV readout goes, so **Analyse…** is
+    never the thing pushed off.
+  - **The game's dialogs end in `DialogFooter`** (`components/engine-dialog/DialogFrame`:
+    Analyse…, Practise…, Collections): Cancel as a tool button, then the one filled
+    primary, last. Cancel had been an outline in one dialog and a ghost in the next.
+  - **"Add to library" is the control row's one filled button** on a model game's screen
+    (a game opened from the explorer's references, `StudioActions`): it is the one
+    affirmative act there, and everything else on the row is a tool button.
+  - **The PGN region on Import has its own Skip evaluation**, deliberately independent of
+    the accounts' box: each region says for itself whether what it brings in is analysed,
+    beside the button that brings it in.
+  - **One Flip everywhere**: the `FlipVertical2` mirror and the word "Flip" on every board
+    (game, explorer, repertoire, Live; icon alone where a strip has no room, as the game's
+    player row and correspondence). An arrow pair is a swap, and ⇅ is the picker's mark.
+
+  And across the app:
+  - **Place names are joined by `›`**, in the UI and in the manual (`Compute › Engines`),
+    the trail's own separator; `→` is left for moves and ranges.
+  - **A popover hangs from the edge its picker stands at** (`FilterPopover align="end"`
+    for a picker at the right of its region: the Dashboard's Speed, the explorer's
+    filters), so it never covers the next column or runs off the window.
+  - **A sideways-scrolling table fades its right edge** while more is off to that side
+    (`lib/ui/useMoreRight.ts`): the Games table and the explorer's move tables.
+  - **Speeds are names**, capitalised and in one order, bullet to correspondence, on every
+    picker and chip; the Dashboard's list carries each speed's game count.
+  - **German writes an ellipsis after a word with a space** ("Analysieren …"), in the
+    catalog and the manual alike.
 - **Game collections: named, coloured groups of games** (issue #37,
   `prototypes/organize-collections.html`, chosen 2026-09-26 over
   `prototypes/organize-tags.html` and `prototypes/organize-folders.html`). A collection holds
@@ -72,18 +135,56 @@ directory are local snapshots pulled 2026-08-25.
     `accent-teal` is still the accent's class; only its value moved.
   - **The overview is sections, not cards**: a heading over a rule
     (`components/shell/Section.tsx`).
-  - **The titlebar is the page's heading** (owner, 2026-09-27). A screen used to be
-    named three times: the rail's highlighted row, the titlebar crumb, and an in-page
-    `h1` with a subtitle under it. The `h1` and its subtitle are gone from every screen.
-    The last crumb is the page's name, a step brighter than the way there. The page's
-    buttons go through `SetPageChrome`'s `actions` and follow the crumb from `md` up, so
-    the bar reads in two halves: the page on the left, the app on the right. Below `md`
-    the shell puts them in one row under the bar (`AppShell`'s `PhoneActions`), and the
-    titlebar keeps only the last crumb. The (?) left the bar for the rail's footer, as
-    **Manual** beside the GitHub link: it is the app's help, not the page's command.
-    Subtitles that explained a page were dropped, since the manual is for that. Live facts went
-    where they belong: the games count is the table footer's, and a full notes page
-    says so under its last note. Only the game screen was already built this way.
+  - **The titlebar is the page's heading** (owner, 2026-09-27; reshaped by the clarity
+    pass, 2026-09-29). A screen used to be named three times: the rail's highlighted row,
+    the titlebar crumb, and an in-page `h1` with a subtitle under it. The `h1` and its
+    subtitle are gone from every screen. The bar's last crumb is the page's title, in
+    `text-heading` (the bar's `h1`, never a link), and every crumb before it is a place,
+    so it is a link (`text-data text-soft`, ink and underlined on hover) with a `›`
+    between: `Library › Import`, `Games › Blunders`, `Collections › League 2026`. A thing
+    that is not a place (the game's date) is not a crumb. The page's buttons go through
+    `SetPageChrome`'s `actions` and stand **right-aligned**, then a `bg-line` rule (only
+    when there are actions), then the **Hide engine** switch, the one global left in the
+    bar because it must be reachable before a game is opened. The bar's left padding is
+    the page gutter (`pl-6`), so the title sits over the column it names.
+  - **The frame: the rail carries the app, the bar carries the page** (clarity D3-A).
+    From `md` the shell is a two-column grid: the 200px rail full height (52px folded, the
+    fold kept in `blunderbase.navCollapsed`), and a column of the 42px bar over the page.
+    The rail's first row is the brand (mark, name, the flat Demo tint on the public demo)
+    at 42px with its own `edge-strong` rule, so the band and its rule still cross the
+    window; then a field-shaped **Search everything ⌘K**; then the destinations (no
+    heading over the first group, `Data & compute` in sentence case over the second); then
+    a three-row foot: the status line (the engines as one link to Compute › Engines, the
+    queue as an unboxed readout), the account row (an initials disc and the name, its menu
+    opening upward, where Appearance, Language and Keyboard shortcuts now live), and the
+    utility row (fold, Manual, GitHub, the connection dot, the version). Only the middle
+    scrolls, and at 1440×900 with any one fold open it does not. On a phone the bar spans
+    the window with ☰ (or a `‹ Parent` back link on a detail page, `SetPageChrome`'s
+    `back`), the title, the switch without its word, and search as an icon; the page's
+    actions stand in a row under it (`PhoneActions`); the drawer is the rail in the same
+    order, without the fold control.
+  - **One "you are here", on the leaf** (clarity). The rail marks the deepest current
+    place, and only it: `bg-nav-current` with `text-accent-teal font-medium` and an accent
+    icon. Its parent (Library over Import, Stats over its report, Games over a saved cut)
+    stays plain `text-ink`; folded to icons, the parent lights instead. Idle rows are
+    unchanged (`text-soft`, `size-3.5 text-dim` icons) and hover changes the text only: a
+    hover fill was a second lit row. A route fold is at most four rows, the last of them
+    `More (n) ›` to its page when there are more, and never hides the lit row (four rows
+    plus `More` overflowed the 900px rail on Games; `shell/fit.mjs` in the clarity shots
+    measured it). Row titles carry the page's shortcut
+    ("Games ⌘2"), as the palette's page rows do.
+  - **Pinned collections** (clarity D4-A). The collections the owner pinned ("Show in the
+    rail" in the collection's dialog; none after the upgrade that added it), in the
+    Collections page's order, always sit under the Collections row, at the fold's indent
+    without its rule, each marked by
+    its square swatch where a saved filter has a round dot. A row opens
+    `/games?collection=<id>&whose=all`; while Games shows exactly that, the row is the lit
+    leaf, Collections its parent, Games unlit, and the title reads `Collections › <name>`.
+    The rail and the title both ask `web/src/lib/libraryPlace.ts`, so they cannot disagree.
+    The **Manual** link sits in the rail's utility row: it is the app's help, not the
+    page's command. Subtitles that explained a page were dropped, since the manual is for
+    that. Live facts went where they belong: the games count is the table footer's, and a
+    full notes page says so under its last note.
   - **The game screen is one workspace**: a full-width `GameHeaderBar`, then the
     board flush left and a pane matrix to its right whose four title strips —
     Maia, the engine, Moves/Flagged, Book/Notes — sit on one line. The real
@@ -107,8 +208,8 @@ directory are local snapshots pulled 2026-08-25.
     | `text-heading` | 0.875rem / 1.25rem (14) | 600 | `ink` | a section's h2, the game header's opening, dialog titles |
     | `text-value` | 0.9375rem / 1.25rem (15) | 500 | `ink`, mono | key numbers: a chart's current rating, a trend's value |
 
-    There is no page-title size, because there is no page title (see "The titlebar is
-    the page's heading" below). Nothing else sets a font size: no `text-[…rem]` and none
+    There is no page-title size: the bar's title reuses `text-heading` (see "The titlebar
+    is the page's heading" above). Nothing else sets a font size: no `text-[…rem]` and none
     of Tailwind's stock `text-xs` … `text-xl`. `scale.test.ts` fails on either, except for
     the short list of things that are not text in this sense (the captured-piece
     figurines, the two Stats display numerals), each named there with its reason.
@@ -136,29 +237,110 @@ directory are local snapshots pulled 2026-08-25.
     `text-data` — forms and dialogs), `lg` (h-9, `text-lead`), and the squares
     `icon` (size-8), `icon-sm` (size-7) and `icon-xs` (size-6), each with a size-4
     icon. The base carries no font size or gap: each size sets its own, because a
-    bare `buttonVariants(...)` string never passes through tailwind-merge. Variants:
-    `default` is the filled accent, at most one per region (Sync all, Resume, Save);
-    `secondary` is *the* tool button (`border-edge bg-elevated text-body`), which
-    replaced eight hand-copied class strings; `outline` and `ghost` are its quieter
-    neighbours; `destructive` and `link` as they were. `Segmented`
-    (`routes/stats/kit/states.tsx`) is h-7 to sit beside an `sm` button, `FilterChip`
-    (`components/ui/chip.tsx`) h-6, both sans. An error message is `.bb-error`: a
-    blunder-red frame and left bar around `body` text, never red text on a red tint,
-    which falls under AA on the light panel.
-  - **One selected state.** `bg-selected text-ink`, plus `border-accent-teal/45`
-    where the element has a border, and the accent on a pressed toggle's icon. A
-    `Button` gets it from `aria-pressed` (on `secondary`, `outline` and `ghost`, never
-    the filled `default`); `Segmented`, `FilterChip` and the rail use the same pair. A
-    selected list or table row adds a bar down its left edge
-    (`shadow-[inset_0.125rem_0_0_var(--bb-accent)]`). The move list's current move is
-    `bg-selected text-bright` with an inset accent ring; the pair under the cursor is
-    `--bb-row-active`, a blue-grey that does not read as hover. Pane tabs keep their own
-    idiom (the surface pushed up into the strip, `paneTabs.ts`). The accent tints
-    (`bg-accent-teal/10`, `/8`) are retired as selection. Blue means selection and
-    interaction; strong colour is kept for evaluation, results, classification glyphs,
-    errors and Maia's purple.
+    bare `buttonVariants(...)` string never passes through tailwind-merge (the export
+    runs `cn` itself since the clarity pass). Variants, as the clarity pass (2026-09-29)
+    left them:
+    - `default`, the filled accent: the one action a region exists for, at most one per
+      region and last in its group (Sync all, Save, Queue analysis, a dialog's OK). Never
+      `aria-pressed`.
+    - `secondary`, *the* tool button and every other command (toolbar, control row,
+      footer, card, Cancel): a **face**, `bg-control` on a `control-edge` border with a 1px
+      inner bottom shade (`shadow-face`). Hover lifts it (`control-hover`), mouse-down
+      sinks it (`raised-2`, shade dropped), `aria-pressed` lights it (below). The icon
+      squares take `control-edge-strong`, since without a label the edge is the whole
+      signal (≥ 3:1).
+    - `ghost`: icon actions in table rows, note cards and pane strips, where a face would
+      be noise. No ghost *text* buttons.
+    - `destructive-outline`: the red command in a toolbar (Delete, Reset library), a face
+      with a blunder border and text, last after a gap. `destructive`, filled red, is only
+      a confirmation dialog's confirm button.
+    - `link`: prose only; a link that goes somewhere is `TextLink`.
+    - `outline` is **retired**: it is `secondary`'s exact string for one release, and
+      `lib/ui/grammar.test.ts` fails on a new use.
+    - **Disabled is one look** for every faced variant: the silhouette without the face
+      (transparent, `edge` border, `faint-2` text, icon at 70 %). It keeps pointer events,
+      so the cursor says not-allowed and the `title` can say why; hover and active are
+      `not-disabled:` (a router `Link` takes these classes too, and `:enabled` never
+      matches an `<a>`). A Radix tooltip on a disabled button wraps it in a span
+      (`TooltipTrigger` does it).
+
+    The other controls, one component each in `components/ui/`, each a shape of its own:
+    - **`Segmented`** (`segmented.tsx`): one value out of two to five short options, all
+      visible (a window, a colour, Mine / Others / All, a view, a theme). A sunken
+      `bg-void` track with the chosen option as a **raised neutral thumb** (`bg-control`,
+      `shadow-thumb`), no dividers, sans, never wrapping; a `radiogroup` with the arrow
+      keys choosing. `ViewToggle` wraps it. Neutral, because a setting's value is not a
+      selection of data.
+    - **`ButtonGroup`** (`button-group.tsx`): "do one of these" (⏮ ◀ ▶ ⏭, flag and explorer
+      navigation). Attached faces under one outline, never a sunken track.
+    - **`PickerButton`** (`picker-button.tsx`): a value from a list (the Games and Notes
+      filters, Speed, Rows, the Maia level). A face reading "Label" or "Label: value" and
+      ending in `ChevronsUpDown` inside the button; lit blue while set (it narrows), with
+      a `×` segment in the same outline; `size="strip"` has no face until hovered, focused
+      or open. "Label: value" is one run of text with a word space after the colon.
+      **`PickerSelect`** (`native-select.tsx`) is its look over a transparent native
+      `<select>` for toolbars and strips (the Maia level and the live engine too, with
+      `display` for a face richer than the option's words); nothing rebuilds it by hand.
+      The shared outline is `pickerLook` (`picker-look.ts`). **`NativeSelect`** is a plain
+      field for forms.
+      **`SpeedPicker`** (`components/filters/`) is the one Speed control: "Speed: All" or
+      "Speed: Blitz, Rapid" over a checklist, on the Dashboard, Stats and the Explorer.
+    - **`ActionMenu`** (`action-menu.tsx`): a list of commands, a labelled face ending in
+      `ChevronDown` (⌄, never ⇅) or the `⋯` square; `role=menu`, arrows, Escape.
+    - **`Switch`** (`switch.tsx`): a mode or setting that persists (Hide engine, vs
+      previous window, Sync automatically). Muted on purpose: a pale accent track and an
+      accent thumb, never the saturated iOS pill. `routes/engines/Toggle.tsx` renders it.
+    - **`Checkbox`** (`checkbox.tsx`): drawn as a field (an outlined `bg-field` box on the
+      strong edge), on and mixed as the accent fill with a glyph.
+    - **`FilterChip`** (`chip.tsx`, h-6): "any of these" for a few short values (rating
+      bands, tags). A border with no face; on always carries a ✓, and the blue fill only
+      while the set is narrowed (`narrowed={false}` when every member is on).
+    - **`TextLink`** (`text-link.tsx`): navigation and nothing else. Accent with a `›`
+      (`↗` external); `tone="quiet"` for metadata repeated down a list; `placement=
+      "inline"` underlined at rest inside a sentence. Accent text means link.
+    - **`Badge`** and **`Readout`** (`badge.tsx`): facts. No border in any variant, no
+      face, not focusable; a tint at most.
+    - **`Pager`** (`pager.tsx`): faced ‹ › around a flat mono "1 / 231".
+    - **Fields** (`input.tsx`, `textarea.tsx`): `Input`, `SearchInput` (a leading
+      magnifier and a scoped placeholder), `Textarea`. Sunk: `bg-field` with a 1px inner
+      top shade (`shadow-field`), the inverse of a face; focus is the accent border and
+      the ring.
+    - **Tables and rows**: `SortableHead` (`table.tsx`) is a column head whose whole cell
+      sorts, and `SortButton` is its button alone for a div grid (the Games table), `end`
+      for a right-aligned figure column; `ui/row.ts` gives non-table lists `TableRow`'s
+      states.
+    - **Pane tabs**: `PaneTabList` / `PaneTab` (`routes/game/components/PaneTabList.tsx`,
+      classes in `paneTabs.ts`): sibling `role=tab` buttons in a `tablist`, the chosen one
+      a folder tab with a 2px accent top edge hung 1px below the strip's top. A tab never
+      has a face, a box or the blue fill.
+
+    An error message is `.bb-error`: a blunder-red frame and left bar around `body` text,
+    never red text on a red tint, which falls under AA on the light panel.
+  - **One state, one channel** (was "One selected state"; the clarity pass split it,
+    because one blue fill had been doing five jobs and so carried no hierarchy):
+    - **Location** is accent text on the `--bb-nav-current` pill, in the rail only.
+    - **A chosen value** is the raised neutral thumb of a `Segmented`.
+    - **On and selection** is the blue fill: `bg-selected text-ink`, plus
+      `border-accent-teal/45` where there is a border and the accent on the icon, with a
+      face's shade dropped (pushed in). A `Button` gets it from `aria-pressed` (never the
+      filled `default`); a set `PickerButton`, a `FilterChip` in a narrowed set, a
+      selected row (plus `shadow-row-bar`, the 2px inset accent bar, unchanged on hover)
+      take it too. The move list's current move is `bg-selected text-bright` with an inset
+      accent ring; the pair under the cursor is `--bb-row-active` plus the bar.
+    - **Hover** is `raised` on rows, ghosts and idle tabs, `control-hover` on a face,
+      text only on rail rows and idle segments. Never `hover:bg-selected`.
+    - **Focus** is one solid 2px accent ring, 2px out (`:focus-visible` in `index.css`),
+      pulled inside with `focus-visible:outline-offset-[-0.125rem]` where a strip clips
+      it. Fields also turn their border accent. Never a fill, never a per-site ring.
+    - **Primary** is the filled accent.
+    - **Status** is green for alive (pulsing while working), grey waiting, orange
+      degraded, red broken (`StatusDot`). Blue is interaction and choice only.
+
+    `lib/ui/grammar.test.ts` fails on the patterns that bring a retired state back.
   - **One hover**: `hover:bg-raised`. `--bb-raised` reads on the canvas and on the
-    chrome in both themes (dark 1.30:1 / 1.16:1, light 1.22:1 / 1.10:1).
+    chrome in both themes (dark 1.30:1 / 1.16:1, light 1.22:1 / 1.10:1). A face lifts to
+    `--bb-control-hover` instead: in dark `raised` is darker than the face and would read
+    as pressed.
   - **Radii.** Controls, menus and popovers `rounded-md` (4px); inline data badges
     (classification, counts, run and status chips) `rounded-sm` (3px); dialogs may keep
     `rounded-xl` (5px); regions and panes none.
@@ -229,9 +411,32 @@ directory are local snapshots pulled 2026-08-25.
     use Tailwind utilities or `var(--bb-*)`; board-overlay tints are
     `color-mix(in srgb, var(--bb-accent) …%, transparent)` so chessground follows
     the theme with no second stylesheet.
+  - **Control tokens** (the clarity pass, 2026-09-29), neutral greys and one shade, with
+    aliases of the same name (`bg-control`, `border-control-edge`, `bg-field`,
+    `bg-nav-current` …):
+
+    | token | dark | light | for |
+    |---|---|---|---|
+    | `--bb-control` | `#3c3d3e` | `#ffffff` | a button's face; 1.27:1 on the panel (light 1.15), where `elevated` was 1.05 |
+    | `--bb-control-hover` | `#444546` | `#f6f6f4` | a face under the pointer |
+    | `--bb-control-edge` | `#5d5f5e` | `#aeaea9` | a labelled face's border and the segment thumb's (2.14:1; the label names it) |
+    | `--bb-control-edge-strong` | `#777975` | `#828282` | where the edge is the whole signal: icon faces, the switch track, the checkbox (≥ 3:1) |
+    | `--bb-control-shade` | `rgb(0 0 0 / 0.40)` | `rgb(0 0 0 / 0.14)` | a face's 1px inner bottom shade |
+    | `--bb-field` | `#212222` | `#f3f3f0` | every field's fill, below the surface and the face in light |
+    | `--bb-field-shade` | `rgb(0 0 0 / 0.25)` | `rgb(0 0 0 / 0.06)` | a field's 1px inner top shade |
+    | `--bb-nav-current` | `#3a3b3c` | `#e2e2de` | the rail's "you are here" pill; accent text on it 5.26:1 / 5.04:1 |
+
+    The light is five `@theme` shadow utilities, so no call site spells a shadow:
+    `shadow-face` (raised), `shadow-field` (sunk), `shadow-thumb` (a chosen segment's edge
+    and shade), `shadow-tab-on` (the folder tab's accent top edge) and `shadow-row-bar`
+    (a selected row's inset accent bar). `lib/utils.ts` teaches tailwind-merge their
+    names, so `cn('shadow-face', 'shadow-none')` keeps the override. The focus ring is
+    solid accent now: 6.47:1 / 5.69:1 on the panel, where the old 55 % mix was 2.37:1 on
+    the light panel and failed 3:1. The manual's `manual.css` copies none of these.
   - **Mechanism** (unchanged by the 2026-09-01 direction; the hexes above are the
     superseded ones): a resolved `dark`/`light` class plus `data-theme="<preference>"`
-    on `<html>`, a three-state toggle in the titlebar, the preference in
+    on `<html>`, a three-state choice (the Settings menu's Appearance row since the
+    clarity pass; it was in the titlebar), the preference in
     `localStorage` under `blunderbase.theme`, and `system` following
     `prefers-color-scheme` live. An inline script in `index.html` applies the
     stored preference before the first paint, so there is no flash of the wrong

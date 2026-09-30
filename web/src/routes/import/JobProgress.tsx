@@ -100,9 +100,13 @@ export function JobProgress({
           <Button
             type="button"
             size="sm"
-            variant="outline"
+            variant="secondary"
             disabled={stopping}
-            title={t`Stop after the game it is on. Everything imported so far stays, and running the import again picks up from there.`}
+            title={
+              stopping
+                ? t`Stopping after the game it is on`
+                : t`Stop after the game it is on. Everything imported so far stays, and running the import again picks up from there.`
+            }
             onClick={() => cancel.mutate(jobId)}
           >
             {stopping ? <Loader2 className="animate-spin" aria-hidden /> : <Square aria-hidden />}

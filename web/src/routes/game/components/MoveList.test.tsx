@@ -158,7 +158,8 @@ describe('MoveList', () => {
       [move(0, 'e4'), move(1, 'd5'), move(2, 'Nc3', { classification: 'mistake' })],
       { flaggedCount: 1 },
     )
-    await user.click(screen.getByRole('button', { name: /Flagged/ }))
+    await user.click(screen.getByRole('tab', { name: /Flagged/ }))
+    expect(screen.getByRole('tab', { name: /Flagged/ })).toHaveAttribute('aria-selected', 'true')
     expect(screen.getByText('Nc3')).toBeInTheDocument()
     expect(screen.queryByText('e4')).not.toBeInTheDocument()
   })
@@ -166,7 +167,7 @@ describe('MoveList', () => {
   it('says so when a game has nothing flagged', async () => {
     const user = userEvent.setup()
     renderList([move(0, 'e4'), move(1, 'd5')])
-    await user.click(screen.getByRole('button', { name: /Flagged/ }))
+    await user.click(screen.getByRole('tab', { name: /Flagged/ }))
     expect(screen.getByText('Nothing flagged in this game.')).toBeInTheDocument()
   })
 
@@ -177,9 +178,14 @@ describe('MoveList', () => {
     vi.stubGlobal('navigator', { ...navigator, clipboard: { writeText } })
     renderList([move(0, 'e4')], { pgn: '[Event "?"]\n\n1. e4 *\n' })
 
-    await user.click(screen.getByRole('button', { name: 'PGN' }))
+    // An icon tool now: named "Copy PGN", its title carrying the key.
+    const copy = screen.getByRole('button', { name: 'Copy PGN' })
+    expect(copy).toHaveAttribute('title', 'Copy PGN (C)')
+    await user.click(copy)
     expect(writeText).toHaveBeenCalledWith('[Event "?"]\n\n1. e4 *\n')
-    expect(await screen.findByText('copied')).toBeInTheDocument()
+    // The flash is announced, and the title says it too.
+    expect(await screen.findByText('PGN copied')).toBeInTheDocument()
+    expect(copy).toHaveAttribute('title', 'PGN copied')
     vi.unstubAllGlobals()
   })
 
@@ -463,7 +469,7 @@ describe('MoveList', () => {
 
   it('leaves the PGN affordance out when there is nothing to copy', () => {
     renderList([move(0, 'e4')])
-    expect(screen.queryByRole('button', { name: 'PGN' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Copy PGN' })).not.toBeInTheDocument()
   })
 
   it('draws the tab a caller names, and hides the row when the caller owns the tabs', () => {
@@ -490,7 +496,7 @@ describe('MoveList', () => {
       />
     )
     const { rerender } = render(list({ tab: 'flagged', showTabRow: false }))
-    expect(screen.queryByRole('button', { name: /^Moves/ })).not.toBeInTheDocument()
+    expect(screen.queryByRole('tab', { name: /^Moves/ })).not.toBeInTheDocument()
     // Filtered to the flagged move without anyone having clicked a tab in here.
     expect(screen.getByText('Qh4')).toBeInTheDocument()
     expect(screen.queryByText('e4')).not.toBeInTheDocument()
@@ -501,9 +507,11 @@ describe('MoveList', () => {
 
   it('offers only Moves and Flagged — notes have a track of their own now', () => {
     renderList([move(0, 'e4'), move(1, 'd5')])
-    expect(screen.getByRole('button', { name: /^Moves/ })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /^Flagged/ })).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: /Notes/ })).not.toBeInTheDocument()
+    // Real tabs in a tablist, the chosen one `aria-selected` (they had been pressed buttons).
+    expect(screen.getByRole('tablist', { name: 'Moves and flagged moves' })).toBeInTheDocument()
+    expect(screen.getByRole('tab', { name: /^Moves/ })).toHaveAttribute('aria-selected', 'true')
+    expect(screen.getByRole('tab', { name: /^Flagged/ })).toHaveAttribute('aria-selected', 'false')
+    expect(screen.queryByRole('tab', { name: /Notes/ })).not.toBeInTheDocument()
     // The plies count and the PGN affordance stay put beside them.
     expect(screen.getByText('2 plies')).toBeInTheDocument()
   })

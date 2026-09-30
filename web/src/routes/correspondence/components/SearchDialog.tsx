@@ -28,6 +28,8 @@ import { Frame } from '@/components/engine-dialog/DialogFrame'
 import { LimitField } from '@/components/engine-dialog/LimitField'
 import { LinesField } from '@/components/engine-dialog/LinesField'
 import { Button } from '@/components/ui/button'
+import { Checkbox } from '@/components/ui/checkbox'
+import { FilterChip } from '@/components/ui/chip'
 import { Label } from '@/components/ui/label'
 import type {
   CorrespondenceSearchCreate,
@@ -35,7 +37,6 @@ import type {
   CorrespondenceTreeNode,
 } from '@/lib/api/types'
 import { useNotation } from '@/lib/chess/notationPrefs'
-import { cn } from '@/lib/utils'
 
 import { sortSiblings } from '../tree'
 
@@ -169,15 +170,12 @@ export function SearchDialog({
 
         {candidates.length > 0 ? (
           <div className="flex flex-col gap-1.5 border-t border-hairline pt-3">
-            <label className="flex items-center gap-2 text-data text-body">
-              <input
-                type="checkbox"
-                checked={restricted}
-                onChange={(event) => setRestricted(event.target.checked)}
-                className="size-3.5 accent-[var(--bb-accent)]"
-              />
-              <Trans>Only the marked moves</Trans>
-            </label>
+            <Checkbox
+              checked={restricted}
+              onCheckedChange={setRestricted}
+              label={<Trans>Only the marked moves</Trans>}
+              className="self-start"
+            />
             <p className="text-meta leading-[1.5] text-dim-2">
               <Trans>
                 The engine spends everything on the moves you pick and answers nothing about
@@ -189,25 +187,20 @@ export function SearchDialog({
                 {candidates.map((child) => {
                   const uci = child.uci as string
                   const on = moves.includes(uci)
+                  // A chip: "any of these", set membership, one click each. Every picked
+                  // move narrows the search, so an on chip is always the narrowed look.
                   return (
-                    <button
+                    <FilterChip
                       key={child.id}
-                      type="button"
-                      aria-pressed={on}
+                      on={on}
+                      name={notate(child.san ?? uci)}
+                      label={<span className="font-mono">{notate(child.san ?? uci)}</span>}
                       onClick={() =>
                         setMoves((was) =>
                           was.includes(uci) ? was.filter((one) => one !== uci) : [...was, uci],
                         )
                       }
-                      className={cn(
-                        'rounded-md border px-2 py-1 font-mono text-label transition-colors',
-                        on
-                          ? 'border-accent-teal/40 bg-selected text-ink'
-                          : 'border-edge text-dim hover:border-edge-hover hover:text-ink',
-                      )}
-                    >
-                      {notate(child.san ?? uci)}
-                    </button>
+                    />
                   )
                 })}
               </div>
@@ -221,10 +214,20 @@ export function SearchDialog({
           </p>
         ) : null}
         <div className="flex justify-end gap-2">
-          <Button type="button" variant="outline" onClick={onClose}>
+          <Button type="button" variant="secondary" onClick={onClose}>
             <Trans>Cancel</Trans>
           </Button>
-          <Button type="submit" disabled={!ready || pending}>
+          <Button
+            type="submit"
+            disabled={!ready || pending}
+            title={
+              engineId === null
+                ? t`Pick an engine that can search here`
+                : restricted && moves.length === 0
+                  ? t`Pick at least one move, or untick Only the marked moves`
+                  : undefined
+            }
+          >
             {pending ? <Loader2 className="animate-spin" aria-hidden /> : null}
             <Trans>Start searching</Trans>
           </Button>

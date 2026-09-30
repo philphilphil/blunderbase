@@ -15,7 +15,7 @@ import { Trans, useLingui } from '@lingui/react/macro'
 import { useId, useState } from 'react'
 
 import { CollectionChecklist } from '@/components/collections/CollectionChecklist'
-import { Frame } from '@/components/engine-dialog/DialogFrame'
+import { DialogFooter, Frame } from '@/components/engine-dialog/DialogFrame'
 import { Button } from '@/components/ui/button'
 import { CollectionDialog } from '@/routes/games/components/CollectionDialog'
 
@@ -54,11 +54,13 @@ export function GameCollectionsDialog({
         newLabel={t`New collection…`}
         className="-mx-1.5"
       />
-      <div className="flex justify-end">
-        <Button type="button" variant="outline" size="sm" onClick={onClose}>
+      {/* Every tick is saved as it is made, so there is nothing to confirm: one secondary
+          Done closes the dialog, and no primary pretends to commit anything. */}
+      <DialogFooter>
+        <Button type="button" variant="secondary" size="sm" onClick={onClose}>
           <Trans>Done</Trans>
         </Button>
-      </div>
+      </DialogFooter>
     </Frame>
   )
 }

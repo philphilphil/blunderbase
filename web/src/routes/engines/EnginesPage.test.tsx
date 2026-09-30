@@ -470,7 +470,7 @@ describe('EnginesPage — delete engine', () => {
     renderPage(<EnginesPage />)
 
     await openEngine('stockfish')
-    await userEvent.click(screen.getByRole('button', { name: 'Remove' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Remove engine…' }))
     expect(
       await screen.findByText(/Remove stockfish\? Analysis already stored keeps its runs\./),
     ).toBeInTheDocument()
@@ -493,7 +493,8 @@ describe('EnginesPage — delete engine', () => {
     renderPage(<EnginesPage />)
 
     await openEngine('stockfish')
-    await userEvent.click(screen.getByRole('button', { name: 'Remove' }))
+    // The red outline asks; the filled red in its place is the one that deletes.
+    await userEvent.click(screen.getByRole('button', { name: 'Remove engine…' }))
     await userEvent.click(screen.getByRole('button', { name: 'Remove' }))
 
     await waitFor(() => expect(requestedPaths(fetchMock)).toContain('/api/engines/1'))
@@ -514,7 +515,7 @@ describe('EnginesPage — delete engine', () => {
 
     await openEngine('sf-remote')
     expect(await screen.findByText(/open gpu-box on/)).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'Remove' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /^Remove/ })).not.toBeInTheDocument()
   })
 
 })

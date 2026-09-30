@@ -48,6 +48,8 @@ import { Trans, useLingui } from '@lingui/react/macro'
 import { Pin, StickyNote } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState, type MouseEvent, type ReactNode } from 'react'
 
+import { Button } from '@/components/ui/button'
+import { COLUMN_HEAD, ROW } from '@/components/ui/row'
 import type { CorrespondenceMark, CorrespondenceTreeNode } from '@/lib/api/types'
 import { formatNodes, formatScore } from '@/lib/chess/evaluation'
 import { useNotation } from '@/lib/chess/notationPrefs'
@@ -113,6 +115,9 @@ function moveNumber(node: CorrespondenceTreeNode): string {
  */
 const COLUMNS = 'grid-cols-[minmax(0,1fr)_3.5rem_4.5rem_2.5rem_3.5rem_4.5rem]'
 
+/** The context menu's width (`w-56`), so it can be kept inside the pane. */
+const MENU_WIDTH_REM = 14
+
 /** How far a variation's rows step in per level of nesting. */
 function indent(level: number): string {
   return `${level * 0.875}rem`
@@ -177,8 +182,11 @@ function Row({
       onMouseLeave={() => onHover?.(null)}
       className={cn(
         COLUMNS,
-        'grid cursor-pointer items-baseline gap-x-2 rounded-sm py-px pr-1 whitespace-nowrap hover:bg-raised',
-        selected && 'bg-selected outline outline-accent-teal',
+        'grid cursor-pointer items-baseline gap-x-2 rounded-sm py-px pr-1 whitespace-nowrap',
+        // The move list's current move: the blue fill and its inset ring, and no hover of
+        // its own, so it stays put under the pointer. A tree row is a move, so it is marked
+        // the way a move is; every other row is the app's clickable row.
+        selected ? 'bg-selected text-bright ring-1 ring-accent-teal/55 ring-inset' : ROW,
         (mark === 'excluded' || weak) && 'opacity-60',
         behind && 'opacity-55',
       )}
@@ -309,7 +317,7 @@ function Row({
       {queued || outstanding ? (
         <span
           data-testid={`tree-queued-${node.id}`}
-          className="text-meta text-accent-teal"
+          className="text-meta text-soft"
           title={
             task?.status === 'queued'
               ? t`A task is waiting in the analysis queue`
@@ -348,7 +356,8 @@ function Heading() {
     <div
       className={cn(
         COLUMNS,
-        'sticky top-0 z-10 grid gap-x-2 border-b border-hairline bg-surface py-1 pr-1 font-sans text-meta text-dim',
+        COLUMN_HEAD,
+        'sticky top-0 z-10 grid gap-x-2 border-b border-hairline bg-surface py-1 pr-1 font-sans',
       )}
     >
       <span>
@@ -509,9 +518,11 @@ function MenuItem({
       disabled={disabled}
       title={title}
       onClick={onClick}
+      // A menu item lifts to `raised` under the pointer like every row; blue is a choice,
+      // never a hover. A disabled one keeps the pointer so its title can say why.
       className={cn(
-        'w-full rounded-sm px-2 py-1 text-left text-data transition-colors',
-        disabled ? 'cursor-default text-faint' : 'text-body hover:bg-selected hover:text-ink',
+        'w-full rounded-sm px-2 py-1 text-left text-data transition-colors focus-visible:outline-offset-[-0.125rem]',
+        disabled ? 'cursor-not-allowed text-faint-2' : 'text-body hover:bg-raised hover:text-ink',
         danger && !disabled && 'text-blunder hover:text-blunder',
       )}
     >
@@ -575,7 +586,9 @@ export function TreePane({
       onMouseLeave={() => onHover?.(null)}
       className="relative min-h-0 flex-1 overflow-auto px-3 pb-2"
     >
-      <div className="font-mono text-data leading-[1.5]">
+      {/* Never narrower than the number columns and a readable move: in a narrow pane the
+          tree scrolls sideways rather than laying the moves over the numbers. */}
+      <div className="min-w-[27rem] font-mono text-data leading-[1.5]">
         <Heading />
         <Line
           start={tree}
@@ -589,11 +602,17 @@ export function TreePane({
           onMenu={(node, event) => {
             if (readOnly) return
             event.preventDefault()
-            const box = host.current?.getBoundingClientRect()
+            const pane = host.current
+            const box = pane?.getBoundingClientRect()
+            // Kept inside the pane: a right-click near its right edge would otherwise open
+            // the menu half under the engine column, where the pane clips it.
+            const rem = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16
+            const scrollLeft = pane?.scrollLeft ?? 0
+            const right = scrollLeft + (pane?.clientWidth || Infinity) - MENU_WIDTH_REM * rem - 4
             setMenu({
               nodeId: node.id,
-              x: event.clientX - (box?.left ?? 0),
-              y: event.clientY - (box?.top ?? 0) + (host.current?.scrollTop ?? 0),
+              x: Math.max(scrollLeft, Math.min(event.clientX - (box?.left ?? 0) + scrollLeft, right)),
+              y: event.clientY - (box?.top ?? 0) + (pane?.scrollTop ?? 0),
             })
             onSelect(node.id)
           }}
@@ -677,9 +696,13 @@ export function TreePane({
             </span>
             <div className="flex flex-1 justify-end gap-0.5">
               {(Object.keys(MARK_GLYPHS) as CorrespondenceMark[]).map((mark) => (
-                <button
+                // Toggles in a menu: ghost squares whose on state is the pressed fill. The
+                // glyph keeps its mark colour, which is data, not state.
+                <Button
                   key={mark}
                   type="button"
+                  variant="ghost"
+                  size="icon-xs"
                   aria-pressed={menuNode.mark === mark}
                   // The glyph is the whole button, so the name it would have read has to be
                   // said some other way or the control has none at all.
@@ -689,16 +712,10 @@ export function TreePane({
                     onMark(menuNode.id, menuNode.mark === mark ? null : mark)
                     setMenu(null)
                   }}
-                  className={cn(
-                    'min-w-6 rounded-sm border px-1 py-px font-mono text-label transition-colors',
-                    menuNode.mark === mark
-                      ? 'border-accent-teal/40 bg-selected'
-                      : 'border-edge hover:bg-raised',
-                    MARK_CLASS[mark],
-                  )}
+                  className={cn('font-mono text-label', MARK_CLASS[mark])}
                 >
                   {MARK_GLYPHS[mark]}
-                </button>
+                </Button>
               ))}
             </div>
           </div>

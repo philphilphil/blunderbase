@@ -1,12 +1,12 @@
 import { Trans, useLingui } from '@lingui/react/macro'
 import { Cpu, Plus } from 'lucide-react'
 import { useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
 
 import { SetPageChrome } from '@/components/shell/PageChrome'
 import { PageBody } from '@/components/shell/PageHeader'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
+import { TextLink } from '@/components/ui/text-link'
 import { useEngineRoles, useEngines, useRunnersStatus } from '@/lib/api/queries'
 import { hostByEngineId } from '@/lib/engines/hosts'
 import { useRuntimeCapabilities } from '@/lib/runtime/capabilities'
@@ -34,6 +34,9 @@ import { engineRoles } from './roles'
  *
  * One detail key spans the engine editors and the add form: the summaries stay visible and
  * every new detail replaces the old.
+ *
+ * The bar carries the page (`Compute › Engines`, the parent linked) and its one primary,
+ * Add an engine; everything else on the page is a secondary face, a field or a readout.
  */
 export function EnginesPage() {
   const { t } = useLingui()
@@ -113,7 +116,7 @@ export function EnginesPage() {
               </p>
               <Button
                 type="button"
-                variant="outline"
+                variant="secondary"
                 size="sm"
                 className="mt-3"
                 onClick={() => void engines.refetch()}
@@ -132,9 +135,9 @@ export function EnginesPage() {
                   <Trans>
                     Add a path-based engine above, or install browser Stockfish and connect
                     remote runners on{' '}
-                    <Link to="/compute/machines" className="text-accent-teal hover:text-accent-link">
+                    <TextLink to="/compute/machines" placement="inline">
                       Machines
-                    </Link>
+                    </TextLink>
                     .
                   </Trans>
                 ) : (
@@ -158,9 +161,9 @@ export function EnginesPage() {
             <Trans>
               Threads and hash belong to one process of one engine. How many processes a machine
               runs at once — passes, boards and correspondence searches together — is set per machine on{' '}
-              <Link to="/compute/machines" className="text-accent-teal hover:text-accent-link">
+              <TextLink to="/compute/machines" placement="inline">
                 Machines
-              </Link>
+              </TextLink>
               .
             </Trans>
           </p>

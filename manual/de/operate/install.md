@@ -53,8 +53,8 @@ Jede Datei trägt ihre Version im Namen: `Blunderbase-<version>-macOS-arm64.dmg`
 `Blunderbase-<version>-Windows-x64-setup.exe`.
 
 Die Anwendung bringt die Web-App und das Backend mit. Sie braucht kein Python, keinen
-Container und kein Terminal und läuft vollständig auf diesem Rechner. **Handbuch** unten
-in der Navigationsleiste öffnet dieses Handbuch in einem zweiten Fenster; Links auf andere Seiten –
+Container und kein Terminal und läuft vollständig auf diesem Rechner. **Handbuch zu dieser Seite**
+im Einstellungsmenü öffnet dieses Handbuch in einem zweiten Fenster; Links auf andere Seiten –
 lichess, chess.com, GitHub – öffnen sich in deinem Browser.
 
 | Plattform | Hinweise |
@@ -97,7 +97,7 @@ Arbeite dann [Erste Schritte](../guide/getting-started.md) durch: ein Konto verb
 importieren, eine Engine registrieren.
 
 Eine frische Installation zeigt beim ersten Öffnen eine kurze geführte Tour.
-**Tour erneut anzeigen** im Kontomenü holt sie zurück.
+**Tour erneut anzeigen** im Einstellungsmenü holt sie zurück.
 
 Das Passwort ohne Browser setzen oder zurücksetzen:
 
@@ -131,7 +131,7 @@ fragt nie nach einem Passwort.
 
 ## Das Passwort ändern { #changing-the-password }
 
-Kontomenü → **Passwort ändern**. Gefragt wird nach dem aktuellen und zweimal nach dem
+Einstellungen › **Passwort ändern**. Gefragt wird nach dem aktuellen und zweimal nach dem
 neuen.
 
 Eine Passwortänderung meldet jeden anderen Browser ab. MCP-Schlüssel funktionieren weiter.

@@ -13,7 +13,7 @@ und aus deinen Partien antworten statt aus Allgemeinplätzen. Und die Kommandoze
 Ganze ist ein Prozess auf einem Port, deshalb ist eine Installation ein einzelner Container,
 eine Desktop-Anwendung oder ein einzelner Befehl.
 
-## Anleitung
+## Anleitung { #guide }
 
 Für den täglichen Gebrauch. Ein Kapitel je Eintrag in der Seitenleiste der App, in derselben
 Reihenfolge.
@@ -44,10 +44,10 @@ Reihenfolge.
   sind unter Betrieb beschrieben, in [Engines](operate/engines.md) und
   [Maschinen](operate/runners.md).
 - [Dein KI-Assistent](guide/coach.md) – einen MCP-Client verbinden und was er kann.
-- [Einstellungen](guide/settings.md) – Sprache, Erscheinungsbild, Bretteinstellungen,
-  Tastenkürzel, die Tour.
+- [Einstellungen](guide/settings.md) – Sprache, Erscheinungsbild und Tastenkürzel im
+  Einstellungsmenü, der Schalter Engine ausblenden, Bretteinstellungen, die Tour.
 
-## Betrieb
+## Betrieb { #operate }
 
 Für alle, die die Installation betreiben.
 

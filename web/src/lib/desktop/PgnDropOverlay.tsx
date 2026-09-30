@@ -27,9 +27,10 @@ function carriesFiles(event: DragEvent): boolean {
  *
  * The drop does not import on its own: a file says nothing about whose games it holds, and
  * storing somebody else's as the owner's puts moves they never played into every statistic.
- * So the drop opens the same question the import page's PGN row shows, and the import waits
- * for it. This is the one place the question has to be a dialog — there is no row here to
- * put a toggle in, and a drop that has already imported is too late to be asked.
+ * So the drop opens the same question the import page's PGN file region shows, and the
+ * import waits for it. This is the one place the question has to be a dialog — there is no
+ * region here to put the choice in, and a drop that has already imported is too late to be
+ * asked.
  */
 export function PgnDropOverlay() {
   const { t } = useLingui()
@@ -133,6 +134,7 @@ export function PgnDropOverlay() {
  *
  * Import closes it rather than waiting: the request is answered as soon as the job row
  * exists, and the toast and the import page's progress are where the rest of it shows.
+ * The footer is every dialog's: Cancel as a secondary face, then the one primary.
  */
 function WhoseGamesDialog({
   files,
@@ -184,7 +186,7 @@ function WhoseGamesDialog({
         <WhoseGamesToggle mine={mine} onChange={onMine} className="self-start" />
 
         <div className="flex justify-end gap-2">
-          <Button type="button" size="sm" variant="ghost" onClick={onClose}>
+          <Button type="button" size="sm" variant="secondary" onClick={onClose}>
             <Trans>Cancel</Trans>
           </Button>
           <Button type="button" size="sm" onClick={onImport}>

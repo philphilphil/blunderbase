@@ -52,7 +52,7 @@ export function AnalysisPage() {
           </p>
           <Button
             type="button"
-            variant="outline"
+            variant="secondary"
             size="sm"
             className="mt-2.5"
             onClick={() => void coverage.refetch()}

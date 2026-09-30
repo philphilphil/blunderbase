@@ -3,9 +3,12 @@
  *
  * A shortcut nobody can find is a feature only the person who wrote it has. The app has
  * had board keys since the game view existed and there was no way to learn them short of
- * reading the source, so this is the affordance — one key, one button in the titlebar, and
- * a list that cannot go stale because it is printed from the same table the handlers
- * dispatch from (`lib/ui/shortcuts.ts`).
+ * reading the source, so this is the affordance — one key, one row in the account menu
+ * ("Keyboard shortcuts ?", which teaches the key as it opens the list), and a list that
+ * cannot go stale because it is printed from the same table the handlers dispatch from
+ * (`lib/ui/shortcuts.ts`). It used to be a keyboard chip in the titlebar too; the bar now
+ * carries only the page (the clarity pass), and a list looked up now and then belongs with
+ * the other once-in-a-while things in the menu.
  *
  * The list is filtered by route rather than printed whole. A reader pressing `?` is asking
  * "what can I press *here*", and answering with three screens' worth of keys makes them do
@@ -25,7 +28,6 @@ import {
 import { useLocation } from 'react-router-dom'
 
 import { HELP_KEY, isTyping, shortcutsFor, type ShortcutGroup } from '@/lib/ui/shortcuts'
-import { cn } from '@/lib/utils'
 
 /** A key as it is printed: the app's one spelling of a keycap. */
 function Key({ children }: { children: ReactNode }) {
@@ -144,7 +146,7 @@ function Dialog({ onClose }: { onClose: () => void }) {
 
 const ShortcutsContext = createContext<{ open: () => void }>({ open: () => {} })
 
-/** The titlebar's `?` button, and anything else that grows a reason to raise the list. */
+/** The account menu's "Keyboard shortcuts" row, and anything else that grows a reason to raise the list. */
 export function useShortcutsOverlay() {
   return useContext(ShortcutsContext)
 }
@@ -174,29 +176,5 @@ export function ShortcutsOverlayProvider({ children }: { children: ReactNode }) 
       {children}
       {open ? <Dialog onClose={() => setOpen(false)} /> : null}
     </ShortcutsContext.Provider>
-  )
-}
-
-/**
- * The titlebar chip. Named beside the palette's, and the same height. A bare `?` read as
- * "help" rather than "keys", so the chip is a keyboard; the key that opens it is in the
- * title, where the palette's chip would otherwise have to spell it.
- */
-export function ShortcutsButton({ className }: { className?: string }) {
-  const shortcuts = useShortcutsOverlay()
-  const { t } = useLingui()
-  return (
-    <button
-      type="button"
-      onClick={shortcuts.open}
-      aria-label={t`Keyboard shortcuts`}
-      title={t`Keyboard shortcuts (?)`}
-      className={cn(
-        'flex flex-none items-center rounded-md border border-edge bg-elevated px-2 py-[0.3125rem] text-label text-soft transition-colors hover:border-edge-hover hover:text-ink',
-        className,
-      )}
-    >
-      <Keyboard className="size-4" aria-hidden />
-    </button>
   )
 }

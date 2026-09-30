@@ -1329,8 +1329,13 @@ def game_card(
     *,
     worst: int = 3,
     collections: Sequence[int] | None = None,
+    queued: bool | None = None,
 ) -> dict[str, Any]:
     """A game as a compact card: the summary, the eval curve and its worst moments.
+
+    `queued` says an analysis run over the game is waiting or running, so a list can say
+    "in queue" rather than offer to queue it again. A caller with many cards looks it up
+    for all of them at once (`game_cards`); left out, it is looked up for this one.
 
     The expensive half is read off `Game.card`, written whenever the game's finished runs
     changed, so a page of fifty of these is fifty rows rather than a hundred queries over
@@ -1348,6 +1353,7 @@ def game_card(
         # exactly what a requested run is now, and refolding every card to rename the key
         # would be a library-wide write for nothing.
         "requested": bool(card.get("requested", card.get("deep", False))),
+        "queued": queued if queued is not None else game.id in queued_games(session, [game.id]),
         "eval_curve": card["eval_curve"],
         "worst_moments": card["worst_moments"][: max(worst, 0)],
     }
@@ -1356,16 +1362,41 @@ def game_card(
 def game_cards(session: Session, games: Iterable[Game], *, worst: int = 3) -> list[dict[str, Any]]:
     """`game_card` over a list, which is what `get_last_games` is usually followed by.
 
-    Each card carries the collections its game is in, looked up once for the whole list.
+    Each card carries the collections its game is in and whether a run over it is queued,
+    each looked up once for the whole list.
     """
     from backend.services import collections as collections_service
 
     rows = list(games)
-    memberships = collections_service.collections_of(session, [game.id for game in rows])
+    ids = [game.id for game in rows]
+    memberships = collections_service.collections_of(session, ids)
+    waiting = queued_games(session, ids)
     return [
-        game_card(session, game, worst=worst, collections=memberships.get(game.id, []))
+        game_card(
+            session,
+            game,
+            worst=worst,
+            collections=memberships.get(game.id, []),
+            queued=game.id in waiting,
+        )
         for game in rows
     ]
+
+
+def queued_games(session: Session, game_ids: Sequence[int]) -> set[int]:
+    """Which of these games have an analysis run waiting in the queue or running now.
+
+    A Maia fill is left out: it only adds human levels to a game already evaluated, so it
+    is not the pass a "queue the analysis" button would be asking for.
+    """
+    if not game_ids:
+        return set()
+    statement = select(AnalysisRun.game_id).where(
+        AnalysisRun.game_id.in_(list(game_ids)),
+        AnalysisRun.status.in_([RunStatus.QUEUED, RunStatus.RUNNING]),
+        AnalysisRun.maia_only.is_(False),
+    )
+    return {game_id for game_id in session.scalars(statement.distinct()) if game_id is not None}
 
 
 def build_card(session: Session, game: Game, *, worst: int = CARD_WORST_MOMENTS) -> dict[str, Any]:

@@ -2,9 +2,9 @@ import type { I18n } from '@lingui/core'
 import { msg, plural } from '@lingui/core/macro'
 import { Trans, useLingui } from '@lingui/react/macro'
 import { Loader2, RotateCcw } from 'lucide-react'
-import { Link } from 'react-router-dom'
 
 import { Button } from '@/components/ui/button'
+import { TextLink } from '@/components/ui/text-link'
 import { ApiError } from '@/lib/api/client'
 import { useFailedRuns, useRetryFailed } from '@/lib/api/queries'
 import type { RunResponse } from '@/lib/api/types'
@@ -31,6 +31,10 @@ import { stamp } from '@/routes/import/format'
  * priority; the failed row stays, because it is the record of what went wrong. The refusal
  * worth naming is a 409: the engine behind these failures still cannot run, so a retry
  * would only fail again — and the fix is a page away rather than in this listing.
+ *
+ * Retry is a secondary face: the page's library actions are peers, none filled. The run
+ * chips are borderless tints (facts, not controls), and the game links are quiet links,
+ * because a row of accent `#id`s outshouted the error they illustrate.
  */
 
 /** How many of a group's games are named before the rest become a count. */
@@ -84,9 +88,9 @@ function RetryError({ error }: { error: Error }) {
         <Trans>
           Nothing was queued: the engine these runs failed on still cannot take them, so a
           retry would fail the same way.{' '}
-          <Link to="/compute/engines" className="text-accent-teal hover:text-accent-link">
+          <TextLink to="/compute/engines" placement="inline">
             Register or enable an engine
-          </Link>{' '}
+          </TextLink>{' '}
           for them first.
         </Trans>
       ) : (
@@ -125,9 +129,10 @@ export function FailedRuns({ failed }: { failed: number }) {
         <div className="flex-1" />
         <Button
           type="button"
-          variant="outline"
+          variant="secondary"
           size="sm"
           disabled={retry.isPending || failed === 0}
+          title={failed === 0 ? t`Nothing has failed` : undefined}
           onClick={() => retry.mutate(undefined)}
         >
           {retry.isPending ? (
@@ -175,7 +180,7 @@ export function FailedRuns({ failed }: { failed: number }) {
                     <span
                       key={`${chip.kind}:${chip.label}`}
                       className={cn(
-                        'rounded-sm border px-1.5 py-px text-label whitespace-nowrap',
+                        'rounded-sm px-1.5 py-px text-label whitespace-nowrap',
                         RUN_STYLES[chip.kind].chipClass,
                       )}
                     >
@@ -230,13 +235,9 @@ function GameList({ runs }: { runs: RunResponse[] }) {
   return (
     <span className="flex flex-wrap items-center gap-1.5 text-meta text-dim-2">
       {named.map((id) => (
-        <Link
-          key={id}
-          to={`/games/${id}`}
-          className="font-mono tabular text-dim hover:text-accent-link"
-        >
+        <TextLink key={id} to={`/games/${id}`} tone="quiet" className="font-mono tabular">
           {`#${id}`}
-        </Link>
+        </TextLink>
       ))}
       {rest > 0 ? (
         <span>

@@ -17,14 +17,12 @@
  * its own.
  */
 import { Trans, useLingui } from '@lingui/react/macro'
-import { Eye, EyeOff, Loader2, RotateCcw, Square } from 'lucide-react'
+import { Eye, EyeOff, Loader2, RotateCcw, RotateCw, Square } from 'lucide-react'
 
-import { buttonVariants } from '@/components/ui/button'
+import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 
 import type { PracticeGame, PracticePhase, PracticeResult } from '../practice'
-
-const BUTTON = buttonVariants({ variant: 'secondary', size: 'sm' })
 
 export interface PracticeBarProps {
   game: PracticeGame
@@ -101,43 +99,45 @@ export function PracticeBar({
 
       <div className="flex flex-none flex-wrap items-center gap-1.5">
         {error ? (
-          <button type="button" onClick={onRetry} className={BUTTON}>
+          <Button variant="secondary" size="sm" onClick={onRetry}>
+            <RotateCw aria-hidden />
             <Trans>Try again</Trans>
-          </button>
+          </Button>
         ) : null}
-        <button
-          type="button"
+        {/* Disabled, it keeps its tooltip and says why (the one disabled look: no face). */}
+        <Button
+          variant="secondary"
+          size="sm"
           onClick={onTakeBack}
           disabled={!canTakeBack}
-          title={t`Take back your last move and the reply to it`}
-          // Disabled, it still shows its tooltip: the base would swallow the hover.
-          className={cn(
-            BUTTON,
-            'disabled:pointer-events-auto disabled:cursor-default disabled:hover:bg-elevated disabled:hover:text-body',
-          )}
+          title={
+            canTakeBack
+              ? t`Take back your last move and the reply to it`
+              : t`Nothing to take back yet`
+          }
         >
           <RotateCcw aria-hidden />
           <Trans>Take back</Trans>
-        </button>
-        <button
-          type="button"
+        </Button>
+        <Button
+          variant="secondary"
+          size="sm"
           onClick={onToggleReveal}
           aria-pressed={game.reveal}
           title={t`Show or hide the evaluation, the engine lines and Maia (H)`}
-          className={BUTTON}
         >
           {game.reveal ? <EyeOff aria-hidden /> : <Eye aria-hidden />}
           {game.reveal ? <Trans>Hide the engine</Trans> : <Trans>Show the engine</Trans>}
-        </button>
-        <button
-          type="button"
+        </Button>
+        <Button
+          variant="secondary"
+          size="sm"
           onClick={onStop}
           title={t`Stop practising; the moves stay on the board as a line (P)`}
-          className={BUTTON}
         >
           <Square aria-hidden />
           <Trans>Stop</Trans>
-        </button>
+        </Button>
       </div>
     </div>
   )

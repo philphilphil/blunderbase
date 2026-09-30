@@ -62,6 +62,22 @@ describe('invalidationsFor — analysis lifecycle', () => {
     }
   })
 
+  // A row says "In queue" from its card, so a run taken back — one by hand, or the whole
+  // queue at once — must refetch the table or the row keeps saying it with no Analyse.
+  it('refetches the games table when runs are taken back or queued in bulk', () => {
+    const cancelled = invalidationsFor({ ...base, event: 'analysis.cancelled' })
+    expect(has(cancelled, queryKeys.games())).toBe(true)
+    const bulk = invalidationsFor({
+      event: 'analysis.backfill',
+      queued: 0,
+      outstanding: 0,
+      maia_only: false,
+    })
+    expect(has(bulk, queryKeys.analysis())).toBe(true)
+    expect(has(bulk, queryKeys.games())).toBe(true)
+    expect(has(bulk, queryKeys.stats())).toBe(false)
+  })
+
   it('refetches games, stats and the explorer when a run finishes', () => {
     for (const event of ['analysis.done', 'analysis.failed'] as const) {
       const keys = invalidationsFor({ ...base, event, status: 'done' })

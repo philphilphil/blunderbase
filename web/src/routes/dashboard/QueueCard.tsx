@@ -5,12 +5,14 @@
 import type { MessageDescriptor } from '@lingui/core'
 import { msg } from '@lingui/core/macro'
 import { Trans, useLingui } from '@lingui/react/macro'
-import { Link } from 'react-router-dom'
+import { RotateCcw } from 'lucide-react'
 
+import { StatusDot, type StatusDotTone } from '@/components/badges/StatusDot'
 import { QueueDestinations } from '@/components/shell/QueueDestinations'
 import { QueueMeter } from '@/components/shell/QueueMeter'
 import { SectionHead } from '@/components/shell/Section'
 import { Button } from '@/components/ui/button'
+import { TextLink } from '@/components/ui/text-link'
 import { useGames, useMaiaFill, useQueueStatus, useRetryFailed } from '@/lib/api/queries'
 import type { RunStatus } from '@/lib/api/types'
 import { RUN_STYLES, runKind, runLabel } from '@/lib/chess/classification'
@@ -39,11 +41,17 @@ const ROWS = 4
 /** Enough recent games to name most runs; the rest are shown by id. */
 const LOOKUP = 50
 
-const DOT: Record<RunStatus, string> = {
-  queued: 'bg-mistake',
-  running: 'bg-accent-teal',
-  done: 'bg-good',
-  failed: 'bg-blunder',
+/**
+ * A run's status in the app's one status grammar (`StatusDot`): green is alive (pulsing
+ * while it works), grey is waiting, red is broken. A running run had been the accent and a
+ * queued one orange, which made a queue in good order look like a selection and a warning;
+ * blue is kept for interaction and choice, orange for "something is wrong".
+ */
+const DOT: Record<RunStatus, StatusDotTone> = {
+  queued: 'waiting',
+  running: 'working',
+  done: 'healthy',
+  failed: 'error',
 }
 
 /**
@@ -73,13 +81,14 @@ function RunRow({
   const style = RUN_STYLES[runKind(run)]
   const { t, i18n } = useLingui()
   return (
+    // A row of facts, not a link: no hover, since there is nothing to click but its retry.
     <div
       className={cn(
         'flex items-center gap-2 rounded-md px-1 py-1.5',
-        run.status === 'failed' ? 'bg-blunder/5' : 'hover:bg-raised',
+        run.status === 'failed' && 'bg-blunder/5',
       )}
     >
-      <span className={cn('size-[0.3125rem] flex-none rounded-full', DOT[run.status])} />
+      <StatusDot tone={DOT[run.status]} />
       <span
         className={cn(
           'flex-1 truncate text-data',
@@ -102,14 +111,24 @@ function RunRow({
           <span className="font-mono text-label text-blunder" title={run.error ?? undefined}>
             <Trans>failed</Trans>
           </span>
+          {/* A command, so a face with its glyph rather than accent text: accent text is a
+              link, and a retry changes state. */}
           <Button
             type="button"
-            variant="ghost"
-            size="sm"
+            variant="secondary"
+            size="xs"
             onClick={onRetry}
             disabled={retrying || run.gameId === null}
-            className="-my-1.5 text-accent-teal hover:text-accent-link"
+            title={
+              run.gameId === null
+                ? t`An ad-hoc position has no game to run again`
+                : retrying
+                  ? t`Already queued again`
+                  : undefined
+            }
+            className="-my-1"
           >
+            <RotateCcw aria-hidden />
             {retrying ? t`queued` : t`retry`}
           </Button>
         </>
@@ -170,11 +189,16 @@ export function QueueCard() {
   const shown = activity.slice(0, ROWS)
   const hidden = Math.max(0, queued - shown.filter((run) => run.status === 'queued').length)
 
-  const state = workersOff
-    ? { label: t`workers idle`, tone: 'text-mistake', dot: 'bg-mistake' }
+  // The queue's state in the status grammar, dot then word: running is alive (green,
+  // pulsing), an empty queue is waiting (grey), and a process whose workers are off is
+  // degraded (orange) — the one of the three that is a problem, and the paragraph under
+  // the list says what it means. Running had been the accent, which is interaction's
+  // colour, so a busy queue read as something selected.
+  const state: { label: string; tone: string; dot: StatusDotTone } = workersOff
+    ? { label: t`workers idle`, tone: 'text-mistake', dot: 'degraded' }
     : running > 0
-      ? { label: t`running`, tone: 'text-accent-teal', dot: 'bg-accent-teal' }
-      : { label: t`idle`, tone: 'text-dim-2', dot: 'bg-faint' }
+      ? { label: t`running`, tone: 'text-ink', dot: 'working' }
+      : { label: t`idle`, tone: 'text-dim', dot: 'waiting' }
 
   return (
     <section className="flex flex-none flex-col gap-2">
@@ -182,7 +206,7 @@ export function QueueCard() {
         title={t`Analysis queue`}
         detail={
           <span className={cn('inline-flex items-center gap-1.5', state.tone)}>
-            <span className={cn('size-[0.3125rem] rounded-full', state.dot)} />
+            <StatusDot tone={state.dot} />
             {state.label}
           </span>
         }
@@ -252,9 +276,9 @@ export function QueueCard() {
             <p className="text-label leading-relaxed text-dim">
               <Trans>
                 Nothing outstanding.{' '}
-                <Link to="/games" className="text-accent-teal hover:text-accent-link">
+                <TextLink to="/games" placement="inline">
                   Pick a game
-                </Link>{' '}
+                </TextLink>{' '}
                 to put something in.
               </Trans>
             </p>

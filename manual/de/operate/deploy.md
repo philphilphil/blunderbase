@@ -294,8 +294,9 @@ Anfrage durch, und eine zweite Prüfung weist alles außer `GET`, `HEAD` und `OP
 `403 read_only` ab. Ausgenommen sind drei Lesezugriffe, die als POST geschrieben sind und
 keine Zeile anfassen – das Analysebrett, Maias Antwort für eine Stellung und eine einmalige
 Engine-Bewertung –, damit die Partieansicht lebendig bleibt. `/mcp` wird gar nicht erst
-eingehängt. Die Seite zeigt in der Titelleiste einen Chip *Demo · schreibgeschützt* und
-beim ersten abgewiesenen Schreibzugriff einen Hinweis.
+eingehängt. Die Seite zeigt oben in der linken Leiste neben dem Namen einen Hinweis
+**Demo ↗** – sein Tooltip sagt, dass alles schreibgeschützt ist, und er führt zu
+blunderbase.org – und beim ersten abgewiesenen Schreibzugriff einen Hinweis.
 
 Zwei Lesezugriffe sind ebenfalls zu: die Datenbanksicherung und der PGN-Export der ganzen
 Bibliothek. Beide kosten pro Anfrage Sekunden an Rechenzeit und liefern die komplette

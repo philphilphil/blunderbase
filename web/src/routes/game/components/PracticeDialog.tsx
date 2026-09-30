@@ -9,7 +9,7 @@
  *   the board was flipped — the side the reader is already looking at the game from.
  * - **Opponent** lists every switched-on search engine and Maia. One that cannot answer
  *   right now (its runner away, a runner too old) is greyed with the backend's sentence
- *   written under the chips, the way Analyse… does it, rather than hidden. Maia opens
+ *   written under the picker, the way Analyse… does it, rather than hidden. Maia opens
  *   preselected where it can answer: a practice opponent is most useful when it plays like
  *   a person of a rating, and that is what Maia is.
  * - **Strength** is the engine's own. A slider appears only for an engine that declares
@@ -18,16 +18,22 @@
  *   strength is a switch beside it. For Maia the strength is its level, from the levels
  *   this deployment is configured for.
  * - **Think time** is how long an engine searches per move; Maia does not search.
+ *
+ * Side, opponent and think time are each one value out of a few that are all on screen, so
+ * each is the one-of-N `Segmented` (a sunken track, the choice a raised neutral thumb). They
+ * had been rows of pressed chips in the selection blue, the look of a data filter.
  */
 import { Trans, useLingui } from '@lingui/react/macro'
 import { Loader2 } from 'lucide-react'
-import { useState, type FormEvent, type ReactNode } from 'react'
+import { useState, type FormEvent } from 'react'
 
-import { Frame } from '@/components/engine-dialog/DialogFrame'
+import { DialogFooter, Frame } from '@/components/engine-dialog/DialogFrame'
 import { Button } from '@/components/ui/button'
+import { Checkbox } from '@/components/ui/checkbox'
 import { Label } from '@/components/ui/label'
+import { NativeSelect } from '@/components/ui/native-select'
+import { Segmented } from '@/components/ui/segmented'
 import type { PracticeOpponents } from '@/lib/api/types'
-import { cn } from '@/lib/utils'
 
 import {
   MAIA_CHOICE as MAIA,
@@ -122,14 +128,16 @@ export function PracticeDialog({
           <Label>
             <Trans>You play</Trans>
           </Label>
-          <div role="group" aria-label={t`You play`} className="flex flex-wrap gap-1">
-            <Choice pressed={side === 'white'} onClick={() => setSide('white')}>
-              <Trans>White</Trans>
-            </Choice>
-            <Choice pressed={side === 'black'} onClick={() => setSide('black')}>
-              <Trans>Black</Trans>
-            </Choice>
-          </div>
+          <Segmented
+            label={t`You play`}
+            value={side}
+            onChange={setSide}
+            className="h-8 self-start"
+            options={[
+              { value: 'white', label: <Trans>White</Trans> },
+              { value: 'black', label: <Trans>Black</Trans> },
+            ]}
+          />
         </div>
 
         <div className="flex flex-col gap-1.5">
@@ -142,27 +150,26 @@ export function PracticeDialog({
               <Trans>Looking for engines…</Trans>
             </p>
           ) : (
-            <div role="group" aria-label={t`Against`} className="flex flex-wrap gap-1">
-              {opponents && (opponents.maia.available || opponents.maia.reason) ? (
-                <Choice
-                  pressed={choice === MAIA}
-                  disabled={!maiaReady}
-                  onClick={() => setPicked(MAIA)}
-                >
-                  Maia
-                </Choice>
-              ) : null}
-              {engines.map((row) => (
-                <Choice
-                  key={row.engine_id}
-                  pressed={choice === row.engine_id}
-                  disabled={!row.available}
-                  onClick={() => setPicked(row.engine_id)}
-                >
-                  {row.name}
-                </Choice>
-              ))}
-            </div>
+            // One opponent of a handful, all on screen: the one-of-N `Segmented`. Its
+            // values are strings, so an engine is its id and Maia is `MAIA`; one that
+            // cannot answer is offered disabled, its reason written under the control.
+            <Segmented
+              label={t`Against`}
+              value={choice === null ? '' : String(choice)}
+              onChange={(next) => setPicked(next === MAIA ? MAIA : Number(next))}
+              className="h-auto min-h-8 max-w-full flex-wrap self-start"
+              options={[
+                ...(opponents && (opponents.maia.available || opponents.maia.reason)
+                  ? [{ value: MAIA, label: 'Maia', disabled: !maiaReady }]
+                  : []),
+                ...engines.map((row) => ({
+                  value: String(row.engine_id),
+                  label: row.name,
+                  disabled: !row.available,
+                  title: row.available ? undefined : (row.reason ?? undefined),
+                })),
+              ]}
+            />
           )}
           {loadError ? (
             <p role="alert" className="text-label text-blunder">
@@ -171,7 +178,7 @@ export function PracticeDialog({
           ) : null}
           {opponents && engines.length === 0 && !opponents.maia.available ? (
             <p className="text-label text-dim">
-              <Trans>There is no engine here that can play. Add one under Compute → Engines.</Trans>
+              <Trans>There is no engine here that can play. Add one under Compute › Engines.</Trans>
             </p>
           ) : null}
           {unavailable.map((row) => (
@@ -186,18 +193,18 @@ export function PracticeDialog({
             <Label htmlFor="practice-dialog-level">
               <Trans>Maia level</Trans>
             </Label>
-            <select
+            <NativeSelect
               id="practice-dialog-level"
               value={maiaLevel ?? ''}
               onChange={(event) => setLevel(Number(event.target.value))}
-              className="h-8 w-40 rounded-md border border-input bg-elevated px-2 text-data text-ink"
+              className="h-8 w-40"
             >
               {maiaLevels.map((value) => (
                 <option key={value} value={value}>
                   {value}
                 </option>
               ))}
-            </select>
+            </NativeSelect>
             <p className="text-meta leading-[1.5] text-dim-2">
               <Trans>
                 Maia plays a move humans at this level play here, drawn by how often they play
@@ -229,14 +236,11 @@ export function PracticeDialog({
                   <span className="w-12 font-mono text-data text-ink tabular-nums">
                     {full ? '—' : shownElo}
                   </span>
-                  <label className="flex items-center gap-1.5 text-data text-soft">
-                    <input
-                      type="checkbox"
-                      checked={full}
-                      onChange={(event) => setFull(event.target.checked)}
-                    />
-                    <Trans>Full strength</Trans>
-                  </label>
+                  <Checkbox
+                    checked={full}
+                    onCheckedChange={(next) => setFull(next)}
+                    label={<Trans>Full strength</Trans>}
+                  />
                 </div>
                 <p className="text-meta leading-[1.5] text-dim-2">
                   <Trans>
@@ -260,24 +264,31 @@ export function PracticeDialog({
             <Label>
               <Trans>Think time</Trans>
             </Label>
-            <div role="group" aria-label={t`Think time`} className="flex flex-wrap gap-1">
-              {THINK_TIMES.map((value) => (
-                <Choice key={value} pressed={movetime === value} onClick={() => setMovetime(value)}>
-                  <Trans>{value / 1000} s</Trans>
-                </Choice>
-              ))}
-            </div>
+            <Segmented
+              label={t`Think time`}
+              value={String(movetime)}
+              onChange={(next) => setMovetime(Number(next))}
+              className="h-8 self-start"
+              options={THINK_TIMES.map((value) => ({
+                value: String(value),
+                label: <Trans>{value / 1000} s</Trans>,
+              }))}
+            />
           </div>
         ) : null}
 
-        <div className="flex justify-end gap-2">
-          <Button type="button" variant="outline" onClick={onClose}>
+        <DialogFooter>
+          <Button type="button" variant="secondary" onClick={onClose}>
             <Trans>Cancel</Trans>
           </Button>
-          <Button type="submit" disabled={!ready}>
+          <Button
+            type="submit"
+            disabled={!ready}
+            title={ready ? undefined : t`Choose an opponent that can play right now`}
+          >
             <Trans>Play</Trans>
           </Button>
-        </div>
+        </DialogFooter>
       </form>
     </Frame>
   )
@@ -285,34 +296,4 @@ export function PracticeDialog({
 
 function clamp(value: number, low: number, high: number): number {
   return Math.max(low, Math.min(high, value))
-}
-
-function Choice({
-  pressed,
-  disabled = false,
-  onClick,
-  children,
-}: {
-  pressed: boolean
-  disabled?: boolean
-  onClick: () => void
-  children: ReactNode
-}) {
-  return (
-    <button
-      type="button"
-      aria-pressed={pressed}
-      disabled={disabled}
-      onClick={onClick}
-      className={cn(
-        'rounded-md border px-2 py-1 text-label transition-colors',
-        pressed && !disabled
-          ? 'border-accent-teal/40 bg-selected text-ink'
-          : 'border-edge text-dim hover:border-edge-hover hover:text-ink',
-        disabled && 'cursor-not-allowed opacity-45 hover:border-edge hover:text-dim',
-      )}
-    >
-      {children}
-    </button>
-  )
 }

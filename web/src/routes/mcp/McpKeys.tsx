@@ -14,7 +14,8 @@ import { CopyButton } from './CopyButton'
  * One minted key: what it is called, when it was made, when a client last used it, and the
  * one thing the owner can do to it — revoke. The confirm is inline, the way `RunnerCard`
  * does it: a second click on the same spot, with the consequence spelled out next to it,
- * rather than a dialog for something that is a two-second decision.
+ * rather than a dialog for something that is a two-second decision. The first press is the
+ * red outline ("Revoke…": it asks), and the filled red is only the confirm, after Cancel.
  */
 function KeyRow({ item }: { item: McpKeyResponse }) {
   const { t } = useLingui()
@@ -38,7 +39,7 @@ function KeyRow({ item }: { item: McpKeyResponse }) {
             </span>
             <Button
               type="button"
-              variant="ghost"
+              variant="secondary"
               size="sm"
               onClick={() => setConfirmRevoke(false)}
             >
@@ -66,12 +67,12 @@ function KeyRow({ item }: { item: McpKeyResponse }) {
             </span>
             <Button
               type="button"
-              variant="ghost"
+              variant="destructive-outline"
               size="sm"
               onClick={() => setConfirmRevoke(true)}
             >
               <Trash2 aria-hidden />
-              <Trans context="button">Revoke</Trans>
+              <Trans context="button">Revoke…</Trans>
             </Button>
           </>
         )}
@@ -94,6 +95,10 @@ function KeyRow({ item }: { item: McpKeyResponse }) {
  * The token is in the create response and nowhere else — only its hash is stored — so it
  * is held by the page (`onMinted`), not the query cache, and goes away with "Done". The
  * page keeps it a moment longer than this panel so the connect snippets below can carry it.
+ *
+ * Create is the form's one primary, last in its row; the reveal panel's Done is its own
+ * primary, after Copy key (a secondary face), and the token sits sunk like a field: it is
+ * text to take away.
  */
 export function McpKeys({
   minted,
@@ -170,7 +175,7 @@ export function McpKeys({
               <Trans>Done</Trans>
             </Button>
           </div>
-          <code className="block overflow-x-auto rounded-md border border-edge bg-elevated px-3 py-2 font-mono text-data text-ink">
+          <code className="block overflow-x-auto rounded-md border border-edge-input bg-field px-3 py-2 font-mono text-data text-ink shadow-field">
             {minted.token}
           </code>
           <p className="text-label leading-[1.5] text-dim">

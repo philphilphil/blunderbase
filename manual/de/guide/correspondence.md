@@ -5,7 +5,7 @@ die, die gerade gespielt wird: ein Zug alle paar Tage, über Monate, auf dem ICC
 überall sonst, wo man so viel Zeit bekommt. Die Arbeit steckt nicht in der Zugliste, sondern
 im Baum der Kandidatenzüge dahinter – und den hält dieser Bildschirm fest.
 
-Der Modus ist aus, bis du ihn unter **Analyse → Fernschach** einschaltest, siehe
+Der Modus ist aus, bis du ihn unter **Analyse › Fernschach** einschaltest, siehe
 [Analyse](analysis.md#correspondence). Ist er an, steht **Fernschach** in der Seitenleiste
 unter **Live**; ist er aus, gibt es den Eintrag nicht und die Seiten schicken dich zur
 Übersicht zurück.
@@ -29,25 +29,25 @@ welche Farbe du auch hast. Dazu ein Chip je Engine, die an dieser Partie arbeite
 Tiefe oder Knotenzahl, bei der sie steht – so sagt die Liste auf einen Blick, wohin die
 Rechenzeit deines Rechners geht.
 
-Oben auf der Seite steht die **Kapazitätsleiste**; in der Titelleiste stehen **Neue
-Partie**, **PGN importieren** und **Alles pausieren**.
+Oben auf der Seite steht die **Kapazitätsleiste**; in der Titelleiste stehen **Alle
+pausieren**, **PGN importieren…** und **Neue Partie…**.
 
 ## Eine Partie anlegen { #start-a-game }
 
-**Neue Partie** fragt ab, was eine Fernschachpartie ausmacht:
+**Neue Partie…** fragt ab, was eine Fernschachpartie ausmacht:
 
 | Feld | |
 |---|---|
 | **Weiß**, **Schwarz** | Die Namen, so geschrieben wie auf dem Server |
-| **Du spielst** | Weiß oder Schwarz. Pflichtangabe: Zugrecht und alle Fristen werden davon aus gerechnet |
+| **Wer bist du** | Einer der beiden Namen, die du gerade eingetragen hast. Pflichtangabe: Zugrecht und alle Fristen werden davon aus gerechnet |
 | **Turnier** | Das Turnier, es landet im PGN-Header `Event` |
-| **Link** | Die Partieseite auf dem Server, gespeichert als `Site` |
-| **ICCF-Nummer** | Die Partienummer. Mit ihr ist die Quelle der Partie **ICCF** und die Nummer identifiziert sie; ohne sie ist es eine manuelle Partie und sonst dasselbe |
+| **Link zur Partie** | Die Partieseite auf dem Server, gespeichert als `Site` |
+| **ICCF-Partienummer** | Mit ihr ist die Quelle der Partie **ICCF** und die Nummer identifiziert sie; ohne sie ist es eine manuelle Partie und sonst dasselbe |
 | **Bedenkzeit** | Freier Text, wie das Turnier sie angibt: `10 Tage/Zug`, `40 Tage/10 Züge` |
 | **Startstellung** | Eine FEN, für ein Thematurnier. Leer ist die gewöhnliche Grundstellung |
 | **Antwort fällig** | Wann dein nächster Zug fällig ist, so wie der Server es anzeigt. Leer heißt keine Frist – Blunderbase rechnet nie eine aus, siehe [Die Züge eintragen](#enter-the-moves) |
 
-**PGN importieren** nimmt den Text, den der Server exportiert – eingefügt in das Feld –, und
+**PGN importieren…** nimmt den Text, den der Server exportiert – eingefügt in das Feld –, und
 füllt dieselben Felder aus den Headern: die Züge werden die gespielte Linie, `Event` und
 `Site` kommen aus dem PGN, solange du sie nicht überschreibst. Für eine laufende Partie ist
 das der schnellere Weg.
@@ -59,10 +59,13 @@ dieselbe ICCF-Nummer, oder dieselben zwei Namen am selben Tag mit denselben Züg
 
 Zwei Schaltflächen in der Kopfzeile bewegen die Partie, beide um genau einen Zug:
 
-- **Gegner hat gezogen…** trägt den Zug ein, der angekommen ist.
+- **Gegner zog …** trägt den Zug ein, der angekommen ist.
 - **Diesen Zug spielen** nimmt den Zug, den du im Baum ausgewählt hast, und das ist dein
   Zug. Hier wird er aufs Brett gelegt; abgeschickt wird er weiterhin dort, wo die Partie
-  läuft.
+  läuft. Es ist die einzige blaue Schaltfläche der Kopfzeile, ganz rechts, und nennt den
+  Zug, sobald du einen Kandidaten ausgewählt hast (**Sf3 ziehen**). Solange sie aus ist,
+  sagt sie beim Draufzeigen, warum: Du bist nicht am Zug, oder es ist noch kein Kandidat
+  gewählt.
 
 Die Frist trägst du selbst ein. Die einzige Uhr ist die des Servers, auf dem die Partie
 läuft – der ICCF führt ein Konto an Tagen und schreibt pro Zug etwas gut, andere Server
@@ -72,7 +75,8 @@ Datum von der Seite des Servers ab und trag es in das Feld in der Kopfzeile ein;
 ist nichts fällig. Spielst du deinen Zug, wird die Frist gelöscht: Sie galt diesem Zug, und
 solange der Gegner denkt, gibt es keine.
 
-**Letzten Zug zurücknehmen** macht einen versehentlich eingetragenen Zug rückgängig. Der Zug
+**Letzten Zug zurücknehmen** (der gebogene Pfeil vor **Gegner zog …**) macht einen
+versehentlich eingetragenen Zug rückgängig. Der Zug
 bleibt im Baum, mit seinen Kommentaren und allem, was darunter analysiert wurde; er gehört
 nur nicht mehr zur gespielten Linie.
 
@@ -149,7 +153,14 @@ gespeichert, der Baum, den du auf einem Rechner aufgeräumt hast, ist also auch 
 nächsten aufgeräumt, und es funktioniert auch bei einer beendeten Partie. Eine eingeklappte
 Linie öffnet sich von selbst, solange die ausgewählte Stellung in ihr liegt.
 
-**PGN exportieren** schreibt den ganzen Baum heraus: die gespielte Linie als Hauptvariante,
+Ein Zug, der anderthalb Bauern oder mehr hinter seinem besten Geschwisterzug liegt, wird
+blass: Er ist aus der Entscheidung heraus. **Schwache kürzen…** in der Leiste über dem
+**Baum** zählt jede blasse Linie Zug für Zug auf und löscht sie erst, wenn du bestätigst.
+Von selbst wird nie gekürzt; ein Zug, den die Partie gespielt hat, steht nie zur Wahl, und
+eine Linie, in der noch eine Engine arbeitet, auch nicht.
+
+**PGN exportieren**, das Download-Symbol am Ende der Leiste über dem **Baum**, schreibt den
+ganzen Baum heraus: die gespielte Linie als Hauptvariante,
 jeden anderen Knoten als Variante unter dem Zug, den er beantwortet, deine Kommentare als
 Kommentare, deine Markierungen als NAGs und die Bewertung jedes Knotens als
 `{[%eval 0.25]}` – in der Schreibweise von Lichess, damit jedes Programm, das sie kennt, die
@@ -217,7 +228,7 @@ solange sie eingereiht, laufend oder pausiert ist, wird abgewiesen – und eine 
 Partie nimmt gar keine Suche mehr an, ihr Baum ist eingefroren.
 
 Jede Suche auf diesem Rechner belegt einen seiner Engine-Plätze – die
-**Warteschlangenprozesse** unter **Rechenleistung → Maschinen** auf der Karte dieses
+**Warteschlangenprozesse** unter **Rechenleistung › Maschinen** auf der Karte dieses
 Servers, dieselben Plätze, die die Analysedurchläufe und die Analysebretter nutzen –,
 und jede Suche auf einem Runner belegt einen Slot dieses Runners, geteilt mit seiner
 Warteschlangenarbeit und nie einem laufenden Durchlauf weggenommen. Sind alle belegt, wird
@@ -290,7 +301,7 @@ den eingereihten Zeilen und nicht in der Seite. **Erweitern …** über dem Baum
 für die Stellung, die du gewählt hast, ohne den Umweg über das Menü.
 
 Aufgaben stehen in der Warteschlange vor der automatischen Analyse jeder importierten Partie
-und hinter einer Analyse, die du über **Analysieren** in einer Partie angefordert hast und
+und hinter einer Analyse, die du über **Analysieren …** in einer Partie angefordert hast und
 auf die du gerade wartest, und untereinander gilt: **die
 nächste Frist zuerst**. Eine Partie, die morgen fällig ist, kommt vor einer, die nächste
 Woche fällig ist – gleich in welcher Reihenfolge sie eingereiht wurden. Ein Knoten, auf dem
@@ -372,14 +383,14 @@ Installation: wie viele der Engine-Plätze dieses Rechners Suchen gerade halten,
 auf einen warten, warm geparkte Engines und der Speicher, den sie halten, wie viele Aufgaben
 unterwegs sind und an wie vielen davon schon gerechnet wird, und eine Zeile je entferntem
 Rechner. Aufgaben werden neben den Suchen gezählt und nicht mit ihnen: Sie halten einen
-Platz nur ein, zwei Minuten, und vielleicht auf einer anderen Maschine. Dieselben Zahlen
-stehen am Fuß der Seitenleiste, damit sie von jedem Bildschirm aus
-beantwortet sind. Leiste und Liste folgen den Suchen, wie sie melden – hier gibt es nichts
-nachzuladen.
+Platz nur ein, zwei Minuten, und vielleicht auf einer anderen Maschine. Die belegten
+Plätze stehen außerdem in der Zeile **Fernschach** unter den Engines unten in der
+Seitenleiste (`1/2`), und fährst du darüber, stehen dort dieselben Angaben – so sind sie von
+jedem Bildschirm aus beantwortet. Beides folgt den Suchen, wie sie melden – hier gibt es nichts nachzuladen.
 
-## Alles pausieren { #pause-all }
+## Alle pausieren { #pause-all }
 
-**Alles pausieren** in der Titelleiste ist für den Moment, in dem der Laptop zugeht oder die
+**Alle pausieren** in der Titelleiste ist für den Moment, in dem der Laptop zugeht oder die
 Maschine für etwas anderes gebraucht wird. Es pausiert jede Suche in jeder Partie, warm,
 genau wie das Pausieren einer einzelnen, und wird zu **Alle fortsetzen**, das sie alle wieder
 in Gang setzt: Jede nimmt einen Platz, sobald einer frei wird. Eine pausierte Suche, deren

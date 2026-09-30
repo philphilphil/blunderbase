@@ -288,6 +288,16 @@ describe('the correspondence list', () => {
     expect(posted[0].path).toContain('/correspondence/searches/pause-all')
   })
 
+  it('names the dialogs its bar opens, and says what Pause all does', async () => {
+    draw()
+    // "…" on a command that opens a dialog: the bar says which of its buttons ask first.
+    expect(await screen.findByRole('button', { name: 'New game…' })).toBeEnabled()
+    expect(screen.getByRole('button', { name: 'Import PGN…' })).toBeEnabled()
+    const pause = screen.getByRole('button', { name: /Pause all/ })
+    await waitFor(() => expect(pause).toBeEnabled())
+    expect(pause).toHaveAttribute('title', expect.stringMatching(/gives its slot back/))
+  })
+
   it('puts an engine chip with its depth on the row that is being searched', async () => {
     draw()
     await screen.findByText('Kowalski, Marek')
@@ -340,7 +350,7 @@ describe('the New game dialog', () => {
     await userEvent.type(screen.getByLabelText('White'), 'Baum')
     await userEvent.type(screen.getByLabelText('Black'), 'Kowalski')
     await userEvent.click(
-      within(screen.getByRole('group', { name: 'Which one is you' })).getByRole('button', {
+      within(screen.getByRole('radiogroup', { name: 'Which one is you' })).getByRole('radio', {
         name: /Baum/,
       }),
     )
@@ -368,7 +378,7 @@ describe('the Import PGN dialog', () => {
     await userEvent.click(await screen.findByRole('button', { name: /Import PGN/ }))
     await userEvent.type(screen.getByLabelText('PGN'), '1. e4 c5')
     await userEvent.click(
-      within(screen.getByRole('group', { name: 'Which one is you' })).getByRole('button', {
+      within(screen.getByRole('radiogroup', { name: 'Which one is you' })).getByRole('radio', {
         name: 'I am Black',
       }),
     )

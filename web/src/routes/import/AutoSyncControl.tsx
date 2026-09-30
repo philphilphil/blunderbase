@@ -1,11 +1,13 @@
 /**
  * "Sync automatically every N minutes" — the Sync button on a clock.
  *
- * One switch and one number, under the sources table because that is what it repeats:
+ * One switch and one number, under the account boxes because that is what it repeats:
  * every connected account above, from its last cursor, pressed for you. It is a
- * deployment setting rather than one of the strip's per-run options, which is why it has a
- * footer of its own instead of a place in the strip — ticking "from the beginning" is
- * about the next press, ticking this is about every press from now on.
+ * deployment setting rather than one of the head's per-run options, which is why it has a
+ * footer of its own instead of a place in the head — ticking "from the beginning" is
+ * about the next press, this is about every press from now on. That difference is also
+ * why it is a `Switch` and they are checkboxes: a mode that holds, not an option ticked
+ * for one run.
  *
  * The box shows what is in force, not what was typed: the backend floors the number, and
  * the answer to a save is what it kept. Off leaves the last number in the box, greyed, so
@@ -15,9 +17,8 @@ import { Trans, useLingui } from '@lingui/react/macro'
 import { useEffect, useState } from 'react'
 
 import { Input } from '@/components/ui/input'
+import { Switch } from '@/components/ui/switch'
 import { useSyncSchedule, useUpdateSyncSchedule } from '@/lib/api/queries'
-
-import { SyncCheckbox } from './SyncCheckbox'
 
 /** What the box says the first time the switch is thrown. Often enough to feel live. */
 export const DEFAULT_MINUTES = 30
@@ -55,12 +56,13 @@ export function AutoSyncControl() {
 
   return (
     <div className="flex flex-wrap items-center gap-x-2 gap-y-2 border-t border-hairline px-3.5 py-2.5">
-      <SyncCheckbox
+      <Switch
         label={t`Sync automatically`}
         title={t`Every connected account above, from its last cursor, on this clock — the same as pressing Sync on each row. The history below records every run.`}
         checked={on}
-        onChange={toggle}
+        onCheckedChange={toggle}
         disabled={schedule.isPending || update.isPending}
+        className="mr-1"
       />
       {/* One message with the field inside it: "every … minutes" is a sentence a
           translator has to be able to reorder around the box. */}
@@ -72,7 +74,8 @@ export function AutoSyncControl() {
           inputMode="numeric"
           placeholder={String(DEFAULT_MINUTES)}
           disabled={!on || update.isPending}
-          className="h-7 w-16 font-mono"
+          inputSize="sm"
+          className="w-16 font-mono"
           onChange={(event) => setDraft(event.target.value)}
           onBlur={commit}
           onKeyDown={(event) => {

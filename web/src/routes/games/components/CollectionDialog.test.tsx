@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { render, screen, waitFor } from '@testing-library/react'
+import { cleanup, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -20,6 +20,7 @@ const LEAGUE: Collection = {
   name: '45-45 League',
   color: 'accent',
   description: 'Lichess 45+45 league rounds',
+  pinned: false,
   rule: { source: 'lichess', time_control: '2700+45', rated: true },
   game_count: 8,
   created_at: '2026-09-26T10:00:00Z',
@@ -108,6 +109,7 @@ describe('CollectionDialog — making one', () => {
           name: 'Tough losses',
           color: 'way-back',
           description: null,
+          pinned: false,
           rule: null,
           apply_to_existing: false,
         },
@@ -204,7 +206,7 @@ describe('CollectionDialog — making one', () => {
     expect(
       await screen.findByText('None of the games you already have match.'),
     ).toBeInTheDocument()
-    expect(screen.queryByRole('checkbox')).toBeNull()
+    expect(screen.queryByRole('checkbox', { name: /Also add/ })).toBeNull()
   })
 })
 
@@ -223,10 +225,29 @@ describe('CollectionDialog — editing one', () => {
           name: '45-45 League',
           color: 'accent',
           description: 'Lichess 45+45 league rounds',
+          pinned: false,
           rule: null,
         },
       },
     ])
+  })
+
+  it('pins it to the rail, or takes it off, with the box', async () => {
+    const user = userEvent.setup()
+    const { onClose } = draw({ collection: LEAGUE })
+    const box = screen.getByRole('checkbox', { name: 'Show in the rail, under Collections' })
+    expect(box).not.toBeChecked()
+    await user.click(box)
+    await user.click(screen.getByRole('button', { name: 'Save' }))
+    await waitFor(() => expect(onClose).toHaveBeenCalled())
+    expect(writes[0]!.body).toMatchObject({ pinned: true })
+    cleanup()
+
+    writes = []
+    draw({ collection: { ...LEAGUE, pinned: true } })
+    expect(
+      screen.getByRole('checkbox', { name: 'Show in the rail, under Collections' }),
+    ).toBeChecked()
   })
 
   it('runs the rule over the library once when asked to add the games already there', async () => {
@@ -254,7 +275,7 @@ describe('CollectionDialog — editing one', () => {
     expect(
       await screen.findByText('Every game you already have that matches is in it.'),
     ).toBeInTheDocument()
-    expect(screen.queryByRole('checkbox')).toBeNull()
+    expect(screen.queryByRole('checkbox', { name: /Also add/ })).toBeNull()
   })
 
   it('asks before deleting, and says the games stay', async () => {
@@ -285,7 +306,12 @@ describe('CollectionDialog — editing one', () => {
     expect(writes).toEqual([
       {
         call: 'PATCH /api/collections/7',
-        body: { name: 'League', color: 'accent', description: 'Lichess 45+45 league rounds' },
+        body: {
+          name: 'League',
+          color: 'accent',
+          description: 'Lichess 45+45 league rounds',
+          pinned: false,
+        },
       },
     ])
   })

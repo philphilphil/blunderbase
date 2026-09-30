@@ -78,6 +78,38 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllGlobals())
 
 describe('QueueCard', () => {
+  it('puts the way to fill an empty queue in its sentence, as an inline link', async () => {
+    draw()
+    const link = await screen.findByRole('link', { name: 'Pick a game' })
+    expect(link).toHaveAttribute('href', '/games')
+    // Underlined at rest and no chevron: it sits inside a sentence.
+    expect(link).toHaveClass('underline')
+    expect(link.querySelector('svg')).toBeNull()
+  })
+
+  it('reads an empty queue as waiting, a grey dot before the word', async () => {
+    draw()
+    const idle = await screen.findByText('idle')
+    expect(idle.querySelector('span')).toHaveClass('bg-dim')
+  })
+
+  it('marks a queue whose workers are off as degraded, not as a selection', async () => {
+    routes['GET /api/analysis/queue'] = () =>
+      json(200, { queued: 2, running: 0, workers: false, busy: 0, destinations: [] })
+    draw()
+    const state = await screen.findByText('workers idle')
+    expect(state.querySelector('span')).toHaveClass('bg-mistake')
+    expect(state.querySelector('span')).not.toHaveClass('bg-accent-teal')
+  })
+
+  it('pulses green while a run works', async () => {
+    routes['GET /api/analysis/queue'] = () =>
+      json(200, { queued: 0, running: 1, workers: true, busy: 1, destinations: [] })
+    draw()
+    const state = await screen.findByText('running', { selector: 'span.inline-flex' })
+    expect(state.querySelector('span')).toHaveClass('bg-good', 'animate-pulse')
+  })
+
   it('calls a Maia fill a fill and not the budget it was queued with', async () => {
     activity.current = [run({ maiaOnly: true })]
     draw()

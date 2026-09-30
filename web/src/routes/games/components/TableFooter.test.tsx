@@ -68,6 +68,36 @@ function setup(over: Partial<TableFooterProps> = {}) {
   return props
 }
 
+describe('TableFooter — the selection', () => {
+  it('lays the commands out in the grammar’s order, with Queue analysis the one primary', () => {
+    setup({ selectedCount: 2, selectedGames: [{ id: 11 }, { id: 12 }] })
+    const names = screen
+      .getAllByRole('button')
+      .map((button) => button.getAttribute('aria-label') ?? button.textContent?.trim())
+    const order = ['Clear selection', 'Add to', 'Queue analysis', 'Delete…']
+    expect(names.filter((name) => order.includes(name ?? ''))).toEqual(order)
+    // One filled button in the region: Queue analysis; Delete… is only red-outlined.
+    const filled = screen
+      .getAllByRole('button')
+      .filter((button) => button.className.includes('bg-accent-teal'))
+    expect(filled.map((button) => button.textContent?.trim())).toEqual(['Queue analysis'])
+    expect(screen.getByRole('button', { name: 'Delete…' }).className).toContain('text-blunder')
+    // The count is data, not a link.
+    expect(screen.getByText('2 selected').className).not.toContain('accent')
+  })
+
+  it('pages with the Rows picker and the pager', async () => {
+    const user = userEvent.setup()
+    const props = setup({ page: 1, pageCount: 3 })
+    expect(screen.getByLabelText('Previous page')).toBeDisabled()
+    await user.click(screen.getByLabelText('Next page'))
+    expect(props.onPageChange).toHaveBeenCalledWith(2)
+    expect(screen.getByText('Rows:')).toBeInTheDocument()
+    await user.selectOptions(screen.getByLabelText('Rows'), 'fit')
+    expect(props.onPageSizeChange).toHaveBeenCalledWith('fit')
+  })
+})
+
 describe('TableFooter — collections', () => {
   it('says a selection can go into a collection, or out of the one the page is', () => {
     setup()
@@ -90,7 +120,7 @@ describe('TableFooter — collections', () => {
       onNewCollection: vi.fn(),
     })
 
-    await user.click(screen.getByRole('button', { name: 'Add to…' }))
+    await user.click(screen.getByRole('button', { name: 'Add to' }))
     // Half the selection is in the league: the half tick.
     const row = await screen.findByRole('checkbox', { name: /45-45 League/ })
     expect(row).toHaveAttribute('aria-checked', 'mixed')
@@ -104,7 +134,7 @@ describe('TableFooter — collections', () => {
   it('closes the checklist on Escape', async () => {
     const user = userEvent.setup()
     setup({ selectedCount: 1, selectedGames: [{ id: 11, collections: [] }] })
-    await user.click(screen.getByRole('button', { name: 'Add to…' }))
+    await user.click(screen.getByRole('button', { name: 'Add to' }))
     expect(screen.getByRole('dialog', { name: 'Add to a collection' })).toBeInTheDocument()
     await user.keyboard('{Escape}')
     expect(screen.queryByRole('dialog', { name: 'Add to a collection' })).not.toBeInTheDocument()

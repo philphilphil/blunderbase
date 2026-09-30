@@ -62,6 +62,8 @@ import { filterLabel, useSavedFilters } from '@/routes/games/savedFilters'
 import { noteHref, oneLine } from '@/routes/notes/presentation'
 import { REPORTS, reportPath } from '@/routes/stats/reports'
 
+import { pageKeyHint } from './pageKeys'
+
 /** Under this the backend answers four empty groups, so the box says so itself. */
 const MIN_QUERY = 2
 /** Per group. The dialog is a jump list, not a results page — five is a glance. */
@@ -121,7 +123,9 @@ const PAGES: PageRoute[] = [
     icon: DashboardIcon,
     to: '/',
   },
-  { label: msg`Games`, hint: msg`the library`, icon: GamesIcon, to: '/games' },
+  // Never "the library" for Games: the rail's Library is Import and Manage, and one word
+  // meaning two places was the collision the clarity pass removed.
+  { label: msg`Games`, hint: msg`every game you have imported`, icon: GamesIcon, to: '/games' },
   {
     label: msg`Collections`,
     hint: msg`the groups you keep, and how each went`,
@@ -138,7 +142,7 @@ const PAGES: PageRoute[] = [
   // (see `SideNav`).
   {
     label: msg`Stats`,
-    hint: msg`reports over the library`,
+    hint: msg`reports over your games`,
     icon: StatsIcon,
     to: '/stats',
   },
@@ -236,6 +240,9 @@ function pageItems(
       group: 'Pages',
       label,
       hint,
+      // The page's ⌘ number, the same one the rail's row names: the palette is where
+      // someone reaching for a page by name learns it has a key.
+      trailing: pageKeyHint(page.to),
       icon: page.icon,
       to: page.to,
     })
@@ -572,7 +579,7 @@ function Dialog({ onClose }: { onClose: () => void }) {
           <span className="flex-1" />
           {searching ? null : (
             <span>
-              <Trans>type two letters to search the library</Trans>
+              <Trans>type two letters to search your games</Trans>
             </span>
           )}
         </div>
@@ -586,7 +593,7 @@ function Dialog({ onClose }: { onClose: () => void }) {
 /** The one thing anything outside the shell wants: a way to raise the box. */
 const PaletteContext = createContext<{ open: () => void }>({ open: () => {} })
 
-/** The titlebar's ⌘K chip, and anything else that grows a reason to open it. */
+/** The rail's "Search everything" field, the phone bar's magnifier, and anything else that grows a reason to open it. */
 export function useCommandPalette() {
   return useContext(PaletteContext)
 }
@@ -596,8 +603,8 @@ export function useCommandPalette() {
  * survives the page under it changing.
  *
  * Ctrl+K is taken alongside ⌘K rather than instead of it: the app runs on a laptop and on
- * whatever machine the engines are on, and the shortcut that is printed in the titlebar
- * should work on both.
+ * whatever machine the engines are on, and the shortcut that is printed on the rail's
+ * search field should work on both.
  */
 export function CommandPaletteProvider({ children }: { children: ReactNode }) {
   const [open, setOpen] = useState(false)

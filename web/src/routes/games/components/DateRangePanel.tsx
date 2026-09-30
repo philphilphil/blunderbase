@@ -72,7 +72,8 @@ export function DateRangePanel({
           value={from ?? ''}
           max={today}
           onChange={(event) => onRange(event.target.value || undefined, to)}
-          className="h-7 w-auto px-2 text-data"
+          inputSize="sm"
+          className="w-auto"
         />
         <span className="text-faint">→</span>
         <Input
@@ -81,7 +82,8 @@ export function DateRangePanel({
           value={to ?? ''}
           max={today}
           onChange={(event) => onRange(from, event.target.value || undefined)}
-          className="h-7 w-auto px-2 text-data"
+          inputSize="sm"
+          className="w-auto"
         />
       </div>
       <div className="flex gap-1">

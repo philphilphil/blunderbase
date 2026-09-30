@@ -9,9 +9,12 @@
  * renders even with nothing to show: an empty card is the invitation to write the first one.
  *
  * Provenance stays visible, and this is the card that needs it most. A note the coach wrote
- * over MCP keeps the amber left edge and the `note via MCP` chip; one the owner typed here
- * carries neither, because a conclusion the coach reached and a reminder they left
- * themselves should not look identical.
+ * over MCP keeps the amber left edge and the `note via MCP` readout (flat text: it is a
+ * fact about the note, not something to press, so it has no border); one the owner typed
+ * here carries neither, because a conclusion the coach reached and a reminder they left
+ * themselves should not look identical. The card's controls follow the app's grammar:
+ * "Add note" is a secondary button, edit and delete are ghost icons (delete turns red
+ * under the pointer), and the line naming the game a note came from is a quiet link.
  *
  * **A note that came from a game says which game and which move**, as a link that opens it
  * there. Most notes here were not written here: a note pinned to a position resurfaces
@@ -47,10 +50,13 @@
  * tree payload carries these same notes on its rows.
  */
 import { Trans, useLingui } from '@lingui/react/macro'
-import { Pencil, Trash2 } from 'lucide-react'
+import { Pencil, Plus, Trash2 } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
-import { Link } from 'react-router-dom'
 
+import { Readout } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { TextLink } from '@/components/ui/text-link'
+import { Textarea } from '@/components/ui/textarea'
 import { useDeleteNote, useNotes, useSaveNote, useUpdateNote } from '@/lib/api/queries'
 import type { NoteResponse } from '@/lib/api/types'
 import { MCP_SERVER_NAME, relative } from '@/lib/mcp/status'
@@ -142,13 +148,14 @@ export function PositionNotes({ fen }: { fen: string }) {
         ) : null}
         <div className="flex-1" />
         {draft === null ? (
-          <button
-            type="button"
+          <Button
+            variant="secondary"
+            size="xs"
             onClick={() => open({ id: null, text: '', saved: '' })}
-            className="rounded-md border border-edge px-2 py-[0.1875rem] text-label text-soft hover:border-edge-hover hover:text-ink"
           >
+            <Plus aria-hidden />
             <Trans>Add note</Trans>
-          </button>
+          </Button>
         ) : null}
       </div>
 
@@ -203,7 +210,7 @@ export function PositionNotes({ fen }: { fen: string }) {
 }
 
 /**
- * One stored note. The amber edge and the chip are the coach's alone, so a note reads as
+ * One stored note. The amber edge and the "via MCP" readout are the coach's alone, so a note reads as
  * either "what I told myself" or "what the coach concluded" at a glance.
  */
 function Written({
@@ -238,49 +245,53 @@ function Written({
         wrapped: two usernames and a move are longer than this column at most widths.
       */}
       {origin ? (
-        <Link
+        <TextLink
           to={origin}
+          tone="quiet"
           title={move ? t`Open ${from} at ${move}` : t`Open ${from}`}
-          className="flex min-w-0 items-baseline gap-1.5 text-label text-dim transition-colors hover:text-accent-teal"
+          className="min-w-0 self-start text-label"
         >
-          {move ? <span className="flex-none font-mono tabular text-soft-2">{move}</span> : null}
+          {move ? <span className="flex-none font-mono tabular">{move}</span> : null}
           <span className="truncate">
             {model ? <Trans>in the model game {from}</Trans> : <Trans>in {from}</Trans>}
           </span>
-        </Link>
+        </TextLink>
       ) : null}
 
       <div className="flex items-center gap-2">
         {viaMcp ? (
-          <span
-            className="inline-flex items-center gap-[0.3125rem] rounded-sm border border-edge px-1.5 py-px text-meta text-soft"
+          <Readout
+            className="inline-flex items-center gap-[0.3125rem] text-meta"
             title={t`written over MCP by ${MCP_SERVER_NAME}`}
           >
-            <span className="size-[0.3125rem] rounded-full bg-good" />
+            <span aria-hidden className="size-[0.3125rem] rounded-full bg-good" />
             <Trans>note via MCP</Trans>
-          </span>
+          </Readout>
         ) : null}
-        <span className="font-mono text-meta text-faint">{relative(note.created_at)}</span>
+        <Readout num className="text-faint">
+          {relative(note.created_at)}
+        </Readout>
         <div className="flex-1" />
-        <button
-          type="button"
+        <Button
+          variant="ghost"
+          size="icon-xs"
           onClick={onEdit}
           aria-label={t`Edit this note`}
           title={t`Edit this note`}
-          className="px-0.5 text-faint hover:text-ink"
         >
           <Pencil className="size-3" aria-hidden />
-        </button>
+        </Button>
         {/* The only thing that destroys a note: a blur never does — see the header. */}
-        <button
-          type="button"
+        <Button
+          variant="ghost"
+          size="icon-xs"
           onClick={onDelete}
           aria-label={t`Delete this note`}
           title={t`Delete this note`}
-          className="px-0.5 text-faint hover:text-blunder"
+          className="hover:not-disabled:text-blunder"
         >
           <Trash2 className="size-3" aria-hidden />
-        </button>
+        </Button>
       </div>
     </div>
   )
@@ -301,7 +312,7 @@ function Composer({
 }) {
   const { t } = useLingui()
   return (
-    <textarea
+    <Textarea
       value={draft.text}
       autoFocus
       rows={3}
@@ -321,7 +332,7 @@ function Composer({
       }}
       placeholder={t`What is worth remembering about this position? Enter saves, Shift+Enter breaks the line.`}
       aria-label={t`Note text`}
-      className="w-full resize-none rounded-md border border-input bg-raised px-2.5 py-1.5 text-lead text-ink outline-none placeholder:text-faint focus-visible:border-accent-teal/50"
+      className="resize-none px-2.5 text-lead"
     />
   )
 }

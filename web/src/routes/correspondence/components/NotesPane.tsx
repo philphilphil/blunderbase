@@ -21,16 +21,25 @@
  * Writing is the composer the rest of the app uses: a textarea that saves when it loses
  * focus, because the one failure a notes box does not get to have is losing what somebody
  * typed. Escape abandons the edit; clearing an existing note to empty leaves it alone.
+ *
+ * The three are the game screen's pane tabs (`PaneTabList`, folder tabs in `TAB_ROW`), not
+ * underlined words: the same strip idiom as every other pane, so a tab reads as a tab.
+ * **Add note** is the strip's one tool, a small secondary face at its end.
  */
 import { Trans, useLingui } from '@lingui/react/macro'
-import { Pencil, Trash2 } from 'lucide-react'
+import { Pencil, Plus, Trash2 } from 'lucide-react'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 
+import { Readout } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { Textarea } from '@/components/ui/textarea'
 import { useDeleteNote, useNotes, useSaveNote, useUpdateNote } from '@/lib/api/queries'
 import type { CorrespondenceTreeNode, NoteResponse } from '@/lib/api/types'
 import { relative } from '@/lib/mcp/status'
 import { commitsOnEnter } from '@/lib/ui/shortcuts'
 import { cn } from '@/lib/utils'
+import { PaneTab, PaneTabList } from '@/routes/game/components/PaneTabList'
+import { TAB_ROW } from '@/routes/game/components/paneTabs'
 
 const LIMIT = 8
 
@@ -53,7 +62,7 @@ function Composer({
 }) {
   const { t } = useLingui()
   return (
-    <textarea
+    <Textarea
       value={value}
       autoFocus
       rows={3}
@@ -73,7 +82,7 @@ function Composer({
       }}
       placeholder={placeholder}
       aria-label={t`Note text`}
-      className="w-full resize-none rounded-md border border-input bg-raised px-2.5 py-1.5 text-data leading-[1.5] text-ink outline-none placeholder:text-faint focus-visible:border-accent-teal/50"
+      className="resize-none leading-[1.5]"
     />
   )
 }
@@ -97,24 +106,30 @@ function Written({
     >
       <p className="whitespace-pre-wrap text-data leading-[1.55] text-body-2">{note.text}</p>
       <div className="flex items-center gap-2">
-        <span className="font-mono text-meta text-faint">{relative(note.created_at)}</span>
+        <Readout num>{relative(note.created_at)}</Readout>
         <div className="flex-1" />
-        <button
+        {/* Icon actions inside a card: ghost squares, the one place a border would be noise. */}
+        <Button
           type="button"
+          variant="ghost"
+          size="icon-xs"
           onClick={onEdit}
           aria-label={t`Edit this note`}
-          className="px-0.5 text-faint hover:text-ink"
+          title={t`Edit this note`}
         >
-          <Pencil className="size-3" aria-hidden />
-        </button>
-        <button
+          <Pencil aria-hidden />
+        </Button>
+        <Button
           type="button"
+          variant="ghost"
+          size="icon-xs"
           onClick={onDelete}
           aria-label={t`Delete this note`}
-          className="px-0.5 text-faint hover:text-blunder"
+          title={t`Delete this note`}
+          className="hover:not-disabled:text-blunder"
         >
-          <Trash2 className="size-3" aria-hidden />
-        </button>
+          <Trash2 aria-hidden />
+        </Button>
       </div>
     </div>
   )
@@ -153,7 +168,7 @@ function CommentBox({
     if (!node.comment.trim()) return null
     return (
       <div className="flex flex-col gap-1 border-b border-hairline px-2.5 py-2">
-        <span className="text-meta tracking-[0.06em] text-faint uppercase">
+        <span className="text-label font-medium text-dim">
           <Trans>Comment on the move</Trans>
         </span>
         <p className="whitespace-pre-wrap text-data leading-[1.5] text-body-2">
@@ -165,10 +180,10 @@ function CommentBox({
 
   return (
     <div className="flex flex-col gap-1 border-b border-hairline px-2.5 py-2">
-      <span className="text-meta tracking-[0.06em] text-faint uppercase">
+      <span className="text-label font-medium text-dim">
         <Trans>Comment on the move</Trans>
       </span>
-      <textarea
+      <Textarea
         value={text}
         rows={2}
         disabled={pending}
@@ -182,7 +197,7 @@ function CommentBox({
         }}
         placeholder={t`Goes into the PGN beside the move. Enter saves, Shift+Enter breaks the line.`}
         aria-label={t`Comment on the move`}
-        className="w-full resize-none rounded-md border border-input bg-raised px-2 py-1 text-data leading-[1.5] text-ink outline-none placeholder:text-faint focus-visible:border-accent-teal/50"
+        className="resize-none py-1 leading-[1.5]"
       />
     </div>
   )
@@ -268,38 +283,38 @@ export function NotesPane({
 
   return (
     <div className="flex min-h-0 flex-col">
-      <div className="flex flex-none items-center gap-1 border-b border-line bg-panel px-2">
-        {tabs.map((entry) => (
-          <button
-            key={entry.key}
-            type="button"
-            aria-pressed={tab === entry.key}
-            onClick={() => onTabChange(entry.key)}
-            className={cn(
-              'h-[2.1875rem] border-b-2 px-2 text-label transition-colors',
-              tab === entry.key
-                ? 'border-b-accent-teal text-ink'
-                : 'border-b-transparent text-dim hover:text-ink',
-            )}
-          >
-            {entry.label}
-            {entry.count > 0 ? (
-              <span className="ml-1 font-mono text-meta text-dim">{entry.count}</span>
-            ) : null}
-          </button>
-        ))}
+      {/* The game screen's strip: folder tabs, then the pane's one tool at the end. */}
+      <div className={TAB_ROW}>
+        <PaneTabList label={t`Notes and book`}>
+          {tabs.map((entry) => (
+            <PaneTab
+              key={entry.key}
+              id={`correspondence-notes-tab-${entry.key}`}
+              controls="correspondence-notes-panel"
+              selected={tab === entry.key}
+              onSelect={() => onTabChange(entry.key)}
+              count={entry.count > 0 ? entry.count : undefined}
+              className="whitespace-nowrap"
+            >
+              {entry.label}
+            </PaneTab>
+          ))}
+        </PaneTabList>
         <span className="flex-1" />
         {draft === null && tab !== 'book' ? (
-          <button
+          <Button
             type="button"
+            size="xs"
+            variant="secondary"
+            className="self-center"
             onClick={() => {
               abandoned.current = false
               setDraft({ id: null, text: '', saved: '' })
             }}
-            className="rounded-md border border-edge px-2 py-px text-meta text-soft hover:border-edge-hover hover:text-ink"
           >
+            <Plus aria-hidden />
             <Trans>Add note</Trans>
-          </button>
+          </Button>
         ) : null}
       </div>
 
@@ -313,9 +328,21 @@ export function NotesPane({
       ) : null}
 
       {tab === 'book' ? (
-        <div className="flex min-h-0 flex-1 flex-col">{book}</div>
+        <div
+          id="correspondence-notes-panel"
+          role="tabpanel"
+          aria-labelledby="correspondence-notes-tab-book"
+          className="flex min-h-0 flex-1 flex-col"
+        >
+          {book}
+        </div>
       ) : (
-      <div className="flex min-h-0 flex-1 flex-col gap-1.5 overflow-y-auto px-2.5 py-2">
+      <div
+        id="correspondence-notes-panel"
+        role="tabpanel"
+        aria-labelledby={`correspondence-notes-tab-${tab}`}
+        className="flex min-h-0 flex-1 flex-col gap-1.5 overflow-y-auto px-2.5 py-2"
+      >
         {notes.map((note) =>
           draft?.id === note.id ? (
             <Composer

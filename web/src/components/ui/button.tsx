@@ -7,17 +7,30 @@ import { cn } from '@/lib/utils'
 /**
  * Every button in the app, as one control standard (docs/design/README.md, "Controls").
  *
- * One tool button (`secondary`): the bordered control a toolbar, a control row or a table
- * footer is made of. It used to be hand-copied as a class string into eight places, each
- * of which had drifted by a padding or a shade, so the screens disagreed about what a
- * button looks like. The filled accent (`default`) is the primary action and there is at
- * most one per region; `outline` and `ghost` are the quieter neighbours.
+ * A raised face means "press me", and only a pressable thing has one (the clarity pass).
+ * The tool button (`secondary`) is that face: `--bb-control` on a `control-edge` border with
+ * a 1px shade along its bottom (`shadow-face`), because the old `elevated` fill sat 1.05:1
+ * off the panel and the border alone could not tell a button from a readout or a field. A
+ * field is the inverse (sunk, `Input`), a chip is a border with no face, data has neither.
+ * The filled accent (`default`) is the primary action, one per region and last in its
+ * group; `ghost` is for icon actions in rows and strips, where a face would be noise;
+ * `destructive-outline` is the red command in a toolbar and the filled `destructive` only
+ * a confirm dialog's button. `outline` is retired: it is `secondary`'s exact string for one
+ * release so a missed call site still draws a face, then it goes.
  *
- * One selected state: a toggle says it is on with `aria-pressed`, and the button lights
- * the way a selected row or segment does — `--bb-selected` behind `ink`, the accent on the
- * border where there is one and on the icon. So "on" is the same blue fill everywhere
- * rather than each toggle inventing a tint. The filled `default` never takes it: it is
- * already the loudest thing in its region and has no quieter "off" to be pressed from.
+ * Each state has its own channel (spec §4): hover lifts the face (`control-hover`), mouse
+ * down sinks it (`raised-2`, the shade dropped), on is `aria-pressed` in the blue selected
+ * fill with the accent on the border and the icon (the shade dropped: pushed in), focus is
+ * the global solid ring. The filled `default` never takes `aria-pressed`: it has no quieter
+ * "off" to be pressed from. Hover skips a pressed button (`not-aria-pressed`), so on stays
+ * on under the pointer instead of lifting back into a face.
+ *
+ * One DISABLED look for every faced variant: the silhouette without the face (transparent,
+ * `edge` border, `faint-2` text, icon at 70 %), so a disabled primary never reads as a faded
+ * selection and a disabled secondary never as an enabled one. It keeps pointer events, so
+ * the `title` saying why can be read and the cursor says not-allowed; hover and active are
+ * therefore `not-disabled:`. That, and not `enabled:`, because Links take these classes too
+ * (`buttonVariants` on a router `Link`, `asChild`), and `:enabled` never matches an `<a>`.
  *
  * The base carries no font size and no gap on purpose. Each size sets its own, because a
  * bare `buttonVariants(...)` string on a Link or a raw button never passes through
@@ -28,20 +41,29 @@ import { cn } from '@/lib/utils'
  * index.css, the same one every hand-built control shows, so a control does not lose its
  * focus ring by being moved onto this standard.
  */
-const PRESSED = 'aria-pressed:bg-selected aria-pressed:text-ink aria-pressed:[&_svg]:text-accent-teal'
+const DISABLED =
+  'disabled:cursor-not-allowed disabled:border-edge disabled:bg-transparent disabled:text-faint-2 disabled:shadow-none disabled:[&_svg]:opacity-70'
 
-const buttonVariants = cva(
-  'inline-flex shrink-0 items-center justify-center whitespace-nowrap rounded-md font-medium transition-colors disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none',
+/** The tool button: a raised face, lit blue while `aria-pressed`. */
+const FACE = `border border-control-edge bg-control text-body shadow-face hover:not-disabled:not-aria-pressed:bg-control-hover hover:not-disabled:text-ink active:not-disabled:bg-raised-2 active:not-disabled:shadow-none aria-pressed:border-accent-teal/45 aria-pressed:bg-selected aria-pressed:text-ink aria-pressed:shadow-none aria-pressed:[&_svg]:text-accent-teal ${DISABLED}`
+
+const variants = cva(
+  'inline-flex shrink-0 items-center justify-center whitespace-nowrap rounded-md font-medium transition-colors [&_svg]:pointer-events-none',
   {
     variants: {
       variant: {
-        default: 'bg-accent-teal font-semibold text-accent-ink hover:bg-accent-hover',
-        outline: `border border-edge-input text-body hover:border-edge-hover hover:text-ink aria-pressed:border-accent-teal/45 ${PRESSED}`,
-        // The tool button.
-        secondary: `border border-edge bg-elevated text-body hover:bg-raised hover:text-ink aria-pressed:border-accent-teal/45 ${PRESSED}`,
-        ghost: `text-soft hover:bg-raised hover:text-ink ${PRESSED}`,
-        destructive: 'bg-blunder text-blunder-ink hover:bg-blunder/85',
-        link: 'text-accent-teal hover:text-accent-link',
+        default: `border border-transparent bg-accent-teal font-semibold text-accent-ink hover:not-disabled:bg-accent-hover active:not-disabled:brightness-95 ${DISABLED}`,
+        secondary: FACE,
+        // Retired: the same face as `secondary`, kept one release so a missed call site is
+        // not left unstyled. New code never asks for it (lib/ui/grammar.test.ts).
+        outline: FACE,
+        ghost:
+          'text-soft hover:not-disabled:not-aria-pressed:bg-raised hover:not-disabled:text-ink active:not-disabled:bg-raised-2 aria-pressed:bg-selected aria-pressed:text-ink aria-pressed:[&_svg]:text-accent-teal disabled:cursor-not-allowed disabled:opacity-50',
+        'destructive-outline': `border border-blunder/40 bg-control text-blunder shadow-face hover:not-disabled:bg-[color-mix(in_srgb,var(--bb-blunder)_10%,var(--bb-control))] active:not-disabled:bg-[color-mix(in_srgb,var(--bb-blunder)_15%,var(--bb-control))] active:not-disabled:shadow-none ${DISABLED}`,
+        // Only the confirm button inside a confirmation dialog.
+        destructive: `border border-transparent bg-blunder text-blunder-ink hover:not-disabled:bg-blunder/85 ${DISABLED}`,
+        // Prose only; a link that goes somewhere is a `TextLink`.
+        link: 'text-accent-teal underline-offset-2 hover:not-disabled:text-accent-link hover:not-disabled:underline disabled:cursor-not-allowed disabled:opacity-50',
       },
       size: {
         // Pane-title-strip controls: fits the 35-design-pixel strip with room to spare.
@@ -56,9 +78,27 @@ const buttonVariants = cva(
         'icon-xs': "size-6 [&_svg:not([class*='size-'])]:size-4",
       },
     },
+    // An icon-only face has no label to say what it is, so its edge is the whole signal and
+    // takes the stronger edge (3.14:1, WCAG 1.4.11).
+    compoundVariants: [
+      {
+        variant: ['secondary', 'outline'],
+        size: ['icon', 'icon-sm', 'icon-xs'],
+        className: 'border-control-edge-strong',
+      },
+    ],
     defaultVariants: { variant: 'default', size: 'default' },
   },
 )
+
+/**
+ * The class list for a button-shaped element, merged: the icon sizes' strong edge has to
+ * replace the face's edge rather than sit beside it, and a bare string on a Link would
+ * otherwise leave the two to stylesheet order.
+ */
+function buttonVariants(props?: Parameters<typeof variants>[0]): string {
+  return cn(variants(props))
+}
 
 function Button({
   className,
@@ -67,12 +107,12 @@ function Button({
   asChild = false,
   ...props
 }: React.ComponentProps<'button'> &
-  VariantProps<typeof buttonVariants> & { asChild?: boolean }) {
+  VariantProps<typeof variants> & { asChild?: boolean }) {
   const Comp = asChild ? Slot : 'button'
   return (
     <Comp
       data-slot="button"
-      className={cn(buttonVariants({ variant, size, className }))}
+      className={buttonVariants({ variant, size, className })}
       {...props}
     />
   )

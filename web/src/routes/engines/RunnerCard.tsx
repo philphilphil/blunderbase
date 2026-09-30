@@ -26,6 +26,9 @@ const TONE: Record<'connected' | 'degraded' | 'away', MachineTone> = {
  * the detail now that the collapsed row has four columns to hold instead of a header's
  * worth of space. Revoke keeps its inline, two-click confirmation rather than a dialog —
  * this codebase confirms in place everywhere else (`EngineInventory`, `BrowserRunnerSection`).
+ * The first press is the red outline ("Revoke…", it asks before it acts); the filled red
+ * is only the confirm, after Cancel, the way every confirmation in the app is drawn. The
+ * rename form's Cancel comes before its Save, which is the form's one primary.
  */
 export function RunnerCard({
   runner,
@@ -112,10 +115,15 @@ export function RunnerCard({
                   className="h-7 max-w-[4rem] font-mono"
                   onChange={(event) => setSlots(event.target.value)}
                 />
+                <Button type="button" variant="secondary" size="sm" onClick={() => setEditing(false)}>
+                  <X aria-hidden />
+                  <Trans>Cancel</Trans>
+                </Button>
                 <Button
                   type="button"
                   size="sm"
                   disabled={!name.trim() || update.isPending}
+                  title={!name.trim() ? t`A runner needs a name` : undefined}
                   onClick={save}
                 >
                   {update.isPending ? (
@@ -125,22 +133,19 @@ export function RunnerCard({
                   )}
                   <Trans>Save</Trans>
                 </Button>
-                <Button type="button" variant="ghost" size="sm" onClick={() => setEditing(false)}>
-                  <X aria-hidden />
-                  <Trans>Cancel</Trans>
-                </Button>
               </>
             ) : (
               <>
-                <button
+                <Button
                   type="button"
+                  variant="secondary"
+                  size="sm"
                   aria-label={t`Edit ${runnerName}`}
                   onClick={open}
-                  className="inline-flex items-center gap-1.5 text-label text-dim transition-colors hover:text-ink"
                 >
-                  <Pencil className="size-3" aria-hidden />
+                  <Pencil aria-hidden />
                   <Trans>Rename or resize</Trans>
-                </button>
+                </Button>
                 <div className="flex-1" />
                 {runner.version ? (
                   <span className="font-mono text-meta text-dim">{runner.version}</span>
@@ -180,7 +185,7 @@ export function RunnerCard({
           </div>
 
           <div className="flex flex-col gap-px border-t border-hairline pt-2.5">
-            <h4 className="mb-1 text-meta tracking-[0.1em] text-faint uppercase">
+            <h4 className="mb-1 text-label font-medium text-dim">
               <Trans>Advertised engines</Trans>
             </h4>
             <MachineEngineList
@@ -204,7 +209,7 @@ export function RunnerCard({
                   </span>
                   <Button
                     type="button"
-                    variant="ghost"
+                    variant="secondary"
                     size="sm"
                     onClick={() => setConfirmRevoke(false)}
                   >
@@ -225,12 +230,12 @@ export function RunnerCard({
                 <>
                   <Button
                     type="button"
-                    variant="ghost"
+                    variant="destructive-outline"
                     size="sm"
                     onClick={() => setConfirmRevoke(true)}
                   >
                     <Trash2 aria-hidden />
-                    <Trans context="button">Revoke</Trans>
+                    <Trans context="button">Revoke…</Trans>
                   </Button>
                   <div className="flex-1" />
                 </>

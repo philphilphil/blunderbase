@@ -241,13 +241,17 @@ const OUTCOME_SUMMARY: Record<Outcome, MessageDescriptor> = {
   draw: msg({ message: 'draw', context: 'filter chip' }),
 }
 
-/** Also the speed popover's own option labels, which the design writes in lower case too. */
+/**
+ * Also the speed popover's own option labels and a collection rule's speed chips. A speed
+ * is a name, written as the app's one Speed picker writes it ("Blitz, Rapid"): the same
+ * five words had been capitalised there and lower case here.
+ */
 export const SPEED_WORDS: Record<Speed, MessageDescriptor> = {
-  bullet: msg({ message: 'bullet', context: 'filter chip' }),
-  blitz: msg({ message: 'blitz', context: 'filter chip' }),
-  rapid: msg({ message: 'rapid', context: 'filter chip' }),
-  classical: msg({ message: 'classical', context: 'filter chip' }),
-  correspondence: msg({ message: 'correspondence', context: 'filter chip' }),
+  bullet: msg`Bullet`,
+  blitz: msg`Blitz`,
+  rapid: msg`Rapid`,
+  classical: msg`Classical`,
+  correspondence: msg`Correspondence`,
 }
 
 /** Also the Time control popover's own labels for the rated row. */

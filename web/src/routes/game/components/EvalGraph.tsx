@@ -7,6 +7,7 @@ import { Area, AreaChart, ReferenceLine, Tooltip, XAxis, YAxis } from 'recharts'
 import { SideDot } from '@/components/badges/SideDot'
 import type { Color } from '@/lib/api/types'
 import { ChartContainer, type ChartConfig } from '@/components/ui/chart'
+import { Checkbox } from '@/components/ui/checkbox'
 import { GLYPHS } from '@/lib/chess/classification'
 import { formatScore } from '@/lib/chess/evaluation'
 import { useWheelStep } from '@/lib/board/wheelStep'
@@ -24,7 +25,8 @@ import { usePlyLabel } from '../plyNumbering'
 import { PlotBars, PlotMarks, type PlotPoint } from './graphParts'
 import { FILL_BLACK, FILL_WHITE } from './graphTokens'
 import { MoveTimePlot, TimeTallies } from './MoveTimeGraph'
-import { TAB, TAB_ON, TAB_ROW } from './paneTabs'
+import { TAB_ROW } from './paneTabs'
+import { PaneTab, PaneTabList } from './PaneTabList'
 
 const AXIS = 50
 const CURVE = 'var(--bb-text-2)'
@@ -209,19 +211,20 @@ export function EvalGraph({
         className,
       )}
     >
-      <div role="tablist" aria-label={t`Graph`} className={TAB_ROW}>
-        <GraphTabs tab={tab} timed={timed} onTabChange={setTab} />
+      <div className={TAB_ROW}>
+        <PaneTabList label={t`Graph`}>
+          <GraphTabs tab={tab} timed={timed} onTabChange={setTab} />
+        </PaneTabList>
         <span className="flex-1" />
+        {/* A filter on what the graph marks, so the one checkbox (a field-drawn box), not a
+            switch: it narrows a list rather than setting a mode that persists. */}
         {ownerSide ? (
-          <label className="inline-flex cursor-pointer select-none items-center gap-1 text-label text-soft hover:text-ink">
-            <input
-              type="checkbox"
-              checked={onlyMine}
-              onChange={(e) => setOnlyMine(e.target.checked)}
-              className="size-3 accent-accent"
-            />
-            <Trans>only mine</Trans>
-          </label>
+          <Checkbox
+            checked={onlyMine}
+            onCheckedChange={(next) => setOnlyMine(next)}
+            label={<Trans>only mine</Trans>}
+            className="self-center gap-1.5 text-label text-soft enabled:hover:text-ink"
+          />
         ) : null}
       </div>
 
@@ -408,17 +411,14 @@ function GraphTabs({
       {tabs.map(({ tab: which, label }) => {
         const selected = tab === which || !timed
         return (
-          <button
+          <PaneTab
             key={which}
-            type="button"
-            role="tab"
-            aria-selected={selected}
+            selected={selected}
             data-testid={`graph-tab-${which}`}
-            onClick={() => onTabChange(which)}
-            className={cn(TAB, selected && TAB_ON)}
+            onSelect={() => onTabChange(which)}
           >
             {label}
-          </button>
+          </PaneTab>
         )
       })}
     </>

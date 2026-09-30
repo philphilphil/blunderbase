@@ -1,0 +1,159 @@
+/* ==========================================================================================
+ * Clarity pass: Import (/library/import). Spec §5 "Import". Loaded after clarity.css; every
+ * rule is scoped to html.clarity.
+ *
+ * Markup hooks added to screens/import.html:
+ *   .cl-syncall(-slot)       new: the Sources panel's one primary, "Sync all", at its head
+ *   .cl-card-btn             the per-card Sync / Connect: secondary faces, no longer four fills
+ *   .cl-cb                   the role=checkbox buttons: a real box, ticked in solid accent
+ *   [data-cl-old-autosync]   the captured "Sync automatically" checkbox, replaced by
+ *   .cl-autosync             a Switch (it is a mode that persists, not a filter)
+ *   .cl-src-head             the card's source name: a heading line (dot + name), not a box
+ *   .cl-pgn-region           new: "PGN file", its own region between Accounts and Sync history
+ *     .cl-pgn-sub .cl-pgn-body .cl-pgn-label   (Choose file…, the drop hint, Whose games, Upload)
+ *                            The captured PGN card in the grid is .cl-old; "Sources" -> "Accounts"
+ *   .cl-choose .cl-drop-hint "Choose a file, or drop one here" (accent text) -> a "Choose file…"
+ *                            button plus a plain hint that the region takes a drop
+ *   .cl-src-name .cl-status  sync history: source and Done as dot + word, no boxes
+ *   .cl-imported             the imported count: ink, not accent (accent text means link)
+ * Mine / Not mine is picked up by the core segmented rule; Upload (disabled) by the core's
+ * neutral disabled primary.
+ * ========================================================================================== */
+
+html.clarity .cl-old,
+html.clarity [data-cl-old-autosync] { display: none !important; }
+html.clarity .cl-ico { width: 0.875rem; height: 0.875rem; flex: none; }
+
+/* ---- Sources head: Since, Max games, the two options, then the region's one primary ---- */
+html.clarity .cl-syncall-slot { display: flex; align-self: flex-end; }
+html.clarity .cl-syncall {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  height: 1.75rem;
+  padding: 0 0.625rem;
+  border-radius: 0.25rem;
+  font-size: var(--text-data);
+  line-height: var(--text-data--line-height);
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+/* ---- the source cards ------------------------------------------------------------------ */
+
+/* a card's name is its heading: the source's dot and its name, no chip around it */
+html.clarity .cl-src-head {
+  border: 0;
+  background: transparent;
+  padding: 0;
+  gap: 0.4375rem;
+  font-size: var(--text-data);
+  line-height: var(--text-data--line-height);
+  font-weight: 500;
+  color: var(--bb-text);
+}
+html.clarity .cl-src-head > span { width: 0.4375rem; height: 0.4375rem; }
+
+/* Sync / Connect on each card: secondary. These carry the auto-primary signature
+   (bg-accent-teal), so the face is restated here at a higher specificity. */
+html.clarity .cl-card-btn.cl-btn {
+  border: 1px solid var(--bb-control-edge);
+  background: var(--bb-control);
+  box-shadow: var(--cl-face-shadow);
+  color: var(--bb-body);
+  font-weight: 500;
+}
+html.clarity .cl-card-btn.cl-btn:hover { background: var(--bb-control-hover); color: var(--bb-text); }
+html.clarity .cl-card-btn.cl-btn:active { background: var(--bb-raised-2); box-shadow: none; filter: none; }
+
+/* Checkboxes (spec §3.11): an input, so drawn like a field: an outlined 1rem box on the field
+   fill whose strong edge (>= 3:1) is the whole signal, never a filled grey square. On = solid
+   accent with the tick. These are the app's role=checkbox buttons with a box span inside, so
+   the core .cl-check (which styles the box element itself) cannot be put on them. */
+html.clarity .cl-cb > span[aria-hidden] {
+  width: 1rem;
+  height: 1rem;
+  border-color: var(--bb-control-edge-strong);
+  background: var(--bb-field);
+  color: transparent;
+}
+html.clarity .cl-cb:hover > span[aria-hidden] { border-color: var(--bb-muted); }
+html.clarity .cl-cb[aria-checked=true] > span[aria-hidden] {
+  border-color: var(--bb-accent);
+  background: var(--bb-accent);
+  color: var(--bb-accent-ink);
+}
+html.clarity .cl-cb[aria-checked=true] > span[aria-hidden] svg { stroke-width: 3; }
+html.clarity .cl-cb > span:not([aria-hidden]) { color: var(--bb-body); }
+html.clarity .cl-cb:hover > span:not([aria-hidden]) { color: var(--bb-text); }
+
+/* ---- the three account cards: PGN left for its own region, so the row is three wide ---- */
+@media (min-width: 80rem) {
+  html.clarity [data-tour=sources] > .grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+
+/* ---- PGN file: its own region under Accounts ------------------------------------------ */
+/* It was a fourth card under the head that holds Since, Max games, the two options and Sync
+   all, so nothing said whether those applied to a file (they do not). As its own region it has
+   its own head, its own choice (Whose games) and its own primary, Upload, which keeps the one
+   disabled look until a file is chosen. No status dot: a file has no connection to report. The
+   whole region is the drop target. */
+html.clarity .cl-pgn-sub {
+  font-size: var(--text-label);
+  line-height: var(--text-label--line-height);
+  color: var(--bb-dim);
+}
+html.clarity .cl-pgn-body {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 0.875rem;
+}
+html.clarity .cl-pgn-spacer { flex: 1; }
+html.clarity .cl-pgn-label {
+  font-size: var(--text-label);
+  line-height: var(--text-label--line-height);
+  color: var(--bb-muted);
+}
+html.clarity .cl-pgn-body > [role=group] + button { margin-left: 0.5rem; }
+
+/* "Choose file…" is a command; the drop is said in plain words beside it */
+html.clarity .cl-choose {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  height: 1.75rem;
+  padding: 0 0.625rem;
+  border-radius: 0.25rem;
+  font-size: var(--text-data);
+  line-height: var(--text-data--line-height);
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+}
+html.clarity .cl-drop-hint {
+  font-size: var(--text-label);
+  line-height: var(--text-label--line-height);
+  color: var(--bb-dim);
+  white-space: nowrap;
+}
+
+/* Sync automatically: a switch, the minutes beside it */
+html.clarity .cl-autosync { gap: 0.5rem; }
+html.clarity .cl-autosync .cl-switch-label { color: var(--bb-body); }
+html.clarity .cl-autosync:hover .cl-switch-label { color: var(--bb-text); }
+
+/* ---- sync history ---------------------------------------------------------------------- */
+html.clarity :is(.cl-src-name, .cl-status) {
+  border: 0;
+  background: transparent;
+  padding: 0;
+  gap: 0.4375rem;
+  font-size: var(--text-data);
+  line-height: var(--text-data--line-height);
+  color: var(--bb-body);
+}
+html.clarity .cl-src-name > span { width: 0.375rem; height: 0.375rem; }
+html.clarity .cl-imported { color: var(--bb-text); font-weight: 500; }

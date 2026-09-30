@@ -20,10 +20,10 @@
 import type { I18n, MessageDescriptor } from '@lingui/core'
 import { msg } from '@lingui/core/macro'
 import { Trans, useLingui } from '@lingui/react/macro'
-import { Check } from 'lucide-react'
 import { CartesianGrid, Line, LineChart, XAxis, YAxis } from 'recharts'
-import { useEffect, useRef, useState } from 'react'
+import { useState } from 'react'
 
+import { SpeedPicker } from '@/components/filters/SpeedPicker'
 import {
   ChartContainer,
   ChartTooltip,
@@ -31,9 +31,9 @@ import {
   type ChartConfig,
 } from '@/components/ui/chart'
 import { SectionHead } from '@/components/shell/Section'
-import { Button } from '@/components/ui/button'
+import { Segmented } from '@/components/ui/segmented'
 import { useProfile } from '@/lib/api/queries'
-import type { Platform, RatingSeries } from '@/lib/api/types'
+import { SPEEDS, type Platform, type RatingSeries } from '@/lib/api/types'
 import { rem, scaleMargin, scalePx } from '@/lib/ui/scale'
 import { cn } from '@/lib/utils'
 
@@ -49,7 +49,7 @@ import {
   windowRange,
   type WindowKey,
 } from '@/routes/stats/kit/analytics'
-import { Bar, EmptyBlock, ErrorBlock, LegendSwatch, Segmented } from '@/routes/stats/kit/states'
+import { Bar, EmptyBlock, ErrorBlock, LegendSwatch } from '@/routes/stats/kit/states'
 
 /** The charts, two to a row (see the doc comment); the loading bars take the same grid. */
 const GRID = 'grid grid-cols-2 gap-x-6 gap-y-5 max-lg:grid-cols-1'
@@ -201,9 +201,9 @@ function SpeedGraph({
   return (
     <div className={cn('flex min-w-0 flex-col gap-1.5', className)}>
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-        <span className="text-data font-semibold text-ink">
-          {speedLabel(chart.speed, i18n)}
-        </span>
+        {/* A heading under the section's "Rating": each chart is a region of its own, and
+            a screen reader can jump between them. */}
+        <h3 className="text-data font-semibold text-ink">{speedLabel(chart.speed, i18n)}</h3>
         <div className="flex-1" />
         {chart.lines.map((line) => (
           <LegendSwatch key={line.platform} color={PLATFORM_COLOR[line.platform]}>
@@ -272,102 +272,45 @@ function SpeedGraph({
   )
 }
 
-/** The checked/unchecked square in front of a speed row — blue-filled when shown. */
-function CheckboxGlyph({ checked }: { checked: boolean }) {
-  return (
-    <span
-      aria-hidden
-      className={cn(
-        'flex size-3.5 flex-none items-center justify-center rounded-sm border',
-        checked
-          ? 'border-accent-teal/40 bg-accent-teal/15 text-accent-teal'
-          : 'border-edge text-transparent',
-      )}
-    >
-      <Check className="size-2.5" strokeWidth={3} />
-    </span>
-  )
-}
-
 /**
- * Which speeds get a chart, remembered per browser. Lists every speed that *would* chart
- * (`allCharts`) rather than only the visible ones, so a hidden speed stays reachable to
- * turn back on.
+ * Which speeds get a chart, remembered per browser: the app's one Speed picker ("Speed:
+ * All", "Speed: Blitz, Rapid"), the same control Stats and the Explorer filter by, because
+ * one concept drawn two ways had to be learnt twice. It had been a bare "speeds" button with
+ * no chevron, which read as a command rather than a value.
+ *
+ * It lists every speed that *would* chart (`allCharts`) rather than only the visible ones,
+ * so a hidden speed stays reachable to turn back on. The picker hands back the whole new
+ * set; what is stored is what is hidden, so each speed whose membership moved is flipped,
+ * and a hidden speed with nothing in this window (not listed) stays hidden.
+ *
+ * The list runs bullet to correspondence, as on Stats and the Explorer, not in the charts'
+ * order (most games first): a checklist is looked up, not ranked. Each row carries its
+ * game count, which is what the chart order was saying. The panel hangs from the picker's
+ * right edge, since opened rightwards it covered Recent games.
  */
-function SpeedsMenu({
-  charts,
-  allCharts,
-  hidden,
-}: {
-  charts: SpeedChart[]
-  allCharts: SpeedChart[]
-  hidden: Set<string>
-}) {
-  const [open, setOpen] = useState(false)
-  const container = useRef<HTMLDivElement>(null)
-  const { t, i18n } = useLingui()
-
-  useEffect(() => {
-    if (!open) return
-    const onPointerDown = (event: MouseEvent) => {
-      if (!container.current?.contains(event.target as Node)) setOpen(false)
-    }
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setOpen(false)
-    }
-    document.addEventListener('mousedown', onPointerDown)
-    document.addEventListener('keydown', onKeyDown)
-    return () => {
-      document.removeEventListener('mousedown', onPointerDown)
-      document.removeEventListener('keydown', onKeyDown)
-    }
-  }, [open])
-
+function SpeedsPicker({ allCharts, hidden }: { allCharts: SpeedChart[]; hidden: Set<string> }) {
+  const { i18n } = useLingui()
+  const rank = (speed: string) => {
+    const at = (SPEEDS as readonly string[]).indexOf(speed)
+    return at === -1 ? SPEEDS.length : at
+  }
+  const speeds = allCharts.map((chart) => chart.speed).sort((a, b) => rank(a) - rank(b))
+  const shown = speeds.filter((speed) => !hidden.has(speed))
+  const labels = Object.fromEntries(speeds.map((speed) => [speed, speedLabel(speed, i18n)]))
+  const counts = Object.fromEntries(allCharts.map((chart) => [chart.speed, chart.games]))
   return (
-    <div ref={container} className="relative flex-none">
-      <Button
-        type="button"
-        variant="outline"
-        size="sm"
-        aria-haspopup="menu"
-        aria-expanded={open}
-        onClick={() => setOpen((was) => !was)}
-      >
-        <Trans>speeds</Trans>
-        {charts.length !== allCharts.length ? (
-          <span className="font-mono tabular text-dim">
-            {charts.length}/{allCharts.length}
-          </span>
-        ) : null}
-      </Button>
-
-      {open ? (
-        <div
-          role="menu"
-          aria-label={t`Speeds`}
-          className="bb-card absolute right-0 top-[calc(100%+0.4375rem)] z-40 flex w-[10rem] flex-col gap-0.5 p-1 shadow-[0_0.75rem_2rem_var(--bb-shadow)]"
-        >
-          {allCharts.map((chart) => {
-            const checked = !hidden.has(chart.speed)
-            return (
-              <button
-                key={chart.speed}
-                type="button"
-                role="menuitemcheckbox"
-                aria-checked={checked}
-                aria-label={speedLabel(chart.speed, i18n)}
-                onClick={() => toggleHiddenSpeed(chart.speed)}
-                className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-data text-soft transition-colors hover:bg-raised hover:text-ink"
-              >
-                <CheckboxGlyph checked={checked} />
-                <span className="flex-1 truncate">{speedLabel(chart.speed, i18n)}</span>
-                <span className="font-mono text-label tabular text-dim">{chart.games}</span>
-              </button>
-            )
-          })}
-        </div>
-      ) : null}
-    </div>
+    <SpeedPicker
+      speeds={speeds}
+      value={shown}
+      labels={labels}
+      counts={counts}
+      align="end"
+      onChange={(next) => {
+        for (const speed of speeds) {
+          if (next.includes(speed) === hidden.has(speed)) toggleHiddenSpeed(speed)
+        }
+      }}
+    />
   )
 }
 
@@ -397,13 +340,16 @@ export function RatingCard() {
 
   return (
     <section className="flex flex-none flex-col gap-3">
-      {/* The window buttons and the speeds menu are 240px of control between them, which is
-          most of a phone's width — below `md` they wrap under the title rather than
-          squeezing it. */}
+      {/* The window segment and the Speed picker are 240px of control between them, which
+          is most of a phone's width — below `md` they wrap under the title rather than
+          squeezing it. The window is one value of four, so it is the one segmented
+          control; the speeds are a set, so they are a picker over a checklist. */}
       <SectionHead
         title={t`Rating`}
         detail={period}
-        className="max-md:flex-wrap max-md:gap-y-2"
+        // `max-md:relative`: on a phone the Speed picker's panel spans the head rather than
+        // hanging off the picker's edge (`FilterPopover`).
+        className="max-md:relative max-md:flex-wrap max-md:gap-y-2"
         end={
           <>
             <Segmented
@@ -415,7 +361,7 @@ export function RatingCard() {
                 label: WINDOW_LABELS[key],
               }))}
             />
-            <SpeedsMenu charts={charts} allCharts={allCharts} hidden={hidden} />
+            <SpeedsPicker allCharts={allCharts} hidden={hidden} />
           </>
         }
       />
@@ -441,7 +387,7 @@ export function RatingCard() {
         </EmptyBlock>
       ) : charts.length === 0 ? (
         <EmptyBlock className="h-[10.625rem] flex-none">
-          <Trans>Every speed is hidden. Pick one in the speeds menu.</Trans>
+          <Trans>Every speed is hidden. Turn one back on under Speed.</Trans>
         </EmptyBlock>
       ) : (
         <div className={GRID}>

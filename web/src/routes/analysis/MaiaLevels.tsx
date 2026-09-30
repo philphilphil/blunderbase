@@ -3,6 +3,8 @@ import { Trans, useLingui } from '@lingui/react/macro'
 import { ChevronDown, ChevronRight } from 'lucide-react'
 import { useState } from 'react'
 
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
 import type { CoverageMaia } from '@/lib/api/types'
 import { formatCount } from '@/routes/games/format'
 
@@ -19,6 +21,12 @@ import { formatCount } from '@/routes/games/format'
  * over one sentence's worth of meaning, so the resting state is the sentence and the rows
  * are behind a press — collapsed, they are not rendered at all rather than hidden, because
  * a hundred rows nobody asked for is a hundred rows either way.
+ *
+ * The configured levels are a flat list of facts (a level, its count), not tiles: bordered,
+ * tinted boxes had the silhouette of something to press, and nothing here is. The Maia
+ * purple stays on the level, as a dot and its figure, which is the data colour Maia wears
+ * everywhere. Showing the orphans is a disclosure, so it is a secondary button saying so,
+ * with the sentence it discloses beside it as plain text.
  */
 export function MaiaLevels({ maia }: { maia: CoverageMaia }) {
   const { t } = useLingui()
@@ -50,41 +58,46 @@ export function MaiaLevels({ maia }: { maia: CoverageMaia }) {
         </span>
       </header>
 
-      <div className="flex flex-wrap gap-2">
-        {maia.per_level.map((level) => (
-          <div
-            key={level.elo}
-            className="flex min-w-24 flex-col gap-1 rounded-md border border-brilliant/28 bg-brilliant/8 px-2.5 py-2"
-          >
-            <span className="font-mono text-label tabular text-brilliant">{level.elo}</span>
-            <span className="font-mono text-lead leading-none tabular text-ink">
-              {formatCount(level.games)}
-            </span>
-            <span className="text-meta text-dim-2">
-              <Trans>games</Trans>
-            </span>
-          </div>
-        ))}
-        {maia.per_level.length === 0 ? (
-          <span className="text-label text-dim-2">
-            <Trans>No levels configured.</Trans>
-          </span>
-        ) : null}
-      </div>
+      {maia.per_level.length === 0 ? (
+        <span className="text-label text-dim-2">
+          <Trans>No levels configured.</Trans>
+        </span>
+      ) : (
+        <dl className="flex flex-col">
+          {maia.per_level.map((level) => (
+            <div
+              key={level.elo}
+              className="flex items-baseline gap-2 border-b border-hairline py-1.5 last:border-b-0"
+            >
+              <dt className="flex items-center gap-1.5">
+                <span aria-hidden className="size-1.5 flex-none rounded-full bg-brilliant" />
+                <span className="font-mono text-data tabular text-brilliant">{level.elo}</span>
+              </dt>
+              <div className="flex-1" />
+              <dd className="flex items-baseline gap-1">
+                <span className="font-mono text-data tabular text-ink">
+                  {formatCount(level.games)}
+                </span>
+                <span className="text-label text-dim-2">
+                  <Trans>games</Trans>
+                </span>
+              </dd>
+            </div>
+          ))}
+        </dl>
+      )}
 
       {orphans.length === 0 ? null : (
         <div className="flex flex-col gap-2 border-t border-hairline pt-2.5">
-          <button
+          <Button
             type="button"
+            variant="secondary"
+            size="sm"
             aria-expanded={showing}
             onClick={() => setShowing(!showing)}
-            className="flex items-center gap-1.5 self-start text-label text-soft transition-colors hover:text-ink"
+            className="h-auto min-h-7 self-start py-1 text-left whitespace-normal"
           >
-            {showing ? (
-              <ChevronDown className="size-3 text-faint" aria-hidden />
-            ) : (
-              <ChevronRight className="size-3 text-faint" aria-hidden />
-            )}
+            {showing ? <ChevronDown aria-hidden /> : <ChevronRight aria-hidden />}
             {t`${levelCount} ${plural(orphans.length, {
               one: 'level',
               other: 'levels',
@@ -92,7 +105,7 @@ export function MaiaLevels({ maia }: { maia: CoverageMaia }) {
               one: 'pair',
               other: 'pairs',
             })}`}
-          </button>
+          </Button>
           <p className="text-meta leading-[1.5] text-dim-2">
             <Trans>
               Maia used to be asked at each game&rsquo;s own rating rather than at a fixed set,
@@ -104,11 +117,10 @@ export function MaiaLevels({ maia }: { maia: CoverageMaia }) {
           {showing ? (
             <ul className="flex flex-wrap gap-1.5">
               {orphans.map((level) => (
-                <li
-                  key={level.elo}
-                  className="bb-chip px-1.5 py-0.5 font-mono text-meta tabular text-dim"
-                >
-                  {`${level.elo} · ${formatCount(level.games)}`}
+                <li key={level.elo}>
+                  <Badge className="font-mono tabular">
+                    {`${level.elo} · ${formatCount(level.games)}`}
+                  </Badge>
                 </li>
               ))}
             </ul>

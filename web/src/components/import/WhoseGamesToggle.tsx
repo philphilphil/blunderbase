@@ -9,12 +9,16 @@
  *
  * The default is Mine because the common PGN really is one's own export — this is a
  * question put where it can be seen and changed, not a modal in the way of the usual case.
+ *
+ * One value out of two, both on screen: the app's one `Segmented` (a raised thumb in a
+ * sunken track), in sans like every label. It had been a mono pair with the blue fill,
+ * which is what a pressed toolbar button and a narrowed filter look like.
  */
 import type { MessageDescriptor } from '@lingui/core'
 import { msg } from '@lingui/core/macro'
 import { useLingui } from '@lingui/react/macro'
 
-import { cn } from '@/lib/utils'
+import { Segmented } from '@/components/ui/segmented'
 
 const OPTIONS: { label: MessageDescriptor; mine: boolean; title: MessageDescriptor }[] = [
   {
@@ -42,32 +46,17 @@ export function WhoseGamesToggle({
 }) {
   const { t, i18n } = useLingui()
   return (
-    <div
-      role="group"
-      aria-label={t`Whose games this PGN holds`}
-      className={cn(
-        'flex overflow-hidden rounded-md border border-edge bg-elevated font-mono text-label',
-        disabled && 'opacity-50',
-        className,
-      )}
-    >
-      {OPTIONS.map((option, index) => (
-        <button
-          key={option.mine ? 'mine' : 'not-mine'}
-          type="button"
-          disabled={disabled}
-          aria-pressed={mine === option.mine}
-          title={i18n._(option.title)}
-          onClick={() => onChange(option.mine)}
-          className={cn(
-            'px-2 py-[0.1875rem] transition-colors',
-            index > 0 && 'border-l border-edge',
-            mine === option.mine ? 'bg-selected text-ink' : 'text-dim hover:text-ink',
-          )}
-        >
-          {i18n._(option.label)}
-        </button>
-      ))}
-    </div>
+    <Segmented
+      label={t`Whose games this PGN holds`}
+      value={mine ? 'mine' : 'not-mine'}
+      onChange={(value) => onChange(value === 'mine')}
+      disabled={disabled}
+      className={className}
+      options={OPTIONS.map((option) => ({
+        value: option.mine ? 'mine' : 'not-mine',
+        label: i18n._(option.label),
+        title: i18n._(option.title),
+      }))}
+    />
   )
 }

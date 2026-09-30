@@ -41,6 +41,7 @@ import { Link } from 'react-router-dom'
 
 import { Board, type BoardArrow, type BoardSquare } from '@/components/board/Board'
 import { SectionHead } from '@/components/shell/Section'
+import { TextLink } from '@/components/ui/text-link'
 import { useWorstMoments } from '@/lib/api/queries'
 import type { MomentResponse } from '@/lib/api/types'
 import { glyphStyle } from '@/lib/chess/classification'
@@ -222,12 +223,10 @@ export function WorstMomentsRow({ className }: { className?: string }) {
         }
         className="max-md:flex-wrap max-md:gap-y-0.5"
         end={
-          <Link
-            to="/games?has_blunders=true"
-            className="text-label text-accent-teal hover:text-accent-link"
-          >
+          // The region's one accent: the way out to every blunder, a link with its ›.
+          <TextLink to="/games?has_blunders=true" className="text-label">
             <Trans>All blunders</Trans>
-          </Link>
+          </TextLink>
         }
       />
       {query.isPending ? (

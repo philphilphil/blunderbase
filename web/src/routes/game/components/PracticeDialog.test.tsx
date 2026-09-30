@@ -51,11 +51,12 @@ describe('PracticeDialog', () => {
   it('opens on Maia at the target level, and starts a game against it', async () => {
     const user = userEvent.setup()
     const { onStart } = renderDialog()
-    expect(screen.getByRole('button', { name: 'Maia' })).toHaveAttribute('aria-pressed', 'true')
+    // Side, opponent and think time are each the one `Segmented`: radios.
+    expect(screen.getByRole('radio', { name: 'Maia' })).toHaveAttribute('aria-checked', 'true')
     expect(screen.getByLabelText('Maia level')).toHaveValue('1700')
 
     await user.selectOptions(screen.getByLabelText('Maia level'), '1100')
-    await user.click(screen.getByRole('button', { name: 'Black' }))
+    await user.click(screen.getByRole('radio', { name: 'Black' }))
     await user.click(screen.getByRole('button', { name: 'Play' }))
     expect(onStart).toHaveBeenCalledWith({ side: 'black', opponent: { kind: 'maia', level: 1100 } })
   })
@@ -63,10 +64,10 @@ describe('PracticeDialog', () => {
   it('holds an engine to a rating, or plays it at full strength', async () => {
     const user = userEvent.setup()
     const { onStart } = renderDialog()
-    await user.click(screen.getByRole('button', { name: 'stockfish' }))
+    await user.click(screen.getByRole('radio', { name: 'stockfish' }))
     expect(screen.getByRole('slider')).toHaveValue('1700')
 
-    await user.click(screen.getByRole('button', { name: '2 s' }))
+    await user.click(screen.getByRole('radio', { name: '2 s' }))
     await user.click(screen.getByRole('checkbox', { name: 'Full strength' }))
     await user.click(screen.getByRole('button', { name: 'Play' }))
     expect(onStart).toHaveBeenCalledWith({
@@ -78,14 +79,14 @@ describe('PracticeDialog', () => {
   it('says an engine without a rating limit plays at full strength', async () => {
     const user = userEvent.setup()
     renderDialog()
-    await user.click(screen.getByRole('button', { name: 'leela' }))
+    await user.click(screen.getByRole('radio', { name: 'leela' }))
     expect(screen.queryByRole('slider')).not.toBeInTheDocument()
     expect(screen.getByText(/leela declares no rating limit/)).toBeInTheDocument()
   })
 
   it('greys an engine that cannot answer, and says why', () => {
     renderDialog()
-    expect(screen.getByRole('button', { name: 'box-sf' })).toBeDisabled()
+    expect(screen.getByRole('radio', { name: 'box-sf' })).toBeDisabled()
     expect(screen.getByText(/cannot play practice moves; update it/)).toBeInTheDocument()
   })
 })

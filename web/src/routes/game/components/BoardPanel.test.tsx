@@ -410,7 +410,7 @@ const IMPORT_RUN: RunResponse = {
 describe('BoardPanel analyse button', () => {
   it('is idle when there is no run and none has ever finished, and opens the dialog', () => {
     const { onAnalyse } = renderPanel()
-    const button = screen.getByRole('button', { name: 'Analyse' })
+    const button = screen.getByRole('button', { name: 'Analyse…' })
     expect(button).toBeEnabled()
 
     fireEvent.click(button)
@@ -456,23 +456,25 @@ describe('BoardPanel analyse button', () => {
 
   it('stays disabled without a percent when no progress frame has arrived yet', () => {
     renderPanel({ activeRun: ACTIVE_RUN })
-    expect(screen.getByRole('button', { name: 'Analyse' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Analyse…' })).toBeDisabled()
   })
 
   it('stays pressable while only an import pass is waiting over the game', () => {
     // A requested run goes ahead of that pass, so asking for one is what the button is for.
     const { onAnalyse } = renderPanel({ activeRun: IMPORT_RUN })
-    const button = screen.getByRole('button', { name: 'Analyse' })
+    const button = screen.getByRole('button', { name: 'Analyse…' })
     expect(button).toBeEnabled()
     fireEvent.click(button)
     expect(onAnalyse).toHaveBeenCalledTimes(1)
   })
 
-  it('shows a done state once a run has finished, and stays clickable to run another', () => {
+  it('stays clickable to run another once a run has finished', () => {
     const { onAnalyse } = renderPanel({ finishedRun: FINISHED_RUN })
-    const button = screen.getByRole('button', { name: 'Analyse' })
+    const button = screen.getByRole('button', { name: 'Analyse…' })
     expect(button).toBeEnabled()
-    expect(button.className).toContain('accent-teal')
+    // Not marked on the button: accent text is a link's, and the header says "analysed".
+    expect(button).toHaveClass('text-body')
+    expect(button).not.toHaveClass('text-accent-teal')
 
     fireEvent.click(button)
     expect(onAnalyse).toHaveBeenCalledTimes(1)
@@ -480,7 +482,7 @@ describe('BoardPanel analyse button', () => {
 
   it('is absent from a read-only board', () => {
     renderPanel({ readOnly: true })
-    expect(screen.queryByRole('button', { name: 'Analyse' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Analyse…' })).not.toBeInTheDocument()
   })
 })
 
@@ -493,7 +495,7 @@ describe('BoardPanel transport row', () => {
   it('keeps the settings, the navigation and the actions in three groups', () => {
     renderPanel()
 
-    const settings = screen.getByRole('button', { name: '⇅ Flip' }).parentElement!
+    const settings = screen.getByRole('button', { name: 'Flip' }).parentElement!
     const row = settings.parentElement!
     const navigation = screen.getByRole('button', { name: 'First' }).closest('div')!.parentElement!
 
@@ -505,9 +507,9 @@ describe('BoardPanel transport row', () => {
     for (const name of ['Last', 'Next flagged move']) {
       expect(navigation.contains(screen.getByRole('button', { name }))).toBe(true)
     }
-    expect(settings.contains(screen.getByRole('button', { name: 'Analyse' }))).toBe(false)
-    expect(navigation.contains(screen.getByRole('button', { name: 'Analyse' }))).toBe(false)
-    expect(row.contains(screen.getByRole('button', { name: 'Analyse' }))).toBe(true)
+    expect(settings.contains(screen.getByRole('button', { name: 'Analyse…' }))).toBe(false)
+    expect(navigation.contains(screen.getByRole('button', { name: 'Analyse…' }))).toBe(false)
+    expect(row.contains(screen.getByRole('button', { name: 'Analyse…' }))).toBe(true)
 
     // The arrows anchor the right end of the row, last in the document — and the phone puts
     // them back on top, because the thumb rests under the board and what it is there for is
@@ -593,9 +595,11 @@ describe('BoardPanel transport row', () => {
       moveEntry: { open: false, onOpenChange: vi.fn(), board: Chess.default(), onPlay: vi.fn(), focusNonce: 0 },
       menu: [{ id: 'x', label: 'Something rare', onSelect: vi.fn() }],
     })
-    for (const name of ['Board settings', 'Type a move (M)', 'More for this game']) {
+    for (const name of ['Board settings', 'Type a move (M)']) {
       expect(screen.getByRole('button', { name })).toHaveClass('max-md:h-auto', 'max-md:py-1.5')
     }
+    // The ⋯ is the app's `ActionMenu`: its `icon-sm` square, h-7, on every width.
+    expect(screen.getByRole('button', { name: 'More for this game' })).toHaveClass('size-7')
     expect(screen.getByRole('button', { name: 'Hints' })).toHaveClass('max-md:h-auto', 'max-md:py-1.5')
   })
 })

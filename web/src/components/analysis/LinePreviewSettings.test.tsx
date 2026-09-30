@@ -41,11 +41,15 @@ describe('LinePreviewFields', () => {
 })
 
 describe('LinePreviewRowChip', () => {
-  it('cycles what hovering a line does, and remembers it', async () => {
+  it('picks what hovering a line does from a list, and remembers it', async () => {
     render(<LinePreviewRowChip />)
 
-    await userEvent.click(screen.getByRole('button', { name: 'Line preview: arrows' }))
-    expect(screen.getByRole('button', { name: 'Line preview: overlay' })).toBeInTheDocument()
+    // A picker over the native select: the value is shown, the list is the select's.
+    const picker = screen.getByRole('combobox', { name: 'Line preview' })
+    expect(picker).toHaveValue('arrows')
+    expect(screen.getByText('Arrows', { selector: 'span' })).toBeInTheDocument()
+    await userEvent.selectOptions(picker, 'overlay')
+    expect(screen.getByText('Overlay', { selector: 'span' })).toBeInTheDocument()
     expect(JSON.parse(localStorage.getItem(LINE_PREVIEW_KEY) ?? '{}')).toMatchObject({
       row: 'overlay',
     })

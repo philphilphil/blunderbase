@@ -53,7 +53,14 @@ function setup(over: Partial<GamesTableProps> = {}) {
     empty: <span>Nothing matches these filters</span>,
     ...over,
   }
-  render(<GamesTable {...props} />)
+  // The table asks for the collections list (it drops its Collections column without any);
+  // an empty client answers "none" by never answering.
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false, enabled: false } } })
+  render(
+    <QueryClientProvider client={client}>
+      <GamesTable {...props} />
+    </QueryClientProvider>,
+  )
   return props
 }
 
@@ -135,9 +142,15 @@ describe('GamesTable rows', () => {
     const props = setup({
       games: [{ ...GAME, analyzed: false, requested: false, worst_moments: [] } as GameCard],
     })
-    await userEvent.click(screen.getByRole('button', { name: 'analyse' }))
+    // In the Analysis column, in place of "Unanalysed", and a copy in the phone card's Flags
+    // slot (that card has no Analysis column); jsdom has no media queries, so both are here.
+    const buttons = screen.getAllByRole('button', { name: 'Analyse' })
+    expect(buttons).toHaveLength(2)
+    expect(buttons[0]!.parentElement).toHaveClass('md:w-[var(--cell-width)]')
+    expect(buttons[1]!.parentElement).toHaveClass('md:hidden')
+    await userEvent.click(buttons[0]!)
     expect(props.onAnalyse).toHaveBeenCalledWith(12)
-    expect(screen.getByText('Unanalysed')).toBeInTheDocument()
+    expect(screen.queryByText('Unanalysed')).not.toBeInTheDocument()
   })
 
   it('flips the sort when a column header is clicked', async () => {
@@ -295,12 +308,14 @@ describe('GamesTable collection chips', () => {
 
   it('shows the collections a game is in, as links that do not open the row', async () => {
     const { onOpen } = withCollections([{ ...GAME, collections: [4, 3] } as GameCard])
-    // One copy per breakpoint (the Flags cell and the phone card's date line); jsdom has
-    // no media queries, so both are in the tree.
+    // One copy per breakpoint; jsdom has no media queries, so both are in the tree. The
+    // Collections column says the names as plain text, in the list's order, comma-separated;
+    // the phone card's date line carries them as chips that link.
+    expect(screen.getByText('45-45 League, Tough losses')).toBeInTheDocument()
     const league = screen.getAllByRole('link', { name: /45-45 League/ })
-    expect(league).toHaveLength(2)
+    expect(league).toHaveLength(1)
     expect(league[0]).toHaveAttribute('href', '/games?collection=3&whose=all')
-    expect(screen.getAllByRole('link', { name: /Tough losses/ })).toHaveLength(2)
+    expect(screen.getAllByRole('link', { name: /Tough losses/ })).toHaveLength(1)
     await userEvent.click(league[0]!)
     expect(onOpen).not.toHaveBeenCalled()
   })
@@ -317,6 +332,19 @@ describe('GamesTable collection chips', () => {
     withCollections([{ ...GAME, collections: [] } as GameCard])
     expect(screen.queryByRole('link', { name: /League/ })).not.toBeInTheDocument()
   })
+
+  it('gives collections a column of their own, last, after the flags', () => {
+    withCollections([{ ...GAME, collections: [3] } as GameCard])
+    const header = screen.getAllByRole('row')[0]!
+    const heads = [...header.children].map((cell) => cell.textContent)
+    expect(heads.slice(-2)).toEqual(['Flags', 'Collections'])
+  })
+
+  it('drops the Collections column while there are no collections', () => {
+    setup()
+    expect(screen.queryByText('Collections')).not.toBeInTheDocument()
+    expect(screen.getByText('Flags')).toBeInTheDocument()
+  })
 })
 
 describe('GamesTable with one game imported with its engine held back', () => {
@@ -328,23 +356,45 @@ describe('GamesTable with one game imported with its engine held back', () => {
     expect(screen.getByRole('button', { name: /Worst/ })).toBeInTheDocument()
     expect(screen.getAllByText('−80%')).toHaveLength(1)
     expect(screen.getAllByLabelText('1 blunder')).toHaveLength(1)
-    // The held-back row says why it is quiet, in the cell the number would be in.
+    // The held-back row says why it is quiet, in the cells the number and the flags would
+    // be in: an empty Flags cell would read as a game without a mistake.
     expect(
-      screen.getByRole('img', { name: 'Engine hidden on this game until you show it' }),
-    ).toBeInTheDocument()
+      screen.getAllByRole('img', { name: 'Engine hidden on this game until you show it' }),
+    ).toHaveLength(2)
     expect(screen.getByText('quietone')).toBeInTheDocument()
   })
 })
 
+describe('GamesTable queue state', () => {
+  const fresh = { ...GAME, analyzed: false, requested: false, worst_moments: [] } as GameCard
+
+  it('says a game is in the queue rather than offering to queue it again', () => {
+    setup({ games: [{ ...fresh, queued: true } as GameCard] })
+    expect(screen.getAllByText('In queue')).toHaveLength(2)
+    expect(screen.queryByRole('button', { name: 'Analyse' })).not.toBeInTheDocument()
+  })
+
+  // The card is the one answer: once a refetch says a run was cancelled or cleared, the row
+  // offers Analyse again rather than holding on to "In queue".
+  it('offers Analyse whenever the card says the game is not queued', () => {
+    setup({ games: [{ ...fresh, queued: false } as GameCard] })
+    expect(screen.queryByText('In queue')).not.toBeInTheDocument()
+    expect(screen.getAllByRole('button', { name: 'Analyse' }).length).toBeGreaterThan(0)
+  })
+})
+
 describe('GamesTable with the engine hidden', () => {
-  it('drops the Worst column and the flag badges, and keeps the game', () => {
+  it('drops the Worst and Flags columns, and keeps the game', () => {
     setEngineHidden(true)
     setup()
 
-    // The two things on a row that are the engine's verdict on how it was played.
+    // The two columns that are the engine's verdict on how it was played, headers and all.
     expect(screen.queryByRole('button', { name: /Worst/ })).not.toBeInTheDocument()
+    expect(screen.queryByText('Flags')).not.toBeInTheDocument()
     expect(screen.queryByText('−80%')).not.toBeInTheDocument()
     expect(screen.queryByLabelText('1 blunder')).not.toBeInTheDocument()
+    // No eye either: that marks one game hidden on its own, and here the switch says why.
+    expect(screen.queryByRole('img', { name: /Engine hidden/ })).not.toBeInTheDocument()
 
     // Everything that is the game, or the app's own bookkeeping about it, stays.
     expect(screen.getByText('chillzone')).toBeInTheDocument()
@@ -360,7 +410,7 @@ describe('GamesTable with the engine hidden', () => {
     })
     // The whole point of reading a game unaided is checking yourself against a pass
     // afterwards, so the way to queue one never goes away.
-    await userEvent.click(screen.getByRole('button', { name: 'analyse' }))
+    await userEvent.click(screen.getAllByRole('button', { name: 'Analyse' })[0]!)
     expect(props.onAnalyse).toHaveBeenCalledWith(12)
   })
 

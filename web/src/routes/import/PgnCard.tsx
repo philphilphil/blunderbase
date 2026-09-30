@@ -1,33 +1,37 @@
 /**
- * The PGN upload, as the fourth box of the sources grid.
+ * "PGN file": the upload, as a region of its own under Accounts.
+ *
+ * It had been a fourth box in the accounts grid, under the head that holds Since, Max games
+ * and Sync all, so nothing said whether those applied to a file (they do not). As its own
+ * region it has its own head, its own options (whether to skip evaluation, whose games the
+ * file holds) and its own primary, Upload, which keeps the one disabled look, with a title
+ * saying why, until a file is chosen. No status dot: a file has no connection to report.
  *
  * The file's text is the request body, so several files dropped at once are simply
- * concatenated — which is what a PGN export of many games already is. The box itself is
- * the drop target: the pointer is already over the thing it means, and a box is a bigger
- * and more obvious target than the table row this used to be.
+ * concatenated — which is what a PGN export of many games already is. The whole region is
+ * the drop target: the pointer is already over the thing it means. Choosing a file is a
+ * command, so it is a button ("Choose file…"), and the drop is said in plain words beside
+ * it: it had been accent text, the colour kept for links.
  *
- * The one control it has of its own is whose games the file holds (`WhoseGamesToggle`).
- * That is a per-upload answer and belongs beside the file it is about, not in the strip
- * above the grid, which every source reads.
- *
- * It is three lines like the account boxes beside it, and the third is not "last upload":
- * an account's stamp is what tells you whether to press Sync, and a file's never is — the
- * only question here is whether to upload this file. The sync history below records every
+ * Whose games the file holds (`WhoseGamesToggle`) is a per-upload answer and belongs
+ * beside the file it is about. There is no "last upload" stamp: an account's stamp tells
+ * you whether to press Sync, and a file's never does. The sync history below records every
  * upload with its time, which is where that belongs.
  */
 import { plural } from '@lingui/core/macro'
 import { Trans, useLingui } from '@lingui/react/macro'
-import { FileUp, Loader2, Upload, X } from 'lucide-react'
+import { Loader2, Upload, X } from 'lucide-react'
 import { useRef, useState, type DragEvent } from 'react'
 
-import { SourceBadge } from '@/components/badges/SourceBadge'
 import { WhoseGamesToggle } from '@/components/import/WhoseGamesToggle'
+import { Readout } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { useUploadPgn } from '@/lib/api/queries'
 import { readPgnFile } from '@/lib/chess/pgnFile'
 import { cn } from '@/lib/utils'
 
 import { JobProgress, progressChrome } from './JobProgress'
+import { SyncCheckbox } from './SyncCheckbox'
 import type { SourceProgress } from './useImportProgress'
 
 /** A PGN export is text; a `.pgn` extension is a convention, not a guarantee. */
@@ -39,17 +43,11 @@ function size(bytes: number): string {
   return `${bytes} B`
 }
 
-export function PgnCard({
-  progress,
-  skipEvaluation,
-}: {
-  progress?: SourceProgress
-  /** The grid's own switch, shared with the accounts beside it. */
-  skipEvaluation: boolean
-}) {
+export function PgnCard({ progress }: { progress?: SourceProgress }) {
   const { t } = useLingui()
   const [files, setFiles] = useState<File[]>([])
   const [mine, setMine] = useState(true)
+  const [skipEvaluation, setSkipEvaluation] = useState(false)
   const [over, setOver] = useState(false)
   const [readError, setReadError] = useState<string | null>(null)
   const input = useRef<HTMLInputElement>(null)
@@ -65,7 +63,7 @@ export function PgnCard({
     setFiles([...list])
   }
 
-  function drop(event: DragEvent<HTMLDivElement>) {
+  function drop(event: DragEvent<HTMLElement>) {
     event.preventDefault()
     event.stopPropagation()
     setOver(false)
@@ -93,10 +91,15 @@ export function PgnCard({
     }
   }
 
+  // The region's own border, unless a run in flight (or one that failed) tints it the way
+  // it tints an account box.
+  const chrome = progressChrome(progress)
+
   return (
-    <div
+    <section
       data-source="pgn"
       data-pgn-drop-target
+      aria-labelledby="pgn-file-title"
       onDragOver={(event) => {
         event.preventDefault()
         setOver(true)
@@ -104,51 +107,87 @@ export function PgnCard({
       onDragLeave={() => setOver(false)}
       onDrop={drop}
       className={cn(
-        'flex flex-col gap-2 rounded-lg border bg-elevated-2 p-3',
-        progressChrome(progress),
+        'flex flex-col rounded-xl border bg-panel transition-colors',
+        chrome === 'border-edge' ? 'border-line' : chrome,
         over && 'border-dashed border-accent-teal/60 bg-accent-teal/5',
       )}
     >
-      <div className="flex items-center gap-2">
-        <SourceBadge source="pgn" title={t`A PGN export, of one game or a hundred thousand.`} />
-        <div className="flex-1" />
-        {files.length > 0 ? (
-          <span className="font-mono text-label text-dim tabular">{size(total)}</span>
-        ) : null}
+      <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 border-b border-hairline px-3.5 py-3">
+        <h2 id="pgn-file-title" className="text-data font-semibold text-ink">
+          <Trans>PGN file</Trans>
+        </h2>
+        <p className="text-label text-dim">
+          <Trans>A PGN export, of one game or a hundred thousand.</Trans>
+        </p>
       </div>
 
-      {/* The file line keeps the box's height whether or not one is picked, so the grid
-          does not shuffle the moment a file is chosen. */}
-      <div className="flex min-h-7 items-center gap-2">
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-2.5 px-3.5 py-3">
+        <Button type="button" variant="secondary" size="sm" onClick={() => input.current?.click()}>
+          <Upload aria-hidden />
+          <Trans>Choose file…</Trans>
+        </Button>
         {files.length > 0 ? (
-          <>
-            <span className="min-w-0 flex-1 truncate font-mono text-label text-soft">
+          <span className="flex min-w-0 items-center gap-1.5">
+            <span className="min-w-0 truncate font-mono text-label text-soft">
               {files.length === 1
                 ? files[0]!.name
                 : plural(files.length, { one: '# file', other: '# files' })}
             </span>
-            <button
+            <Readout num>{size(total)}</Readout>
+            <Button
               type="button"
+              variant="ghost"
+              size="icon-xs"
               aria-label={t`Clear the selected file`}
+              title={t`Clear the selected file`}
               onClick={() => {
                 setFiles([])
                 if (input.current) input.current.value = ''
               }}
-              className="text-faint hover:text-ink"
             >
-              <X className="size-3.5" aria-hidden />
-            </button>
-          </>
+              <X aria-hidden />
+            </Button>
+          </span>
         ) : (
-          <button
-            type="button"
-            onClick={() => input.current?.click()}
-            className="inline-flex items-center gap-1.5 text-label text-accent-teal transition-colors hover:text-accent-link"
-          >
-            <FileUp className="size-3.5" aria-hidden />
-            <Trans>Choose a file, or drop one here</Trans>
-          </button>
+          <span className="text-label whitespace-nowrap text-dim">
+            <Trans>or drop it on this box</Trans>
+          </span>
         )}
+        <div className="flex-1" />
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+          <SyncCheckbox
+            label={t`Skip evaluation`}
+            title={t`Store the games and stop there — no analysis pass is queued. Backfill on the Analysis page queues the passes afterwards.`}
+            checked={skipEvaluation}
+            onChange={setSkipEvaluation}
+            disabled={busy}
+          />
+          {/* Always shown, not only once a file is picked: it is the question the upload
+              would otherwise answer silently, and the answer is worth reading before the
+              file is chosen as well as after. */}
+          <span className="flex items-center gap-2">
+            <span className="text-label text-soft">
+              <Trans>Whose games</Trans>
+            </span>
+            <WhoseGamesToggle mine={mine} onChange={setMine} disabled={busy} />
+          </span>
+          <Button
+            type="button"
+            size="sm"
+            disabled={files.length === 0 || busy}
+            title={
+              busy
+                ? t`A PGN is being imported`
+                : files.length === 0
+                  ? t`Choose a file first`
+                  : undefined
+            }
+            onClick={() => void send()}
+          >
+            {busy ? <Loader2 className="animate-spin" aria-hidden /> : <Upload aria-hidden />}
+            <Trans>Upload</Trans>
+          </Button>
+        </div>
       </div>
       <input
         ref={input}
@@ -159,24 +198,12 @@ export function PgnCard({
         data-testid="pgn-file-input"
         onChange={(event) => accept(event.target.files)}
       />
-      {readError ? <p className="text-label text-blunder">{readError}</p> : null}
+      {readError ? <p className="px-3.5 pb-3 text-label text-blunder">{readError}</p> : null}
       {upload.isError ? (
-        <p className="text-label text-blunder">{upload.error.message}</p>
+        <p className="px-3.5 pb-3 text-label text-blunder">{upload.error.message}</p>
       ) : null}
 
-      <div className="flex flex-wrap items-center gap-2">
-        {/* Always shown, not only once a file is picked: it is the question the upload
-            would otherwise answer silently, and the answer is worth reading before the
-            file is chosen as well as after. */}
-        <WhoseGamesToggle mine={mine} onChange={setMine} disabled={busy} />
-        <div className="flex-1" />
-        <Button type="button" size="sm" disabled={files.length === 0 || busy} onClick={() => void send()}>
-          {busy ? <Loader2 className="animate-spin" aria-hidden /> : <Upload aria-hidden />}
-          <Trans>Upload</Trans>
-        </Button>
-      </div>
-
-      {progress ? <JobProgress progress={progress} /> : null}
-    </div>
+      {progress ? <JobProgress progress={progress} className="mx-3.5 mb-3" /> : null}
+    </section>
   )
 }

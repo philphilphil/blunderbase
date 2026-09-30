@@ -82,7 +82,8 @@ export function BlundersByPieceCard({ query }: { query: StatsQuery }) {
     <StatCard
       title={t`Blunders by piece`}
       aside={
-        <span className="font-mono text-label tabular text-dim-2">
+        // Words, so sans like every readout of words; mono is for figures.
+        <span className="text-label text-dim">
           <Trans>count · rate</Trans>
         </span>
       }
@@ -99,7 +100,9 @@ export function BlundersByPieceCard({ query }: { query: StatsQuery }) {
         <ChartContainer config={CHART} className="aspect-auto h-full min-h-0 w-full">
           <BarChart
             data={rows}
-            margin={scaleMargin({ top: 4, right: 4, bottom: 0, left: -22 })}
+            // The left margin pulls the axis in over its own spare width, but no further than
+            // a three-digit count needs: at -22 "100" lost its first digit to the card edge.
+            margin={scaleMargin({ top: 4, right: 4, bottom: 0, left: -14 })}
             barCategoryGap="28%"
           >
             <CartesianGrid vertical={false} stroke="var(--bb-hairline)" />

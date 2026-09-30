@@ -131,6 +131,10 @@ def game_card(card: Mapping[str, Any], *, curve_points: int) -> dict[str, Any]:
     # `deep` is what a card folded before the single analysis pass calls the same thing.
     if card.get("requested", card.get("deep")):
         row["requested"] = True
+    # Said only when true, like `requested`: an unanalysed game on its way through the queue
+    # is "wait a moment", not "never looked at".
+    if card.get("queued"):
+        row["queued"] = True
     points = eval_curve(card.get("eval_curve") or (), curve_points)
     if points:
         row["eval_curve"] = points

@@ -15,6 +15,7 @@ import { Trans, useLingui } from '@lingui/react/macro'
 import { Check, Loader2, X } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
+import { Textarea } from '@/components/ui/textarea'
 import { useDeleteNote, useUpdateNote } from '@/lib/api/queries'
 import type { NoteResponse } from '@/lib/api/types'
 import { commitsOnEnter } from '@/lib/ui/shortcuts'
@@ -45,7 +46,7 @@ export function NoteEditor({ note, onDone, tagSuggestions = [] }: NoteEditorProp
 
   return (
     <>
-      <textarea
+      <Textarea
         autoFocus
         value={text}
         onChange={(event) => setText(event.target.value)}
@@ -59,31 +60,37 @@ export function NoteEditor({ note, onDone, tagSuggestions = [] }: NoteEditorProp
         }}
         aria-label={t`Note`}
         rows={4}
-        className="w-full resize-y rounded-md border border-input bg-elevated px-2.5 py-2 text-data leading-[1.55] text-ink outline-none focus-visible:border-accent-teal/50"
+        className="resize-y px-2.5 py-2 leading-[1.55]"
       />
       <TagEditor
         tags={tags}
         onChange={setTags}
         suggestions={tagSuggestions}
         label={t`This note's tags`}
-        className="rounded-md border border-input bg-elevated px-1.5 py-1"
       />
+      {/* The footer every form has: the way out, then the one filled button that commits. */}
       <div className="flex items-center gap-1.5 max-md:flex-wrap max-md:gap-y-1.5">
-        <Button size="sm" onClick={save} disabled={update.isPending || !text.trim()}>
-          {update.isPending ? (
-            <Loader2 className="size-3 animate-spin" aria-hidden />
-          ) : (
-            <Check className="size-3" aria-hidden />
-          )}
-          <Trans>Save</Trans>
-        </Button>
-        <Button size="sm" variant="ghost" onClick={onDone}>
-          <X className="size-3" aria-hidden />
-          <Trans>Cancel</Trans>
-        </Button>
         {update.isError ? (
           <span className="text-label text-blunder">{update.error.message}</span>
         ) : null}
+        <span className="flex-1" />
+        <Button size="sm" variant="secondary" onClick={onDone}>
+          <X aria-hidden />
+          <Trans>Cancel</Trans>
+        </Button>
+        <Button
+          size="sm"
+          onClick={save}
+          disabled={update.isPending || !text.trim()}
+          title={text.trim() ? undefined : t`A note needs some words to be saved`}
+        >
+          {update.isPending ? (
+            <Loader2 className="animate-spin" aria-hidden />
+          ) : (
+            <Check aria-hidden />
+          )}
+          <Trans>Save</Trans>
+        </Button>
       </div>
     </>
   )
@@ -101,17 +108,17 @@ export function DeleteConfirm({ noteId, onCancel }: { noteId: number; onCancel: 
         <Trans>Forget this note for good?</Trans>
       </span>
       <span className="flex-1" />
+      <Button size="sm" variant="secondary" onClick={onCancel}>
+        <Trans>Keep it</Trans>
+      </Button>
       <Button
         size="sm"
         variant="destructive"
         disabled={remove.isPending}
         onClick={() => remove.mutate(noteId)}
       >
-        {remove.isPending ? <Loader2 className="size-3 animate-spin" aria-hidden /> : null}
+        {remove.isPending ? <Loader2 className="animate-spin" aria-hidden /> : null}
         <Trans>Forget it</Trans>
-      </Button>
-      <Button size="sm" variant="ghost" onClick={onCancel}>
-        <Trans>Keep it</Trans>
       </Button>
     </div>
   )

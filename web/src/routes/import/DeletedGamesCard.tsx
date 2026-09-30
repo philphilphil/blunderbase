@@ -13,7 +13,8 @@
  * button says Forget rather than Restore.
  *
  * Collapsed by default and absent entirely on a library that has deleted nothing: this is a
- * record to consult, not a thing to read every time the page opens.
+ * record to consult, not a thing to read every time the page opens. Its commands are
+ * secondary faces and none is filled: nothing here is the one thing the page is for.
  */
 import { Plural, Trans, useLingui } from '@lingui/react/macro'
 import { ChevronDown, ChevronRight, Loader2, Undo2 } from 'lucide-react'
@@ -70,7 +71,7 @@ export function DeletedGamesCard() {
         </div>
         <Button
           type="button"
-          variant="outline"
+          variant="secondary"
           size="sm"
           aria-expanded={open}
           onClick={() => setOpen((current) => !current)}
@@ -80,9 +81,10 @@ export function DeletedGamesCard() {
         </Button>
         <Button
           type="button"
-          variant="outline"
+          variant="secondary"
           size="sm"
           disabled={forget.isPending}
+          title={forget.isPending ? t`Forgetting` : undefined}
           onClick={() => forget.mutate(undefined)}
         >
           {forget.isPending && pending === undefined ? (
@@ -138,7 +140,7 @@ function Row({
   const when = stamp(row.deleted_at)
   return (
     <li className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-hairline px-4 py-2 last:border-b-0">
-      <SourceBadge source={row.source} size="sm" />
+      <SourceBadge source={row.source} variant="plain" />
       <span
         className={cn(
           'w-40 flex-none truncate font-mono text-label',
@@ -159,11 +161,14 @@ function Row({
       <span className="font-mono text-meta text-faint tabular">
         <Trans>deleted {when}</Trans>
       </span>
+      {/* A secondary face, not a ghost: a ghost is for icon actions, and a ghost *word* read
+          as a label beside the date. */}
       <Button
         type="button"
-        variant="ghost"
+        variant="secondary"
         size="sm"
         disabled={busy}
+        title={busy ? t`Forgetting` : undefined}
         onClick={onForget}
         aria-label={t`Forget the deletion of ${white} vs ${black}`}
       >

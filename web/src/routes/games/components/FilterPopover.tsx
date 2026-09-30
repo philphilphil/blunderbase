@@ -1,46 +1,65 @@
 /**
- * The dropdown chips over design 2b's table.
+ * The filter pickers over design 2b's table, and the panel each opens.
  *
- * A chip is a button that opens a small panel anchored under it. Deliberately hand-rolled
- * rather than pulled from `components/ui`: the chip is two buttons in one frame (open, and
- * clear once set), and the panel is the only floating surface in either of these two
- * screens.
+ * The trigger is the app's `PickerButton` (components/ui/picker-button.tsx): a face that
+ * reads "Label" or "Label: value" and ends in ⇅, lit with the blue fill while it narrows
+ * the data, with a `×` segment inside its outline to clear it. It is as tall as a `sm`
+ * Button (h-7) so the bar's controls share one line. The panel under it is hand-rolled:
+ * it is the only floating surface in these screens, and it needs the phone behaviour
+ * described on `FilterPopover`.
  *
- * The chip is as tall as a `sm` Button (h-7) so the bar's controls share one line, and it
- * has the app's two states: the tool look (`elevated`, `body` text) when the group is
- * unset, and the one selected state (`bg-selected`, `ink`, the accent on the border) when
- * it is set, with the summary picked out in the accent so a glance down the bar finds the
- * filters that are on. The options inside a panel light the same way.
+ * Inside a panel, a choice is drawn as a chip (a border with no face, a ✓ and the blue
+ * fill when on), because it is one of a set of values; a preset that simply does something
+ * ("Last 30 days") is a small tool button.
  */
 import { useLingui } from '@lingui/react/macro'
+import { Check } from 'lucide-react'
 import type * as React from 'react'
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react'
 
+import { buttonVariants } from '@/components/ui/button'
+import { PickerButton } from '@/components/ui/picker-button'
 import { cn } from '@/lib/utils'
 
 /**
- * One option button inside a panel — `OptionRow`, `TriState` and the date presets — so
- * the three cannot drift apart: bordered tool look when off, the selected blue when on.
- * `selected` undefined is a plain action (a preset), which has no pressed state to report.
+ * One option button inside a panel (`OptionRow`, `TriState`, the date presets), so the
+ * three cannot drift apart. A choice (`selected` given) is a chip: bordered, no face, and
+ * when on a leading ✓ and the blue fill. `selected` undefined is a plain action (a preset),
+ * which has no on state to report, so it is the `xs` tool button.
  */
 export function OptionButton({
   selected,
   className,
+  children,
   ...props
 }: React.ComponentProps<'button'> & { selected?: boolean }) {
+  if (selected === undefined) {
+    return (
+      <button
+        type="button"
+        className={cn(buttonVariants({ variant: 'secondary', size: 'xs' }), className)}
+        {...props}
+      >
+        {children}
+      </button>
+    )
+  }
   return (
     <button
       type="button"
       aria-pressed={selected}
       className={cn(
-        'rounded-md border px-2 py-1 text-label transition-colors',
+        'inline-flex h-6 items-center justify-center gap-1 rounded-md border px-2 font-sans text-label transition-colors disabled:cursor-not-allowed disabled:opacity-50',
         selected
-          ? 'border-accent-teal/45 bg-selected text-ink'
-          : 'border-edge bg-elevated text-body hover:bg-raised hover:text-ink',
+          ? 'border-accent-teal/45 bg-selected text-ink [&_svg]:text-accent-teal'
+          : 'border-edge text-soft enabled:hover:border-edge-hover enabled:hover:text-ink',
         className,
       )}
       {...props}
-    />
+    >
+      {selected ? <Check aria-hidden className="-ml-0.5 size-3 flex-none" /> : null}
+      {children}
+    </button>
   )
 }
 
@@ -50,64 +69,26 @@ export function FilterChipButton({
   onClear,
   placeholder,
   ...props
-}: React.ComponentProps<'button'> & {
+}: Omit<React.ComponentProps<'button'>, 'value'> & {
   label: string
   /** The chip's current value, or null when the group is unset. */
   summary: string | null
   onClear?: () => void
   /**
-   * For a chip that already sits under its label (the explorer's rows): it then reads as
-   * its value alone, or this when unset, and `label` only names it for a screen reader.
+   * What an unset picker names as its value ("Speed: All", "Date: Any time"), for a group
+   * whose unset state is itself a value worth reading.
    */
   placeholder?: string
 }) {
-  const { t } = useLingui()
-  const active = summary !== null
   return (
-    <span
-      className={cn(
-        'inline-flex h-7 items-stretch rounded-md border font-sans text-label transition-colors',
-        active
-          ? 'border-accent-teal/45 bg-selected text-ink'
-          : 'border-edge bg-elevated text-body hover:bg-raised hover:text-ink',
-      )}
-    >
-      <button
-        type="button"
-        aria-label={placeholder === undefined ? undefined : label}
-        className="inline-flex items-center gap-1.5 rounded-md px-2.5 outline-none focus-visible:ring-1 focus-visible:ring-accent-teal/55 focus-visible:ring-inset"
-        {...props}
-      >
-        {placeholder !== undefined ? (
-          <>
-            <span className={active ? 'text-accent-teal' : undefined}>
-              {summary ?? placeholder}
-            </span>
-            <span className="text-dim">▾</span>
-          </>
-        ) : active ? (
-          <>
-            <span>{label}:</span>
-            <span className="font-mono text-accent-teal">{summary}</span>
-          </>
-        ) : (
-          <>
-            {label}
-            <span className="text-dim">▾</span>
-          </>
-        )}
-      </button>
-      {active && onClear ? (
-        <button
-          type="button"
-          aria-label={t`Clear ${label} filter`}
-          onClick={onClear}
-          className="rounded-md px-1.5 text-soft outline-none hover:text-ink focus-visible:ring-1 focus-visible:ring-accent-teal/55 focus-visible:ring-inset"
-        >
-          ×
-        </button>
-      ) : null}
-    </span>
+    <PickerButton
+      label={label}
+      value={summary ?? placeholder ?? null}
+      set={summary !== null}
+      onClear={onClear}
+      aria-haspopup="dialog"
+      {...props}
+    />
   )
 }
 
@@ -122,6 +103,11 @@ export function FilterChipButton({
  * clips it or grows the page sideways; a bar-wide panel cannot. Every bar that hosts one
  * of these has to say `max-md:relative` for that to work — `FilterBar` and
  * `NoteFilterBar` both do.
+ *
+ * `align="end"` hangs the panel from the chip's right edge instead of its left, from `md`
+ * up, for a chip that stands at the right of its region (the Dashboard's Speed, the
+ * explorer's filters): opened rightwards, those panels covered the next column or ran off
+ * the window.
  */
 export function FilterPopover({
   label,
@@ -130,6 +116,7 @@ export function FilterPopover({
   children,
   width = '14.5rem',
   placeholder,
+  align = 'start',
 }: {
   label: string
   value: string | null
@@ -138,6 +125,8 @@ export function FilterPopover({
   width?: string
   /** See `FilterChipButton`. */
   placeholder?: string
+  /** Which edge of the chip the panel hangs from, from `md` up. */
+  align?: 'start' | 'end'
 }) {
   const [open, setOpen] = useState(false)
   const host = useRef<HTMLDivElement>(null)
@@ -176,7 +165,10 @@ export function FilterPopover({
           // Handed over rather than set, so `max-md:right-0` can win below the breakpoint:
           // an inline width outranks every class.
           style={{ '--panel-width': width } as React.CSSProperties}
-          className="bb-pop-in absolute top-[calc(100%+0.375rem)] left-0 z-30 flex flex-col gap-2.5 rounded-md border border-edge bg-elevated p-2.5 shadow-[0_1.125rem_2.5rem_-1.125rem_var(--bb-shadow)] md:w-[var(--panel-width)] max-md:right-0"
+          className={cn(
+            'bb-pop-in absolute top-[calc(100%+0.375rem)] left-0 z-30 flex flex-col gap-2.5 rounded-md border border-edge bg-elevated p-2.5 shadow-[0_1.125rem_2.5rem_-1.125rem_var(--bb-shadow)] md:w-[var(--panel-width)] max-md:right-0',
+            align === 'end' && 'md:right-0 md:left-auto',
+          )}
         >
           {children(() => setOpen(false))}
         </div>

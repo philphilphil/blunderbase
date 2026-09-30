@@ -15,6 +15,10 @@ import { authErrorMessage } from '@/routes/auth/password'
  * A server asks for its owner password again: being signed in is a session, not a decision.
  * Desktop has no persistent password and uses this explicit destructive dialog as the
  * confirmation. In both cases the count names whether this is the library the owner means.
+ *
+ * Its confirm is the one filled red button in the app's grammar (Cancel a secondary face
+ * before it): the page's Reset is only the red outline, so the fill appears at the moment
+ * of the decision and nowhere earlier.
  */
 export function DeleteAllGamesDialog({
   games,
@@ -98,7 +102,7 @@ export function DeleteAllGamesDialog({
           ) : null}
           {message ? <FormError>{message}</FormError> : null}
           <div className="flex justify-end gap-2">
-            <Button type="button" variant="outline" onClick={onClose}>
+            <Button type="button" variant="secondary" onClick={onClose}>
               <Trans>Cancel</Trans>
             </Button>
             <Button
@@ -106,6 +110,9 @@ export function DeleteAllGamesDialog({
               variant="destructive"
               autoFocus={!capabilities.password_auth}
               disabled={(capabilities.password_auth && !password) || wipe.isPending}
+              title={
+                capabilities.password_auth && !password ? t`Type your password first` : undefined
+              }
             >
               {wipe.isPending ? <Loader2 className="animate-spin" aria-hidden /> : null}
               <Trans>Delete them</Trans>

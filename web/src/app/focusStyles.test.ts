@@ -12,4 +12,12 @@ describe('global focus styles', () => {
     expect(css.slice(0, baseLayerStart)).not.toContain('[tabindex]):focus-visible')
     expect(css.slice(baseLayerStart)).toMatch(/:focus-visible\s*\{[^}]*outline:/s)
   })
+
+  // The clarity pass (spec §3.1): the ring is solid accent, because the 55 % mix it replaced
+  // was 2.37:1 on the light panel and failed WCAG's 3:1 for a focus indicator.
+  it('draws the ring in solid accent, two design px out', () => {
+    const rule = css.slice(css.indexOf('@layer base')).match(/:focus-visible\s*\{([^}]*)\}/s)
+    expect(rule?.[1]).toMatch(/outline:\s*0\.125rem solid var\(--bb-accent\);/)
+    expect(rule?.[1]).toMatch(/outline-offset:\s*0\.125rem;/)
+  })
 })

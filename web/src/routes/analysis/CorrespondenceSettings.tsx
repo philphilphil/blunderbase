@@ -21,18 +21,21 @@
  * The form saves through `completeUpdate` like the other two settings pages: `PUT
  * /settings` is a replace, so a page that sent only its own fields would clear everything
  * Maia and Engine passes hold.
+ *
+ * The mode is a `Switch` labelled with what it does (a setting that persists), the numbers
+ * are sunk fields, links are inline links, and the one primary is Save, last.
  */
 import { Trans, useLingui } from '@lingui/react/macro'
 import { useState, type FormEvent } from 'react'
-import { Link } from 'react-router-dom'
 
-import { Toggle } from '@/components/analysis/AnalysisControls'
 import { SaveRow, SettingField, type SettingSpec } from '@/components/settings/SettingField'
 import { SetPageChrome } from '@/components/shell/PageChrome'
 import { PageBody } from '@/components/shell/PageHeader'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
+import { Switch } from '@/components/ui/switch'
+import { TextLink } from '@/components/ui/text-link'
 import {
   completeUpdate,
   parseSetting as parse,
@@ -78,7 +81,7 @@ export function CorrespondenceSettingsPage() {
             </p>
             <Button
               type="button"
-              variant="outline"
+              variant="secondary"
               size="sm"
               className="mt-2.5"
               onClick={() => void settings.refetch()}
@@ -167,33 +170,31 @@ export function CorrespondenceSettingsPage() {
             </CardDescription>
           </CardHeader>
           <CardContent className="flex flex-col gap-3">
-            <div className="flex items-start gap-2">
-              <Toggle
+            {/* The switch carries its own label, so the words are part of its hit area; the
+                caption lines up with the words rather than with the track. */}
+            <div className="flex flex-col items-start gap-0.5">
+              <Switch
                 checked={enabled}
-                onChange={(next) =>
+                onCheckedChange={(next) =>
                   setDraft({ ...draft, correspondence_enabled: next ? '1' : '0' })
                 }
                 label={t`Show correspondence mode`}
+                className="gap-2.5 text-data text-body"
               />
-              <div className="flex flex-col gap-0.5 pt-1.5">
-                <span className="text-data text-body">
-                  <Trans>Show correspondence mode</Trans>
-                </span>
-                <span className="text-meta leading-[1.5] text-dim-2">
-                  <Trans>
-                    Adds Correspondence to the rail, after Live, with the number of games
-                    waiting on your move.
-                  </Trans>
-                </span>
-              </div>
+              <span className="pl-[2.375rem] text-meta leading-[1.5] text-dim-2">
+                <Trans>
+                  Adds Correspondence to the rail, after Live, with the number of games
+                  waiting on your move.
+                </Trans>
+              </span>
             </div>
             {enabled ? (
               <p className="border-t border-hairline pt-3 text-meta text-dim-2">
                 <Trans>
                   Start a game from{' '}
-                  <Link to="/correspondence" className="text-accent-teal hover:text-accent-link">
+                  <TextLink to="/correspondence" placement="inline">
                     Correspondence
-                  </Link>
+                  </TextLink>
                   .
                 </Trans>
               </p>
@@ -241,10 +242,10 @@ export function CorrespondenceSettingsPage() {
             <p className="text-meta leading-[1.6] text-dim-2">
               <Trans>
                 How many engine processes this machine runs at once — searches, passes and
-                boards together — is <strong>Queue processes</strong> on{' '}
-                <Link to="/compute/machines" className="text-accent-teal hover:text-accent-link">
+                boards together — is <strong>Queue processes</strong> on Compute ›{' '}
+                <TextLink to="/compute/machines" placement="inline">
                   Machines
-                </Link>
+                </TextLink>
                 , and it takes effect when saved.
               </Trans>
             </p>

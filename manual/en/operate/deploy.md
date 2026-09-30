@@ -276,8 +276,9 @@ In demo mode the door is open and every write is closed: the guard lets every re
 through, and a second check refuses everything but `GET`, `HEAD` and `OPTIONS` with
 `403 read_only`. The exceptions are three reads spelled as POSTs that touch no row — the
 analysis board, Maia's answer for a position, and a one-off engine evaluation — so the game
-view stays alive. `/mcp` is not mounted at all. The page shows a *Demo · read-only* chip in
-the title bar and one toast the first time a write is refused.
+view stays alive. `/mcp` is not mounted at all. The page shows a **Demo ↗** tint at the top
+of the rail, beside the name (its tooltip says it is read-only, and it links to
+blunderbase.org), and one toast the first time a write is refused.
 
 Two reads are closed too: the database backup and the PGN export of the whole library. Each
 one is seconds of CPU and the complete library as a file, to anyone, so a demo answers them

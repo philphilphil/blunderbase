@@ -14,6 +14,9 @@ import { authErrorMessage, passwordProblem } from './password'
  * The server revokes every session and hands *this* browser a fresh cookie, so the owner
  * stays where they are and everything else — another laptop, a phone, the coach's bearer
  * key — stops working. That is worth saying on the form rather than discovering later.
+ *
+ * The footer is every dialog's: Cancel as the secondary face, then the one primary. Once
+ * the change has gone through, Close is the only thing left to do, so it is the primary.
  */
 export function ChangePasswordDialog({ onClose }: { onClose: () => void }) {
   const [current, setCurrent] = useState('')
@@ -127,7 +130,7 @@ export function ChangePasswordDialog({ onClose }: { onClose: () => void }) {
             {message ? <FormError>{message}</FormError> : null}
 
             <div className="flex items-center justify-end gap-2">
-              <Button type="button" variant="outline" onClick={onClose}>
+              <Button type="button" variant="secondary" onClick={onClose}>
                 <Trans>Cancel</Trans>
               </Button>
               <Button type="submit" disabled={change.isPending}>

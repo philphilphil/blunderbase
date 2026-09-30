@@ -10,7 +10,7 @@
  * - **Engine** is any engine that is switched on, a runner's included (`EnginePicker` in
  *   `run` mode): a run is ordinary queue work. The analysis role's opens preselected. One
  *   the server already knows it would refuse — its binary gone, Maia on another host — is
- *   greyed with the reason written under the chips, so nobody learns it only on pressing.
+ *   greyed with the reason written under the picker, so nobody learns it only on pressing.
  * - **Lines** is left blank by default, the deployment's `analysis_multipv` as placeholder
  *   (`LinesField`).
  * - **Stop each move at** opens on depth 24, a number that means the same on every machine,
@@ -30,16 +30,18 @@ import { Trans, useLingui } from '@lingui/react/macro'
 import { Loader2 } from 'lucide-react'
 import { useState, type FormEvent } from 'react'
 
-import { Frame } from '@/components/engine-dialog/DialogFrame'
+import { DialogFooter, Frame } from '@/components/engine-dialog/DialogFrame'
 import { EnginePicker, preferredEngine } from '@/components/engine-dialog/EnginePicker'
 import { LimitField } from '@/components/engine-dialog/LimitField'
 import { LinesField } from '@/components/engine-dialog/LinesField'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
+import { Segmented } from '@/components/ui/segmented'
 import type { AnalysisRequest, CorrespondenceSearchEngine } from '@/lib/api/types'
 import { formatNodes, moveNumberLabel } from '@/lib/chess/evaluation'
 import { useNotation } from '@/lib/chess/notationPrefs'
-import { cn } from '@/lib/utils'
+
+import { parseLimit } from './analyseLimit'
 
 /** What the dialog hands back: an `AnalysisRequest` without the game, which the caller owns. */
 export type AnalyseChoice = Pick<
@@ -208,36 +210,30 @@ export function AnalyseDialog({
           <Label>
             <Trans>Moves</Trans>
           </Label>
-          <div role="group" aria-label={t`Moves`} className="flex flex-wrap gap-1">
-            {(['this', 'from-here', 'whole'] as const).map((choice) => {
+          {/* One of three, all on screen: the one-of-N `Segmented`. A choice that cannot
+              apply at the starting position is offered disabled with the reason. */}
+          <Segmented
+            label={t`Moves`}
+            value={effectiveMoves}
+            onChange={setMoves}
+            className="h-8 self-start"
+            options={(['this', 'from-here', 'whole'] as const).map((choice) => {
               const disabled = choice !== 'whole' && atStart
-              return (
-                <button
-                  key={choice}
-                  type="button"
-                  aria-pressed={effectiveMoves === choice}
-                  disabled={disabled}
-                  title={disabled ? t`No move has been played at the starting position` : undefined}
-                  onClick={() => setMoves(choice)}
-                  className={cn(
-                    'rounded-md border px-2 py-1 text-label transition-colors',
-                    effectiveMoves === choice
-                      ? 'border-accent-teal/40 bg-selected text-ink'
-                      : 'border-edge text-dim hover:border-edge-hover hover:text-ink',
-                    disabled && 'cursor-not-allowed opacity-45 hover:border-edge hover:text-dim',
-                  )}
-                >
-                  {choice === 'this' ? (
+              return {
+                value: choice,
+                disabled,
+                title: disabled ? t`No move has been played at the starting position` : undefined,
+                label:
+                  choice === 'this' ? (
                     <Trans>This move</Trans>
                   ) : choice === 'from-here' ? (
                     <Trans>From here on</Trans>
                   ) : (
                     <Trans>Whole game</Trans>
-                  )}
-                </button>
-              )
+                  ),
+              }
             })}
-          </div>
+          />
           <p className="text-meta leading-[1.5] text-dim-2">
             {effectiveMoves === 'whole' ? (
               <Trans>Every move of the game.</Trans>
@@ -254,31 +250,28 @@ export function AnalyseDialog({
             {error}
           </p>
         ) : null}
-        <div className="flex justify-end gap-2">
-          <Button type="button" variant="outline" onClick={onClose}>
+        <DialogFooter>
+          <Button type="button" variant="secondary" onClick={onClose}>
             <Trans>Cancel</Trans>
           </Button>
-          <Button type="submit" disabled={!ready || pending}>
+          <Button
+            type="submit"
+            disabled={!ready || pending}
+            title={
+              pending
+                ? t`Queueing the run…`
+                : !ready
+                  ? t`Choose an engine and a limit above 0 first`
+                  : undefined
+            }
+          >
             {pending ? <Loader2 className="animate-spin" aria-hidden /> : null}
             <Trans>Analyse</Trans>
           </Button>
-        </div>
+        </DialogFooter>
       </form>
     </Frame>
   )
-}
-
-/**
- * The limit as the request carries it, or `null` when the box cannot be sent. Seconds may
- * be a fraction; depth and nodes are whole. Unlike a correspondence search an empty box is
- * not "no limit" — every move needs one — so it holds the button back instead.
- */
-export function parseLimit(kind: AnalyseLimitKind, value: string): number | null {
-  const text = value.trim()
-  const parsed = Number(text)
-  if (text === '' || !Number.isFinite(parsed) || parsed <= 0) return null
-  if (kind === 'seconds') return parsed
-  return parsed >= 1 ? Math.trunc(parsed) : null
 }
 
 /** `null` is blank — the deployment decides; `undefined` is a number outside 1 to 5. */

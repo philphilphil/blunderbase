@@ -1,12 +1,13 @@
 import type { MessageDescriptor } from '@lingui/core'
 import { msg } from '@lingui/core/macro'
 import { Trans, useLingui } from '@lingui/react/macro'
-import { ChevronDown, ChevronLeft, ChevronRight } from 'lucide-react'
+import { ChevronDown, ChevronRight } from 'lucide-react'
 import { useState } from 'react'
 
-import { Button } from '@/components/ui/button'
-
 import { SourceBadge } from '@/components/badges/SourceBadge'
+import { StatusDot, type StatusDotTone } from '@/components/badges/StatusDot'
+import { Button } from '@/components/ui/button'
+import { Pager } from '@/components/ui/pager'
 import { Skeleton } from '@/components/ui/skeleton'
 import {
   Table,
@@ -23,27 +24,27 @@ import { pageRange } from '@/routes/games/paging'
 
 import { duration, stamp } from './format'
 
-const STATUS: Record<JobStatus, { label: MessageDescriptor; dot: string; text: string }> = {
-  queued: { label: msg`Queued`, dot: 'bg-mistake', text: 'text-soft' },
-  running: { label: msg`Running`, dot: 'bg-accent-teal', text: 'text-soft' },
-  done: { label: msg`Done`, dot: 'bg-good', text: 'text-soft' },
-  failed: { label: msg`Failed`, dot: 'bg-blunder', text: 'text-blunder' },
+const STATUS: Record<JobStatus, { label: MessageDescriptor; tone: StatusDotTone; text: string }> = {
+  queued: { label: msg`Queued`, tone: 'waiting', text: 'text-body' },
+  running: { label: msg`Running`, tone: 'working', text: 'text-body' },
+  done: { label: msg`Done`, tone: 'healthy', text: 'text-body' },
+  failed: { label: msg`Failed`, tone: 'error', text: 'text-blunder' },
   // Stopped on purpose, part-way: not a failure, and not a run whose cursor anything
   // resumes from. What it stored is in the library like any other import.
-  cancelled: { label: msg`Stopped`, dot: 'bg-mistake', text: 'text-mistake' },
+  cancelled: { label: msg`Stopped`, tone: 'degraded', text: 'text-mistake' },
 }
 
-function StatusChip({ status }: { status: JobStatus }) {
+/**
+ * A run's state as a readout: the status dot and the word. It had been a bordered box with
+ * a raised fill, the same silhouette as the buttons on the page, and a state is a fact
+ * about the run, not something to press.
+ */
+function StatusWord({ status }: { status: JobStatus }) {
   const { i18n } = useLingui()
   const style = STATUS[status] ?? STATUS.queued
   return (
-    <span
-      className={cn(
-        'inline-flex items-center gap-1.5 rounded-[0.3125rem] border border-edge-strong bg-raised px-2 py-[0.1875rem] text-label',
-        style.text,
-      )}
-    >
-      <span className={cn('size-[0.3125rem] rounded-full', style.dot)} />
+    <span className={cn('inline-flex items-center gap-1.5 text-data', style.text)}>
+      <StatusDot tone={style.tone} />
       {i18n._(style.label)}
     </span>
   )
@@ -197,23 +198,21 @@ export function SyncHistory({
                 <TableRow key={job.id} data-state={expanded ? 'selected' : undefined}>
                   <TableCell className="pr-0">
                     {expandable ? (
-                      <button
+                      <Button
                         type="button"
+                        variant="ghost"
+                        size="icon-xs"
                         aria-label={expanded ? t`Hide failures` : t`Show failures`}
+                        title={expanded ? t`Hide failures` : t`Show failures`}
                         aria-expanded={expanded}
                         onClick={() => setOpen(expanded ? null : job.id)}
-                        className="text-faint hover:text-ink"
                       >
-                        {expanded ? (
-                          <ChevronDown className="size-3.5" aria-hidden />
-                        ) : (
-                          <ChevronRight className="size-3.5" aria-hidden />
-                        )}
-                      </button>
+                        {expanded ? <ChevronDown aria-hidden /> : <ChevronRight aria-hidden />}
+                      </Button>
                     ) : null}
                   </TableCell>
                   <TableCell>
-                    <SourceBadge source={job.source} size="sm" />
+                    <SourceBadge source={job.source} variant="plain" className="text-data text-body" />
                   </TableCell>
                   <TableCell className="font-mono text-data text-soft tabular">
                     {stamp(job.started_at ?? job.created_at)}
@@ -225,7 +224,9 @@ export function SyncHistory({
                     <Count value={job.games_seen} />
                   </TableCell>
                   <TableCell className="text-right">
-                    <Count value={job.games_imported} tone="text-accent-teal" />
+                    {/* Ink, the heaviest figure in the row: it is what the run was for.
+                        Accent text is kept for links, and this goes nowhere. */}
+                    <Count value={job.games_imported} tone="font-medium text-ink" />
                   </TableCell>
                   <TableCell className="text-right">
                     <Count value={job.games_skipped} tone="text-soft-2" />
@@ -240,7 +241,7 @@ export function SyncHistory({
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-2">
-                      <StatusChip status={job.status} />
+                      <StatusWord status={job.status} />
                       {job.message ? (
                         <span
                           title={job.message}
@@ -270,31 +271,13 @@ export function SyncHistory({
             </Trans>
           </span>
           <div className="flex-1" />
-          <Button
-            type="button"
-            size="sm"
-            variant="outline"
-            aria-label={t`Previous page`}
-            className="size-7 p-0"
-            disabled={page <= 1}
-            onClick={() => onPageChange(page - 1)}
-          >
-            <ChevronLeft className="size-3.5" aria-hidden />
-          </Button>
-          <span className="font-mono text-label text-soft tabular" aria-live="polite">
-            {page} / {pageCount}
-          </span>
-          <Button
-            type="button"
-            size="sm"
-            variant="outline"
-            aria-label={t`Next page`}
-            className="size-7 p-0"
-            disabled={page >= pageCount}
-            onClick={() => onPageChange(page + 1)}
-          >
-            <ChevronRight className="size-3.5" aria-hidden />
-          </Button>
+          <Pager
+            label={t`Pages`}
+            page={page}
+            pages={pageCount}
+            onPrev={() => onPageChange(page - 1)}
+            onNext={() => onPageChange(page + 1)}
+          />
         </div>
       ) : null}
     </section>

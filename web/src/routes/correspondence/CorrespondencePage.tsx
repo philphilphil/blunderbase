@@ -19,17 +19,26 @@
  * **Pause all** / **Resume all** are in the titlebar because they are one gesture for the
  * whole install: the laptop is closing, or it has been opened again. The button that shows
  * is the one that would do something — with nothing running there is nothing to pause.
+ * Beside them, **Import PGN…** and **New game…** open their dialogs; New game is the bar's
+ * one primary, last, because starting a game is what the list is the front door to.
+ *
+ * The two tables' rows are the app's clickable rows (`ui/row.ts`), their heads column
+ * heads, and what an engine is doing is a borderless tint with the status dot's grammar
+ * (green alive, amber parked, grey waiting): a boxed chip had read as a button.
  */
 import { Plural, Trans, useLingui } from '@lingui/react/macro'
-import { ArrowRight, FileText, Pause, Play, Plus } from 'lucide-react'
+import { FileText, Pause, Play, Plus, RefreshCw } from 'lucide-react'
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 
+import { StatusDot } from '@/components/badges/StatusDot'
 import { SetPageChrome } from '@/components/shell/PageChrome'
 import { PageBody } from '@/components/shell/PageHeader'
 import { Section } from '@/components/shell/Section'
 import { Button } from '@/components/ui/button'
+import { COLUMN_HEAD, ROW } from '@/components/ui/row'
 import { Skeleton } from '@/components/ui/skeleton'
+import { TextLink } from '@/components/ui/text-link'
 import {
   useCorrespondenceGames,
   useCorrespondenceSearches,
@@ -142,19 +151,16 @@ function EngineChips({ game }: { game: CorrespondenceGameSummary }) {
                   : undefined
             }
             className={cn(
-              'inline-flex items-center gap-1.5 rounded-sm border px-1.5 py-px font-mono text-meta text-body',
-              search.status === 'queued' ? 'border-dashed border-edge text-dim' : 'border-edge',
+              'inline-flex items-center gap-1.5 rounded-sm px-1.5 py-px font-mono text-meta',
+              // Waiting its turn is quieter than working: no tint, dim text.
+              search.status === 'queued' ? 'text-dim' : 'bg-chip-neutral text-body',
             )}
           >
-            <span
-              aria-hidden
-              className={cn(
-                'size-[0.3125rem] rounded-full',
-                live ? 'bg-good' : search.status === 'paused' ? 'bg-mistake' : 'bg-accent-teal',
-              )}
+            <StatusDot
+              tone={live ? 'healthy' : search.status === 'paused' ? 'degraded' : 'waiting'}
             />
             {/* The queue mark the tree uses, so one glyph means one thing on both screens. */}
-            {task ? <span className="text-accent-teal">◌</span> : null}
+            {task ? <span className="text-dim">◌</span> : null}
             {search.engine_name ?? '—'}
             {counter ? <span className="text-dim">{counter}</span> : null}
           </span>
@@ -173,13 +179,13 @@ function OngoingRow({ game }: { game: CorrespondenceGameSummary }) {
   const last = game.last_move_san ? notate(game.last_move_san) : null
   return (
     <tr
-      className="cursor-pointer border-t border-hairline hover:bg-raised"
+      className={cn(ROW, 'cursor-pointer border-t border-hairline')}
       onClick={() => void navigate(`/correspondence/${game.game_id}`)}
     >
       <td className="py-2 pr-3 align-middle">
         <Link
           to={`/correspondence/${game.game_id}`}
-          className="flex items-center gap-2 text-lead font-medium text-ink hover:text-accent-link"
+          className="flex items-center gap-2 text-lead font-medium text-ink underline-offset-2 hover:underline"
           onClick={(event) => event.stopPropagation()}
         >
           <Side color={ownerColor(game)} />
@@ -222,9 +228,11 @@ function OngoingTable({
 }) {
   return (
     <div className="overflow-x-auto">
-      <table className="w-full border-collapse">
+      {/* Never squeezed below its columns: on a phone the table scrolls sideways in its
+          own box rather than wrapping every cell to one word a line. */}
+      <table className="w-full min-w-[40rem] border-collapse">
         <thead>
-          <tr className="text-meta tracking-[0.1em] text-faint uppercase">
+          <tr className={COLUMN_HEAD}>
             <th className="w-[38%] py-1.5 pr-3 text-left font-normal">
               <Trans>Game</Trans>
             </th>
@@ -271,13 +279,9 @@ function FinishedRow({ game }: { game: CorrespondenceGameSummary }) {
           {date ? <span>· {date}</span> : null}
         </span>
       </span>
-      <Link
-        to={`/games/${game.game_id}`}
-        className="inline-flex items-center gap-1 text-label text-accent-teal hover:text-accent-link"
-      >
+      <TextLink to={`/games/${game.game_id}`} className="text-label">
         <Trans>Open in Games</Trans>
-        <ArrowRight className="size-3" aria-hidden />
-      </Link>
+      </TextLink>
     </div>
   )
 }
@@ -347,8 +351,9 @@ export function CorrespondencePage() {
               <Button
                 type="button"
                 size="sm"
-                variant="outline"
+                variant="secondary"
                 disabled={resumeAll.isPending}
+                title={t`Every parked search takes its slot back and goes on where it stopped`}
                 onClick={() => resumeAll.mutate()}
               >
                 <Play aria-hidden />
@@ -358,22 +363,26 @@ export function CorrespondencePage() {
               <Button
                 type="button"
                 size="sm"
-                variant="outline"
+                variant="secondary"
                 disabled={active === 0 || pauseAll.isPending}
-                title={t`Every search gives its slot back and keeps its process`}
+                title={
+                  active === 0
+                    ? t`Nothing is searching, so there is nothing to pause`
+                    : t`Every search gives its slot back and keeps its process`
+                }
                 onClick={() => pauseAll.mutate()}
               >
                 <Pause aria-hidden />
                 <Trans>Pause all</Trans>
               </Button>
             )}
-            <Button type="button" size="sm" variant="outline" onClick={() => setDialog('import')}>
+            <Button type="button" size="sm" variant="secondary" onClick={() => setDialog('import')}>
               <FileText aria-hidden />
-              <Trans>Import PGN</Trans>
+              <Trans>Import PGN…</Trans>
             </Button>
             <Button type="button" size="sm" onClick={() => setDialog('new')}>
               <Plus aria-hidden />
-              <Trans>New game</Trans>
+              <Trans>New game…</Trans>
             </Button>
           </>
         }
@@ -390,19 +399,24 @@ export function CorrespondencePage() {
           <p className="mt-1 font-mono text-label text-blunder/80">{games.error.message}</p>
           <Button
             type="button"
-            variant="outline"
+            variant="secondary"
             size="sm"
             className="mt-2.5"
             onClick={() => void games.refetch()}
           >
+            <RefreshCw aria-hidden />
             <Trans>Try again</Trans>
           </Button>
         </div>
       ) : null}
 
+      {/* `flex-none` on every section: the page body is a scrolling column and a Section
+          may shrink (`min-h-0`), so on a phone, where the page is taller than the screen,
+          the sections had shrunk and drawn over each other instead of scrolling. */}
       {games.data ? (
         <>
           <Section
+            className="flex-none"
             title={<Trans>Your move</Trans>}
             detail={t`by due date`}
             end={<span className="font-mono text-label text-dim">{cut.yourMove.length}</span>}
@@ -417,6 +431,7 @@ export function CorrespondencePage() {
           </Section>
 
           <Section
+            className="flex-none"
             title={<Trans>Waiting for the opponent</Trans>}
             end={<span className="font-mono text-label text-dim">{cut.waiting.length}</span>}
           >
@@ -430,6 +445,7 @@ export function CorrespondencePage() {
           </Section>
 
           <Section
+            className="flex-none"
             title={<Trans>Running now</Trans>}
             detail={t`every engine on every game`}
             end={<span className="font-mono text-label text-dim">{rows.length}</span>}
@@ -437,7 +453,7 @@ export function CorrespondencePage() {
             <RunningNow searches={rows} games={games.data.games} hosts={hosts} now={now} />
           </Section>
 
-          <Section title={<Trans>Finished</Trans>} detail={t`in the library now`}>
+          <Section className="flex-none" title={<Trans>Finished</Trans>} detail={t`in the library now`}>
             {cut.finished.length === 0 ? (
               <Empty>
                 <Trans>No correspondence game has finished yet.</Trans>

@@ -292,6 +292,7 @@ def collection_payload(collection: Collection, game_count: int) -> dict[str, Any
         "name": collection.name,
         "color": collection.color,
         "description": collection.description,
+        "pinned": collection.pinned,
         "rule": dict(collection.rule) if collection.rule else None,
         "game_count": game_count,
         "created_at": collection.created_at.isoformat(),
@@ -367,6 +368,7 @@ def create_collection(
     name: str,
     color: str = DEFAULT_COLOR,
     description: str | None = None,
+    pinned: bool = False,
     rule: Mapping[str, Any] | None = None,
     apply_to_existing: bool = False,
     game_ids: Sequence[int] = (),
@@ -383,6 +385,7 @@ def create_collection(
         name=_valid_name(session, name),
         color=_valid_color(color),
         description=_valid_description(description),
+        pinned=bool(pinned),
         rule=stored_rule,
     )
     session.add(collection)
@@ -409,6 +412,7 @@ def update_collection(
     name: Any = UNSET,
     color: Any = UNSET,
     description: Any = UNSET,
+    pinned: Any = UNSET,
     rule: Any = UNSET,
 ) -> Collection:
     """Change what was named; `UNSET` leaves a field alone and `rule=None` clears the rule.
@@ -429,6 +433,8 @@ def update_collection(
         collection.color = _valid_color(color)
     if description is not UNSET:
         collection.description = _valid_description(description)
+    if pinned is not UNSET:
+        collection.pinned = bool(pinned)
     if rule is not UNSET:
         stored_rule = normalize_rule(rule)
         if stored_rule != collection.rule:

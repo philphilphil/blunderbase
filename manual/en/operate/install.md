@@ -52,7 +52,7 @@ file carries its version in the name: `Blunderbase-<version>-macOS-arm64.dmg` an
 `Blunderbase-<version>-Windows-x64-setup.exe`.
 
 The application bundles the web app and the backend. It needs no Python, no container and
-no terminal, and it runs entirely on that computer. **Manual**, at the foot of the rail,
+no terminal, and it runs entirely on that computer. **Manual for this page**, in the settings menu,
 opens this manual in a second window; links to other sites — lichess, chess.com, GitHub — open in your
 browser.
 
@@ -95,7 +95,7 @@ Then work through [Getting started](../guide/getting-started.md): connect an acc
 import, register an engine.
 
 A fresh installation runs a short guided tour the first time it is opened. **Show the tour
-again** in the account menu brings it back.
+again** in the settings menu brings it back.
 
 To set or reset the password without a browser:
 
@@ -128,7 +128,7 @@ for a password.
 
 ## Changing the password
 
-Account menu → **Change password**. It asks for the current one and the new one twice.
+Settings › **Change password**. It asks for the current one and the new one twice.
 
 A password change signs every other browser out. MCP keys keep working.
 

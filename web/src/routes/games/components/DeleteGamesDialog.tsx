@@ -6,9 +6,13 @@
  * and can see. What it does ask is that the count is read — one game and forty games are
  * the same two clicks otherwise — and it names what goes with them, because the analysis
  * and the notes are the part nobody expects to lose.
+ *
+ * This is the one place the filled red belongs (docs/design/README.md, "Controls"): the
+ * footer's Delete… is only red-outlined, and the confirm here is the filled destructive,
+ * last, after Cancel as the tool button.
  */
 import { Plural, Trans } from '@lingui/react/macro'
-import { Loader2, TriangleAlert } from 'lucide-react'
+import { Loader2, Trash2, TriangleAlert } from 'lucide-react'
 import { useEffect, type FormEvent } from 'react'
 
 import { Button } from '@/components/ui/button'
@@ -75,11 +79,11 @@ export function DeleteGamesDialog({
             </p>
           ) : null}
           <div className="flex justify-end gap-2">
-            <Button type="button" variant="outline" onClick={onClose}>
+            <Button type="button" variant="secondary" onClick={onClose}>
               <Trans>Cancel</Trans>
             </Button>
             <Button type="submit" variant="destructive" autoFocus disabled={pending}>
-              {pending ? <Loader2 className="animate-spin" aria-hidden /> : null}
+              {pending ? <Loader2 className="animate-spin" aria-hidden /> : <Trash2 aria-hidden />}
               <Plural value={count} one="Delete it" other="Delete them" />
             </Button>
           </div>

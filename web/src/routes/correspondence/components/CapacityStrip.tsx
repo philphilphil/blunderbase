@@ -24,9 +24,11 @@
  */
 import { t as global } from '@lingui/core/macro'
 import { Plural, Trans, useLingui } from '@lingui/react/macro'
+import type { ReactNode } from 'react'
 
+import { StatusDot } from '@/components/badges/StatusDot'
+import { Readout } from '@/components/ui/badge'
 import type { CorrespondenceStatus } from '@/lib/api/types'
-import { cn } from '@/lib/utils'
 
 /** MB across the parked processes, or null when none of them names a Hash. */
 export function parkedMegabytes(status: CorrespondenceStatus): number | null {
@@ -52,21 +54,34 @@ export function formatMemory(mb: number): string {
   return global`${mb} MB`
 }
 
+/**
+ * The status dot's grammar (`StatusDot`): green is something alive, amber a process parked,
+ * grey something waiting its turn or idle. Waiting had been the accent, which is kept for
+ * what can be clicked; nothing on this strip can.
+ */
 function Dot({ tone }: { tone: 'live' | 'warm' | 'queued' | 'idle' }) {
   return (
-    <span
-      aria-hidden
-      className={cn(
-        'inline-block size-[0.4375rem] rounded-full align-[0.0625rem]',
+    <StatusDot
+      className="inline-block align-[0.0625rem]"
+      tone={
         tone === 'live'
-          ? 'bg-good'
+          ? 'healthy'
           : tone === 'warm'
-            ? 'bg-mistake'
+            ? 'degraded'
             : tone === 'queued'
-              ? 'bg-accent-teal'
-              : 'bg-faint',
-      )}
+              ? 'waiting'
+              : 'away'
+      }
     />
+  )
+}
+
+/** A figure on the strip: a flat mono readout, a shade brighter than the words around it. */
+function Figure({ children }: { children: ReactNode }) {
+  return (
+    <Readout num className="text-label text-body">
+      {children}
+    </Readout>
   )
 }
 
@@ -77,7 +92,7 @@ export function CapacityStrip({ status }: { status: CorrespondenceStatus | undef
     return (
       <div
         data-testid="correspondence-capacity"
-        className="flex flex-wrap gap-x-6 gap-y-1.5 border-y border-hairline py-2 text-label text-dim"
+        className="flex flex-none flex-wrap gap-x-6 gap-y-1.5 border-y border-hairline py-2 text-label text-dim"
       >
         <span>
           <Trans>Reading what the engines are doing…</Trans>
@@ -103,11 +118,10 @@ export function CapacityStrip({ status }: { status: CorrespondenceStatus | undef
   return (
     <div
       data-testid="correspondence-capacity"
-      className="flex flex-wrap gap-x-6 gap-y-1.5 border-y border-hairline py-2 text-label text-dim"
+      className="flex flex-none flex-wrap gap-x-6 gap-y-1.5 border-y border-hairline py-2 text-label text-dim"
     >
       <span>
-        <Dot tone={inUse > 0 ? 'live' : 'idle'} />{' '}
-        <b className="font-medium text-body">{t`${inUse} of ${slots}`}</b>{' '}
+        <Dot tone={inUse > 0 ? 'live' : 'idle'} /> <Figure>{t`${inUse} of ${slots}`}</Figure>{' '}
         <Trans>engine slots held by searches on this machine</Trans>
       </span>
       {parked > 0 ? (
@@ -119,7 +133,7 @@ export function CapacityStrip({ status }: { status: CorrespondenceStatus | undef
           {memory === null ? null : (
             <>
               {', '}
-              <b className="font-medium text-body">{formatMemory(memory)}</b>
+              <Figure>{formatMemory(memory)}</Figure>
             </>
           )}
         </span>
@@ -148,6 +162,10 @@ export function CapacityStrip({ status }: { status: CorrespondenceStatus | undef
       ) : null}
       {remote.map((host) => (
         <span key={host.runner_id ?? host.host}>
+          <StatusDot
+            className="inline-block align-[0.0625rem]"
+            tone={host.connected === false ? 'degraded' : (host.in_use ?? 0) > 0 ? 'healthy' : 'away'}
+          />{' '}
           <b className="font-medium text-body">{host.host}</b>{' '}
           {host.connected === false ? (
             <span className="text-mistake">

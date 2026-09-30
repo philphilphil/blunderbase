@@ -9,7 +9,9 @@
  * else.
  *
  * These are quieter than a run badge on purpose: on this page the name is the headline and
- * the chips are the annotation, where on a game row what ran *is* the headline.
+ * the chips are the annotation, where on a game row what ran *is* the headline. Like every
+ * readout they carry no border: a tint at most, so a row of them cannot be taken for a row
+ * of buttons.
  */
 import { useLingui } from '@lingui/react/macro'
 
@@ -33,10 +35,8 @@ export function KindBadge({ kind, className }: { kind: EngineKind; className?: s
   return (
     <span
       className={cn(
-        'inline-flex flex-none items-center rounded-sm border px-1.5 py-px text-meta',
-        kind === 'maia'
-          ? 'border-deep/28 bg-deep/10 text-deep'
-          : 'border-edge bg-elevated text-soft',
+        'inline-flex w-fit flex-none items-center rounded-sm px-1.5 py-px text-meta',
+        kind === 'maia' ? 'bg-deep/10 text-deep' : 'bg-chip-neutral text-soft',
         className,
       )}
     >
@@ -48,7 +48,7 @@ export function KindBadge({ kind, className }: { kind: EngineKind; className?: s
 /**
  * What this engine is assigned to — `Analysis`, `Human moves`, or an em dash.
  *
- * The em dash is unbordered: an engine that serves nothing should read as a quiet fact
+ * The em dash has no tint: an engine that serves nothing should read as a quiet fact
  * about the roster, not as a chip claiming something.
  */
 export function RoleBadge({ roles, className }: { roles: EngineRoles; className?: string }) {
@@ -59,8 +59,8 @@ export function RoleBadge({ roles, className }: { roles: EngineRoles; className?
     <span
       title={idle ? t`Assigned to nothing right now` : undefined}
       className={cn(
-        'inline-flex flex-none items-center rounded-sm border px-1.5 py-px text-meta',
-        idle ? 'border-transparent text-faint' : 'border-edge-strong bg-raised text-soft',
+        'inline-flex w-fit flex-none items-center rounded-sm px-1.5 py-px text-meta',
+        idle ? 'text-faint' : 'bg-chip-neutral text-soft',
         className,
       )}
     >

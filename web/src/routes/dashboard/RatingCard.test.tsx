@@ -115,16 +115,17 @@ describe('RatingCard — one chart per time control', () => {
     draw({ data: PROFILE })
 
     // The default window is everything, so both speeds with points chart at first.
-    expect(screen.getByText('Rapid')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Rapid' })).toBeInTheDocument()
 
-    const windows = screen.getByRole('group', { name: 'Rating window' })
-    await userEvent.click(within(windows).getByRole('button', { name: '90d' }))
+    const windows = screen.getByRole('radiogroup', { name: 'Rating window' })
+    await userEvent.click(within(windows).getByRole('radio', { name: '90d' }))
+    expect(within(windows).getByRole('radio', { name: '90d' })).toHaveAttribute('aria-checked', 'true')
 
-    expect(screen.getByText('Blitz')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Blitz' })).toBeInTheDocument()
     // Rapid stopped 300 days ago, so the 90-day window has nothing to draw.
-    expect(screen.queryByText('Rapid')).not.toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Rapid' })).not.toBeInTheDocument()
     // Bullet has a series but no points at all.
-    expect(screen.queryByText('Bullet')).not.toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Bullet' })).not.toBeInTheDocument()
 
     expect(screen.getByText('Lichess')).toBeInTheDocument()
     expect(screen.getByText('Chess.com')).toBeInTheDocument()
@@ -143,30 +144,47 @@ describe('RatingCard — one chart per time control', () => {
     draw({ data: PROFILE })
     expect(screen.queryByRole('group', { name: 'Rating series' })).not.toBeInTheDocument()
 
-    const windows = screen.getByRole('group', { name: 'Rating window' })
-    await userEvent.click(within(windows).getByRole('button', { name: '1y' }))
+    const windows = screen.getByRole('radiogroup', { name: 'Rating window' })
+    await userEvent.click(within(windows).getByRole('radio', { name: '1y' }))
 
-    expect(screen.getByText('Blitz')).toBeInTheDocument()
-    expect(screen.getByText('Rapid')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Blitz' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Rapid' })).toBeInTheDocument()
   })
 
-  it('hiding a speed from the menu drops its chart and persists the choice', async () => {
+  it('hiding a speed in the Speed picker drops its chart and persists the choice', async () => {
     draw({ data: PROFILE })
 
-    await userEvent.click(screen.getByRole('button', { name: /speeds/i }))
-    const row = screen.getByRole('menuitemcheckbox', { name: 'Blitz' })
+    // Every speed on is the picker's default: "Speed: All", not lit.
+    await userEvent.click(screen.getByRole('button', { name: /^Speed:\s*All$/ }))
+    const row = screen.getByRole('checkbox', { name: 'Blitz' })
     expect(row).toHaveAttribute('aria-checked', 'true')
 
     await userEvent.click(row)
     expect(row).toHaveAttribute('aria-checked', 'false')
 
     const stored = JSON.parse(window.localStorage.getItem(HIDDEN_RATING_SPEEDS_KEY) ?? '[]')
-    expect(stored).toContain('blitz')
+    expect(stored).toEqual(['blitz'])
 
-    // The row and the chart header both say "Blitz" while the menu is open — close it
-    // before asserting the chart itself is gone.
+    // The row and the chart header both say "Blitz" while the picker is open — close it
+    // before asserting the chart itself is gone. The picker now names what is left.
     await userEvent.keyboard('{Escape}')
-    expect(screen.queryByText('Blitz')).not.toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Blitz' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /^Speed:\s*Rapid$/ })).toBeInTheDocument()
+  })
+
+  it('refuses to hide the last speed from the picker, and puts every speed back on clear', async () => {
+    window.localStorage.setItem(HIDDEN_RATING_SPEEDS_KEY, JSON.stringify(['blitz']))
+    resetHiddenSpeeds()
+    draw({ data: PROFILE })
+
+    await userEvent.click(screen.getByRole('button', { name: /^Speed:\s*Rapid$/ }))
+    await userEvent.click(screen.getByRole('checkbox', { name: 'Rapid' }))
+    expect(screen.getByRole('checkbox', { name: 'Rapid' })).toHaveAttribute('aria-checked', 'true')
+
+    await userEvent.keyboard('{Escape}')
+    await userEvent.click(screen.getByRole('button', { name: /clear/i }))
+    expect(JSON.parse(window.localStorage.getItem(HIDDEN_RATING_SPEEDS_KEY) ?? '[]')).toEqual([])
+    expect(screen.getByRole('heading', { name: 'Blitz' })).toBeInTheDocument()
   })
 
   it('keeps a hidden speed hidden after remount, from what is already in storage', async () => {
@@ -175,11 +193,11 @@ describe('RatingCard — one chart per time control', () => {
     draw({ data: PROFILE })
 
     // Widen the window so Rapid has something to draw — Blitz stays hidden regardless.
-    const windows = screen.getByRole('group', { name: 'Rating window' })
-    await userEvent.click(within(windows).getByRole('button', { name: '1y' }))
+    const windows = screen.getByRole('radiogroup', { name: 'Rating window' })
+    await userEvent.click(within(windows).getByRole('radio', { name: '1y' }))
 
-    expect(screen.getByText('Rapid')).toBeInTheDocument()
-    expect(screen.queryByText('Blitz')).not.toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Rapid' })).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Blitz' })).not.toBeInTheDocument()
   })
 
   it('says so when every speed present in the window is hidden', () => {

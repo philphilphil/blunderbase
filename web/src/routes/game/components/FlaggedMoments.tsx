@@ -1,6 +1,7 @@
 import { Trans } from '@lingui/react/macro'
 
 import { ClassificationBadge } from '@/components/badges/ClassificationBadge'
+import { ROW, ROW_SELECTED } from '@/components/ui/row'
 import type { MoveRow } from '@/lib/api/types'
 import { isFlagged } from '@/lib/chess/classification'
 import { formatWinLoss } from '@/lib/chess/evaluation'
@@ -68,14 +69,14 @@ export function FlaggedMoments({
             key={move.ply}
             type="button"
             onClick={() => onSelect(target)}
-            // The app's selected row: `--bb-selected` with the accent bar down its left edge,
-            // the same as a selected game in the table. The ply number is metadata, so it
-            // rises to `soft` on the blue, where `dim` would fall below AA.
+            // The app's row grammar (`ui/row.ts`): hover `raised`, selected the blue fill with
+            // the accent bar down its left edge, the same as a selected game in the table,
+            // focus the ring pulled inside. The ply number is metadata, so it rises to
+            // `soft` on the blue, where `dim` would fall below AA.
             className={cn(
+              ROW,
               'flex items-center gap-2 border-b border-hairline px-3 py-2 text-left last:border-b-0',
-              selected
-                ? 'bg-selected shadow-[inset_0.125rem_0_0_var(--bb-accent)]'
-                : 'hover:bg-raised',
+              selected && ROW_SELECTED,
             )}
           >
             <span

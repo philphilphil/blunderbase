@@ -134,6 +134,8 @@ describe('SyncAllButton', () => {
     const button = screen.getByRole('button', { name: /syncing/i })
     expect(button).toBeDisabled()
     expect(button).toHaveAttribute('aria-busy', 'true')
+    // Disabled, it still says which accounts it is on.
+    expect(button).toHaveAttribute('title', 'Lichess: phib')
   })
 
   it('shows why a sync did not start', async () => {

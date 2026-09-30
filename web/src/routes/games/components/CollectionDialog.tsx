@@ -1,6 +1,6 @@
 /**
- * Make a collection, or change one: its name, its colour, a line about it, and the rule
- * that fills it as games arrive.
+ * Make a collection, or change one: its name, its colour, a line about it, whether the rail
+ * shows it, and the rule that fills it as games arrive.
  *
  * One dialog for every door — "Make a collection" beside Save filter (a rule taken from
  * the filter that was open), "+ New collection from these N…" in the Add to… checklist
@@ -17,16 +17,28 @@
  *
  * Delete lives here rather than on the card because it is rare and final, and it asks
  * first, saying the part that reassures: the games stay.
+ *
+ * Every control is the app's own (docs/design/README.md, "Controls"): the colour is a
+ * `Segmented` of swatches (one of eight, all on screen), the rule is a `Switch` (a setting
+ * that persists), its fields are sunk FIELDs (`Input`, `NativeSelect`, `Textarea`), the
+ * speeds are chips that turn blue only once they narrow, the "Also add" box and "Show in
+ * the rail" are the `Checkbox` (a choice saved with the form, not a live switch). The footer reads Delete… (red-outlined, apart on the left), then Cancel as the
+ * tool button and the one filled primary, last.
  */
 import { Plural, Trans, useLingui } from '@lingui/react/macro'
-import { Loader2, TriangleAlert } from 'lucide-react'
+import { Loader2, RotateCw, Trash2, TriangleAlert } from 'lucide-react'
 import { useEffect, useId, useMemo, useState, type FormEvent } from 'react'
 
 import { RuleChips } from '@/components/collections/RuleChips'
 import { Field, Frame } from '@/components/engine-dialog/DialogFrame'
 import { Button } from '@/components/ui/button'
+import { Checkbox } from '@/components/ui/checkbox'
 import { FilterChip } from '@/components/ui/chip'
 import { Input } from '@/components/ui/input'
+import { NativeSelect } from '@/components/ui/native-select'
+import { Segmented } from '@/components/ui/segmented'
+import { Switch } from '@/components/ui/switch'
+import { Textarea } from '@/components/ui/textarea'
 import { ApiError } from '@/lib/api/client'
 import {
   useApplyCollectionRule,
@@ -66,8 +78,8 @@ const RULE_CLOCK_MAX = 32
 const RULE_ECO_MAX = 8
 const RULE_OPPONENT_MAX = 128
 
-const FIELD_CLASS =
-  'h-8 w-full rounded-md border border-input bg-elevated px-2 text-data text-ink outline-none transition-colors focus-visible:border-accent-teal/50'
+/** A rule's selects: a dialog's fields are `default` height (h-8), as its inputs are. */
+const SELECT_CLASS = 'h-8 w-full'
 
 export interface CollectionDialogProps {
   /** The collection to edit. Left out, the dialog makes a new one. */
@@ -153,6 +165,7 @@ export function CollectionDialog({
   const [name, setName] = useState(collection?.name ?? '')
   const [color, setColor] = useState<CollectionColor>(collection?.color ?? 'accent')
   const [description, setDescription] = useState(collection?.description ?? '')
+  const [pinned, setPinned] = useState(collection?.pinned ?? false)
   const [ruleOn, setRuleOn] = useState(!isRuleEmpty(startRule))
   const [draft, setDraft] = useState<RuleDraft>(() => draftOf(startRule))
   const [addExisting, setAddExisting] = useState(addExistingByDefault)
@@ -250,6 +263,7 @@ export function CollectionDialog({
             name: trimmed,
             color,
             description: description.trim() || null,
+            pinned,
             ...(JSON.stringify(rule) === startRuleKey ? {} : { rule }),
           },
         })
@@ -259,6 +273,7 @@ export function CollectionDialog({
           name: trimmed,
           color,
           description: description.trim() || null,
+          pinned,
           rule,
           apply_to_existing: withExisting,
           ...(handIn ? { game_ids: [...(gameIds ?? [])] } : {}),
@@ -332,85 +347,62 @@ export function CollectionDialog({
           <span id={`${titleId}-colour`} className="text-label font-medium text-soft">
             <Trans>Colour</Trans>
           </span>
-          {/* A radio group the ARIA way: one tab stop, on the chosen colour, and the arrow
-              keys move the choice along the row. */}
-          <div
-            role="radiogroup"
-            aria-labelledby={`${titleId}-colour`}
-            className="flex gap-2"
-            onKeyDown={(event) => {
-              const step =
-                event.key === 'ArrowRight' || event.key === 'ArrowDown'
-                  ? 1
-                  : event.key === 'ArrowLeft' || event.key === 'ArrowUp'
-                    ? -1
-                    : 0
-              if (!step) return
-              event.preventDefault()
-              const count = COLLECTION_COLORS.length
-              const at = (COLLECTION_COLORS.indexOf(color) + step + count) % count
-              setColor(COLLECTION_COLORS[at])
-              event.currentTarget.querySelectorAll<HTMLElement>('[role="radio"]')[at]?.focus()
-            }}
-          >
-            {COLLECTION_COLORS.map((key) => (
-              <button
-                key={key}
-                type="button"
-                role="radio"
-                aria-checked={color === key}
-                tabIndex={color === key ? 0 : -1}
-                aria-label={i18n._(COLLECTION_COLOR_NAMES[key])}
-                title={i18n._(COLLECTION_COLOR_NAMES[key])}
-                onClick={() => setColor(key)}
-                className={cn(
-                  'size-[1.125rem] rounded-[0.25rem] outline-none transition-shadow',
-                  COLLECTION_COLOR_CLASSES[key].fill,
-                  color === key
-                    ? 'shadow-[0_0_0_0.09375rem_var(--bb-surface),0_0_0_0.1875rem_var(--bb-text)]'
-                    : 'hover:shadow-[0_0_0_0.09375rem_var(--bb-surface),0_0_0_0.1875rem_var(--bb-edge-strong)] focus-visible:shadow-[0_0_0_0.09375rem_var(--bb-surface),0_0_0_0.1875rem_var(--bb-accent)]',
-                )}
-              />
-            ))}
-          </div>
+          {/* One colour of eight, all on screen: the app's one-of-N control, the swatch as
+              each option's face and its name for a screen reader and on hover. The chosen
+              one sits on the raised thumb; the arrow keys move the choice along the row. */}
+          <Segmented
+            label={t`Colour`}
+            value={color}
+            onChange={setColor}
+            className="self-start"
+            options={COLLECTION_COLORS.map((key) => ({
+              value: key,
+              title: i18n._(COLLECTION_COLOR_NAMES[key]),
+              label: (
+                <>
+                  <span
+                    aria-hidden
+                    className={cn(
+                      'inline-block size-3.5 rounded-sm align-middle',
+                      COLLECTION_COLOR_CLASSES[key].fill,
+                    )}
+                  />
+                  <span className="sr-only">{i18n._(COLLECTION_COLOR_NAMES[key])}</span>
+                </>
+              ),
+            }))}
+          />
         </div>
 
         <Field id={descriptionId} label={<Trans>Description (optional)</Trans>}>
-          <textarea
+          <Textarea
             id={descriptionId}
             rows={2}
             value={description}
             onChange={(event) => setDescription(event.target.value)}
             placeholder={t`What these games have in common`}
-            className="w-full resize-y rounded-md border border-input bg-elevated px-2.5 py-1.5 text-data text-ink outline-none transition-colors placeholder:text-faint focus-visible:border-accent-teal/50"
+            className="resize-y"
           />
         </Field>
+
+        <Checkbox
+          checked={pinned}
+          onCheckedChange={(next) => setPinned(next)}
+          className="self-start text-data text-soft"
+          label={<Trans>Show in the rail, under Collections</Trans>}
+        />
 
         <div className="flex flex-col gap-1.5">
           <span className="text-label font-medium text-soft">
             <Trans>Rule</Trans>
           </span>
           <div className="flex flex-col gap-3 rounded-md border border-edge bg-raised/40 px-3 py-2.5">
-            <label className="flex cursor-pointer items-center gap-2 text-data text-ink">
-              <button
-                type="button"
-                role="switch"
-                aria-checked={ruleOn}
-                onClick={() => setRuleOn((current) => !current)}
-                className={cn(
-                  'relative h-[0.9375rem] w-[1.625rem] flex-none rounded-full transition-colors',
-                  ruleOn ? 'bg-accent-teal' : 'bg-edge',
-                )}
-              >
-                <span
-                  className={cn(
-                    'absolute top-0.5 size-[0.6875rem] rounded-full bg-surface transition-[left]',
-                    ruleOn ? 'left-[0.8125rem]' : 'left-0.5',
-                  )}
-                />
-              </button>
-              <Trans>Add new games that match</Trans>
-            </label>
+            <Switch
+              checked={ruleOn}
+              onCheckedChange={setRuleOn}
+              label={t`Add new games that match`}
+              className="self-start text-data"
+            />
 
             {ruleOn ? (
               <RuleFields draft={draft} onPatch={patchDraft} onToggleSpeed={toggleSpeed} />
@@ -426,14 +418,14 @@ export function CollectionDialog({
                   <Trans>Could not count the games you already have.</Trans>
                   <Button
                     type="button"
-                    variant="link"
+                    variant="secondary"
                     size="xs"
-                    className="px-0"
                     onClick={() => {
                       void matching.refetch()
                       if (editing) void matchingInside.refetch()
                     }}
                   >
+                    <RotateCw aria-hidden />
                     <Trans>Try again</Trans>
                   </Button>
                 </span>
@@ -451,15 +443,12 @@ export function CollectionDialog({
                   )}
                 </span>
               ) : (
-                <label className="flex cursor-pointer items-center gap-2 text-label text-dim">
-                  <input
-                    type="checkbox"
-                    checked={addExisting}
-                    onChange={(event) => setAddExisting(event.target.checked)}
-                    className="size-3.5 accent-[var(--bb-accent)]"
-                  />
-                  <span>
-                    {editing ? (
+                <Checkbox
+                  checked={addExisting}
+                  onCheckedChange={(next) => setAddExisting(next)}
+                  className="self-start text-label text-soft"
+                  label={
+                    editing ? (
                       <Plural
                         value={matchCount}
                         one="Also add the # game that matches and is not in it yet"
@@ -471,9 +460,9 @@ export function CollectionDialog({
                         one="Also add the # game you already have that matches"
                         other="Also add the # games you already have that match"
                       />
-                    )}
-                  </span>
-                </label>
+                    )
+                  }
+                />
               )
             ) : null}
           </div>
@@ -501,7 +490,7 @@ export function CollectionDialog({
               </Trans>
             </p>
             <div className="flex justify-end gap-2">
-              <Button type="button" variant="outline" size="sm" onClick={() => setConfirmingDelete(false)}>
+              <Button type="button" variant="secondary" size="sm" onClick={() => setConfirmingDelete(false)}>
                 <Trans>Keep it</Trans>
               </Button>
               <Button
@@ -511,7 +500,11 @@ export function CollectionDialog({
                 disabled={remove.isPending}
                 onClick={() => void confirmDelete()}
               >
-                {remove.isPending ? <Loader2 className="animate-spin" aria-hidden /> : null}
+                {remove.isPending ? (
+                  <Loader2 className="animate-spin" aria-hidden />
+                ) : (
+                  <Trash2 aria-hidden />
+                )}
                 <Trans>Delete collection</Trans>
               </Button>
             </div>
@@ -522,15 +515,15 @@ export function CollectionDialog({
           {editing && !confirmingDelete ? (
             <Button
               type="button"
-              variant="ghost"
-              className="text-blunder hover:text-blunder"
+              variant="destructive-outline"
               onClick={() => setConfirmingDelete(true)}
             >
+              <Trash2 aria-hidden />
               <Trans>Delete…</Trans>
             </Button>
           ) : null}
           <span className="flex-1" />
-          <Button type="button" variant="outline" onClick={onClose}>
+          <Button type="button" variant="secondary" onClick={onClose}>
             <Trans>Cancel</Trans>
           </Button>
           <Button type="submit" disabled={pending || !name.trim()}>
@@ -545,7 +538,8 @@ export function CollectionDialog({
 
 /**
  * The rule's fields. Speeds are chips because a rule can name several (blitz *and* rapid);
- * everything else is one value or none, which a native select says best.
+ * everything else is one value or none, which a native select says best: in a form a select
+ * is one more field to fill in, so it is the sunk `NativeSelect`, not a toolbar picker.
  */
 function RuleFields({
   draft,
@@ -561,11 +555,11 @@ function RuleFields({
   return (
     <div className="grid grid-cols-2 gap-x-3 gap-y-2.5 max-sm:grid-cols-1">
       <Field id={`${ids}-source`} label={<Trans>Source</Trans>}>
-        <select
+        <NativeSelect
           id={`${ids}-source`}
           value={draft.source}
           onChange={(event) => onPatch({ source: event.target.value as Source | '' })}
-          className={FIELD_CLASS}
+          className={SELECT_CLASS}
         >
           <option value="">{t`Any source`}</option>
           {FILTER_OPTIONS.sources.map((source) => (
@@ -573,7 +567,7 @@ function RuleFields({
               {SOURCE_LABELS[source]}
             </option>
           ))}
-        </select>
+        </NativeSelect>
       </Field>
 
       <Field id={`${ids}-clock`} label={<Trans>Time control</Trans>}>
@@ -599,6 +593,8 @@ function RuleFields({
               key={speed}
               label={i18n._(SPEED_WORDS[speed])}
               on={draft.speed.includes(speed)}
+              // Blue only while the ticked speeds narrow the rule; all of them narrow nothing.
+              narrowed={draft.speed.length < FILTER_OPTIONS.speeds.length}
               onClick={() => onToggleSpeed(speed)}
             />
           ))}
@@ -606,29 +602,29 @@ function RuleFields({
       </div>
 
       <Field id={`${ids}-rated`} label={<Trans>Rated</Trans>}>
-        <select
+        <NativeSelect
           id={`${ids}-rated`}
           value={draft.rated}
           onChange={(event) => onPatch({ rated: event.target.value as RuleDraft['rated'] })}
-          className={FIELD_CLASS}
+          className={SELECT_CLASS}
         >
           <option value="">{t`Either`}</option>
           <option value="true">{t`Rated`}</option>
           <option value="false">{t`Casual`}</option>
-        </select>
+        </NativeSelect>
       </Field>
 
       <Field id={`${ids}-color`} label={<Trans>Colour</Trans>}>
-        <select
+        <NativeSelect
           id={`${ids}-color`}
           value={draft.color}
           onChange={(event) => onPatch({ color: event.target.value as Color | '' })}
-          className={FIELD_CLASS}
+          className={SELECT_CLASS}
         >
           <option value="">{t`Either`}</option>
           <option value="white">{t`White`}</option>
           <option value="black">{t`Black`}</option>
-        </select>
+        </NativeSelect>
       </Field>
 
       <Field id={`${ids}-opponent`} label={<Trans>Opponent</Trans>}>
