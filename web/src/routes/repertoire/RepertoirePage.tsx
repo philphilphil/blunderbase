@@ -38,12 +38,27 @@ import type { MessageDescriptor } from '@lingui/core'
 import { msg } from '@lingui/core/macro'
 import { Plural, Trans, useLingui } from '@lingui/react/macro'
 import type { Api } from '@lichess-org/chessground/api'
-import { MessageSquare } from 'lucide-react'
+import {
+  ArrowUp,
+  ChevronLeft,
+  ChevronRight,
+  FlipVertical2,
+  MessageSquare,
+  Plus,
+  RefreshCw,
+  RotateCcw,
+  Trash2,
+} from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 
 import { Board, type BoardArrow } from '@/components/board/Board'
 import { SetPageChrome } from '@/components/shell/PageChrome'
+import { Button } from '@/components/ui/button'
+import { ButtonGroup, ButtonGroupItem } from '@/components/ui/button-group'
+import { ROW, ROW_SELECTED } from '@/components/ui/row'
+import { Segmented } from '@/components/ui/segmented'
+import { Textarea } from '@/components/ui/textarea'
 import {
   useAddRepertoireLine,
   useDeleteRepertoireMove,
@@ -80,8 +95,8 @@ const FLASH_MS = 2000
 const INDENT_REM = 0.875
 
 /**
- * The two sides as the colour toggle writes them: lower case, in the mono face, the way
- * the explorer's segmented control sets its own options.
+ * The two sides as the colour toggle writes them: lower case, the way the explorer's
+ * segments write their own options.
  */
 const COLOR_WORDS: Record<Color, MessageDescriptor> = {
   white: msg({ message: 'white', context: 'repertoire toggle' }),
@@ -260,14 +275,15 @@ export function RepertoirePage() {
             <div className="flex items-center gap-2.5">
               {/* The two repertoires are named whole rather than by a colour dropped into
                   a shared frame: an adjective before a noun agrees with it in most
-                  languages, and there are only ever two of these. */}
-              <h1 className="text-value font-semibold text-ink">
+                  languages, and there are only ever two of these. An h2 at the heading
+                  size, as on the explorer: the bar's "Repertoire" is the page's title. */}
+              <h2 className="text-heading font-semibold text-ink">
                 {color === 'white' ? (
                   <Trans>White repertoire</Trans>
                 ) : (
                   <Trans>Black repertoire</Trans>
                 )}
-              </h1>
+              </h2>
               <div className="flex-1" />
               <ColorToggle color={color} onChange={setColor} />
             </div>
@@ -290,40 +306,33 @@ export function RepertoirePage() {
           />
 
           <div className="flex items-center gap-2.5 max-md:flex-wrap">
-            <div className="flex overflow-hidden rounded-md border border-edge bg-elevated">
-              <button
-                type="button"
+            {/* The explorer's own board controls, so the two screens are walked alike. */}
+            <ButtonGroup label={t`Move navigation`}>
+              <ButtonGroupItem
                 aria-label={t`Back one move`}
+                title={line.steps.length === 0 ? t`Already at the start` : t`Back one move (←)`}
                 onClick={back}
                 disabled={line.steps.length === 0}
-                className="border-r border-edge px-2.5 py-1 text-data text-soft transition-colors hover:bg-selected hover:text-ink disabled:text-faint-2 disabled:hover:bg-transparent"
               >
-                ◀
-              </button>
-              <button
-                type="button"
+                <ChevronLeft aria-hidden />
+              </ButtonGroupItem>
+              <ButtonGroupItem
                 aria-label={t`Forward one move`}
+                title={t`Forward one move (→)`}
                 onClick={forward}
-                className="px-2.5 py-1 text-data text-soft transition-colors hover:bg-selected hover:text-ink"
               >
-                ▶
-              </button>
-            </div>
-            <button
-              type="button"
-              onClick={() => setFlipped((was) => !was)}
-              className="rounded-md border border-edge bg-elevated px-2.5 py-1 text-data text-soft transition-colors hover:text-ink"
-            >
-              ⇅ <Trans>Flip</Trans>
-            </button>
+                <ChevronRight aria-hidden />
+              </ButtonGroupItem>
+            </ButtonGroup>
+            <Button variant="secondary" size="sm" onClick={() => setFlipped((was) => !was)}>
+              <FlipVertical2 aria-hidden />
+              <Trans>Flip</Trans>
+            </Button>
             {line.steps.length > 0 ? (
-              <button
-                type="button"
-                onClick={() => setLine([])}
-                className="rounded-md border border-edge bg-elevated px-2.5 py-1 text-data text-soft transition-colors hover:text-ink"
-              >
+              <Button variant="secondary" size="sm" onClick={() => setLine([])}>
+                <RotateCcw aria-hidden />
                 <Trans>Reset</Trans>
-              </button>
+              </Button>
             ) : null}
             <div className="flex-1" />
             <span className="font-mono text-label tabular text-dim">
@@ -357,13 +366,15 @@ export function RepertoirePage() {
                   <Trans>This line is not in your black repertoire yet.</Trans>
                 )}
               </p>
-              <button
-                type="button"
+              <Button
+                variant="secondary"
+                size="sm"
+                className="flex-none"
                 onClick={() => store(ucis)}
-                className="flex-none rounded-md border border-edge-input px-2.5 py-1 text-data text-soft hover:border-edge-hover hover:text-ink"
               >
+                <Plus aria-hidden />
                 <Trans>Add this line</Trans>
-              </button>
+              </Button>
             </div>
           ) : null}
 
@@ -413,13 +424,10 @@ export function RepertoirePage() {
               <p className="text-data leading-relaxed text-soft">
                 {tree.error?.message ?? t`The backend did not answer.`}
               </p>
-              <button
-                type="button"
-                onClick={() => void tree.refetch()}
-                className="rounded-md border border-edge-input px-2.5 py-1 text-data text-soft hover:border-edge-hover hover:text-ink"
-              >
+              <Button variant="secondary" size="sm" onClick={() => void tree.refetch()}>
+                <RefreshCw aria-hidden />
                 <Trans>Try again</Trans>
-              </button>
+              </Button>
             </div>
           ) : rows.length === 0 ? (
             <div className="rounded-[0.5625rem] border border-dashed border-edge-strong bg-panel/60 px-5 py-8 text-center">
@@ -465,28 +473,20 @@ function continuationIsMain(
   return siblings[0]?.id === node.id
 }
 
-/** Which repertoire is on screen. The explorer's segmented control, with two options. */
+/**
+ * Which repertoire is on screen: one value of two, so the app's one `Segmented`, the same
+ * control as the explorer's source and colour.
+ */
 function ColorToggle({ color, onChange }: { color: Color; onChange: (next: Color) => void }) {
-  const { i18n } = useLingui()
+  const { i18n, t } = useLingui()
   const options: Color[] = ['white', 'black']
   return (
-    <div className="flex overflow-hidden rounded-md border border-edge font-mono text-label">
-      {options.map((option, index) => (
-        <button
-          key={option}
-          type="button"
-          aria-pressed={color === option}
-          onClick={() => onChange(option)}
-          className={cn(
-            'px-2.5 py-1 transition-colors',
-            index > 0 && 'border-l border-edge',
-            color === option ? 'bg-selected text-ink' : 'text-dim hover:text-ink',
-          )}
-        >
-          {i18n._(COLOR_WORDS[option])}
-        </button>
-      ))}
-    </div>
+    <Segmented
+      label={t`Repertoire`}
+      value={color}
+      onChange={onChange}
+      options={options.map((option) => ({ value: option, label: i18n._(COLOR_WORDS[option]) }))}
+    />
   )
 }
 
@@ -628,7 +628,7 @@ function NodeEditor({
         ) : null}
       </div>
 
-      <textarea
+      <Textarea
         value={text}
         rows={2}
         onChange={(event) => {
@@ -647,41 +647,36 @@ function NodeEditor({
         }}
         placeholder={t`Why this move? It saves when you click away.`}
         aria-label={t`Comment on ${san}`}
-        className="w-full resize-none rounded-md border border-input bg-raised px-2.5 py-1.5 text-lead text-ink outline-none placeholder:text-faint focus-visible:border-accent-teal/50"
+        className="resize-none px-2.5 text-lead"
       />
 
       <div className="flex items-center gap-2">
         {main ? null : (
-          <button
-            type="button"
-            onClick={onPromote}
-            className="rounded-md border border-edge px-2 py-[0.1875rem] text-label text-soft hover:border-edge-hover hover:text-ink"
-          >
+          <Button variant="secondary" size="sm" onClick={onPromote}>
+            <ArrowUp aria-hidden />
             <Trans>Promote to main</Trans>
-          </button>
+          </Button>
         )}
         <div className="flex-1" />
         {/*
           Two clicks on one button rather than a `window.confirm`: the app uses no native
           dialogs, and a branch is the one thing on this page whose loss cannot be undone
-          by playing the move again — the comments under it go with it.
+          by playing the move again — the comments under it go with it. The red command
+          of a toolbar at rest; the second click is the confirmation itself, so it takes
+          the filled red a confirm dialog's button has.
         */}
-        <button
-          type="button"
+        <Button
+          variant={confirming ? 'destructive' : 'destructive-outline'}
+          size="sm"
           onClick={() => {
             if (confirming) onDelete()
             else setConfirming(true)
           }}
           onBlur={() => setConfirming(false)}
-          className={cn(
-            'rounded-md border px-2 py-[0.1875rem] text-label transition-colors',
-            confirming
-              ? 'border-blunder/45 bg-blunder/10 text-blunder'
-              : 'border-edge text-soft hover:border-edge-hover hover:text-blunder',
-          )}
         >
+          <Trash2 aria-hidden />
           {confirming ? <Trans>Confirm — delete branch</Trans> : <Trans>Delete branch</Trans>}
-        </button>
+        </Button>
       </div>
     </div>
   )
@@ -692,7 +687,9 @@ function NodeEditor({
  * indented under the move they replace (`flattenTree` puts them in that order).
  *
  * One button per move and nothing else inside it, so a row has exactly one meaning —
- * jump the line here. A move that carries a comment says so with an icon rather than by
+ * jump the line here. Rows are the shared `ROW`, and the move the line stands on is
+ * `ROW_SELECTED` (the blue fill plus the accent bar, unchanged under the pointer), so
+ * hovering never previews "chosen". A move that carries a comment says so with an icon rather than by
  * printing it: the text belongs under the board, beside the position it is about, and a
  * tree that prints its own annotations stops being scannable after the third one.
  */
@@ -725,12 +722,13 @@ function MoveTree({
             onClick={() => onJump(row.path)}
             style={{ paddingLeft: `${0.5 + row.depth * INDENT_REM}rem` }}
             className={cn(
-              'flex items-center gap-1.5 rounded-[0.3125rem] py-[0.1875rem] pr-2 text-left transition-colors',
+              ROW,
+              'flex items-center gap-1.5 rounded-sm py-[0.1875rem] pr-2 text-left',
               active
-                ? 'bg-selected text-ink'
+                ? cn(ROW_SELECTED, 'text-ink')
                 : row.main
-                  ? 'text-body hover:bg-elevated-2'
-                  : 'text-dim hover:bg-elevated-2 hover:text-soft',
+                  ? 'text-body'
+                  : 'text-dim hover:text-soft',
             )}
           >
             <span className={cn(row.depth > 0 && 'text-data')}>

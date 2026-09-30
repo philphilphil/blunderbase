@@ -3,8 +3,12 @@
  * chip states (`routes/games/components/FilterPopover`), so the two screens filter the
  * same way rather than each inventing a control.
  *
- * The free-text box sits outside the chips because it is what the screen is usually used
- * with: a note is prose, and prose is searched, not faceted.
+ * The free-text box sits outside the pickers because it is what the screen is usually used
+ * with: a note is prose, and prose is searched, not faceted. It is the page's own search
+ * field (a sunk field with a leading magnifier and the scoped "Filter notes…"), so it never
+ * reads as the rail's "Search everything", and it ends the row, as Games' does: view |
+ * filters … text. On a phone it leads instead, at full width — prose is what this screen is
+ * searched by, so it is the last thing to give up width.
  */
 import type { I18n, MessageDescriptor } from '@lingui/core'
 import { Trans, useLingui } from '@lingui/react/macro'
@@ -52,17 +56,18 @@ export function NoteFilterBar({ filters, onChange, className }: NoteFilterBarPro
   const patch = (next: Partial<NoteFilters>) => onChange(prune({ ...filters, ...next }))
 
   return (
-    // `max-md:relative` anchors the chips' panels to the bar instead of to the chip they
+    // `max-md:relative` anchors the pickers' panels to the bar instead of to the picker they
     // hang off, which is the only way a 250px panel stays on a 375px screen; see
-    // `FilterPopover`. The box takes the whole first line there — prose is what this
-    // screen is searched by, so it is the last thing to give up width.
+    // `FilterPopover`.
     <div className={cn('flex flex-wrap items-center gap-[0.4375rem] max-md:relative', className)}>
+      {/* It gives up width (down to 8rem) before it gives up the line, so the row stays one
+          line at 1440. */}
       <DebouncedInput
-        aria-label={t`Search the notes`}
-        placeholder={t`Search what you wrote…`}
+        aria-label={t`Filter notes`}
+        placeholder={t`Filter notes…`}
         value={filters.text ?? ''}
         onCommit={(value) => patch({ text: value || undefined })}
-        className="h-7 w-[16rem] text-data max-md:w-full"
+        wrapperClassName="order-last ml-auto max-w-[11rem] min-w-[8rem] flex-1 basis-[8rem] max-md:order-first max-md:ml-0 max-md:max-w-none max-md:basis-full"
       />
 
       {NOTE_FILTER_GROUPS.map((group) => (
@@ -145,7 +150,6 @@ function GroupPanel({
             placeholder={t`Part of a name`}
             value={filters.opponent ?? ''}
             onCommit={(value) => patch({ opponent: value || undefined })}
-            className="h-7 text-data"
           />
           <span className="text-label leading-snug text-dim">
             <Trans>
@@ -206,7 +210,8 @@ function GroupPanel({
               const parsed = Number(event.target.value)
               patch({ game_id: Number.isInteger(parsed) && parsed > 0 ? parsed : undefined })
             }}
-            className="h-7 font-mono text-data"
+            inputSize="sm"
+            className="font-mono"
           />
           <span className="text-label leading-snug text-dim">
             <Trans>

@@ -10,18 +10,19 @@
  * They share this file because they share a shape — a draft over the stored settings, a
  * Save that sends the whole of them (`lib/api/appSettings.ts`) — and because a reader
  * comparing the two pages should not have to open two. What is *not* here is queueing work
- * over the library: that is not configuration, and stays on the Analysis overview
+ * over the library: that is not configuration, and stays on Analysis › Coverage
  * (`LibraryActions`) — the Maia page links out to it.
+ *
+ * The controls follow the app's grammar: numbers and the speed select are sunk fields
+ * (`Input`, `NativeSelect`), the Maia flags are `Switch`es (a setting that persists, labelled
+ * with what it does), Add is a secondary face, and each form's one primary is Save, last.
  */
 import type { MessageDescriptor } from '@lingui/core'
 import { msg } from '@lingui/core/macro'
 import { Trans, useLingui } from '@lingui/react/macro'
 import { Plus, X } from 'lucide-react'
 import { useState, type FormEvent } from 'react'
-import { Link } from 'react-router-dom'
 
-import { Toggle } from '@/components/analysis/AnalysisControls'
-import { SETTINGS_SELECT } from '@/components/analysis/LinePreviewSettings'
 import { SaveRow, SettingField, type SettingSpec } from '@/components/settings/SettingField'
 import { SetPageChrome } from '@/components/shell/PageChrome'
 import { PageBody } from '@/components/shell/PageHeader'
@@ -29,7 +30,10 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { NativeSelect } from '@/components/ui/native-select'
 import { Skeleton } from '@/components/ui/skeleton'
+import { Switch } from '@/components/ui/switch'
+import { TextLink } from '@/components/ui/text-link'
 import {
   completeUpdate,
   parseSetting as parse,
@@ -45,7 +49,6 @@ import {
   MAX_MAIA_ELOS,
   type AppSettings,
 } from '@/lib/api/types'
-import { cn } from '@/lib/utils'
 
 type EngineKey =
   | 'analysis_nodes'
@@ -145,7 +148,7 @@ function LoadingOrError({
         <Trans>The analysis configuration could not be read.</Trans>
       </p>
       <p className="mt-1 font-mono text-label text-blunder/80">{error.message}</p>
-      <Button type="button" variant="outline" size="sm" className="mt-2.5" onClick={retry}>
+      <Button type="button" variant="secondary" size="sm" className="mt-2.5" onClick={retry}>
         <Trans>Try again</Trans>
       </Button>
     </div>
@@ -255,18 +258,18 @@ export function EnginePassesPage() {
               <Label htmlFor="hide-engine-new-games">
                 <Trans>Hide the engine on</Trans>
               </Label>
-              <select
+              <NativeSelect
                 id="hide-engine-new-games"
                 value={String(hideNewShown)}
                 onChange={(event) => setHideNew(Number(event.target.value))}
-                className={cn(SETTINGS_SELECT, 'w-64')}
+                className="h-8 w-64"
               >
                 {HIDE_ENGINE_CHOICES.map((choice) => (
                   <option key={choice.value} value={choice.value}>
                     {i18n._(choice.label)}
                   </option>
                 ))}
-              </select>
+              </NativeSelect>
               <p className="text-label text-dim">
                 <Trans>Still analysed — press Show the engine when you have read it.</Trans>
               </p>
@@ -314,7 +317,14 @@ function MaiaLevels({ elos, onChange }: { elos: number[]; onChange: (next: numbe
         {elos.map((elo) => (
           <span key={elo} className="inline-flex items-center gap-1 rounded-full border border-brilliant/35 bg-brilliant/10 py-0.5 pl-2 pr-1 font-mono text-label text-brilliant">
             {elo}
-            <button type="button" aria-label={t`Remove ${elo}`} disabled={elos.length < 2} onClick={() => onChange(elos.filter((each) => each !== elo))} className="rounded-full p-px disabled:opacity-40">
+            <button
+              type="button"
+              aria-label={t`Remove ${elo}`}
+              title={elos.length < 2 ? t`Maia needs at least one level` : t`Remove ${elo}`}
+              disabled={elos.length < 2}
+              onClick={() => onChange(elos.filter((each) => each !== elo))}
+              className="rounded-full p-px hover:not-disabled:bg-brilliant/20 disabled:cursor-not-allowed disabled:opacity-40"
+            >
               <X className="size-2.5" aria-hidden />
             </button>
           </span>
@@ -343,7 +353,22 @@ function MaiaLevels({ elos, onChange }: { elos: number[]; onChange: (next: numbe
             }}
           />
         </div>
-        <Button type="button" variant="outline" size="sm" disabled={!addable} onClick={() => candidate !== null && add(candidate)}>
+        <Button
+          type="button"
+          variant="secondary"
+          size="default"
+          disabled={!addable}
+          title={
+            full
+              ? t`Up to ${MAX_MAIA_ELOS} levels`
+              : candidate === null
+                ? t`Type a rating first`
+                : !addable
+                  ? t`That level is already asked`
+                  : undefined
+          }
+          onClick={() => candidate !== null && add(candidate)}
+        >
           <Plus aria-hidden /> <Trans context="button">Add</Trans>
         </Button>
       </div>
@@ -433,21 +458,28 @@ export function MaiaSettingsPage() {
             </CardDescription>
           </CardHeader>
           <CardContent className="flex flex-col gap-3">
-            {FLAGS.map((item) => {
-              const label = i18n._(item.label)
-              return (
-                <div key={item.key} className="flex items-start gap-2">
-                  <Toggle checked={flag(item.key)} onChange={(next) => setDraft({ ...draft, [item.key]: next ? '1' : '0' })} label={label} />
-                  <div className="flex flex-col gap-0.5 pt-1.5">
-                    <span className="text-data text-body">{label}</span>
-                    <span className="text-meta leading-[1.5] text-dim-2">{i18n._(item.caption)}</span>
-                  </div>
-                </div>
-              )
-            })}
+            {FLAGS.map((item) => (
+              // The switch carries its own label, so the words are part of its hit area; the
+              // caption under it lines up with the words rather than with the track.
+              <div key={item.key} className="flex flex-col items-start gap-0.5">
+                <Switch
+                  checked={flag(item.key)}
+                  onCheckedChange={(next) => setDraft({ ...draft, [item.key]: next ? '1' : '0' })}
+                  label={i18n._(item.label)}
+                  className="gap-2.5 text-data text-body"
+                />
+                <span className="pl-[2.375rem] text-meta leading-[1.5] text-dim-2">
+                  {i18n._(item.caption)}
+                </span>
+              </div>
+            ))}
             <p className="border-t border-hairline pt-3 text-meta text-dim-2">
               <Trans>
-                Changed the levels? <Link to="/analysis" className="text-accent-teal hover:text-accent-link">Fill missing levels</Link> from Analysis overview.
+                Changed the levels?{' '}
+                <TextLink to="/analysis/coverage" placement="inline">
+                  Fill missing levels
+                </TextLink>{' '}
+                on Analysis › Coverage.
               </Trans>
             </p>
           </CardContent>

@@ -27,4 +27,13 @@ describe('cn', () => {
       expect(cn('text-data', `text-${size}`)).toBe(`text-${size}`)
     }
   })
+
+  // The control grammar's shadows (index.css) are sizes of shadow, not colours: a call
+  // site that flattens a face with `shadow-none` must drop the face's shade.
+  it('lets a later shadow replace one of the control grammar shadows', () => {
+    for (const shadow of ['face', 'field', 'thumb', 'tab-on', 'row-bar']) {
+      expect(cn(`shadow-${shadow}`, 'shadow-none')).toBe('shadow-none')
+    }
+    expect(cn('shadow-face', 'shadow-thumb')).toBe('shadow-thumb')
+  })
 })

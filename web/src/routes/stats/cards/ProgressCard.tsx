@@ -39,12 +39,13 @@ interface Row {
 }
 
 /** The design's footer: three "then → now" pairs under the chart. */
+/** A span, not a div: it sits inside the card's footer, which is a paragraph. */
 function ThenNow({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex flex-col gap-0.5">
+    <span className="flex flex-col gap-0.5">
       <span className="text-label text-dim-2">{label}</span>
       <span className="font-mono text-lead tabular text-ink">{value}</span>
-    </div>
+    </span>
   )
 }
 

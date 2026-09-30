@@ -27,15 +27,16 @@ import { useState, type FormEvent } from 'react'
 import { Field, Frame } from '@/components/engine-dialog/DialogFrame'
 import { EnginePicker, preferredEngine } from '@/components/engine-dialog/EnginePicker'
 import { Button } from '@/components/ui/button'
+import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Segmented } from '@/components/ui/segmented'
 import type {
   CorrespondenceExpand,
   CorrespondenceSearchEngine,
   CorrespondenceTreeNode,
 } from '@/lib/api/types'
 import { useNotation } from '@/lib/chess/notationPrefs'
-import { cn } from '@/lib/utils'
 
 /** 1 to 3, and the server clamps to the same — see `MAX_EXPAND_STAGES`. */
 const STAGES = [1, 2, 3] as const
@@ -118,24 +119,14 @@ export function ExpandDialog({
             <Label>
               <Trans>Stages</Trans>
             </Label>
-            <div role="group" aria-label={t`Stages`} className="flex gap-1">
-              {STAGES.map((count) => (
-                <button
-                  key={count}
-                  type="button"
-                  aria-pressed={stages === count}
-                  onClick={() => setStages(count)}
-                  className={cn(
-                    'min-w-9 rounded-md border px-2 py-1 font-mono text-label transition-colors',
-                    stages === count
-                      ? 'border-accent-teal/40 bg-selected text-ink'
-                      : 'border-edge text-dim hover:border-edge-hover hover:text-ink',
-                  )}
-                >
-                  {count}
-                </button>
-              ))}
-            </div>
+            {/* One of three values, all on screen: the app's one-of-N control. */}
+            <Segmented
+              label={t`Stages`}
+              value={String(stages)}
+              onChange={(chosen) => setStages(Number(chosen))}
+              options={STAGES.map((count) => ({ value: String(count), label: String(count) }))}
+              labelClassName="min-w-4 text-center"
+            />
           </div>
           <p className="max-w-[16rem] pt-6 text-meta leading-[1.6] text-dim-2">
             <Trans>
@@ -146,22 +137,21 @@ export function ExpandDialog({
           </p>
         </div>
 
-        <label className="flex items-start gap-2 border-t border-hairline pt-3 text-data text-body">
-          <input
-            type="checkbox"
+        <div className="flex flex-col gap-0.5 border-t border-hairline pt-3">
+          <Checkbox
             checked={tasks}
-            onChange={(event) => setTasks(event.target.checked)}
-            className="mt-0.5 size-3.5 accent-[var(--bb-accent)]"
+            onCheckedChange={setTasks}
+            label={<Trans>Queue tasks</Trans>}
+            aria-describedby="correspondence-expand-tasks-hint"
+            className="self-start"
           />
-          <span className="flex flex-col gap-0.5">
-            <Trans>Queue tasks</Trans>
-            <span className="text-meta leading-[1.5] text-dim-2">
-              <Trans>
-                Off, the moves go into the tree and nothing is calculated.
-              </Trans>
-            </span>
+          <span
+            id="correspondence-expand-tasks-hint"
+            className="pl-6 text-meta leading-[1.5] text-dim-2"
+          >
+            <Trans>Off, the moves go into the tree and nothing is calculated.</Trans>
           </span>
-        </label>
+        </div>
 
         {tasks ? (
           <div className="flex flex-col gap-1.5">
@@ -193,10 +183,14 @@ export function ExpandDialog({
           </p>
         ) : null}
         <div className="flex justify-end gap-2">
-          <Button type="button" variant="outline" onClick={onClose}>
+          <Button type="button" variant="secondary" onClick={onClose}>
             <Trans>Cancel</Trans>
           </Button>
-          <Button type="submit" disabled={pending || !ready}>
+          <Button
+            type="submit"
+            disabled={pending || !ready}
+            title={ready ? undefined : t`Pick the engine the tasks run on, or untick Queue tasks`}
+          >
             {pending ? <Loader2 className="animate-spin" aria-hidden /> : null}
             <Trans>Expand</Trans>
           </Button>

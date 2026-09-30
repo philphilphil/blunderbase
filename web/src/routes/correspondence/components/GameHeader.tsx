@@ -6,22 +6,25 @@
  * and is never worth a dialog. The two actions that append a move are deliberately
  * separate: **Opponent played…** takes a move that arrived by mail, and **Play** commits
  * the candidate the tree is standing on — the same call, but not the same decision, and a
- * single button would make it far too easy to answer your own move.
+ * single button would make it far too easy to answer your own move. Play is the header's
+ * one primary and stands last; the rest are secondary faces.
  */
 import { Trans, useLingui } from '@lingui/react/macro'
-import { ExternalLink, Flag, Loader2, Undo2 } from 'lucide-react'
+import { Flag, Inbox, Loader2, Send, Undo2 } from 'lucide-react'
 import { useState, type FormEvent } from 'react'
 
+import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Segmented } from '@/components/ui/segmented'
+import { TextLink } from '@/components/ui/text-link'
 import type {
   CorrespondenceGameSummary,
   CorrespondenceTreeNode,
   Result,
 } from '@/lib/api/types'
 import { useNotation } from '@/lib/chess/notationPrefs'
-import { cn } from '@/lib/utils'
 
 import { dateInputToIso, dateInputValue, duePhrase, dueTone, iccfNumber } from '../format'
 import { parseMoveText } from '../moves'
@@ -50,6 +53,7 @@ export function OpponentMoveDialog({
   onPlay: (uci: string) => void
   onClose: () => void
 }) {
+  const { t } = useLingui()
   const notate = useNotation()
   const [text, setText] = useState('')
   const uci = parseMoveText(tip.fen, text)
@@ -106,20 +110,23 @@ export function OpponentMoveDialog({
         </div>
         {tip.children.length > 0 ? (
           <div className="flex flex-col gap-1.5">
-            <span className="text-meta tracking-[0.06em] text-faint uppercase">
+            <span className="text-label font-medium text-dim">
               <Trans>Already in the tree</Trans>
             </span>
+            {/* Each is a command (play this move), so a secondary face; mono, as moves are. */}
             <div className="flex flex-wrap gap-1.5">
               {tip.children.map((child) => (
-                <button
+                <Button
                   key={child.id}
                   type="button"
+                  size="sm"
+                  variant="secondary"
                   disabled={pending}
                   onClick={() => child.uci && onPlay(child.uci)}
-                  className="rounded-md border border-edge px-2 py-1 font-mono text-label text-body hover:border-edge-hover hover:text-ink"
+                  className="font-mono"
                 >
                   {notate(child.san ?? child.uci ?? '')}
-                </button>
+                </Button>
               ))}
             </div>
           </div>
@@ -133,10 +140,14 @@ export function OpponentMoveDialog({
           </p>
         ) : null}
         <div className="flex justify-end gap-2">
-          <Button type="button" variant="outline" onClick={onClose}>
+          <Button type="button" variant="secondary" onClick={onClose}>
             <Trans>Cancel</Trans>
           </Button>
-          <Button type="submit" disabled={uci === null || pending}>
+          <Button
+            type="submit"
+            disabled={uci === null || pending}
+            title={uci === null ? t`Type a legal move first` : undefined}
+          >
             {pending ? <Loader2 className="animate-spin" aria-hidden /> : null}
             <Trans context="button">Play it</Trans>
           </Button>
@@ -194,24 +205,16 @@ export function FinishDialog({
           <Label>
             <Trans>Result</Trans>
           </Label>
-          <div role="group" aria-label={t`Result`} className="flex gap-2">
-            {RESULTS.map((option) => (
-              <button
-                key={option}
-                type="button"
-                aria-pressed={result === option}
-                onClick={() => setResult(option)}
-                className={cn(
-                  'flex-1 rounded-md border px-2 py-1.5 font-mono text-data transition-colors',
-                  result === option
-                    ? 'border-accent-teal/40 bg-selected text-ink'
-                    : 'border-edge text-dim hover:border-edge-hover hover:text-ink',
-                )}
-              >
-                {option}
-              </button>
-            ))}
-          </div>
+          {/* One of three, none chosen until the owner says: the one-of-N control. */}
+          <Segmented<Result | ''>
+            label={t`Result`}
+            value={result ?? ''}
+            onChange={(chosen) => {
+              if (chosen) setResult(chosen)
+            }}
+            options={RESULTS.map((option) => ({ value: option, label: option }))}
+            className="self-start"
+          />
         </div>
         <div className="flex flex-col gap-1.5">
           <Label htmlFor="correspondence-termination">
@@ -234,10 +237,14 @@ export function FinishDialog({
           </p>
         ) : null}
         <div className="flex justify-end gap-2">
-          <Button type="button" variant="outline" onClick={onClose}>
+          <Button type="button" variant="secondary" onClick={onClose}>
             <Trans>Cancel</Trans>
           </Button>
-          <Button type="submit" disabled={result === null || pending}>
+          <Button
+            type="submit"
+            disabled={result === null || pending}
+            title={result === null ? t`Pick the result first` : undefined}
+          >
             {pending ? <Loader2 className="animate-spin" aria-hidden /> : null}
             <Trans>Finish game</Trans>
           </Button>
@@ -277,39 +284,39 @@ export function GameHeader({
 
   return (
     <header className="flex flex-none flex-wrap items-center gap-4 border-b border-edge-strong bg-surface px-4 py-2">
+      {/* The players are the content's name, not a second page title: the bar's last crumb
+          is the page's one heading. */}
       <div className="min-w-0">
-        <h1 className="flex min-w-0 flex-wrap items-baseline gap-1.5 text-heading font-semibold text-ink">
+        <p className="flex min-w-0 flex-wrap items-baseline gap-1.5 text-lead font-medium text-ink">
           <span className="truncate">{game.white}</span>
-          {game.owner_color === 'white' ? <YouBadge label={you} /> : null}
+          {game.owner_color === 'white' ? <Badge className="self-center">{you}</Badge> : null}
           <span className="font-normal text-dim">–</span>
           <span className="truncate">{game.black}</span>
-          {game.owner_color === 'black' ? <YouBadge label={you} /> : null}
-        </h1>
+          {game.owner_color === 'black' ? <Badge className="self-center">{you}</Badge> : null}
+        </p>
         <p className="mt-0.5 flex flex-wrap items-baseline gap-1.5 text-label text-dim">
           {game.event ? <span>{game.event}</span> : null}
           {number ? <span>· {t`ICCF game ${number}`}</span> : null}
           {game.time_control ? <span>· {game.time_control}</span> : null}
           {game.url ? (
-            <a
-              href={game.url}
-              target="_blank"
-              rel="noreferrer"
-              className="inline-flex items-center gap-1 text-accent-teal hover:text-accent-link"
-            >
+            <TextLink href={game.url} external>
               <Trans>the game's page</Trans>
-              <ExternalLink className="size-3" aria-hidden />
-            </a>
+            </TextLink>
           ) : null}
         </p>
       </div>
 
+      {/* Whose move, the move number and the deadline are facts, so they are flat text; the
+          one thing here that takes input is the date, and it is a field. */}
       {game.finished ? (
-        <span className="rounded-md border border-edge px-2 py-1 font-mono text-label text-body">
+        <span className="font-mono text-data text-body">
           {game.result}
-          {game.termination ? <span className="ml-1.5 text-dim">{game.termination}</span> : null}
+          {game.termination ? (
+            <span className="ml-1.5 font-sans text-label text-dim">{game.termination}</span>
+          ) : null}
         </span>
       ) : (
-        <div className="flex items-center gap-2 rounded-md border border-edge px-2.5 py-1 text-label whitespace-nowrap">
+        <div className="flex items-center gap-2 text-label whitespace-nowrap">
           <strong className="font-semibold text-ink">
             {game.your_move ? <Trans>Your move</Trans> : <Trans>Their move</Trans>}
           </strong>
@@ -319,58 +326,58 @@ export function GameHeader({
           ) : null}
           <Input
             type="date"
+            inputSize="sm"
             aria-label={t`Reply due`}
+            title={t`Reply due`}
             value={dateInputValue(game.reply_due)}
-            className="h-6 w-[8.5rem] font-mono text-label"
+            className="w-[8.5rem] font-mono text-label"
             onChange={(event) => onDue(dateInputToIso(event.target.value))}
           />
         </div>
       )}
 
+      {/* Secondary faces, then the one primary last: playing your move is what the header
+          is for. Each disabled button says why in its title. */}
       <div className="ml-auto flex flex-wrap items-center gap-2">
         {game.finished ? null : (
           <>
-            <Button type="button" variant="outline" disabled={busy} onClick={onOpponentMove}>
+            <Button type="button" variant="secondary" disabled={busy} onClick={onFinish}>
+              <Flag aria-hidden />
+              <Trans>Finish…</Trans>
+            </Button>
+            <Button
+              type="button"
+              variant="secondary"
+              size="icon"
+              disabled={busy || game.ply_count === 0}
+              aria-label={t`Take the last move back`}
+              title={game.ply_count === 0 ? t`No move to take back yet` : t`Take the last move back`}
+              onClick={onUndo}
+            >
+              <Undo2 aria-hidden />
+            </Button>
+            <Button type="button" variant="secondary" disabled={busy} onClick={onOpponentMove}>
+              <Inbox aria-hidden />
               <Trans>Opponent played…</Trans>
             </Button>
             <Button
               type="button"
               disabled={busy || !playable || !game.your_move}
               title={
-                game.your_move
-                  ? t`Append the selected candidate to the game`
-                  : t`It is not your move`
+                !game.your_move
+                  ? t`It is not your move`
+                  : playable
+                    ? t`Append the selected candidate to the game`
+                    : t`Select a candidate move in the tree first`
               }
               onClick={() => playable?.uci && onPlay(playable.uci)}
             >
+              <Send aria-hidden />
               {move ? t`Play ${move}` : t`Play this move`}
-            </Button>
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              disabled={busy || game.ply_count === 0}
-              aria-label={t`Take the last move back`}
-              title={t`Take the last move back`}
-              onClick={onUndo}
-            >
-              <Undo2 aria-hidden />
-            </Button>
-            <Button type="button" variant="outline" disabled={busy} onClick={onFinish}>
-              <Flag aria-hidden />
-              <Trans>Finish…</Trans>
             </Button>
           </>
         )}
       </div>
     </header>
-  )
-}
-
-function YouBadge({ label }: { label: string }) {
-  return (
-    <span className="rounded-sm border border-edge px-1.5 py-px align-[0.0625rem] font-mono text-meta font-normal text-dim">
-      {label}
-    </span>
   )
 }

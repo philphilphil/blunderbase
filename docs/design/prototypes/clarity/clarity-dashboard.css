@@ -1,0 +1,37 @@
+/* ==========================================================================================
+ * Clarity pass: Dashboard (spec §5 "Dashboard"). Scoped to html.clarity like the core overlay;
+ * everything shared (faces, segments, links, the shell) comes from ../clarity.css.
+ *
+ * Screen hooks added to screens/dashboard.html:
+ *   .cld-old          captured text that the proposal replaces (hidden under html.clarity)
+ *   .cld-speeds       the Rating card's "speeds" menu, now a picker "Speeds: All ⇅"
+ *   .cld-prose-link   "Pick a game" inside a sentence: a link without the ›, underlined instead
+ *   .cld-queue-state  the Analysis queue's state word beside its status dot
+ *   .cld-trend-span   "62 games · to Sep 5, 2026": words and a date, so sans, and it fits
+ * Bar actions carry .cl-new icons (Download on Import PGN, Plug on Connect account).
+ * ========================================================================================== */
+
+html.clarity .cld-old { display: none; }
+
+/* The speeds picker: a face with ⇅ and "Speeds: All", the value in ink. It lists which speeds
+   get a chart, all of them by default, so "All" is the default value and the face stays
+   neutral (a set picker would take the selected fill). */
+html.clarity .cld-speeds { gap: 0.3125rem; }
+
+/* A link inside prose keeps the sentence intact: no chevron, a quiet underline says "link". */
+html.clarity .cld-prose-link {
+  text-decoration: underline;
+  text-decoration-color: color-mix(in srgb, var(--bb-accent) 40%, transparent);
+  text-underline-offset: 0.125rem;
+}
+html.clarity .cld-prose-link:hover { text-decoration-color: currentColor; }
+
+/* The queue's state reads as a status, dot then word, the dot at the status-dot size. */
+html.clarity .cld-queue-state { gap: 0.375rem; }
+
+/* Words and a date: sans, like every other readout of words, which also lets it fit beside
+   the 7d / 30d / 90d segment instead of truncating to "to …". Figures keep tabular digits. */
+html.clarity .cld-trend-span {
+  font-family: var(--font-sans);
+  font-variant-numeric: tabular-nums;
+}

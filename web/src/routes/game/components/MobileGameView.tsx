@@ -13,6 +13,7 @@ import { cn } from '@/lib/utils'
 
 import { formatResult } from '../gameModel'
 import { PgnButton, type MoveTab } from './MoveList'
+import { PaneTab, PaneTabList } from './PaneTabList'
 
 /**
  * The phone's tabs. `moves` is the move table's own tab, promoted out of it (see
@@ -408,42 +409,36 @@ function TabStrip({
   const { t, i18n } = useLingui()
 
   return (
-    <div
-      role="tablist"
-      aria-label={t`Game panels`}
-      className="flex h-[2.5rem] flex-none items-stretch border-y border-hairline select-none"
-    >
-      {tabs.map((name) => {
-        const count = name === 'eval' ? flaggedCount : name === 'notes' ? noteCount : 0
-        const selected = tab === name
-        return (
-          <button
-            key={name}
-            type="button"
-            role="tab"
-            aria-selected={selected}
-            onClick={() => onTabChange(name)}
-            className={cn(
-              'flex flex-1 items-center justify-center gap-1.5 whitespace-nowrap text-data',
-              selected
-                ? 'font-medium text-ink shadow-[inset_0_-0.125rem_0_var(--bb-accent)]'
-                : 'text-soft hover:text-ink',
-            )}
-          >
-            {i18n._(TAB_LABEL[name])}
-            {count > 0 ? (
-              <span
-                className={cn(
-                  'font-mono text-meta tabular',
-                  name === 'eval' ? 'text-blunder' : 'text-accent-teal',
-                )}
-              >
-                {count}
-              </span>
-            ) : null}
-          </button>
-        )
-      })}
+    // The desktop's pane strip (`PaneTabList`, folder tabs: the chosen tab is the pane's
+    // surface pushed up between two side rules with the accent along its top), so the phone
+    // and the desktop mark a chosen tab one way (decision D1-A applies everywhere).
+    <div className="flex h-[2.5rem] flex-none items-stretch border-y border-line bg-panel select-none">
+      <PaneTabList label={t`Game panels`} className="flex-1">
+        {tabs.map((name) => {
+          const count = name === 'eval' ? flaggedCount : name === 'notes' ? noteCount : 0
+          return (
+            <PaneTab
+              key={name}
+              selected={tab === name}
+              onSelect={() => onTabChange(name)}
+              className="flex-1 justify-center whitespace-nowrap px-1"
+            >
+              {i18n._(TAB_LABEL[name])}
+              {/* Flagged keeps the blunder hue (a verdict); a note count is plain data. */}
+              {count > 0 ? (
+                <span
+                  className={cn(
+                    'font-mono text-meta tabular',
+                    name === 'eval' ? 'text-blunder' : 'text-dim-2',
+                  )}
+                >
+                  {count}
+                </span>
+              ) : null}
+            </PaneTab>
+          )
+        })}
+      </PaneTabList>
     </div>
   )
 }

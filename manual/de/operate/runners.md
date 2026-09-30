@@ -1,6 +1,6 @@
 # Maschinen
 
-**Rechenleistung → Maschinen** ist, wo Engines laufen, wie viel gleichzeitig läuft und was
+**Rechenleistung › Maschinen** ist, wo Engines laufen, wie viel gleichzeitig läuft und was
 gerade läuft: eine Karte je Host. [Engines](engines.md) ist, was installiert ist; diese
 Seite ist, worauf es läuft.
 
@@ -13,7 +13,11 @@ in dem Moment eine Maschine wird, in dem du die mitgelieferte Engine installiers
 **Remote Runner** mit seinen Slots und den Engines, die er anbietet. Ein Slot ist ein
 Engine-Auftrag oder ein Analysebrett.
 
-**Externer Runner** und **Wie externe Runner funktionieren** stehen in der Titelleiste.
+**Externer Runner** und **Wie externe Runner funktionieren** (das ⓘ) stehen in der
+Titelleiste. Die Karte eines Browsers oder Runners klappt mit einem Druck auf ihre Zeile auf,
+und die offene ist hervorgehoben. Auf der Karte dieses Browsers installiert **Browser-Stockfish
+installieren** die Engine, **Starten** und **Stoppen** verbinden und trennen sie, und
+**Deinstallieren …** fragt nach, bevor der Browser widerrufen und vergessen wird.
 
 ## Wie viel gleichzeitig { #how-much-at-once }
 
@@ -51,7 +55,7 @@ die Obergrenze, oder gib einer Zeile unter Engines weniger Threads. Threads gelt
 Engine; wie viele Prozesse, gilt je Maschine. Solange der
 [Fernschachmodus](../guide/analysis.md#correspondence) aus ist, wird nur die Engine mit
 der Rolle Analyse bemessen, weil sonst nichts hier läuft, es sei denn, du wählst in
-**Analysieren** einer Partie eine andere.
+**Analysieren …** einer Partie eine andere.
 
 Die Slots eines Remote Runners werden beim Registrieren festgelegt und lassen sich auf
 seiner Karte ändern (**Umbenennen oder Größe ändern**); die Threads jener Maschine stehen in
@@ -296,7 +300,8 @@ zeigt sie wartend auf dieser Maschine, und die Lösung ist das Update.
 $ blunderbase runners revoke gpu-box
 ```
 
-**Widerrufen** auf der Karte des Runners auf der Maschinen-Seite tut dasselbe. So oder so
+**Widerrufen …** auf der Karte des Runners auf der Maschinen-Seite tut dasselbe, sobald du
+mit **Widerrufen** bestätigst. So oder so
 hört das Token auf zu funktionieren, und die
 Engines, die es angeboten hat, werden gelöscht.
 

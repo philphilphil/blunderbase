@@ -15,9 +15,16 @@
  *
  * Each card carries the game, the move, the engine's own number and both of its counters —
  * depth and nodes — because for Leela the second is the one that means anything.
+ *
+ * A card that opens its game is a clickable row in card form: it lifts to `raised` under
+ * the pointer like every row does. Its state is the status dot's grammar — green (pulsing)
+ * while an engine works, amber parked, grey waiting — and "task" is a borderless tint.
  */
 import { Trans, useLingui } from '@lingui/react/macro'
 import { Link } from 'react-router-dom'
+
+import { StatusDot } from '@/components/badges/StatusDot'
+import { Badge } from '@/components/ui/badge'
 
 import type { CorrespondenceGameSummary, CorrespondenceSearch } from '@/lib/api/types'
 import { formatNodes, formatScore } from '@/lib/chess/evaluation'
@@ -69,6 +76,7 @@ function Card({
       data-testid={`running-search-${search.id}`}
       className={cn(
         'grid grid-cols-[minmax(0,1fr)_auto] gap-x-2.5 gap-y-0.5 rounded-md border border-line bg-surface px-2.5 py-2',
+        game && 'transition-colors group-hover/card:bg-raised',
         !live && 'opacity-70',
       )}
     >
@@ -77,12 +85,9 @@ function Card({
           {search.engine_name ?? t`Engine`}
         </span>
         {task ? (
-          <span
-            className="flex-none rounded-sm border border-edge px-1 text-meta text-dim uppercase"
-            title={t`A bounded look through the analysis queue`}
-          >
+          <Badge className="flex-none" title={t`A bounded look through the analysis queue`}>
             <Trans>task</Trans>
-          </span>
+          </Badge>
         ) : null}
       </span>
       {/*
@@ -98,13 +103,7 @@ function Card({
       </span>
       <span className="col-span-2 truncate text-meta text-dim">{detail || '—'}</span>
       <span className="col-span-2 flex items-center gap-1.5 text-meta text-dim-2">
-        <span
-          aria-hidden
-          className={cn(
-            'size-[0.3125rem] rounded-full',
-            live ? 'bg-good' : warm ? 'bg-mistake' : 'bg-faint',
-          )}
-        />
+        <StatusDot tone={live ? 'working' : warm ? 'degraded' : 'waiting'} />
         {task && live ? (
           <Trans>being worked on</Trans>
         ) : task ? (
@@ -127,7 +126,7 @@ function Card({
   )
 
   return game ? (
-    <Link to={`/correspondence/${game.game_id}`} className="block no-underline hover:opacity-95">
+    <Link to={`/correspondence/${game.game_id}`} className="group/card block rounded-md no-underline">
       {body}
     </Link>
   ) : (

@@ -131,6 +131,25 @@ describe('MoveTreeTable', () => {
     expect(name.compareDocumentPosition(note) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
   })
 
+  it('names the opening and the note on the row too, for a table too narrow to show them', () => {
+    render(<MoveTreeTable tree={TREE} ply={1} loading={false} onPlay={vi.fn()} />)
+    const row = screen.getByText('1…e5').closest('button') as HTMLButtonElement
+    expect(row).toHaveAttribute(
+      'title',
+      "King's Pawn Game — the open games, when I want a fight",
+    )
+  })
+
+  it('draws the main line as data, not as a chosen row', () => {
+    render(<MoveTreeTable tree={TREE} ply={1} loading={false} onPlay={vi.fn()} />)
+    // Nothing is chosen until a move is played: the main line keeps a bold move and the
+    // row itself takes no selected fill (the one channel for "chosen" is `ROW_SELECTED`).
+    const main = screen.getByText('1…e5')
+    expect(main).toHaveClass('font-semibold')
+    expect(main.closest('button')).not.toHaveClass('bg-selected')
+    expect(screen.getByText('1…Nf6')).not.toHaveClass('font-semibold')
+  })
+
   it('shows the owner’s own note, whole in the title, and nothing derived', () => {
     render(<MoveTreeTable tree={TREE} ply={1} loading={false} onPlay={vi.fn()} />)
     // The Note column is truncated in place, so the full text is on the element to hover.

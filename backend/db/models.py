@@ -830,6 +830,11 @@ class Collection(Base):
         String(16), nullable=False, default="accent", server_default="accent"
     )
     description: Mapped[str | None] = mapped_column(Text)
+    # Whether the rail shows it under Collections, one click from anywhere. The owner's
+    # choice per collection; nothing else reads it.
+    pinned: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default=false()
+    )
     rule: Mapped[dict[str, Any] | None] = mapped_column(JSON(none_as_null=True))
     # When `rule` took the form it has now: set with the collection and moved by every edit
     # that really changes the rule. A game whose side is learned after it was imported is

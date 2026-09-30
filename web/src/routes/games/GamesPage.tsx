@@ -17,24 +17,34 @@
  * It is always the whole library. A collection is one of its filters and nothing more — the
  * Collection chip, over the owner's games unless the link says `whose=all`, and cleared by
  * "Clear" like any other — because a collection as a thing of its own (its record, its
- * rule, Edit) is the Collections screen's (`routes/collections`). The title, the default
- * and Clear mean the same whichever chips are set. What a collection filter does add is the
- * way out of it: "Remove from collection" in the footer, next to Add to….
+ * rule, its score line) is the Collections screen's (`routes/collections`). The default and
+ * Clear mean the same whichever chips are set. What a collection filter does add is the way
+ * out of it: "Remove from collection" in the footer, next to Add to. And while the list is
+ * exactly one collection (the title says `Collections › <name>`), the bar offers Edit
+ * collection…, the same dialog as the card's Edit, since that collection is where you are.
+ *
+ * The title says where the reader is standing, from the same function the rail lights its
+ * row by (`useLibraryPlace`): `Games`, `Games › <saved cut>`, `Collections › <name>` for a
+ * pinned collection, or `Games (filtered)`. So the bar, the rail and the Collection picker
+ * give one answer rather than the rail naming a collection while the bar said "Games".
  */
 import { plural } from '@lingui/core/macro'
 import { Trans, useLingui } from '@lingui/react/macro'
+import { Download, Pencil, X } from 'lucide-react'
 import type * as React from 'react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Link, useNavigate, useSearchParams } from 'react-router-dom'
+import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 
 import { SetPageChrome } from '@/components/shell/PageChrome'
 import { Button } from '@/components/ui/button'
 import { ApiError } from '@/lib/api/client'
 import {
+  useCollections,
   useDeleteGames,
   useRemoveFromCollection,
   useRequestAnalysisBatch,
 } from '@/lib/api/queries'
+import { useLibraryPlace } from '@/lib/libraryPlace'
 import { useEngineHidden } from '@/lib/ui/engineVisibility'
 import { isTyping } from '@/lib/ui/shortcuts'
 
@@ -74,10 +84,14 @@ import { useGameLibrary } from './useGameLibrary'
  */
 const SEARCH_ID = 'games-search'
 
+/** No game queued from this page since the cards were last fetched. */
+const NONE_QUEUED: ReadonlySet<number> = new Set()
+
 export function GamesPage() {
   const { t } = useLingui()
   const navigate = useNavigate()
   const [params, setParams] = useSearchParams()
+  const place = useLibraryPlace(useLocation().search)
 
   const filters = useMemo(() => filtersFromParams(params), [params])
   const sort = useMemo(() => sortFromParams(params), [params])
@@ -122,6 +136,15 @@ export function GamesPage() {
   const collectionName = useCollectionNames()
   /** Games handed to "+ New collection from these N…", while its dialog is open. */
   const [newFrom, setNewFrom] = useState<number[] | null>(null)
+  // While the list is exactly one collection (`Collections › <name>`), that collection is
+  // the place, so it can be edited from here as from its card — without a trip back to the
+  // Collections screen to rename it or change its rule.
+  const collections = useCollections().data?.collections
+  const shownCollection =
+    place.kind === 'collection'
+      ? (collections?.find((collection) => collection.id === place.collectionId) ?? null)
+      : null
+  const [editingCollection, setEditingCollection] = useState(false)
 
   /**
    * Open a game, and hand the run it was opened from over with it.
@@ -253,6 +276,16 @@ export function GamesPage() {
     })
   }, [rows])
 
+  // The games this page queued, until the next page of cards arrives. The table is not
+  // refetched on `analysis.queued` (`lib/events/invalidation`), so without this a row would
+  // go back to offering Analyse until its run finished. Tied to the `rows` it was set
+  // against: the next fetch, whose cards say `queued` themselves, replaces it on its own.
+  const [queuedHere, setQueuedHere] = useState<{ rows: unknown; ids: ReadonlySet<number> }>({
+    rows: null,
+    ids: new Set(),
+  })
+  const queuedIds = queuedHere.rows === rows ? queuedHere.ids : NONE_QUEUED
+
   const queueAnalysis = useCallback(
     async (ids: number[]) => {
       if (ids.length === 0) return
@@ -271,6 +304,13 @@ export function GamesPage() {
         const receipt = await analysis.mutateAsync({ game_ids: ids })
         queued = receipt.queued.length
         refused = receipt.refused.length
+        setQueuedHere((current) => ({
+          rows,
+          ids: new Set([
+            ...(current.rows === rows ? current.ids : []),
+            ...receipt.queued.map((run) => run.game_id),
+          ]),
+        }))
       } catch (error) {
         // A call that never landed refused the selection whole, and the backend always
         // says why — a selection over the batch cap, an analysis role with no engine behind it.
@@ -292,7 +332,7 @@ export function GamesPage() {
             : t`${queued} queued, ${refused} refused`,
       )
     },
-    [analysis, t],
+    [analysis, rows, t],
   )
 
   // Deleting goes through the dialog, which is what `doomed` is: the ids it is open over.
@@ -363,18 +403,28 @@ export function GamesPage() {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      {/* No heading of its own: the titlebar's crumb names the page and carries Import, and
+      {/* No heading of its own: the titlebar's crumbs name the place and carry Import, and
           the count is the footer's ("1–50 of 312") and the rail's. What is left is the one
-          toolbar — whose games, the filters, then Clear and the search at its right end. */}
+          toolbar: whose games, the filters, then Clear, Save filter… and the search at its
+          right end. Import is a secondary: the bar's page action, not the region's primary. */}
       <SetPageChrome
-        breadcrumb={[{ label: t`Games`, to: '/games' }]}
+        breadcrumb={place.crumbs}
         manual="guide/games"
         actions={
-          <Button asChild size="sm" variant="secondary">
-            <Link to="/library/import">
-              <Trans>Import</Trans>
-            </Link>
-          </Button>
+          <>
+            {shownCollection ? (
+              <Button size="sm" variant="secondary" onClick={() => setEditingCollection(true)}>
+                <Pencil aria-hidden />
+                <Trans>Edit collection…</Trans>
+              </Button>
+            ) : null}
+            <Button asChild size="sm" variant="secondary">
+              <Link to="/library/import">
+                <Download aria-hidden />
+                <Trans>Import games</Trans>
+              </Link>
+            </Button>
+          </>
         }
       />
 
@@ -382,29 +432,31 @@ export function GamesPage() {
         <FilterBar
           filters={filters}
           onChange={setFilters}
+          clear={
+            active > 0 ? (
+              <Button type="button" size="sm" variant="secondary" onClick={() => setFilters({})}>
+                <X aria-hidden />
+                <Trans>Clear {active}</Trans>
+              </Button>
+            ) : null
+          }
           trailing={
-            <>
-              {active > 0 ? (
-                <Button type="button" size="sm" variant="outline" onClick={() => setFilters({})}>
-                  <Trans>Clear {active}</Trans>
-                </Button>
-              ) : null}
-              {/* On a phone it takes the rest of its own line: shrinking a box you type an
-                  opponent's name into is the wrong half to give up. */}
-              <DebouncedInput
-                id={SEARCH_ID}
-                aria-label={t`Search games`}
-                placeholder={t`Opponent, ECO, PGN text…`}
-                value={filters.text ?? ''}
-                onCommit={(value) => setFilters({ ...filters, text: value || undefined })}
-                // `/` puts the cursor here, so Esc takes it back out — the rows' arrow keys
-                // and `/` itself are dead while it is in a text box. The text stays.
-                onKeyDown={(event) => {
-                  if (event.key === 'Escape') event.currentTarget.blur()
-                }}
-                className="h-7 w-[13.75rem] max-md:w-auto max-md:flex-1"
-              />
-            </>
+            // On a phone it takes the rest of its own line: shrinking a box you type an
+            // opponent's name into is the wrong half to give up. The placeholder says what
+            // it searches, so it never reads as the rail's "Search everything".
+            <DebouncedInput
+              id={SEARCH_ID}
+              aria-label={t`Search games`}
+              placeholder={t`Filter games: opponent, ECO, PGN…`}
+              value={filters.text ?? ''}
+              onCommit={(value) => setFilters({ ...filters, text: value || undefined })}
+              // `/` puts the cursor here, so Esc takes it back out — the rows' arrow keys
+              // and `/` itself are dead while it is in a text box. The text stays.
+              onKeyDown={(event) => {
+                if (event.key === 'Escape') event.currentTarget.blur()
+              }}
+              wrapperClassName="w-[18rem] max-md:w-auto max-md:min-w-0 max-md:flex-1"
+            />
           }
         />
       </div>
@@ -419,6 +471,7 @@ export function GamesPage() {
         onOpen={open}
         onAnalyse={(id) => void queueAnalysis([id])}
         analysing={analysing}
+        queued={queuedIds}
         onDelete={(id) => setDoomed([id])}
         status={library.status}
         error={library.error}
@@ -478,6 +531,16 @@ export function GamesPage() {
           }}
         />
       ) : null}
+
+      {editingCollection && shownCollection ? (
+        <CollectionDialog
+          collection={shownCollection}
+          onClose={() => setEditingCollection(false)}
+          // The list was that collection; with it gone, the Collections screen is where
+          // the owner was, one level up.
+          onDeleted={() => navigate('/collections')}
+        />
+      ) : null}
     </div>
   )
 }
@@ -498,7 +561,7 @@ function refusalReason(error: unknown, fallback: string): string {
  * middle of the table's own space: the table is already the region, and a dashed card
  * inside it was a second frame around one sentence. An empty library has one thing to do,
  * so importing is the filled primary; a filter that matched nothing is routine and gets
- * the quieter outline.
+ * the quieter tool button.
  */
 function EmptyState({ active, onClear }: { active: number; onClear: () => void }) {
   return (
@@ -522,12 +585,14 @@ function EmptyState({ active, onClear }: { active: number; onClear: () => void }
         )}
       </p>
       {active > 0 ? (
-        <Button type="button" size="sm" variant="outline" onClick={onClear}>
+        <Button type="button" size="sm" variant="secondary" onClick={onClear}>
+          <X aria-hidden />
           <Trans>Clear the filters</Trans>
         </Button>
       ) : (
         <Button asChild size="sm">
           <Link to="/library/import">
+            <Download aria-hidden />
             <Trans>Go to import</Trans>
           </Link>
         </Button>

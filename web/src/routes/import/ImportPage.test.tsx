@@ -192,7 +192,48 @@ describe('ImportPage', () => {
       selector: '#lichess-username',
     })
     await waitFor(() => expect(username.value).toBe('phib'))
-    expect(screen.getByRole('button', { name: /Sync/ })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Sync' })).toBeInTheDocument()
+  })
+
+  it('syncs every included account from the Accounts head, told what the head says', async () => {
+    stubFetch({
+      '/api/import/jobs': { jobs: [], total: 0, limit: 25, offset: 0 },
+      '/api/stats/profile': PROFILE,
+      '/api/games': { games: [], total: 15, limit: 1, offset: 0 },
+      '/api/import/lichess': { source: 'lichess', status: 'running', job_id: 13 },
+      '/api/import/schedule': { minutes: null, disabled_sources: [] },
+    })
+    renderPage(<ImportPage />)
+
+    const accounts = await screen.findByRole('region', { name: 'Accounts' })
+    const syncAll = within(accounts).getByRole('button', { name: 'Sync all' })
+    await waitFor(() => expect(syncAll).toBeEnabled())
+    // The region's one primary; each box's own Sync is a secondary face.
+    expect(within(accounts).getAllByRole('button', { name: 'Sync' })).toHaveLength(1)
+
+    await userEvent.type(within(accounts).getByLabelText('Max games'), '20')
+    await userEvent.click(syncAll)
+
+    // Only the account the profile knows: an unconnected box has nobody to sync.
+    await waitFor(() => expect(postedTo('/api/import/lichess')).toHaveLength(1))
+    expect(postedTo('/api/import/lichess')[0]).toMatchObject({ username: 'phib', max_games: 20 })
+    expect(postedTo('/api/import/chesscom')).toHaveLength(0)
+    expect(postedTo('/api/import/fics')).toHaveLength(0)
+  })
+
+  it('says why Sync all cannot be pressed when nothing is connected', async () => {
+    stubFetch({
+      '/api/import/jobs': { jobs: [], total: 0, limit: 25, offset: 0 },
+      '/api/stats/profile': { ...PROFILE, accounts: [] },
+      '/api/games': { games: [], total: 0, limit: 1, offset: 0 },
+      '/api/import/schedule': { minutes: null, disabled_sources: [] },
+    })
+    renderPage(<ImportPage />)
+
+    const syncAll = await screen.findByRole('button', { name: 'Sync all' })
+    await waitFor(() => expect(syncAll).toHaveAttribute('title', 'Connect an account first'))
+    expect(syncAll).toBeDisabled()
+    expect(syncAll).toHaveAttribute('title', 'Connect an account first')
   })
 
   it('says nothing about evaluation until a sync is asked to skip it', async () => {
@@ -208,17 +249,18 @@ describe('ImportPage', () => {
       selector: '#lichess-username',
     })
     await waitFor(() => expect(username.value).toBe('phib'))
-    await userEvent.click(screen.getByRole('button', { name: /Sync/ }))
+    await userEvent.click(screen.getByRole('button', { name: 'Sync' }))
 
     // Unticked, the request carries no opinion at all and the backend queues the pass.
     await waitFor(() => expect(postedTo('/api/import/lichess')).toHaveLength(1))
     expect(postedTo('/api/import/lichess')[0]).not.toHaveProperty('analyze')
 
-    // One switch for the whole grid: the answer is never different per source.
-    const skip = screen.getByRole('checkbox', { name: 'Skip evaluation' })
+    // One option for the whole grid: the answer is never different per account.
+    const accounts = screen.getByRole('region', { name: 'Accounts' })
+    const skip = within(accounts).getByRole('checkbox', { name: 'Skip evaluation' })
     await userEvent.click(skip)
     expect(skip).toHaveAttribute('aria-checked', 'true')
-    await userEvent.click(screen.getByRole('button', { name: /Sync/ }))
+    await userEvent.click(screen.getByRole('button', { name: 'Sync' }))
 
     await waitFor(() => expect(postedTo('/api/import/lichess')).toHaveLength(2))
     expect(postedTo('/api/import/lichess')[1]).toMatchObject({ username: 'phib', analyze: false })
@@ -241,7 +283,7 @@ describe('ImportPage', () => {
     // A native date input takes a value, not keystrokes.
     fireEvent.change(screen.getByLabelText('Since'), { target: { value: '2024-01-01' } })
     await userEvent.type(screen.getByLabelText('Max games'), '50')
-    await userEvent.click(screen.getByRole('button', { name: /Sync/ }))
+    await userEvent.click(screen.getByRole('button', { name: 'Sync' }))
 
     await waitFor(() => expect(postedTo('/api/import/lichess')).toHaveLength(1))
     expect(postedTo('/api/import/lichess')[0]).toMatchObject({
@@ -270,13 +312,13 @@ describe('ImportPage', () => {
     await userEvent.click(screen.getByRole('checkbox', { name: 'From the beginning' }))
     expect(screen.getByLabelText('Since')).toBeDisabled()
 
-    await userEvent.click(screen.getByRole('button', { name: /Sync/ }))
+    await userEvent.click(screen.getByRole('button', { name: 'Sync' }))
 
     await waitFor(() => expect(postedTo('/api/import/lichess')).toHaveLength(1))
     expect(postedTo('/api/import/lichess')[0]).toMatchObject({ username: 'phib', since: 'all' })
   })
 
-  it('carries the same skip into the PGN upload, where it is a query flag', async () => {
+  it('gives the PGN file its own skip, where it is a query flag', async () => {
     stubFetch({
       '/api/import/jobs': { jobs: [], total: 0, limit: 25, offset: 0 },
       '/api/stats/profile': PROFILE,
@@ -286,22 +328,33 @@ describe('ImportPage', () => {
     renderPage(<ImportPage />)
     await screen.findByText('Sync history')
 
+    // Nothing to upload yet: the primary keeps the one disabled look and says why.
+    const pgn = screen.getByRole('region', { name: 'PGN file' })
+    const upload = within(pgn).getByRole('button', { name: 'Upload' })
+    expect(upload).toBeDisabled()
+    expect(upload).toHaveAttribute('title', 'Choose a file first')
+
     const file = new File(['[Event "Casual"]\n\n1. e4 e5 *\n'], 'games.pgn', {
       type: 'text/plain',
     })
     await userEvent.upload(screen.getByTestId('pgn-file-input'), file)
-    await userEvent.click(screen.getByRole('button', { name: 'Upload' }))
+    await userEvent.click(upload)
 
     await waitFor(() => expect(urlsFor('/api/import/pgn/upload')).toHaveLength(1))
     expect(urlsFor('/api/import/pgn/upload')[0]).not.toContain('analyze')
 
-    // The same one switch the accounts above use.
-    const skip = screen.getByRole('checkbox', { name: 'Skip evaluation' })
-    await userEvent.click(skip)
-    await userEvent.click(screen.getByRole('button', { name: 'Upload' }))
-
+    // The accounts' option is about syncs; a file has its own, in its own region.
+    const accounts = screen.getByRole('region', { name: 'Accounts' })
+    await userEvent.click(within(accounts).getByRole('checkbox', { name: 'Skip evaluation' }))
+    await userEvent.click(upload)
     await waitFor(() => expect(urlsFor('/api/import/pgn/upload')).toHaveLength(2))
-    expect(urlsFor('/api/import/pgn/upload')[1]).toContain('analyze=false')
+    expect(urlsFor('/api/import/pgn/upload')[1]).not.toContain('analyze')
+
+    await userEvent.click(within(pgn).getByRole('checkbox', { name: 'Skip evaluation' }))
+    await userEvent.click(upload)
+
+    await waitFor(() => expect(urlsFor('/api/import/pgn/upload')).toHaveLength(3))
+    expect(urlsFor('/api/import/pgn/upload')[2]).toContain('analyze=false')
   })
 
   it('asks whose games the PGN holds and only says so when they are not the owner’s', async () => {
@@ -324,7 +377,7 @@ describe('ImportPage', () => {
     await waitFor(() => expect(urlsFor('/api/import/pgn/upload')).toHaveLength(1))
     expect(urlsFor('/api/import/pgn/upload')[0]).not.toContain('mine')
 
-    await userEvent.click(screen.getByRole('button', { name: 'Not mine' }))
+    await userEvent.click(screen.getByRole('radio', { name: 'Not mine' }))
     await userEvent.click(screen.getByRole('button', { name: 'Upload' }))
 
     await waitFor(() => expect(urlsFor('/api/import/pgn/upload')).toHaveLength(2))
@@ -428,8 +481,9 @@ describe('ImportPage', () => {
     await screen.findByText('Sync history')
 
     deliver({ event: 'import.started', job_id: 9, source: 'lichess', at: '2026-08-26T00:50:19Z' })
-    // The progress block and the button both say it.
-    expect(await screen.findAllByText('Syncing')).toHaveLength(2)
+    // The progress block, the box's button and Sync all (the box's account is one of its
+    // targets) all say it.
+    expect(await screen.findAllByText('Syncing')).toHaveLength(3)
 
     deliver({
       event: 'import.game',

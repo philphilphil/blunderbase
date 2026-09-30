@@ -1,23 +1,29 @@
 /**
- * "Sync all" — the overview's one-press refresh.
+ * "Sync all" — the dashboard's one-press refresh, and the bar's one filled primary.
  *
  * The Import page syncs one account at a time because it also has to *connect* them; the
  * dashboard only ever re-syncs what is already connected, so it needs no form. Which
  * accounts those are is read off `/import/jobs`: a sync that finished cleanly records the
  * username it was given in `ImportJob.message`, and that is the only place the last-used
  * username survives a reload. Nothing synced yet — nothing to press, so the button becomes
- * a link to the page that can connect an account.
+ * a link to the page that can connect an account, still the primary (it is still what the
+ * page wants done next) and carrying a `Plug` where Sync carries `RefreshCw`, so the two
+ * commands are told apart before they are read. No "…": it goes to a page, it does not open
+ * a dialog.
+ *
+ * While a sync runs the button is disabled and takes the one disabled look every button
+ * shares (the face goes); its spinner and "Syncing" say why, and its title still names the
+ * accounts it is on.
  */
 import { useLingui } from '@lingui/react/macro'
-import { Loader2, RefreshCw } from 'lucide-react'
+import { Loader2, Plug, RefreshCw } from 'lucide-react'
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 
-import { buttonVariants } from '@/components/ui/button'
+import { Button } from '@/components/ui/button'
 import { useSyncSchedule, useImportJobs, useStartImport } from '@/lib/api/queries'
 import type { ImportJob, Source } from '@/lib/api/types'
 import { useImportProgress } from '@/routes/import/useImportProgress'
-import { cn } from '@/lib/utils'
 
 /** The sources a sync can be started for — `pgn` is an upload and `manual` is by hand. */
 const SYNCABLE = ['lichess', 'chesscom', 'fics'] as const
@@ -31,13 +37,6 @@ const PLATFORM_LABEL: Record<Syncable, string> = {
 
 /** Enough history to find the last good sync of each source without paging. */
 const JOB_LIMIT = 25
-
-/**
- * The page's primary action: the filled button at the control standard's `sm`, so it
- * stands at the same height as Import PGN beside it. A bare class string rather than
- * `<Button>`, because the no-accounts case renders it on a Link.
- */
-const BUTTON = buttonVariants({ variant: 'default', size: 'sm' })
 
 export interface SyncTarget {
   source: Syncable
@@ -112,9 +111,12 @@ export function SyncAllButton() {
 
   if (!jobs.isPending && targets.length === 0) {
     return (
-      <Link to="/library/import" className={BUTTON}>
-        {syncTargets(jobs.data?.jobs).length ? t`Enable sources` : t`Connect account`}
-      </Link>
+      <Button asChild size="sm">
+        <Link to="/library/import">
+          <Plug aria-hidden />
+          {syncTargets(jobs.data?.jobs).length ? t`Enable sources` : t`Connect account`}
+        </Link>
+      </Button>
     )
   }
 
@@ -125,8 +127,9 @@ export function SyncAllButton() {
           {failure}
         </span>
       ) : null}
-      <button
+      <Button
         type="button"
+        size="sm"
         onClick={() => void syncAll()}
         disabled={jobs.isPending || !schedule.data || syncing}
         aria-busy={syncing}
@@ -137,19 +140,10 @@ export function SyncAllButton() {
                 .map((target) => `${PLATFORM_LABEL[target.source]}: ${target.username}`)
                 .join(' · ')
         }
-        // Still hoverable while it syncs, so the title keeps saying which accounts it is on.
-        className={cn(
-          BUTTON,
-          'disabled:pointer-events-auto disabled:cursor-default disabled:hover:bg-accent-teal',
-        )}
       >
-        {syncing ? (
-          <Loader2 className="size-3.5 animate-spin" aria-hidden />
-        ) : (
-          <RefreshCw className="size-3.5" aria-hidden />
-        )}
+        {syncing ? <Loader2 className="animate-spin" aria-hidden /> : <RefreshCw aria-hidden />}
         {syncing ? t`Syncing` : t`Sync all`}
-      </button>
+      </Button>
     </>
   )
 }

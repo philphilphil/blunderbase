@@ -1,10 +1,10 @@
 import { Trans, useLingui } from '@lingui/react/macro'
 import { Bot } from 'lucide-react'
 import { useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
 
 import { SetPageChrome } from '@/components/shell/PageChrome'
 import { PageBody } from '@/components/shell/PageHeader'
+import { TextLink } from '@/components/ui/text-link'
 import type { McpKeyCreated } from '@/lib/api/types'
 import { MCP_SERVER_NAME } from '@/lib/mcp/status'
 
@@ -124,9 +124,9 @@ export function McpPage() {
         <p className="text-label leading-[1.5] text-faint">
           <Trans>
             Nothing to query yet?{' '}
-            <Link to="/library/import" className="text-accent-teal hover:text-accent-link">
+            <TextLink to="/library/import" placement="inline">
               Import some games
-            </Link>{' '}
+            </TextLink>{' '}
             first — the coach only knows what the database holds.
           </Trans>
         </p>

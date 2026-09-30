@@ -7,6 +7,7 @@ import { PageBody } from '@/components/shell/PageHeader'
 import { useImportJobs, useProfile } from '@/lib/api/queries'
 import type { ImportJob, Source } from '@/lib/api/types'
 
+import { PgnCard } from './PgnCard'
 import { SourcesPanel } from './SourcesPanel'
 import { SyncHistory } from './SyncHistory'
 import { useImportProgress } from './useImportProgress'
@@ -26,9 +27,11 @@ function newestFirst(jobs: ImportJob[] | undefined): ImportJob[] | undefined {
  * Import: connect an account, sync it, drop a PGN in, and read what every previous sync
  * did.
  *
- * Two tables in the order the work happens: what games come from, then what every run of
- * it did. Export and reset live on Library → Manage, where those database-wide actions
- * have a stable route and cannot be mistaken for another import source.
+ * Three regions in the order the work happens: the accounts games are synced from, a PGN
+ * file, then what every run of either did. Each region carries its own primary (Sync all,
+ * Upload), so the bar carries none: the page's commands belong to the region they act on.
+ * Export and reset live on Library → Manage, where those database-wide actions have a
+ * stable route and cannot be mistaken for another import source.
  */
 export function ImportPage() {
   const { t } = useLingui()
@@ -66,6 +69,8 @@ export function ImportPage() {
         manual="guide/library#import"
       />
       <SourcesPanel accounts={accounts} latestOf={latestOf} progress={progress} />
+
+      <PgnCard progress={progress.pgn} />
 
       <SyncHistory
         jobs={history}

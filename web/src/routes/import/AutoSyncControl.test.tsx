@@ -58,7 +58,7 @@ afterEach(() => {
 describe('syncing on a schedule', () => {
   it('switches on at the default and shows what the backend kept', async () => {
     draw()
-    const box = await screen.findByRole('checkbox', { name: 'Sync automatically' })
+    const box = await screen.findByRole('switch', { name: 'Sync automatically' })
     await waitFor(() => expect(box).toBeEnabled())
     expect(box).toHaveAttribute('aria-checked', 'false')
     expect(screen.getByRole('textbox', { name: 'Minutes between syncs' })).toBeDisabled()
@@ -94,7 +94,7 @@ describe('syncing on a schedule', () => {
   it('switches off with a null and keeps the number in the greyed box', async () => {
     stored = 45
     draw()
-    const box = await screen.findByRole('checkbox', { name: 'Sync automatically' })
+    const box = await screen.findByRole('switch', { name: 'Sync automatically' })
     await waitFor(() => expect(box).toHaveAttribute('aria-checked', 'true'))
 
     await userEvent.click(box)

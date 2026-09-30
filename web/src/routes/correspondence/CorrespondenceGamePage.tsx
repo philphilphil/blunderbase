@@ -25,15 +25,26 @@
  * to patch in place and nothing that can be half-updated.
  */
 import { Trans, useLingui } from '@lingui/react/macro'
-import { ChevronsLeft, ChevronsRight, ChevronLeft, ChevronRight, Download, FlipVertical2 } from 'lucide-react'
+import {
+  ChevronsLeft,
+  ChevronsRight,
+  ChevronLeft,
+  ChevronRight,
+  Download,
+  FlipVertical2,
+  Trash2,
+} from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { useParams } from 'react-router-dom'
 
 import { Board, type BoardArrow, type Square } from '@/components/board/Board'
 import { Frame } from '@/components/engine-dialog/DialogFrame'
 import { SetPageChrome } from '@/components/shell/PageChrome'
+import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { ButtonGroup, ButtonGroupItem } from '@/components/ui/button-group'
 import { Skeleton } from '@/components/ui/skeleton'
+import { TextLink } from '@/components/ui/text-link'
 import { saveDownload } from '@/lib/api/client'
 import { SETTING_DEFAULTS } from '@/lib/api/appSettings'
 import {
@@ -65,6 +76,8 @@ import { useIsMobile } from '@/lib/ui/media'
 import { isTyping } from '@/lib/ui/shortcuts'
 import { cn } from '@/lib/utils'
 import { EvalBar } from '@/routes/game/components/EvalBar'
+import { PaneTab, PaneTabList } from '@/routes/game/components/PaneTabList'
+import { STRIP_FACTS, STRIP_RULE, TAB_ROW } from '@/routes/game/components/paneTabs'
 
 import { BookPane, type BookSource } from './components/BookPane'
 import { EnginesPane } from './components/EnginesPane'
@@ -93,7 +106,12 @@ type MobilePane = 'board' | 'tree' | 'engines' | 'notes'
 
 const ARROWS: ArrowKey[] = ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown']
 
-/** The pane title strip every column wears — chrome, a rule, and whatever sits hard right. */
+/**
+ * The pane title strip every column wears, in the game screen's strip order: the name,
+ * then its facts (`STRIP_FACTS`), then a rule and the tools hard right — small secondary
+ * faces for commands, a ghost square for an icon-only one. A ghost *word* is not a button
+ * the grammar allows: "Expand…" drawn as bare text had read as a label.
+ */
 function PaneTitle({
   title,
   detail,
@@ -108,8 +126,13 @@ function PaneTitle({
       {/* Only the detail gives way on a narrow column: it is a count the pane itself shows,
           while the title names the pane and the actions at the end are the only way to them. */}
       <strong className="flex-none font-semibold text-ink">{title}</strong>
-      {detail ? <span className="min-w-0 truncate text-dim">{detail}</span> : null}
-      {end ? <div className="ml-auto flex flex-none items-center gap-1.5">{end}</div> : null}
+      {detail ? <span className={cn(STRIP_FACTS, 'min-w-0 truncate')}>{detail}</span> : null}
+      {end ? (
+        <div className="ml-auto flex flex-none items-center gap-1.5">
+          <span aria-hidden className={cn(STRIP_RULE, 'mr-0.5')} />
+          {end}
+        </div>
+      ) : null}
     </div>
   )
 }
@@ -234,6 +257,9 @@ export function CorrespondenceGamePage() {
     const onKey = (event: KeyboardEvent) => {
       if (event.metaKey || event.ctrlKey || event.altKey) return
       if (isTyping(event.target)) return
+      // A tab strip or a segmented choice has already used the arrow to move between its
+      // own options; it must not walk the tree as well.
+      if (event.defaultPrevented) return
       if (document.querySelector('[role="dialog"]')) return
       if (!ARROWS.includes(event.key as ArrowKey)) return
       setSelectedId((current) => {
@@ -378,32 +404,49 @@ export function CorrespondenceGamePage() {
           />
         </div>
       </div>
+      {/* The transport is one "do one of these" group of faced cells, as on the game
+          screen; flipping is a different kind of thing, so it stands apart. */}
       <div className="flex flex-none items-center justify-center gap-1.5 border-t border-line bg-panel py-1.5">
-        <Control
-          label={t`Back to the start`}
-          onClick={() => select(tree.id)}
-          icon={<ChevronsLeft aria-hidden />}
-        />
-        <Control
-          label={t`Previous move`}
-          onClick={() => select(nextSelection(index, node.id, 'ArrowLeft'))}
-          icon={<ChevronLeft aria-hidden />}
-        />
-        <Control
-          label={t`Next move`}
-          onClick={() => select(nextSelection(index, node.id, 'ArrowRight'))}
-          icon={<ChevronRight aria-hidden />}
-        />
-        <Control
-          label={t`End of this line`}
-          onClick={() => select(mainlineFrom(node).at(-1)?.id ?? node.id)}
-          icon={<ChevronsRight aria-hidden />}
-        />
-        <Control
-          label={t`Flip the board`}
+        <ButtonGroup label={t`Move navigation`} size="xs">
+          <ButtonGroupItem
+            aria-label={t`Back to the start`}
+            title={t`Back to the start`}
+            onClick={() => select(tree.id)}
+          >
+            <ChevronsLeft aria-hidden className="size-3.5" />
+          </ButtonGroupItem>
+          <ButtonGroupItem
+            aria-label={t`Previous move`}
+            title={t`Previous move (←)`}
+            onClick={() => select(nextSelection(index, node.id, 'ArrowLeft'))}
+          >
+            <ChevronLeft aria-hidden className="size-3.5" />
+          </ButtonGroupItem>
+          <ButtonGroupItem
+            aria-label={t`Next move`}
+            title={t`Next move (→)`}
+            onClick={() => select(nextSelection(index, node.id, 'ArrowRight'))}
+          >
+            <ChevronRight aria-hidden className="size-3.5" />
+          </ButtonGroupItem>
+          <ButtonGroupItem
+            aria-label={t`End of this line`}
+            title={t`End of this line`}
+            onClick={() => select(mainlineFrom(node).at(-1)?.id ?? node.id)}
+          >
+            <ChevronsRight aria-hidden className="size-3.5" />
+          </ButtonGroupItem>
+        </ButtonGroup>
+        <Button
+          type="button"
+          variant="secondary"
+          size="icon-xs"
+          aria-label={t`Flip the board`}
+          title={t`Flip the board`}
           onClick={() => setFlipped((was) => !was)}
-          icon={<FlipVertical2 aria-hidden />}
-        />
+        >
+          <FlipVertical2 aria-hidden />
+        </Button>
         <span className="ml-2 font-mono text-meta text-dim">
           {preview.caption ?? (node.uci ? `${node.san} · ${t`ply ${node.ply}`}` : t`start`)}
         </span>
@@ -440,37 +483,46 @@ export function CorrespondenceGamePage() {
           <>
             <Button
               type="button"
-              variant="ghost"
-              size="sm"
+              variant="secondary"
+              size="xs"
               disabled={Boolean(game.finished) || node.mark === 'excluded'}
-              title={t`Make the best moves after the selected position into branches, with an engine on each`}
+              title={
+                game.finished
+                  ? t`A finished game's tree is read-only`
+                  : node.mark === 'excluded'
+                    ? t`An excluded move is never expanded`
+                    : t`Make the best moves after the selected position into branches, with an engine on each`
+              }
               onClick={() => openOn(node.id, 'expand')}
             >
               <Trans>Expand…</Trans>
             </Button>
             <Button
               type="button"
-              variant="ghost"
-              size="sm"
+              variant="secondary"
+              size="xs"
               disabled={Boolean(game.finished) || prunable.length === 0}
               title={
-                prunable.length === 0
-                  ? t`Nothing in this tree has fallen far enough behind to prune`
-                  : t`Delete the faded lines — never automatic, and always after a confirm`
+                game.finished
+                  ? t`A finished game's tree is read-only`
+                  : prunable.length === 0
+                    ? t`Nothing in this tree has fallen far enough behind to prune`
+                    : t`Delete the faded lines — never automatic, and always after a confirm`
               }
               onClick={() => setDialog('prune')}
             >
-              <Trans>Prune weak</Trans>
+              <Trans>Prune weak…</Trans>
             </Button>
             <Button
               type="button"
               variant="ghost"
-              size="sm"
+              size="icon-xs"
+              aria-label={t`Export PGN`}
+              title={t`Export PGN`}
               disabled={exportPgn.isPending}
               onClick={() => exportPgn.mutate(game.game_id)}
             >
               <Download aria-hidden />
-              <Trans>Export PGN</Trans>
             </Button>
           </>
         }
@@ -507,9 +559,14 @@ export function CorrespondenceGamePage() {
         end={
           <Button
             type="button"
-            variant="ghost"
-            size="sm"
+            variant="secondary"
+            size="xs"
             disabled={Boolean(game.finished)}
+            title={
+              game.finished
+                ? t`A finished game's tree is read-only`
+                : t`Put one engine on this position for as long as you let it`
+            }
             onClick={() => openOn(node.id, 'search')}
           >
             <Trans>Search with…</Trans>
@@ -571,6 +628,7 @@ export function CorrespondenceGamePage() {
         { label: t`Correspondence`, to: '/correspondence' },
         { label: opponentOf(game) },
       ]}
+      back={{ label: t`Correspondence`, to: '/correspondence' }}
       manual="guide/correspondence"
     />
   )
@@ -597,33 +655,37 @@ export function CorrespondenceGamePage() {
 
       {mobile ? (
         <div className="flex min-h-0 flex-1 flex-col">
-          <div className="flex flex-none border-b border-edge-strong bg-panel">
-            {(['board', 'tree', 'engines', 'notes'] as MobilePane[]).map((each) => (
-              <button
-                key={each}
-                type="button"
-                aria-pressed={pane === each}
-                onClick={() => setPane(each)}
-                className={cn(
-                  'flex-1 border-b-2 py-2 text-label transition-colors',
-                  pane === each
-                    ? 'border-b-accent-teal text-ink'
-                    : 'border-b-transparent text-dim hover:text-ink',
-                )}
-              >
-                {each === 'board' ? (
-                  <Trans>Board</Trans>
-                ) : each === 'tree' ? (
-                  <Trans>Tree</Trans>
-                ) : each === 'engines' ? (
-                  <Trans>Engines</Trans>
-                ) : (
-                  <Trans>Notes</Trans>
-                )}
-              </button>
-            ))}
+          {/* The phone's four panes are the game screen's folder tabs, sharing the width. */}
+          <div className={cn(TAB_ROW, 'pr-0')}>
+            <PaneTabList label={t`Panes`} className="flex-1">
+              {(['board', 'tree', 'engines', 'notes'] as MobilePane[]).map((each) => (
+                <PaneTab
+                  key={each}
+                  id={`correspondence-pane-tab-${each}`}
+                  controls="correspondence-pane"
+                  selected={pane === each}
+                  onSelect={() => setPane(each)}
+                  className="flex-1 justify-center"
+                >
+                  {each === 'board' ? (
+                    <Trans>Board</Trans>
+                  ) : each === 'tree' ? (
+                    <Trans>Tree</Trans>
+                  ) : each === 'engines' ? (
+                    <Trans>Engines</Trans>
+                  ) : (
+                    <Trans>Notes</Trans>
+                  )}
+                </PaneTab>
+              ))}
+            </PaneTabList>
           </div>
-          <div className="flex min-h-0 flex-1 flex-col">
+          <div
+            id="correspondence-pane"
+            role="tabpanel"
+            aria-labelledby={`correspondence-pane-tab-${pane}`}
+            className="flex min-h-0 flex-1 flex-col"
+          >
             {pane === 'board' ? boardColumn : null}
             {pane === 'tree' ? treeColumn : null}
             {pane === 'engines' ? enginesColumn : null}
@@ -631,10 +693,15 @@ export function CorrespondenceGamePage() {
           </div>
         </div>
       ) : (
-        <div className="grid min-h-0 flex-1 grid-cols-[minmax(24rem,0.9fr)_minmax(22rem,1.15fr)_minmax(20rem,0.95fr)] bg-void">
+        <div className="grid min-h-0 flex-1 grid-cols-[minmax(20rem,0.9fr)_minmax(0,1.15fr)_minmax(18rem,0.95fr)] bg-void">
           {/* The board keeps its square and the notes take what is left under it, never
               less than a heading and a few lines: on a short window the board gives way,
-              not the writing. */}
+              not the writing.
+
+              The three minimums fit the 1200 px a 1440 window leaves beside the rail. They
+              had added up to more than that, so the engine column was cut off at the right
+              and the tree's move column squeezed to nothing; now the tree takes what is
+              left and scrolls sideways inside its own pane when that is too little. */}
           <div className="grid min-h-0 grid-rows-[minmax(0,1fr)_minmax(12rem,0.8fr)] border-r border-edge-strong">
             {boardColumn}
             {notesColumn}
@@ -755,13 +822,13 @@ function PruneDialog({
       onClose={onClose}
       description={t`${nodes.length} lines and everything under them — ${total} positions in all. Their evaluations stay in the library; only these nodes go.`}
     >
+      {/* The moves that would go are facts, so borderless tints, not boxes. */}
       <ul className="flex flex-wrap gap-1.5">
         {nodes.map((node) => (
-          <li
-            key={node.id}
-            className="rounded-sm border border-edge px-1.5 py-0.5 font-mono text-label text-dim"
-          >
-            {node.san ?? node.uci}
+          <li key={node.id}>
+            <Badge size="md" className="font-mono text-soft">
+              {node.san ?? node.uci}
+            </Badge>
           </li>
         ))}
       </ul>
@@ -770,37 +837,17 @@ function PruneDialog({
           {error}
         </p>
       ) : null}
+      {/* A confirm dialog: the one place the filled red button belongs. */}
       <div className="flex justify-end gap-2">
-        <Button type="button" variant="outline" onClick={onClose}>
+        <Button type="button" variant="secondary" onClick={onClose}>
           <Trans>Cancel</Trans>
         </Button>
         <Button type="button" variant="destructive" disabled={pending} onClick={onPrune}>
+          <Trash2 aria-hidden />
           <Trans>Prune</Trans>
         </Button>
       </div>
     </Frame>
-  )
-}
-
-function Control({
-  label,
-  icon,
-  onClick,
-}: {
-  label: string
-  icon: ReactNode
-  onClick: () => void
-}) {
-  return (
-    <button
-      type="button"
-      aria-label={label}
-      title={label}
-      onClick={onClick}
-      className="flex h-6 min-w-8 items-center justify-center rounded-md border border-edge bg-elevated text-body hover:bg-raised [&_svg]:size-3.5"
-    >
-      {icon}
-    </button>
   )
 }
 
@@ -811,9 +858,9 @@ function Missing({ message }: { message?: string }) {
         <Trans>That correspondence game is not here.</Trans>
       </p>
       {message ? <p className="font-mono text-label text-dim">{message}</p> : null}
-      <Link to="/correspondence" className="text-data text-accent-teal hover:text-accent-link">
+      <TextLink to="/correspondence" className="text-data">
         <Trans>Back to the list</Trans>
-      </Link>
+      </TextLink>
     </div>
   )
 }

@@ -383,7 +383,7 @@ describe('RepertoirePage', () => {
     renderPage('/repertoire?color=white&line=e2e4,c7c5')
 
     await screen.findByLabelText('Comment on c5')
-    await user.click(screen.getByRole('button', { name: 'black' }))
+    await user.click(screen.getByRole('radio', { name: 'black' }))
 
     await waitFor(() =>
       expect(seen.some((call) => call.url.includes('/repertoire/black'))).toBe(true),

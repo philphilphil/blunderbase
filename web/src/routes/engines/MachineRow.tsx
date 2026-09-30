@@ -10,12 +10,16 @@
  *
  * The chevron leads the summary because it must advertise the disclosure before the owner
  * reads the row; it stays `aria-hidden` so the enclosing button remains the only control.
+ * The summary takes the app's one row grammar (`ui/row.ts`): hover is `raised`, and the
+ * open one is the selected row, the blue fill with the accent bar, since the detail under
+ * it belongs to it.
  */
 import { Plural } from '@lingui/react/macro'
 import { ChevronRight } from 'lucide-react'
 import type { ReactNode } from 'react'
 
 import { StatusDot, type StatusDotTone } from '@/components/badges/StatusDot'
+import { ROW, ROW_SELECTED } from '@/components/ui/row'
 import { cn } from '@/lib/utils'
 
 /** The three fixed-width columns after the name, shared by the header and every row. */
@@ -81,8 +85,8 @@ export function MachineRow({
       <div className="contents">
         <div
           className={cn(
-            'flex min-w-0 flex-col rounded-lg border bg-panel',
-            expanded ? 'border-edge-strong bg-raised-2' : 'border-line',
+            'flex min-w-0 flex-col overflow-hidden rounded-lg border bg-panel',
+            expanded ? 'border-edge-strong' : 'border-line',
           )}
         >
           <button
@@ -90,7 +94,11 @@ export function MachineRow({
             onClick={onToggleExpand}
             aria-expanded={expanded}
             aria-label={ariaLabel}
-            className="flex min-w-0 items-center gap-2 px-3 py-2.5 text-left"
+            className={cn(
+              'flex min-w-0 items-center gap-2 px-3 py-2.5 text-left',
+              ROW,
+              expanded && ROW_SELECTED,
+            )}
           >
             <ChevronRight
               className={cn(
@@ -139,7 +147,11 @@ export function MachineRow({
           onClick={onToggleExpand}
           aria-expanded={expanded}
           aria-label={ariaLabel}
-          className="flex min-w-0 flex-1 items-center gap-3 py-2.5 text-left"
+          className={cn(
+            'flex min-w-0 flex-1 items-center gap-3 py-2.5 text-left',
+            ROW,
+            expanded && ROW_SELECTED,
+          )}
         >
           <ChevronRight
             className={cn('size-3.5 flex-none text-faint transition-transform', expanded && 'rotate-90')}

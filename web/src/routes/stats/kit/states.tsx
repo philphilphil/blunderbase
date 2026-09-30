@@ -7,8 +7,10 @@
  * card ends on.
  */
 import { Trans, useLingui } from '@lingui/react/macro'
+import { RotateCcw } from 'lucide-react'
 import type { CSSProperties, ReactNode } from 'react'
 
+import { Button } from '@/components/ui/button'
 import type { StatsResponse } from '@/lib/api/types'
 import { cn } from '@/lib/utils'
 
@@ -184,14 +186,13 @@ export function ErrorBlock({
       <p className="max-w-[38ch] font-mono text-label leading-relaxed break-words text-dim-2">
         {error?.message ?? t`the request failed`}
       </p>
+      {/* The one thing to do about it, so a command: the tool button's face and its glyph,
+          not a hand-built bordered box that read the same as a chip. */}
       {onRetry ? (
-        <button
-          type="button"
-          onClick={onRetry}
-          className="rounded-md border border-edge-strong px-2.5 py-1 text-label text-soft transition-colors hover:border-edge-hover hover:text-ink"
-        >
+        <Button type="button" variant="secondary" size="sm" onClick={onRetry}>
+          <RotateCcw aria-hidden />
           <Trans>Try again</Trans>
-        </button>
+        </Button>
       ) : null}
     </div>
   )
@@ -362,55 +363,6 @@ export function DeltaText({
     <span className={cn('font-mono text-label tabular', DELTA_TONE[tone], className)}>
       {children}
     </span>
-  )
-}
-
-/**
- * The bordered inline group the design uses for `30d · 90d · 1y`.
- *
- * The same height as a `sm` Button (h-7) so it sits in a toolbar beside one without a
- * seam, in sans like every other label, and lit with the app's one selected state
- * (`bg-selected text-ink`) rather than a tint of its own.
- */
-export function Segmented<T extends string>({
-  value,
-  options,
-  onChange,
-  label,
-  className,
-}: {
-  value: T
-  options: { value: T; label: ReactNode; title?: string }[]
-  onChange: (value: T) => void
-  label: string
-  className?: string
-}) {
-  return (
-    <div
-      role="group"
-      aria-label={label}
-      className={cn(
-        'inline-flex h-7 items-stretch overflow-hidden rounded-md border border-edge bg-elevated font-sans text-label',
-        className,
-      )}
-    >
-      {options.map((option, index) => (
-        <button
-          key={option.value}
-          type="button"
-          title={option.title}
-          aria-pressed={option.value === value}
-          onClick={() => onChange(option.value)}
-          className={cn(
-            'px-2.5 transition-colors',
-            index > 0 && 'border-l border-hairline',
-            option.value === value ? 'bg-selected text-ink' : 'text-soft hover:text-ink',
-          )}
-        >
-          {option.label}
-        </button>
-      ))}
-    </div>
   )
 }
 

@@ -7,6 +7,13 @@
  * lets the table say how many rows it has room for: `onCapacityChange` measures the
  * container against a rendered row, and the footer's "Fit" page size is that number.
  *
+ * From `md` up the whole table (head and body together) scrolls sideways where its columns
+ * do not fit, with a fade on the right edge while there is more, instead of clipping them:
+ * at 1440 with the rail open the columns need more than the pane has, and the old table cut
+ * Source mid-word and hid Analysis and Flags with nothing saying so. The heads follow the
+ * control grammar: sortable ones are the table's `SortButton`, Analysis and Flags stay plain
+ * dim caps, and the select-all box is the app's `Checkbox`, mixed while some rows are ticked.
+ *
  * Below `md` the rows fold into cards (`GameRow`) and the header stops being a ruler over
  * them: it wraps into a strip of sort chips, one per column the card still shows. The
  * body keeps its own scroller there rather than handing the page one — it is the only
@@ -14,14 +21,19 @@
  * below are worth more pinned than scrolled past.
  */
 import { Trans, useLingui } from '@lingui/react/macro'
+import { RotateCw } from 'lucide-react'
 import type * as React from 'react'
 import { useEffect, useRef } from 'react'
 
 import { Button } from '@/components/ui/button'
+import { Checkbox } from '@/components/ui/checkbox'
 import { Skeleton } from '@/components/ui/skeleton'
+import { SortButton } from '@/components/ui/table'
+import { useCollections } from '@/lib/api/queries'
 import type { GameCard } from '@/lib/api/types'
 import { useEngineHidden } from '@/lib/ui/engineVisibility'
 import { isTyping } from '@/lib/ui/shortcuts'
+import { useMoreRight } from '@/lib/ui/useMoreRight'
 import { cn } from '@/lib/utils'
 
 import { nextSort, type Sort } from '../sorting'
@@ -49,6 +61,8 @@ export interface GamesTableProps {
   onOpen: (id: number) => void
   onAnalyse: (id: number) => void
   analysing: Set<number>
+  /** Games queued from this page since the cards were fetched, whose cards do not say so yet. */
+  queued?: ReadonlySet<number>
   onDelete: (id: number) => void
   status: 'pending' | 'error' | 'success'
   error: Error | null
@@ -71,6 +85,7 @@ export function GamesTable({
   onOpen,
   onAnalyse,
   analysing,
+  queued,
   onDelete,
   status,
   error,
@@ -84,8 +99,20 @@ export function GamesTable({
   // it, and each row loses its flag badges — read once, at the top, so the header, the rows
   // and the skeleton are laid out from the same answer.
   const engineHidden = useEngineHidden()
-  const columns = columnsFor(engineHidden)
+  // No collections, no Collections column: an empty 160px strip down every row says nothing.
+  const collectionsColumn = (useCollections().data?.collections?.length ?? 0) > 0
+  const columns = columnsFor(engineHidden, collectionsColumn)
   const body = useRef<HTMLDivElement>(null)
+  // Whether columns are still off to the right: the table scrolls sideways where they do
+  // not fit, rather than cutting Source mid-word and leaving Analysis and Flags (with the
+  // row's delete) off screen with nothing saying so.
+  const {
+    ref: frame,
+    onScroll: measureOverflow,
+    moreRight,
+  } = useMoreRight<HTMLDivElement>(
+    `${games.length}:${status}:${engineHidden}:${collectionsColumn}`,
+  )
   const report = useRef(onCapacityChange)
   useEffect(() => {
     report.current = onCapacityChange
@@ -110,6 +137,8 @@ export function GamesTable({
   }, [games.length, status])
 
   const allSelected = games.length > 0 && games.every((game) => selected.has(game.id))
+  // Some but not all: the head box says "mixed" (a minus), and a click selects the rest.
+  const someSelected = !allSelected && games.some((game) => selected.has(game.id))
 
   /*
    * Arrow keys walk the rows, which is the one thing a table of a thousand games could not
@@ -157,7 +186,19 @@ export function GamesTable({
   }, [])
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col" role="table" aria-label={t`Games`}>
+    <div
+      ref={frame}
+      role="table"
+      aria-label={t`Games`}
+      onScroll={measureOverflow}
+      className={cn(
+        'flex min-h-0 flex-1 flex-col md:overflow-x-auto md:*:min-w-max',
+        // The fade on the right edge is the only sign there is more to the side: overlay
+        // scrollbars show nothing at rest. It goes once the scroll reaches the end.
+        moreRight &&
+          'md:[mask-image:linear-gradient(to_right,black_calc(100%-3.5rem),transparent)]',
+      )}
+    >
       <div
         role="row"
         // The six chips and the checkbox measure ~260px of text; at `gap-x-3` the gaps
@@ -168,23 +209,14 @@ export function GamesTable({
       >
         {columns.map((col) => {
           const active = col.sort === sort.key
-          const arrow = active ? (sort.direction === 'asc' ? ' ↑' : ' ↓') : ''
           if (col.id === 'select') {
             return (
               <span key={col.id} style={cellStyle(col)} className={cn(cellClass(col), 'flex items-center')}>
-                <button
-                  type="button"
-                  role="checkbox"
-                  aria-checked={allSelected}
+                <Checkbox
+                  checked={allSelected ? true : someSelected ? 'mixed' : false}
                   aria-label={t`Select every game on this page`}
-                  onClick={onToggleAll}
+                  onCheckedChange={() => onToggleAll()}
                   disabled={games.length === 0}
-                  className={cn(
-                    'size-[1.125rem] rounded-sm border transition-colors',
-                    allSelected
-                      ? 'border-accent-teal bg-accent-teal'
-                      : 'border-edge-strong hover:border-edge-hover',
-                  )}
                 />
               </span>
             )
@@ -192,29 +224,36 @@ export function GamesTable({
           return (
             <span
               key={col.id}
+              role="columnheader"
+              aria-sort={
+                col.sort
+                  ? active
+                    ? sort.direction === 'asc'
+                      ? 'ascending'
+                      : 'descending'
+                    : 'none'
+                  : undefined
+              }
               style={cellStyle(col)}
               className={cn(
                 cellClass(col),
+                'flex items-center',
                 // Only a sort earns a place in the phone's chip strip: `Flags` has none,
                 // and a bare label there would read as a control that does nothing.
                 !col.sort && 'max-md:hidden',
-                col.align === 'right' && 'text-right',
-                col.align === 'center' && 'text-center',
+                col.align === 'right' && 'justify-end',
+                col.align === 'center' && 'justify-center',
               )}
             >
               {col.sort ? (
-                <button
-                  type="button"
-                  onClick={() => onSortChange(nextSort(sort, col.sort!))}
-                  aria-sort={active ? (sort.direction === 'asc' ? 'ascending' : 'descending') : 'none'}
-                  className={cn(
-                    'uppercase transition-colors',
-                    active ? 'text-ink' : 'text-dim hover:text-soft',
-                  )}
+                <SortButton
+                  end={col.align === 'right'}
+                  sorted={active ? sort.direction : false}
+                  onSort={() => onSortChange(nextSort(sort, col.sort!))}
+                  className={SORT_HEAD_FIT}
                 >
                   {col.label ? i18n._(col.label) : null}
-                  {arrow}
-                </button>
+                </SortButton>
               ) : col.label ? (
                 i18n._(col.label)
               ) : null}
@@ -249,7 +288,9 @@ export function GamesTable({
               onAnalyse={onAnalyse}
               onDelete={onDelete}
               analysing={analysing.has(game.id)}
+              queued={game.queued === true || queued?.has(game.id) === true}
               engineHidden={engineHidden}
+              collectionsColumn={collectionsColumn}
             />
           ))
         )}
@@ -310,10 +351,18 @@ function ErrorState({ error, onRetry }: { error: Error | null; onRetry: () => vo
           </span>
           <p className="mt-1 leading-relaxed">{error?.message ?? t`The backend did not answer.`}</p>
         </div>
-        <Button type="button" size="sm" variant="outline" onClick={onRetry}>
+        <Button type="button" size="sm" variant="secondary" onClick={onRetry}>
+          <RotateCw aria-hidden />
           <Trans>Try again</Trans>
         </Button>
       </div>
     </div>
   )
 }
+
+/**
+ * The sort head's geometry inside this grid's cells, which carry their own padding: the
+ * table's one `SortButton` sized to its word, a small padding giving the hover a shape and
+ * the negative margin keeping the word where the rows' text starts.
+ */
+const SORT_HEAD_FIT = '-mx-1.5 h-auto w-auto rounded-sm px-1.5 py-0.5'

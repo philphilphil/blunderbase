@@ -1,176 +1,192 @@
-import { Trans, useLingui } from '@lingui/react/macro'
-import { Menu, Search } from 'lucide-react'
-import { Fragment } from 'react'
+import { useLingui } from '@lingui/react/macro'
+import { ChevronLeft, ChevronRight, Menu, Search } from 'lucide-react'
+import { Fragment, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 
-import { SITE_URL } from '@/lib/links'
-import { useRuntimeCapabilities } from '@/lib/runtime/capabilities'
+import { Button } from '@/components/ui/button'
 import { useIsMobile } from '@/lib/ui/media'
 import { cn } from '@/lib/utils'
 
-import { AccountMenu } from './AccountMenu'
 import { useCommandPalette } from './CommandPalette'
 import { EngineToggle } from './EngineToggle'
+import { usePageChrome, type Crumb, type PageBack } from './PageChrome'
 import { QueueIndicator } from './QueueIndicator'
-import { usePageChrome } from './PageChrome'
-import { ShortcutsButton } from './ShortcutsOverlay'
-import { ThemeToggle } from './ThemeToggle'
 
 /**
- * The 42px titlebar: brand, breadcrumb and the page's buttons on the left; queue / engine /
- * theme / search / shortcuts / account on the right. Thin, flat and identical on every
- * screen — it is the one strip of the window that must never move, so it carries a strong
- * bottom rule and the chrome surface rather than a hairline over the canvas.
+ * The page's name as the bar prints it: the way there, then the title.
  *
- * THE BREADCRUMB IS THE PAGE'S HEADING. Pages print no title of their own: the rail already
- * says where you are, and a titlebar crumb over an in-page `h1` over the same word was the
- * one name said three times. So the last crumb — the page you are on — is set a step
- * brighter than the way there, and the page's own buttons (`SetPageChrome`'s `actions`)
- * follow it, so the bar reads in two halves: this page on the left, the app on the right.
- * The manual link is the app's too, and lives in the rail's footer (`SideNav`).
- *
- * On a phone the row has about 375px to spend and four things that must stay reachable —
- * the way back to the rail, the queue, search and the account — so what repeats something
- * gives up its space first: the wordmark (the mark itself is still the link home), every
- * crumb but the last (the page's name stays, since nothing else on a phone says it), and
- * the page's buttons, which the shell stands in a row of their own under the bar instead
- * (`AppShell`'s `PhoneActions`).
- * The ⌘K chip keeps its button and drops the glyph for a magnifier, since a phone has no
- * ⌘ to press but still wants the search.
- *
- * The horizontal padding is `max(1rem, …)` of the safe-area inset rather than `px-4`, so a
- * landscape iPhone's notch does not sit on the hamburger; away from a notch every one of
- * those insets is 0 and the bar is the 46px × 16px it always was. The `env()` fallbacks are
- * written `0rem` rather than the usual `0px` because `lib/ui/scale.test.ts` bans a px
- * length from a Tailwind arbitrary value — at zero the two are the same length anyway.
- *
- * The public demo carries one more thing, right after the brand: a chip saying this is
- * the demo and that it is read-only, linking to where a copy of one's own comes from. It
- * is in the titlebar because that is the one strip every screen shares, and it is a link
- * rather than a banner because a visitor who has understood it should not have to keep
- * reading it.
+ * The title is the last crumb in `text-heading`, a step up from the old `text-data` crumb
+ * and the one heading the page has (pages print no in-page title; a crumb over an `h1` over
+ * the same word was one name said three times). Every crumb before it is a place, so it is
+ * a link that says so on hover (ink and an underline), with a `›` between: the old `/`
+ * separators and grey non-link crumbs made the trail read as a path you could not walk.
+ * Only the title stays on a phone, since nothing else there says where you are.
  */
-export function TopBar({ onOpenNav }: { onOpenNav: () => void }) {
-  const { breadcrumb, actions } = usePageChrome()
-  const palette = useCommandPalette()
-  const capabilities = useRuntimeCapabilities()
-  const mobile = useIsMobile()
+function Trail({ crumbs }: { crumbs: Crumb[] }) {
+  const last = crumbs.length - 1
+  return (
+    <div className="flex min-w-0 flex-1 items-center gap-1.5 max-md:min-w-[6rem]">
+      {crumbs.map((crumb, index) => {
+        if (index === last) {
+          return (
+            <h1
+              key={index}
+              className={cn(
+                'min-w-0 truncate text-heading font-semibold text-ink',
+                crumb.mono && 'font-mono',
+              )}
+            >
+              {/* The page you are on, so never a link, whatever `to` it was handed. */}
+              {crumb.label}
+            </h1>
+          )
+        }
+        return (
+          <Fragment key={index}>
+            {crumb.to ? (
+              <Link
+                to={crumb.to}
+                className={cn(
+                  'flex-none text-data text-soft underline-offset-2 transition-colors hover:text-ink hover:underline max-md:hidden',
+                  crumb.mono && 'font-mono',
+                )}
+              >
+                {crumb.label}
+              </Link>
+            ) : (
+              <span
+                className={cn('flex-none text-data text-soft max-md:hidden', crumb.mono && 'font-mono')}
+              >
+                {crumb.label}
+              </span>
+            )}
+            <ChevronRight className="size-3 flex-none text-faint max-md:hidden" aria-hidden />
+          </Fragment>
+        )
+      })}
+    </div>
+  )
+}
+
+/**
+ * The phone bar's way out of a detail page, in place of the ☰: `‹ Games`, naming where it
+ * goes. Keeping both the ☰ and a back link squeezed the title to nothing, and the drawer is
+ * one step away on the parent anyway. When the word no longer fits beside a title of at
+ * least 6rem, it drops to the chevron alone and the name moves to its accessible label.
+ */
+function BackLink({ back }: { back: PageBack }) {
   const { t } = useLingui()
+  const word = useRef<HTMLSpanElement>(null)
+  const [width, setWidth] = useState(0)
+  // The window width and label the word was last found not to fit at. A wider window or
+  // another label starts from the word again, and the check below takes it back away if it
+  // still does not fit — before paint, so the bar never shows the squeezed word.
+  const at = `${width}|${back.label}`
+  const [compactAt, setCompactAt] = useState<string | null>(null)
+  const compact = compactAt === at
+
+  useEffect(() => {
+    const onResize = () => setWidth(window.innerWidth)
+    window.addEventListener('resize', onResize)
+    return () => window.removeEventListener('resize', onResize)
+  }, [])
+  useLayoutEffect(() => {
+    const node = word.current
+    // A measurement of the laid-out bar, which is only known after layout.
+    if (!compact && node && node.scrollWidth > node.clientWidth + 1) setCompactAt(at)
+  }, [compact, at])
 
   return (
-    <header className="flex h-[calc(2.625rem+env(safe-area-inset-top,0rem))] flex-none items-center gap-3 border-b border-edge-strong bg-panel select-none pt-[env(safe-area-inset-top,0rem)] pr-[max(0.75rem,env(safe-area-inset-right,0rem))] pl-[max(0.75rem,env(safe-area-inset-left,0rem))] max-md:gap-2.5">
-      <button
-        type="button"
-        onClick={onOpenNav}
-        aria-label={t`Open the navigation`}
-        className="-ml-1 rounded-md p-1 text-dim transition-colors hover:bg-raised hover:text-ink md:hidden"
-      >
-        <Menu className="size-4" />
-      </button>
-      <Link to="/" className="flex items-center gap-2">
-        {/*
-          The brand mark is drawn for a light ground (a near-black pawn with a teal band),
-          so the light theme takes it as-is; inverting it and putting the hue back is what
-          makes it legible on the dark `--bb-panel` without shipping a second asset.
-        */}
-        <img
-          src="/logo.png"
-          alt=""
-          className="size-[1.1875rem] dark:[filter:invert(1)_hue-rotate(180deg)]"
-        />
-        <span className="text-lead font-semibold tracking-[-0.01em] text-ink max-md:hidden">
-          Blunderbase
-        </span>
-      </Link>
-      {capabilities.read_only ? (
-        <a
-          href={SITE_URL}
-          target="_blank"
-          rel="noreferrer"
-          title={t`This is the public demo: look at everything, change nothing. Get your own Blunderbase at blunderbase.org.`}
-          className="flex flex-none items-center gap-1.5 rounded-md border border-chip-info-edge bg-chip-info px-2 py-[0.1875rem] text-label font-medium text-info transition-colors hover:border-edge-hover hover:text-ink"
-        >
-          <Trans>Demo</Trans>
-          <span className="text-dim max-md:hidden">
-            <Trans>· read-only</Trans>
+    <Button
+      asChild
+      variant="ghost"
+      size={compact ? 'icon-sm' : 'sm'}
+      className={cn('min-w-0 shrink md:hidden', compact ? '-ml-1' : '-ml-1.5 gap-0.5 px-1.5')}
+    >
+      <Link to={back.to} aria-label={compact ? t`Back to ${back.label}` : undefined}>
+        <ChevronLeft className="size-4 flex-none" aria-hidden />
+        {compact ? null : (
+          <span ref={word} className="min-w-0 truncate">
+            {back.label}
           </span>
-        </a>
-      ) : null}
-      <div className="h-[1.125rem] w-px bg-line max-md:hidden" />
+        )}
+      </Link>
+    </Button>
+  )
+}
 
-      {breadcrumb.length > 0 ? (
-        <div className="flex min-w-0 items-center gap-[0.4375rem] text-data text-soft">
-          {breadcrumb.map((crumb, index) => {
-            const last = index === breadcrumb.length - 1
-            const tone = last ? 'font-medium text-ink' : 'text-soft hover:text-ink'
-            return (
-              <Fragment key={index}>
-                {index > 0 ? <span className="text-faint-2 max-md:hidden">/</span> : null}
-                {crumb.to ? (
-                  <Link
-                    to={crumb.to}
-                    className={cn('truncate', tone, crumb.mono && 'font-mono', !last && 'max-md:hidden')}
-                  >
-                    {crumb.label}
-                  </Link>
-                ) : (
-                  <span
-                    className={cn(
-                      'truncate',
-                      last ? tone : 'text-body-3',
-                      crumb.mono && 'font-mono',
-                      !last && 'max-md:hidden',
-                    )}
-                  >
-                    {crumb.label}
-                  </span>
-                )}
-              </Fragment>
-            )
-          })}
-        </div>
-      ) : null}
-      {actions && !mobile ? (
-        <div className="ml-2 flex flex-none items-center gap-2">{actions}</div>
-      ) : null}
+/**
+ * The 42px titlebar: the page's title, its own actions right-aligned, and then, past a
+ * rule, the analysis queue and the Hide engine switch (the clarity pass, D3-A).
+ * Thin, flat and on every screen — it carries a strong bottom rule and the chrome surface
+ * rather than a hairline over the canvas. It starts at the rail's edge, and its left padding
+ * is the page's gutter (`pl-6`, `PageBody`'s), so the title sits over the column it names.
+ *
+ * Most of what belongs to the app rather than to the page — the brand, the demo tint,
+ * search, the account, the theme and the shortcuts — moved to the rail and the account
+ * menu. The queue went down to the rail's foot too and came back: in 200px it lost its
+ * word and, paused, its Clear, and the foot read as crammed (`QueueIndicator`). A bar holding both halves read as two toolbars run together, and the page's
+ * buttons sat left, straight after its name, where they looked like more of the name.
+ * Right-aligned, a page's actions end at the rule, and the rule is only drawn when there are
+ * actions to end.
+ *
+ * The engine switch stays because it is a mode, not a screen's control: it has to be
+ * reachable *before* a game is opened, which is the only moment at which hiding a verdict
+ * is worth anything, and it keeps its place at every width.
+ *
+ * On a phone the bar spans the window (the rail is a drawer) and holds, in order: the ☰, or
+ * on a detail page the back link that replaces it (`SetPageChrome`'s `back`); the title
+ * alone, never under 6rem; the queue's figure (and Pause/Clear while they apply); the
+ * engine switch without its word; and search as an icon,
+ * since the rail's search field is behind the ☰. The page's actions stand in a row of their
+ * own under the bar (`AppShell`'s `PhoneActions`).
+ *
+ * The horizontal padding is `max(…)` of the safe-area inset, so a landscape iPhone's notch
+ * does not sit on the ☰; away from a notch every inset is 0. The `env()` fallbacks are
+ * written `0rem` rather than `0px` because `lib/ui/scale.test.ts` bans a px length from a
+ * Tailwind arbitrary value — at zero the two are the same length anyway.
+ */
+export function TopBar({ onOpenNav }: { onOpenNav: () => void }) {
+  const { breadcrumb, actions, back } = usePageChrome()
+  const palette = useCommandPalette()
+  const mobile = useIsMobile()
+  const { t } = useLingui()
+  const pageActions = actions && !mobile ? actions : null
 
-      <div className="flex-1" />
-
+  return (
+    <header className="flex h-[calc(2.625rem+env(safe-area-inset-top,0rem))] flex-none items-center gap-2.5 border-b border-edge-strong bg-panel pt-[env(safe-area-inset-top,0rem)] pr-[max(0.75rem,env(safe-area-inset-right,0rem))] pl-[max(0.75rem,env(safe-area-inset-left,0rem))] select-none max-md:gap-2 md:pl-6">
+      {back ? (
+        <BackLink back={back} />
+      ) : (
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          onClick={onOpenNav}
+          aria-label={t`Open the navigation`}
+          className="-ml-1 md:hidden"
+        >
+          <Menu className="size-4" aria-hidden />
+        </Button>
+      )}
+      <Trail crumbs={breadcrumb} />
+      {pageActions ? (
+        <>
+          <div className="flex flex-none items-center gap-2">{pageActions}</div>
+          <div className="h-[1.125rem] w-px flex-none bg-line" />
+        </>
+      ) : null}
       <QueueIndicator />
-      {/*
-        Whether the engine is allowed to speak at all. In the titlebar because it is a mode
-        rather than a screen's control — it has to be reachable *before* a game is opened,
-        which is the only moment at which hiding a verdict is worth anything — and it keeps
-        its place at every width, since the two screens it changes are the two a phone reads.
-      */}
-      <EngineToggle />
-      {/*
-        The theme control lives on the toolbar, beside the window's other odds and ends,
-        because that is where a desktop app keeps it and where it is found without hunting.
-        Below `md` the row has no 60 pixels to spare for it, so it gives way to the copy in
-        the rail's footer — which is what the phone's drawer carries (`SideNav`'s
-        `NavFooter`). Exactly one of the two is ever visible.
-      */}
-      <ThemeToggle className="max-md:hidden" />
-      {/* The chip was always a label for the shortcut; now it is also the way to press it. */}
-      <button
-        type="button"
+      <EngineToggle compact={mobile} />
+      <Button
+        variant="ghost"
+        size="icon-sm"
         onClick={palette.open}
         aria-label={t`Search everything`}
         title={t`Search everything (⌘K)`}
-        className="flex flex-none items-center gap-1.5 rounded-md border border-edge bg-elevated px-2.5 py-[0.3125rem] font-mono text-label text-soft transition-colors hover:border-edge-hover hover:text-ink max-md:px-2"
+        className="-mr-1 md:hidden"
       >
-        <Search className="size-3.5 md:hidden" aria-hidden />
-        <span className="max-md:hidden">⌘K</span>
-      </button>
-      {/*
-        Beside the search chip, and the same shape, because it answers the same kind of
-        question: that one is "where is it", this one is "what can I press". Off below
-        `md` — the row has no width to spare there, and a phone has no keyboard to
-        describe.
-      */}
-      <ShortcutsButton className="max-md:hidden" />
-      <AccountMenu />
+        <Search className="size-4" aria-hidden />
+      </Button>
     </header>
   )
 }

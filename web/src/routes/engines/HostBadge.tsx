@@ -1,6 +1,7 @@
 import { Trans, useLingui } from '@lingui/react/macro'
 
 import { StatusDot } from '@/components/badges/StatusDot'
+import { Badge, Readout } from '@/components/ui/badge'
 import type { EngineHost } from '@/lib/engines/hosts'
 import { cn } from '@/lib/utils'
 
@@ -10,6 +11,10 @@ import { cn } from '@/lib/utils'
  * The `queue only` chip is the transport speaking — a poll-mode link takes queue work and
  * refuses an analysis board, and a row that does not say so looks broken when the board's
  * toggle will not turn on.
+ *
+ * All of it is readout, so none of it wears a border (a border is a control's edge): the
+ * host is flat text (a runner with its status dot, green while connected), and `queue only`
+ * a borderless warning tint.
  */
 export function HostBadge({ host, className }: { host?: EngineHost; className?: string }) {
   const { t } = useLingui()
@@ -24,25 +29,22 @@ export function HostBadge({ host, className }: { host?: EngineHost; className?: 
   return (
     <span className={cn('inline-flex flex-none items-center gap-1.5', className)}>
       {host.runnerId === null ? (
-        <span className="rounded-sm border border-edge bg-elevated px-1.5 py-px font-mono text-meta text-dim">
+        <Readout num>
           <Trans>local</Trans>
-        </span>
+        </Readout>
       ) : (
         <span
-          className="inline-flex items-center gap-1 rounded-sm border border-edge bg-elevated px-1.5 py-px text-meta text-soft"
+          className="inline-flex items-center gap-1.5 text-meta text-soft"
           title={host.connected ? undefined : t`${runnerName} is not connected`}
         >
-          <StatusDot tone={host.connected ? 'healthy' : 'away'} className="size-1" />
+          <StatusDot tone={host.connected ? 'healthy' : 'away'} />
           {runnerName}
         </span>
       )}
       {queueOnly ? (
-        <span
-          className="rounded-sm border border-mistake/28 bg-mistake/8 px-1.5 py-px text-meta text-mistake"
-          title={host.streamsReason ?? undefined}
-        >
+        <Badge variant="warn" title={host.streamsReason ?? undefined}>
           <Trans>queue only</Trans>
-        </span>
+        </Badge>
       ) : null}
     </span>
   )

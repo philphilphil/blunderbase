@@ -13,6 +13,7 @@ function collection(id: number, name: string, color: Collection['color']): Colle
     name,
     color,
     description: null,
+    pinned: false,
     rule: null,
     game_count: 1,
     created_at: '2026-09-26T10:00:00Z',

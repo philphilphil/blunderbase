@@ -1,11 +1,14 @@
 /**
- * A collection's rule read out as small neutral chips — `Lichess`, `45+45`, `rated`.
+ * A collection's rule read out as small neutral tags — `Lichess`, `45+45`, `rated`.
  *
- * Neutral rather than in the collection's colour: the chips describe a filter, and the
- * library's own filter chips are the thing they should look like, not the collection.
+ * Neutral rather than in the collection's colour: they describe a filter, not the
+ * collection. And readouts (`Badge`: a borderless tint, no face, no hover), not chips: in
+ * the control grammar a bordered chip is something you press to toggle, and these are facts
+ * about the rule that nothing here changes by clicking.
  */
 import { useLingui } from '@lingui/react/macro'
 
+import { Badge } from '@/components/ui/badge'
 import type { CollectionRule } from '@/lib/api/types'
 import { cn } from '@/lib/utils'
 
@@ -24,12 +27,9 @@ export function RuleChips({
   return (
     <span className={cn('inline-flex flex-wrap items-center gap-1', className)}>
       {parts.map((part) => (
-        <span
-          key={part}
-          className="rounded-sm border border-edge bg-raised px-1.5 text-label text-soft"
-        >
+        <Badge key={part} size="md" className="py-0 text-soft">
           {part}
-        </span>
+        </Badge>
       ))}
     </span>
   )

@@ -15,6 +15,10 @@
  * their Lichess password into it. It opens the approval page in their own browser instead,
  * and the callback there is answered with a page to close; this window learns about the
  * new token over `/events`, which is why the button only says where to look meanwhile.
+ *
+ * Filled by default, because where it stands alone (the reference books, the
+ * correspondence book) connecting is the one thing that region is for. Inside the Lichess
+ * account box it is `secondary`: that region's one primary is Sync all.
  */
 import { Trans, useLingui } from '@lingui/react/macro'
 import { useState } from 'react'
@@ -28,11 +32,14 @@ import { cn } from '@/lib/utils'
 export function ConnectLichessButton({
   reconnect = false,
   size = 'sm',
+  variant = 'default',
   className,
 }: {
   /** Say "Reconnect" — for a token Lichess refused or one that has no name yet. */
   reconnect?: boolean
   size?: 'sm' | 'default'
+  /** `secondary` where the region around it already has its one primary. */
+  variant?: 'default' | 'secondary'
   className?: string
 }) {
   const { t } = useLingui()
@@ -62,7 +69,14 @@ export function ConnectLichessButton({
 
   return (
     <div className={cn('flex flex-col items-start gap-1.5', className)}>
-      <Button type="button" size={size} disabled={connect.isPending} onClick={start}>
+      <Button
+        type="button"
+        size={size}
+        variant={variant}
+        disabled={connect.isPending}
+        title={connect.isPending ? t`Asking Lichess for its sign-in page` : undefined}
+        onClick={start}
+      >
         {reconnect ? t`Reconnect Lichess` : t`Connect Lichess`}
       </Button>
       {inBrowser ? (

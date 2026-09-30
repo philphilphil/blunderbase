@@ -77,7 +77,7 @@ describe('PgnDropOverlay', () => {
 
     dropFile()
     await screen.findByText('Whose games are these?')
-    await userEvent.click(screen.getByRole('button', { name: 'Not mine' }))
+    await userEvent.click(screen.getByRole('radio', { name: 'Not mine' }))
     await userEvent.click(screen.getByRole('button', { name: 'Import' }))
 
     await waitFor(() => expect(uploadUrls()).toHaveLength(1))

@@ -12,6 +12,7 @@ import { Trans, useLingui } from '@lingui/react/macro'
 import { useMemo, useState } from 'react'
 
 import { SectionHead } from '@/components/shell/Section'
+import { Segmented } from '@/components/ui/segmented'
 import { useStats } from '@/lib/api/queries'
 import { useProfile } from '@/lib/api/queries'
 import type { GameFilters, StatsBucket } from '@/lib/api/types'
@@ -32,7 +33,7 @@ import {
   windowRange,
   type WindowKey,
 } from '@/routes/stats/kit/analytics'
-import { Bar, DeltaText, EmptyBlock, ErrorBlock, Segmented } from '@/routes/stats/kit/states'
+import { Bar, DeltaText, EmptyBlock, ErrorBlock } from '@/routes/stats/kit/states'
 
 const WINDOWS: WindowKey[] = ['7d', '30d', '90d']
 
@@ -134,10 +135,12 @@ export function TrendsCard({ className }: { className?: string }) {
   // of it — "to today" or "to 7 Dec 2016". It used to be that prose with the front cut off
   // by a regex, which stopped matching the moment the prose could arrive in another
   // language; the two halves are built here instead.
+  // The year only when it is not this one: "to Sep 5" beside the segment fits the rail,
+  // "to Sep 5, 2026" was cut to "to Sep 5,…" there.
   const until = anchor.toLocaleDateString(undefined, {
     day: 'numeric',
     month: 'short',
-    year: 'numeric',
+    ...(anchor.getFullYear() === new Date().getFullYear() ? {} : { year: 'numeric' }),
   })
   const ending = endsToday ? t`to today` : t`to ${until}`
   const played = plural(games, { one: '# game', other: '# games' })
@@ -147,8 +150,11 @@ export function TrendsCard({ className }: { className?: string }) {
     <section className={cn('flex flex-col gap-2', className)}>
       <SectionHead
         title={t`Last ${days} days`}
+        // Words and a date, so sans like every readout of words (figures keep tabular
+        // digits); in mono the line was wide enough to truncate to "to S…" beside the
+        // segment.
         detail={
-          <span className="font-mono text-label tabular text-dim">
+          <span className="text-label tabular text-dim">
             {speed.isPending ? '…' : played} · {ending}
           </span>
         }

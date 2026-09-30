@@ -2,32 +2,35 @@
 
 ## Change the language
 
-The account menu, under **Language**, switches between English and German. It is a setting
+The settings menu opens from **Settings** at the foot of the rail. Its **Language** row
+switches between English and German. It is a setting
 of the browser rather than of the account, so a phone in German and a desk in English is an
 ordinary arrangement. The page reloads under you, so save an open note first.
 
 ## Switch the theme
 
-Also in the account menu: **Dark**, **Light** or **Match the system**. Dark is the default.
+Also in the settings menu, the **Appearance** row: **Dark**, **Light** or **System**, which
+follows your computer's setting and changes with it. Dark is the default.
 
 ## Hide the engine
 
-The lit computer in the title bar, or `⇧E` from anywhere, hides everything an engine has
-said about your games — so you can annotate a game yourself first and check afterwards. It
-stays on until you press it again, on every game and after a reload, and it is a setting of
-this browser.
+The **Hide engine** switch at the right end of the bar, or `⇧E` from anywhere, hides
+everything an engine has said about your games — so you can annotate a game yourself first
+and check afterwards. It is off until you turn it on. Then it stays on until you turn it
+off, on every game and after a reload, and it is a setting of this browser. On a phone the
+switch has no word beside it; an eye in it shows the state.
 
 Hidden, the game screen loses the evaluation bar and the score, the `??` badges and the
 tinted rows, the evaluation graph, the engine and Maia panels and the live engine; the
-games list loses its **Worst** column and its flag badges, and the dashboard loses its
+games list loses its **Worst** and **Flags** columns, and the dashboard loses its
 worst moments and, on each recent game, the swing and the badge. What stays is the game itself —
 the moves, the clocks, your notes — and what Blunderbase has *done*: the badge that says
-what ran and how far it looked, and **Analyse**, which is what you press once you have
+what ran and how far it looked, and **Analyse…**, which is what you press once you have
 written your own verdict down.
 
 If what you want is quiet on *new* games only — review each one as it comes in, then turn
 the engine on for it — that is a setting of the library rather than of the browser:
-**Analysis → Engine passes → New games**, described under
+**Analysis › Engine passes › New games**, described under
 [Analysis](analysis.md#hide-the-engine-on-new-games).
 
 ## Set up the board
@@ -45,21 +48,22 @@ only.
 
 ## Replay the tour
 
-**Show the tour again** in the account menu restarts the five-step tour. **Back** and
+**Show the tour again** in the settings menu restarts the five-step tour. **Back** and
 **Next** walk it, **Skip** or `Esc` ends it. A step whose control is not on screen is
 skipped.
 
 ## The command palette
 
-⌘K opens the command palette. With nothing typed it lists the pages; type two characters
+⌘K, or **Search everything** at the top of the rail, opens the command palette. With
+nothing typed it lists the pages, each with its `⌘1`–`⌘6` key where it has one; type two characters
 and it also finds games, opponents, openings and notes, your saved filters, your
 collections and the statistics reports. Typing "collection" lists every collection. `↵`
 opens what is highlighted.
 
 ## Every keyboard shortcut
 
-`?`, or the keyboard button in the title bar, prints the keys that apply to the screen you
-are on.
+`?`, or **Keyboard shortcuts** in the settings menu, prints the keys that apply to the
+screen you are on.
 
 ### Anywhere
 

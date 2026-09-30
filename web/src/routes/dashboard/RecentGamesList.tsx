@@ -3,16 +3,23 @@
  * game, so it sits beside the queue instead of stretching across the main column. Twelve
  * rows fit where five cards used to; opening/source/analysis no longer have room on the line,
  * so they ride along in the row's `title` tooltip instead of disappearing.
+ *
+ * A row is a clickable row in the app's one row grammar (`ROW`: hover `raised`, the focus
+ * ring pulled inside), and nothing in it is blue: the result letter and the swing are data
+ * colour. The region's one accent is its "All 3,000 ›" link, the way out to Games, so blue
+ * in the rail means "go there" and nothing else.
  */
 import type { I18n, MessageDescriptor } from '@lingui/core'
 import { msg } from '@lingui/core/macro'
 import { Trans, useLingui } from '@lingui/react/macro'
-import { EyeOff } from 'lucide-react'
+import { Download, EyeOff } from 'lucide-react'
 import { Link } from 'react-router-dom'
 
 import { ClassificationBadge } from '@/components/badges/ClassificationBadge'
 import { SectionHead } from '@/components/shell/Section'
-import { buttonVariants } from '@/components/ui/button'
+import { Button } from '@/components/ui/button'
+import { ROW } from '@/components/ui/row'
+import { TextLink } from '@/components/ui/text-link'
 import { useGameCards } from '@/lib/api/queries'
 import type { GameCard as GameCardRow, WorstMoment } from '@/lib/api/types'
 import { formatWinLoss } from '@/lib/chess/evaluation'
@@ -101,7 +108,10 @@ function GameRow({ game, engineHidden }: { game: GameCardRow; engineHidden: bool
       // thumb, so the phone gets a taller one. The rule above each row but the first is
       // what makes the list a list rather than a stack of pills: `-mt-px` collapses it into
       // the row above so the hairlines do not double up.
-      className="-mt-px flex items-center gap-2 border-t border-hairline px-1 py-[0.4375rem] transition-colors first:mt-0 first:border-t-0 hover:bg-raised max-md:py-2.5"
+      className={cn(
+        ROW,
+        '-mt-px flex items-center gap-2 border-t border-hairline px-1 py-[0.4375rem] first:mt-0 first:border-t-0 max-md:py-2.5',
+      )}
     >
       <span className={cn('font-mono text-label font-semibold', outcome.text)}>
         {typeof outcome.letter === 'string' ? outcome.letter : i18n._(outcome.letter)}
@@ -154,9 +164,9 @@ export function RecentGamesList() {
       <SectionHead
         title={t`Recent games`}
         end={
-          <Link to="/games" className="text-label text-accent-teal hover:text-accent-link">
+          <TextLink to="/games" className="text-label">
             {total === undefined ? t`All games` : t`All ${total}`}
-          </Link>
+          </TextLink>
         }
       />
       {query.isPending ? (
@@ -171,9 +181,12 @@ export function RecentGamesList() {
         <EmptyBlock
           className="flex-none"
           action={
-            <Link to="/library/import" className={buttonVariants({ size: 'sm' })}>
-              <Trans>Import games</Trans>
-            </Link>
+            <Button asChild size="sm">
+              <Link to="/library/import">
+                <Download aria-hidden />
+                <Trans>Import games</Trans>
+              </Link>
+            </Button>
           }
         >
           <Trans>

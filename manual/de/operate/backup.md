@@ -1,6 +1,6 @@
 # Sichern und wiederherstellen
 
-Unter **Bibliothek → Verwalten** liegen zwei verschiedene Dinge, und keines ersetzt das
+Unter **Bibliothek › Verwalten** liegen zwei verschiedene Dinge, und keines ersetzt das
 andere.
 
 | | PGN-Export | Datenbanksicherung |
@@ -12,7 +12,7 @@ andere.
 
 ## PGN exportieren { #export-pgn }
 
-**Bibliothek → Verwalten → PGN exportieren** lädt jede gespeicherte Partie in einer Datei
+**Bibliothek › Verwalten › PGN exportieren** lädt jede gespeicherte Partie in einer Datei
 `blunderbase-library.pgn` herunter.
 
 Das ist die Kopie, die du einem anderen Programm gibst. Eine Sicherung der Anwendung ist
@@ -20,7 +20,7 @@ sie nicht.
 
 ## Eine Sicherung herunterladen { #download-a-backup }
 
-**Bibliothek → Verwalten → Sicherung herunterladen** erstellt die verlustfreie,
+**Bibliothek › Verwalten › Sicherung herunterladen** erstellt die verlustfreie,
 integritätsgeprüfte Kopie der SQLite-Datei. Der Download erscheint, sobald Blunderbase
 einen konsistenten Schnappschuss vorbereitet hat.
 
@@ -99,6 +99,6 @@ verbinden sich mit den Token wieder, die sie schon haben.
 ## Löschen statt sichern { #deleting-instead }
 
 Partien zu entfernen steht unter [Partien](../guide/games.md#delete-games) und
-[Bibliothek](../guide/library.md#manage), nicht auf dieser Seite. **Bibliothek → Verwalten
-→ Importierte Bibliothek zurücksetzen** löscht die importierten Partien und alles, was an
+[Bibliothek](../guide/library.md#manage), nicht auf dieser Seite. **Bibliothek › Verwalten
+› Importierte Bibliothek zurücksetzen** löscht die importierten Partien und alles, was an
 ihnen hängt. Mach vorher eine Sicherung, falls du sie noch einmal haben willst.

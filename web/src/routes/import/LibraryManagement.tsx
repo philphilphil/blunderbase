@@ -3,7 +3,9 @@ import { Plural, Trans, useLingui } from '@lingui/react/macro'
 import { Download, HardDriveDownload, Loader2, Trash2 } from 'lucide-react'
 import { useState } from 'react'
 
+import { Readout } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { TextLink } from '@/components/ui/text-link'
 import { saveDownload, saveUrlDownload } from '@/lib/api/client'
 import { preparedBackupUrl } from '@/lib/api/endpoints'
 import { useBackupEstimate, useExportLibrary, useGames, usePrepareBackup } from '@/lib/api/queries'
@@ -24,8 +26,11 @@ function fileSize(bytes: number): string {
 /**
  * The database-wide actions, separated by what their files mean and by consequence. PGN is
  * the portable chess document; SQLite is the technical, lossless recovery copy; reset is
- * destructive and gets the only danger treatment. Keeping them in separate cards prevents
- * "backup" and "export" from reading like two spellings of the same promise.
+ * destructive and gets the only danger treatment: the red `destructive-outline` face here,
+ * and the filled red only on the confirm inside its dialog. Keeping them in separate cards
+ * prevents "backup" and "export" from reading like two spellings of the same promise.
+ * "Technical" is a flat readout beside the backup's name, not a bordered tag: a border
+ * made it the same silhouette as the buttons on the page.
  *
  * The deletion record sits under them and only appears once something has been deleted —
  * it is the undo for a delete made on the games page, and belongs with the other things
@@ -79,9 +84,10 @@ export function LibraryManagement() {
         </div>
         <Button
           type="button"
-          variant="outline"
+          variant="secondary"
           size="sm"
           disabled={exporting.isPending}
+          title={exporting.isPending ? t`Preparing the export` : undefined}
           onClick={() => exporting.mutate()}
         >
           {exporting.isPending ? (
@@ -100,22 +106,18 @@ export function LibraryManagement() {
             <h2 className="text-data font-semibold text-ink">
               <Trans>Database backup</Trans>
             </h2>
-            <span className="rounded-sm border border-edge px-1.5 py-0.5 font-mono text-meta tracking-wide text-faint uppercase">
+            {/* A word, so a word readout: sans, sentence case (mono is for figures). */}
+            <Readout className="text-faint">
               <Trans>Technical</Trans>
-            </span>
+            </Readout>
           </div>
           <p className="mt-1 text-label leading-[1.5] text-dim">
             <Trans>
               A lossless SQLite copy including analysis, accounts and settings. Restoring it
               requires the CLI while Blunderbase is stopped.{' '}
-              <a
-                href={manualUrl(locale, 'operate/backup')}
-                target="_blank"
-                rel="noreferrer"
-                className="text-accent-teal hover:text-accent-link"
-              >
-                Restore guide ↗
-              </a>
+              <TextLink href={manualUrl(locale, 'operate/backup')} external>
+                Restore guide
+              </TextLink>
             </Trans>
           </p>
           <p className="mt-1 text-label text-faint">
@@ -130,9 +132,10 @@ export function LibraryManagement() {
         </div>
         <Button
           type="button"
-          variant="outline"
+          variant="secondary"
           size="sm"
           disabled={backingUp.isPending}
+          title={backingUp.isPending ? t`Preparing a consistent snapshot` : undefined}
           onClick={() => backingUp.mutate()}
         >
           {backingUp.isPending ? (
@@ -173,9 +176,8 @@ export function LibraryManagement() {
         </div>
         <Button
           type="button"
-          variant="outline"
+          variant="destructive-outline"
           size="sm"
-          className="border-blunder/40 text-blunder hover:border-blunder hover:text-blunder"
           onClick={() => {
             setDeleted(null)
             setAsking(true)

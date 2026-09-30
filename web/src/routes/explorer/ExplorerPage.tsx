@@ -39,12 +39,16 @@
  */
 import type { Api } from '@lichess-org/chessground/api'
 import { Trans, useLingui } from '@lingui/react/macro'
+import { ChevronLeft, ChevronRight, FlipVertical2, RefreshCw, RotateCcw } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
+import { Link, useLocation, useSearchParams } from 'react-router-dom'
 
 import { Board } from '@/components/board/Board'
 import { LichessConnectCard } from '@/components/lichess/ConnectLichess'
 import { SetPageChrome } from '@/components/shell/PageChrome'
+import { Button } from '@/components/ui/button'
+import { ButtonGroup, ButtonGroupItem } from '@/components/ui/button-group'
+import { Segmented } from '@/components/ui/segmented'
 import {
   useCollections,
   useExplorer,
@@ -58,6 +62,7 @@ import { isTyping } from '@/lib/ui/shortcuts'
 import { WAY_BACK } from '@/lib/ui/wayBack'
 import { cn } from '@/lib/utils'
 
+import { FilterField } from './components/FilterField'
 import { GamesInLine } from './components/GamesInLine'
 import { LineBreadcrumb } from './components/LineBreadcrumb'
 import { LineSummary } from './components/LineSummary'
@@ -115,7 +120,6 @@ const NO_DESTS: LinePosition['dests'] = new Map()
 
 export function ExplorerPage() {
   const [params, setParams] = useSearchParams()
-  const navigate = useNavigate()
   const { t } = useLingui()
   /**
    * The game whose Book tab sent the reader here, if one did (`GamePage`'s `openInExplorer`
@@ -353,24 +357,23 @@ export function ExplorerPage() {
 
   // Deliberately the tagged code and not the book's: `/games?eco=` filters on the codes the
   // owner's own games carry, and a book code none of them was tagged with lands on an empty
-  // library page.
-  const openLibrary = useMemo(() => {
+  // library page. An address rather than a callback, so "Open in Games" is a real link that
+  // can be opened in a new tab like every other way to a place.
+  const libraryHref = useMemo(() => {
     const eco = tagged?.eco
     if (!eco) return null
-    return () => {
-      const query = new URLSearchParams({ eco })
-      if (scope) query.set('color', scope)
-      // The library filters by one speed and a date range, so a single speed and the days
-      // carry over; a set of two speeds has no spelling there and is left behind.
-      if (ownFilter.speed?.length === 1) query.set('speed', ownFilter.speed[0])
-      const days = playedDays(period, range)
-      if (days?.from) query.set('since', days.from)
-      if (days?.to) query.set('until', days.to)
-      // The library is scoped by collection the same way, so the lens carries over whole.
-      if (ownFilter.collection) query.set('collection', String(ownFilter.collection))
-      navigate(`/games?${query.toString()}`)
-    }
-  }, [tagged?.eco, scope, ownFilter, period, range, navigate])
+    const query = new URLSearchParams({ eco })
+    if (scope) query.set('color', scope)
+    // The library filters by one speed and a date range, so a single speed and the days
+    // carry over; a set of two speeds has no spelling there and is left behind.
+    if (ownFilter.speed?.length === 1) query.set('speed', ownFilter.speed[0])
+    const days = playedDays(period, range)
+    if (days?.from) query.set('since', days.from)
+    if (days?.to) query.set('until', days.to)
+    // The library is scoped by collection the same way, so the lens carries over whole.
+    if (ownFilter.collection) query.set('collection', String(ownFilter.collection))
+    return `/games?${query.toString()}`
+  }, [tagged?.eco, scope, ownFilter, period, range])
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -386,11 +389,16 @@ export function ExplorerPage() {
       <div className="flex min-h-0 flex-1 gap-[1.125rem] overflow-hidden px-5 py-[1.125rem] max-md:flex-col max-md:gap-3 max-md:overflow-y-auto max-md:px-3 max-md:py-3">
         <div className="flex w-[31.25rem] flex-none flex-col gap-3.5 max-md:w-full">
           <div className="flex flex-col gap-[0.4375rem]">
+            {/*
+              The position's name is content, not the page's title: the bar already says
+              "Explorer" in its own heading, and a second, larger heading here read as the
+              page being called "Scotch Game". So an h2 at the heading size.
+            */}
             <div className="flex items-baseline gap-2">
-              <h1 className="text-value font-semibold text-ink">
+              <h2 className="text-heading font-semibold text-ink">
                 {opening?.name ??
                   (line.steps.length === 0 ? t`The initial position` : t`This line`)}
-              </h1>
+              </h2>
               {opening?.eco ? (
                 <span className="font-mono text-label text-dim">{opening.eco}</span>
               ) : null}
@@ -420,40 +428,37 @@ export function ExplorerPage() {
           />
 
           <div className="flex items-center gap-2.5 max-md:flex-wrap">
-            <div className="flex overflow-hidden rounded-md border border-edge bg-elevated">
-              <button
-                type="button"
+            {/* "Do one of these": attached faces, the same group as the game's transport. */}
+            <ButtonGroup label={t`Move navigation`}>
+              <ButtonGroupItem
                 aria-label={t`Back one move`}
+                title={line.steps.length === 0 ? t`Already at the start` : t`Back one move (←)`}
                 onClick={back}
                 disabled={line.steps.length === 0}
-                className="border-r border-edge px-2.5 py-1 text-data text-soft transition-colors hover:bg-selected hover:text-ink disabled:text-faint-2 disabled:hover:bg-transparent"
               >
-                ◀
-              </button>
-              <button
-                type="button"
+                <ChevronLeft aria-hidden />
+              </ButtonGroupItem>
+              <ButtonGroupItem
                 aria-label={t`Forward one move`}
+                title={t`Forward one move (→)`}
                 onClick={forward}
-                className="px-2.5 py-1 text-data text-soft transition-colors hover:bg-selected hover:text-ink"
               >
-                ▶
-              </button>
-            </div>
-            <button
-              type="button"
+                <ChevronRight aria-hidden />
+              </ButtonGroupItem>
+            </ButtonGroup>
+            <Button
+              variant="secondary"
+              size="sm"
               onClick={() => setFlipped((current) => !current)}
-              className="rounded-md border border-edge bg-elevated px-2.5 py-1 text-data text-soft transition-colors hover:text-ink"
             >
-              <Trans>⇅ Flip</Trans>
-            </button>
+              <FlipVertical2 aria-hidden />
+              <Trans>Flip</Trans>
+            </Button>
             {line.steps.length > 0 ? (
-              <button
-                type="button"
-                onClick={() => setLine([])}
-                className="rounded-md border border-edge bg-elevated px-2.5 py-1 text-data text-soft transition-colors hover:text-ink"
-              >
+              <Button variant="secondary" size="sm" onClick={() => setLine([])}>
+                <RotateCcw aria-hidden />
                 <Trans>Reset</Trans>
-              </button>
+              </Button>
             ) : null}
             {/*
               In the board's own control row, exactly where the game screen puts "← Back to
@@ -463,7 +468,7 @@ export function ExplorerPage() {
             {backToGame ? (
               <Link
                 to={backToGame}
-                className={cn(WAY_BACK, 'px-2.5 py-1 text-data')}
+                className={cn(WAY_BACK, 'inline-flex h-7 items-center px-2.5 text-data')}
               >
                 <Trans>← Back to game</Trans>
               </Link>
@@ -491,7 +496,7 @@ export function ExplorerPage() {
         </div>
 
         <div className="flex min-w-0 flex-1 flex-col gap-3.5 overflow-y-auto max-md:flex-none max-md:overflow-visible">
-          <div className="flex flex-none flex-col gap-1.5">
+          <div className="@container flex flex-none flex-col gap-2">
             <div className="flex items-center gap-2.5 max-md:flex-wrap">
               <span className="text-data font-semibold text-ink">
                 {source === 'mine'
@@ -502,45 +507,61 @@ export function ExplorerPage() {
               </span>
             </div>
             {/*
-              Leading the pane rather than trailing the title, because the two controls
-              decide what every number below them means — which book is open, and which of
-              the owner's colours count. The scope is a statement about the owner's games,
-              so a reference source disables it rather than hiding it: the answer is
-              "not applicable", not "gone", and the table below never jumps.
+              One small form, leading the pane rather than trailing the title, because these
+              controls decide what every number below them means — which book is open, which
+              of the owner's colours count, which games. Every control is named: a segment
+              by the label beside it (a segment cannot hold its own), a picker by
+              "Label: value" inside its face. Two columns when the pane has the room (the
+              segments, then the pickers, row for row), one column below that with the
+              pickers side by side; a container query rather than a breakpoint, since the
+              pane is 370px wide on a 1280 screen and 1000px on a 1920 one.
+
+              The scope is a statement about the owner's games, so a reference source
+              disables it rather than hiding it: the answer is "not applicable", not
+              "gone", and the table below never jumps. `max-md:relative` makes the whole
+              form the phone's anchor for the pickers' popovers (`FilterPopover`).
             */}
-            <div className="flex items-center gap-2 max-md:flex-wrap">
-              <SourceToggle
-                source={source}
-                onChange={(next) => setLens('source', next === 'mine' ? null : next)}
-              />
-              <ScopeToggle scope={scope} onChange={setScope} disabled={reference} />
+            <div className="flex flex-col gap-1.5 max-md:relative @min-[25.5rem]:grid @min-[25.5rem]:grid-cols-[max-content_minmax(0,max-content)] @min-[25.5rem]:items-start @min-[25.5rem]:justify-start @min-[25.5rem]:gap-x-5">
+              <div className="flex flex-col gap-1.5">
+                <FilterField label={t`Games from`}>
+                  <SourceToggle
+                    source={source}
+                    onChange={(next) => setLens('source', next === 'mine' ? null : next)}
+                  />
+                </FilterField>
+                <FilterField label={t`Colour`}>
+                  <ScopeToggle scope={scope} onChange={setScope} disabled={reference} />
+                </FilterField>
+              </div>
+              {source === 'mine' ? (
+                <OwnFilters
+                  speeds={ownSpeeds}
+                  period={period}
+                  onSpeeds={(next) =>
+                    setLens('tc', next.length === SPEEDS.length ? null : formatCsv(next))
+                  }
+                  // A quick pick and typed days are one lens: choosing either clears the other.
+                  onPeriod={(next) => setLenses({ period: next, from: null, to: null })}
+                  range={range}
+                  onRange={(next) =>
+                    setLenses({ period: null, from: next?.from ?? null, to: next?.to ?? null })
+                  }
+                  collections={collectionList}
+                  collection={collection}
+                  onCollection={(next) =>
+                    setLens('collection', next === null ? null : String(next))
+                  }
+                />
+              ) : null}
+              {source === 'lichess' ? (
+                <ReferenceFilters
+                  speeds={speeds}
+                  ratings={ratings}
+                  onSpeeds={(next: Speed[]) => setLens('speeds', formatCsv(next))}
+                  onRatings={(next: number[]) => setLens('ratings', formatCsv(next))}
+                />
+              ) : null}
             </div>
-            {source === 'mine' ? (
-              <OwnFilters
-                speeds={ownSpeeds}
-                period={period}
-                onSpeeds={(next) =>
-                  setLens('tc', next.length === SPEEDS.length ? null : formatCsv(next))
-                }
-                // A quick pick and typed days are one lens: choosing either clears the other.
-                onPeriod={(next) => setLenses({ period: next, from: null, to: null })}
-                range={range}
-                onRange={(next) =>
-                  setLenses({ period: null, from: next?.from ?? null, to: next?.to ?? null })
-                }
-                collections={collectionList}
-                collection={collection}
-                onCollection={(next) => setLens('collection', next === null ? null : String(next))}
-              />
-            ) : null}
-            {source === 'lichess' ? (
-              <ReferenceFilters
-                speeds={speeds}
-                ratings={ratings}
-                onSpeeds={(next: Speed[]) => setLens('speeds', formatCsv(next))}
-                onRatings={(next: number[]) => setLens('ratings', formatCsv(next))}
-              />
-            ) : null}
           </div>
 
           {reference ? (
@@ -589,7 +610,7 @@ export function ExplorerPage() {
                 games={occurrences.data ?? []}
                 loading={occurrences.isPending}
                 total={totalGames}
-                onOpenLibrary={openLibrary}
+                libraryHref={libraryHref}
               />
             </>
           )}
@@ -603,10 +624,10 @@ export function ExplorerPage() {
  * Which book the page is reading — design 2c's source control, at last with three
  * sources to offer.
  *
- * It leads the tree pane, left-aligned above the table with the colour scope beside it,
- * a step larger than an ordinary chip — it changes what every number below it means, so
- * it has to be found before the table is read. `mine` clears the param instead of
- * writing `source=mine`, so the page's own URL stays the short one it has always been.
+ * The one `Segmented` (a value of the page, not a command), labelled "Games from" beside
+ * it; it heads the filter form because it changes what every number below it means.
+ * `mine` clears the param instead of writing `source=mine`, so the page's own URL stays
+ * the short one it has always been.
  */
 function SourceToggle({
   source,
@@ -615,25 +636,14 @@ function SourceToggle({
   source: ExplorerSource
   onChange: (next: ExplorerSource) => void
 }) {
-  const { i18n } = useLingui()
+  const { i18n, t } = useLingui()
   return (
-    <div className="flex overflow-hidden rounded-md border border-edge bg-elevated font-mono text-data">
-      {SOURCES.map((option, index) => (
-        <button
-          key={option}
-          type="button"
-          aria-pressed={source === option}
-          onClick={() => onChange(option)}
-          className={cn(
-            'px-3 py-1.5 transition-colors',
-            index > 0 && 'border-l border-edge',
-            source === option ? 'bg-selected text-ink' : 'text-dim hover:text-ink',
-          )}
-        >
-          {i18n._(SOURCE_LABELS[option])}
-        </button>
-      ))}
-    </div>
+    <Segmented
+      label={t`Games from`}
+      value={source}
+      onChange={onChange}
+      options={SOURCES.map((option) => ({ value: option, label: i18n._(SOURCE_LABELS[option]) }))}
+    />
   )
 }
 
@@ -651,13 +661,10 @@ function Failure({
     <div className="flex flex-col items-start gap-2.5 rounded-xl border border-blunder/28 bg-blunder/5 p-5">
       <span className="text-data font-semibold text-blunder">{title}</span>
       <p className="text-data leading-relaxed text-soft">{message}</p>
-      <button
-        type="button"
-        onClick={onRetry}
-        className="rounded-md border border-edge-input px-2.5 py-1 text-data text-soft hover:border-edge-hover hover:text-ink"
-      >
+      <Button variant="secondary" size="sm" onClick={onRetry}>
+        <RefreshCw aria-hidden />
         <Trans>Try again</Trans>
-      </button>
+      </Button>
     </div>
   )
 }
@@ -665,7 +672,11 @@ function Failure({
 /**
  * Which colour's games count — the one scope `/explorer` really takes. Disabled, not
  * hidden, on a reference source: the question only makes sense of the owner's own games,
- * and keeping the inert control in place says so without reflowing the pane.
+ * and keeping the inert control in place says so without reflowing the pane. The title
+ * says why it is inert.
+ *
+ * `both` is spelled as a value of its own because the segment needs a key for "no scope";
+ * it is never written to the URL.
  */
 function ScopeToggle({
   scope,
@@ -677,37 +688,20 @@ function ScopeToggle({
   disabled?: boolean
 }) {
   const { t } = useLingui()
-  const options: { label: string; value: Color | undefined }[] = [
-    { label: t`both`, value: undefined },
-    { label: t`as white`, value: 'white' },
-    { label: t`as black`, value: 'black' },
-  ]
+  const why = disabled ? t`Only your own games have a colour to count` : undefined
   return (
-    <div
-      className={cn(
-        'flex overflow-hidden rounded-md border border-edge bg-elevated font-mono text-data',
-        disabled && 'opacity-40',
-      )}
-    >
-      {options.map((option, index) => (
-        <button
-          // Keyed on the scope rather than the label: the label is translated now, and two
-          // languages are free to write it differently or to collide.
-          key={option.value ?? 'both'}
-          type="button"
-          aria-pressed={!disabled && scope === option.value}
-          disabled={disabled}
-          onClick={() => onChange(option.value)}
-          className={cn(
-            'px-3 py-1.5 transition-colors',
-            index > 0 && 'border-l border-edge',
-            !disabled && scope === option.value ? 'bg-selected text-ink' : 'text-dim',
-            !disabled && scope !== option.value && 'hover:text-ink',
-          )}
-        >
-          {option.label}
-        </button>
-      ))}
-    </div>
+    <span title={why}>
+      <Segmented<'both' | Color>
+        label={t`Colour`}
+        value={scope ?? 'both'}
+        onChange={(next) => onChange(next === 'both' ? undefined : next)}
+        disabled={disabled}
+        options={[
+          { value: 'both', label: t`both` },
+          { value: 'white', label: t`as white` },
+          { value: 'black', label: t`as black` },
+        ]}
+      />
+    </span>
   )
 }

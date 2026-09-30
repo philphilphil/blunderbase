@@ -43,7 +43,8 @@ One chapter per entry in the app's sidebar, in the sidebar's order.
 - Compute is the next entry in the sidebar, Engines and Machines; both are written up
   under Operate, in [Engines](operate/engines.md) and [Machines](operate/runners.md).
 - [Your AI assistant](guide/coach.md) — connecting an MCP client and what it can ask.
-- [Settings](guide/settings.md) — language, theme, board preferences, shortcuts, the tour.
+- [Settings](guide/settings.md) — the settings menu's language, appearance and keyboard
+  shortcuts, the Hide engine switch, board preferences, the tour.
 
 ## Operate
 

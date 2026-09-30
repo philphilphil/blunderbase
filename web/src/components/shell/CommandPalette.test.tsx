@@ -29,10 +29,10 @@ vi.mock('@/lib/api/queries', () => ({
   useCollections,
 }))
 
-// The account chip is the titlebar's, not the palette's, and it wants the tour provider
-// the shell mounts around the whole app. `AccountMenu.test.tsx` is where it is exercised.
-vi.mock('./AccountMenu', () => ({
-  AccountMenu: () => <div data-testid="account" />,
+// The Settings menu is the rail's, not the palette's, and it wants the tour provider
+// the shell mounts around the whole app. `SettingsMenu.test.tsx` is where it is exercised.
+vi.mock('./SettingsMenu', () => ({
+  SettingsMenu: () => <div data-testid="settings" />,
 }))
 
 /** Prints where the router is, so "Enter navigates" is an assertion and not a guess. */
@@ -98,7 +98,22 @@ describe('the ⌘K palette', () => {
     expect(screen.queryByRole('option', { name: /Blunder taxonomy/ })).not.toBeInTheDocument()
   })
 
-  it('opens from the titlebar chip too, and closes on escape', async () => {
+  it('names the pages as the rail does, never Games as "library", with their ⌘ numbers', async () => {
+    const user = userEvent.setup()
+    draw()
+    await user.keyboard('{Meta>}k{/Meta}')
+
+    const games = screen.getByRole('option', { name: /^Games/ })
+    expect(games).toHaveTextContent('⌘2')
+    expect(games.textContent).not.toMatch(/library/i)
+    expect(screen.getByRole('option', { name: /^Dashboard/ })).toHaveTextContent('⌘1')
+    expect(screen.getByRole('option', { name: /^Collections/ })).toHaveTextContent('⌘6')
+    // A page without a number carries none.
+    expect(screen.getByRole('option', { name: /^Live/ }).textContent).not.toMatch(/⌘/)
+    expect(screen.getByRole('dialog').textContent).not.toMatch(/search the library/)
+  })
+
+  it('opens from the phone bar’s search too, and closes on escape', async () => {
     const user = userEvent.setup()
     draw()
 

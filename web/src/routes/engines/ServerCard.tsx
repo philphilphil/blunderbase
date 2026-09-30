@@ -16,14 +16,19 @@
  *
  * Saves go through `completeUpdate` like every settings form: `PUT /settings` replaces the
  * lot, so a form that sent only its own two keys would clear what the other pages hold.
+ *
+ * The status is a dot (green while its workers drain the queue) and the words beside it,
+ * the sub-headings are sentence case (spaced caps are for column heads), and the form's one
+ * primary is Save.
  */
 import { Plural, Trans, useLingui } from '@lingui/react/macro'
 import { useMemo, useState, type FormEvent } from 'react'
-import { Link } from 'react-router-dom'
 
 import { StatusDot } from '@/components/badges/StatusDot'
 import { SaveRow, SettingField, type SettingSpec } from '@/components/settings/SettingField'
+import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { TextLink } from '@/components/ui/text-link'
 import {
   completeUpdate,
   parseSetting as parse,
@@ -182,7 +187,7 @@ export function ServerCard({
           onSubmit={submit}
           className="flex flex-col gap-3 px-3.5 py-3 md:border-r md:border-line"
         >
-          <h4 className="text-meta tracking-[0.1em] text-faint uppercase">
+          <h4 className="text-label font-medium text-dim">
             <Trans>How much at once</Trans>
           </h4>
           <div className="flex flex-wrap items-start gap-4">
@@ -190,11 +195,11 @@ export function ServerCard({
               {pinned ? (
                 <div className="flex w-36 flex-none flex-col gap-1.5">
                   <Label htmlFor="analysis-concurrency">{queueField.label}</Label>
-                  <input
+                  <Input
                     id="analysis-concurrency"
                     readOnly
                     value={inForce ?? ''}
-                    className="h-8 w-full rounded-md border border-input bg-raised px-2 font-mono text-data text-dim tabular"
+                    className="font-mono text-dim tabular"
                   />
                   <span className="font-mono text-meta text-dim-2">
                     <Trans>Set by BLUNDERBASE_ANALYSIS_CONCURRENCY</Trans>
@@ -275,7 +280,7 @@ export function ServerCard({
         </form>
 
         <div className="flex flex-col gap-3 px-3.5 py-3">
-          <h4 className="text-meta tracking-[0.1em] text-faint uppercase">
+          <h4 className="text-label font-medium text-dim">
             <Trans>Engines on this machine</Trans>
           </h4>
           <MachineEngineList engines={local.engines} streamable connected />
@@ -283,17 +288,17 @@ export function ServerCard({
             {local.workers ? (
               <Trans>
                 {local.queued} queued, {local.running} running here. Add or edit engines on{' '}
-                <Link to="/compute/engines" className="text-accent-teal hover:text-accent-link">
+                <TextLink to="/compute/engines" placement="inline">
                   Engines
-                </Link>
+                </TextLink>
                 .
               </Trans>
             ) : (
               <Trans>
                 Add or edit engines on{' '}
-                <Link to="/compute/engines" className="text-accent-teal hover:text-accent-link">
+                <TextLink to="/compute/engines" placement="inline">
                   Engines
-                </Link>
+                </TextLink>
                 .
               </Trans>
             )}

@@ -5,6 +5,7 @@ import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { Providers } from '@/app/Providers'
+import { usePageChrome } from '@/components/shell/PageChrome'
 import type {
   GameDetail,
   LineResponse,
@@ -380,12 +381,32 @@ function ExplorerStub() {
   )
 }
 
+/** What the page asked the titlebar for: its trail (label → address) and the phone's back. */
+function ChromeProbe() {
+  const { breadcrumb, back } = usePageChrome()
+  return (
+    <div data-testid="chrome">
+      {breadcrumb.map((crumb, index) => (
+        <span key={index} data-testid="crumb" data-to={crumb.to ?? ''}>
+          {crumb.label}
+        </span>
+      ))}
+      {back ? (
+        <span data-testid="back" data-to={back.to}>
+          {back.label}
+        </span>
+      ) : null}
+    </div>
+  )
+}
+
 function renderPage(entry: string | { pathname: string; state: unknown } = '/games/14') {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false, gcTime: 0, staleTime: 0 } },
   })
   const view = render(
     <Providers client={client}>
+      <ChromeProbe />
       <EventsProvider>
         <MemoryRouter initialEntries={[entry]}>
           <Routes>
@@ -459,8 +480,8 @@ describe('GamePage', () => {
 
     // The analysis trigger lives in the engine pane's title strip, beside the live switch
     // it is fenced off from, and not in the board's transport row.
-    const analyse = screen.getByRole('button', { name: 'Analyse' })
-    expect(within(screen.getByTestId('maia-engine-lines')).getByRole('button', { name: 'Analyse' })).toBe(
+    const analyse = screen.getByRole('button', { name: 'Analyse…' })
+    expect(within(screen.getByTestId('maia-engine-lines')).getByRole('button', { name: 'Analyse…' })).toBe(
       analyse,
     )
     // The board's own toggles are not in that row either: they ride the top player row.
@@ -477,7 +498,7 @@ describe('GamePage', () => {
 
     // ⇧E takes the engine pane away, and asking is what a reader does next.
     expect(screen.queryByTestId('maia-engine-lines')).not.toBeInTheDocument()
-    const analyse = screen.getByRole('button', { name: 'Analyse' })
+    const analyse = screen.getByRole('button', { name: 'Analyse…' })
     // The board row is the one holding the transport, which is where Analyse… stands in.
     const row = screen.getByRole('button', { name: 'First' }).closest('div')!.parentElement!
       .parentElement!
@@ -647,9 +668,9 @@ describe('GamePage', () => {
     const dialog = await screen.findByRole('dialog', { name: 'Analyse…' })
     // A key is not a run: nothing is queued until the dialog is answered.
     expect(posted).toHaveLength(0)
-    // The engine chips are buttons, not inputs, so an arrow pressed on one must not walk
-    // the game hidden behind the dim.
-    await user.click(within(dialog).getByRole('button', { name: /stockfish/ }))
+    // The engines are radios, which take the arrows themselves, so an arrow pressed on one
+    // must not also walk the game hidden behind the dim.
+    await user.click(within(dialog).getByRole('radio', { name: /stockfish/ }))
     await user.keyboard('{ArrowRight}')
     expect(screen.getByText('ply 0 / 4')).toBeInTheDocument()
   })
@@ -659,20 +680,20 @@ describe('GamePage', () => {
     renderPage()
     await screen.findByText('Scandinavian Defense')
 
-    await user.click(screen.getByRole('button', { name: 'Analyse' }))
+    await user.click(screen.getByRole('button', { name: 'Analyse…' }))
     let dialog = await screen.findByRole('dialog', { name: 'Analyse…' })
-    expect(within(dialog).getByRole('button', { name: 'This move' })).toBeDisabled()
-    expect(within(dialog).getByRole('button', { name: 'From here on' })).toBeDisabled()
-    expect(within(dialog).getByRole('button', { name: 'Whole game' })).toHaveAttribute('aria-pressed', 'true')
+    expect(within(dialog).getByRole('radio', { name: 'This move' })).toBeDisabled()
+    expect(within(dialog).getByRole('radio', { name: 'From here on' })).toBeDisabled()
+    expect(within(dialog).getByRole('radio', { name: 'Whole game' })).toHaveAttribute('aria-checked', 'true')
     await user.click(within(dialog).getByRole('button', { name: 'Cancel' }))
 
     // Two plies in: the board shows the position after 1…d5, so "this move" is 1…d5 —
     // ply 1, the move whose classification is on show.
     await user.keyboard('{ArrowRight}{ArrowRight}')
-    await user.click(screen.getByRole('button', { name: 'Analyse' }))
+    await user.click(screen.getByRole('button', { name: 'Analyse…' }))
     dialog = await screen.findByRole('dialog', { name: 'Analyse…' })
-    await user.click(within(dialog).getByRole('button', { name: 'This move' }))
-    await user.click(within(dialog).getByRole('button', { name: 'Seconds' }))
+    await user.click(within(dialog).getByRole('radio', { name: 'This move' }))
+    await user.click(within(dialog).getByRole('radio', { name: 'Seconds' }))
     expect(within(dialog).getByLabelText('Limit')).toHaveValue(5)
     await user.click(within(dialog).getByRole('button', { name: 'Analyse' }))
 
@@ -693,7 +714,7 @@ describe('GamePage', () => {
 
     await user.keyboard('c')
     // The button's own flash is the receipt, which is the point of going through it.
-    expect(await screen.findByText('copied')).toBeInTheDocument()
+    expect(await screen.findByText('PGN copied')).toBeInTheDocument()
     expect(copied[0]).toContain('[White "phib"]')
   })
 
@@ -805,10 +826,17 @@ describe('GamePage', () => {
     renderPage()
     await screen.findByText('Scandinavian Defense')
 
-    // Both ends of the run are offered, and no counter beside them — the run is the whole
-    // filtered library, not the page that happened to be up.
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Next game' })).toBeEnabled())
-    expect(screen.getByRole('button', { name: 'Previous game' })).toBeEnabled()
+    // Both ends of the run are offered, named by the run they walk (the whole library
+    // here, so "Games"), and no counter beside them — the run is the whole filtered
+    // library, not the page that happened to be up.
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Next game in Games' })).toBeEnabled(),
+    )
+    expect(screen.getByRole('button', { name: 'Previous game in Games' })).toBeEnabled()
+    expect(screen.getByRole('button', { name: 'Next game in Games' })).toHaveAttribute(
+      'title',
+      'Next game in Games (])',
+    )
     expect(screen.queryByText(/^\d+ \/ \d+$/)).not.toBeInTheDocument()
 
     await user.keyboard(']')
@@ -821,7 +849,62 @@ describe('GamePage', () => {
 
     // Reached from the dashboard, a note or a link: there is no run to step along, so
     // nothing is drawn rather than two dead arrows.
-    expect(screen.queryByRole('button', { name: 'Next game' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /^Next game/ })).not.toBeInTheDocument()
+  })
+
+  it('titles the bar with the players under the list the game came from, and dates the header', async () => {
+    renderPage()
+    await screen.findByText('Scandinavian Defense')
+
+    // Reached from nowhere in particular: the whole library, linked back, then the players.
+    const crumbs = screen.getAllByTestId('crumb')
+    expect(crumbs.map((crumb) => crumb.textContent)).toEqual(['Games', 'phib — lichess AI level 2'])
+    expect(crumbs[0]).toHaveAttribute('data-to', '/games')
+    expect(screen.getByTestId('back')).toHaveTextContent('Games')
+    expect(screen.getByTestId('back')).toHaveAttribute('data-to', '/games')
+    // The date is not a place: it left the trail and joined the header's facts.
+    expect(screen.getByTestId('chrome')).not.toHaveTextContent('2016')
+    expect(within(screen.getByTestId('game-header')).getByTestId('game-date')).toHaveTextContent(
+      '2016',
+    )
+    // The opening is the header's first fact, not a second page title.
+    expect(within(screen.getByTestId('game-header')).queryByRole('heading')).not.toBeInTheDocument()
+  })
+
+  it('names a collection the game was opened from, and goes back to that exact list', async () => {
+    vi.stubGlobal(
+      'fetch',
+      stubFetch({
+        '/collections': {
+          collections: [{ id: 3, name: '45-45 League', color: 'good', game_count: 8, created_at: '' }],
+        },
+        '/games?': { games: [{ id: 13 }, { id: 14 }, { id: 15 }], total: 8 },
+      }),
+    )
+    rememberTrail({
+      query: {},
+      offset: 1,
+      gameId: 14,
+      library: { search: 'collection=3&whose=all', rowsPerPage: 25 },
+    })
+    renderPage()
+    await screen.findByText('Scandinavian Defense')
+
+    await waitFor(() =>
+      expect(screen.getAllByTestId('crumb').map((crumb) => crumb.textContent)).toEqual([
+        'Collections',
+        '45-45 League',
+        'phib — lichess AI level 2',
+      ]),
+    )
+    const [collections, league] = screen.getAllByTestId('crumb')
+    expect(collections).toHaveAttribute('data-to', '/collections')
+    expect(league).toHaveAttribute('data-to', '/games?collection=3&whose=all')
+    expect(screen.getByTestId('back')).toHaveTextContent('Collections')
+    // The arrows say which run they walk.
+    expect(
+      await screen.findByRole('button', { name: 'Next game in 45-45 League' }),
+    ).toBeInTheDocument()
   })
 
   it('opens the board settings with s, and escape closes them again', async () => {
@@ -887,14 +970,15 @@ describe('GamePage', () => {
     renderPage()
     await screen.findByText('Scandinavian Defense')
 
-    // This game carries one level, so the toggle is only offered while compare is on — which
-    // is exactly the state the key has to be able to get into and back out of.
+    // This game carries one level, so "All levels" is only offered while compare is on —
+    // which is exactly the state the key has to be able to get into and back out of.
     await user.keyboard('l')
-    expect(screen.getByTestId('maia-compare-toggle')).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByLabelText('Maia level')).toHaveValue('compare')
     await user.keyboard('l')
-    expect(screen.queryByTestId('maia-compare-toggle')?.getAttribute('aria-pressed') ?? 'false').toBe(
-      'false',
+    expect(screen.queryByLabelText('Maia level')?.getAttribute('value') ?? 'off').not.toBe(
+      'compare',
     )
+    expect(screen.getByTestId('maia-panel')).not.toHaveTextContent('All levels')
   })
 
   it('turns hints off and on with h', async () => {
@@ -925,6 +1009,7 @@ describe('GamePage', () => {
     renderPage()
     await screen.findByText('Scandinavian Defense')
 
+    // Stop is a tool beside the engine pane's tabs, there while the search runs.
     const stop = () => screen.queryByRole('button', { name: 'Stop live analysis' })
     expect(stop()).not.toBeInTheDocument()
 
@@ -1027,9 +1112,10 @@ describe('GamePage', () => {
     expect(flagged.querySelector('span')?.getAttribute('style')).toContain(
       'color-mix(in srgb, var(--bb-blunder) 13%, transparent)',
     )
+    // "played" is a flat readout now, the verdict's colour on the word and no border.
     expect(
       within(screen.getByTestId('maia-panel')).getByText('played').getAttribute('style'),
-    ).toContain('color-mix(in srgb, var(--bb-blunder) 35%, transparent)')
+    ).toContain('color: var(--bb-blunder)')
   })
 
   it('jumps the board when a move in the list is clicked', async () => {
@@ -1045,10 +1131,10 @@ describe('GamePage', () => {
     const { rerender } = renderPage()
     await screen.findByText('Scandinavian Defense')
 
-    await user.click(screen.getByRole('button', { name: 'Analyse' }))
+    await user.click(screen.getByRole('button', { name: 'Analyse…' }))
     const dialog = await screen.findByRole('dialog', { name: 'Analyse…' })
     // The analysis role's engine is preselected, and the limit opens on depth 24.
-    expect(within(dialog).getByRole('button', { name: /stockfish/ })).toHaveAttribute('aria-pressed', 'true')
+    expect(within(dialog).getByRole('radio', { name: /stockfish/ })).toHaveAttribute('aria-checked', 'true')
     await user.click(within(dialog).getByRole('button', { name: 'Analyse' }))
     await waitFor(() => expect(posted).toHaveLength(1))
     expect(posted[0].url).toContain('/analysis')
@@ -1108,7 +1194,7 @@ describe('GamePage', () => {
     vi.stubGlobal('fetch', stubFetch({ '/analysis/runs': [QUEUED_RUN] }))
     renderPage()
     await screen.findByText('Scandinavian Defense')
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Analyse' })).toBeDisabled())
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Analyse…' })).toBeDisabled())
     await user.keyboard('a')
     expect(screen.queryByRole('dialog', { name: 'Analyse…' })).not.toBeInTheDocument()
   })
@@ -1128,7 +1214,7 @@ describe('GamePage', () => {
     renderPage()
     await screen.findByText('Scandinavian Defense')
 
-    await user.click(screen.getByRole('button', { name: 'Analyse' }))
+    await user.click(screen.getByRole('button', { name: 'Analyse…' }))
     const dialog = await screen.findByRole('dialog', { name: 'Analyse…' })
     await user.click(within(dialog).getByRole('button', { name: 'Analyse' }))
 
@@ -1147,7 +1233,7 @@ describe('GamePage', () => {
     renderPage()
     await screen.findByText('Scandinavian Defense')
 
-    const trigger = screen.getByRole('button', { name: 'Analyse' })
+    const trigger = screen.getByRole('button', { name: 'Analyse…' })
     await user.click(trigger)
     await user.click(
       within(await screen.findByRole('dialog', { name: 'Analyse…' })).getByRole('button', { name: 'Analyse' }),
@@ -1168,14 +1254,14 @@ describe('GamePage', () => {
     const user = userEvent.setup()
     renderPage()
     await screen.findByText('Scandinavian Defense')
-    await user.click(screen.getByRole('button', { name: 'Analyse' }))
+    await user.click(screen.getByRole('button', { name: 'Analyse…' }))
     await user.click(
       within(await screen.findByRole('dialog', { name: 'Analyse…' })).getByRole('button', { name: 'Analyse' }),
     )
     await waitFor(() => expect(posted).toHaveLength(1))
     // The mutation's own run stands in until the run list catches up: run 21, requested.
     // No progress frame has arrived yet, so the button just sits disabled.
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Analyse' })).toBeDisabled())
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Analyse…' })).toBeDisabled())
 
     const socket = SilentSocket.instances.at(-1)!
     // The pass an import queued over the same game is not this button's run.
@@ -1188,7 +1274,7 @@ describe('GamePage', () => {
       done: 2,
       total: 4,
     })
-    expect(screen.getByRole('button', { name: 'Analyse' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Analyse…' })).toBeDisabled()
     expect(screen.queryByRole('button', { name: '50%' })).toBeNull()
 
     socket.emit({
@@ -1249,7 +1335,7 @@ describe('GamePage', () => {
     expect(screen.getByText('No engine run')).toBeInTheDocument()
     // A run is the obvious next thing to do, so the button is idle and enabled rather than
     // describing a run that has already happened.
-    expect(screen.getByRole('button', { name: 'Analyse' })).toBeEnabled()
+    expect(screen.getByRole('button', { name: 'Analyse…' })).toBeEnabled()
   })
 
   it('offers a live search beside the stored run, and opens one when asked', async () => {
@@ -1258,7 +1344,7 @@ describe('GamePage', () => {
     await screen.findByText('Scandinavian Defense')
 
     // One pane, two claims: what the run concluded, and what an engine could find now. At
-    // rest the pane is on Run, and the Live tab is what starts the search.
+    // rest the pane is on Run; clicking Live is asking for the search, so it starts one.
     const pane = within(screen.getByTestId('maia-panel'))
     expect(pane.getByText('stockfish')).toBeInTheDocument()
     expect(pane.getByRole('tab', { name: 'Run' })).toHaveAttribute('aria-selected', 'true')
@@ -1267,6 +1353,7 @@ describe('GamePage', () => {
     expect(streamCalls).toHaveLength(0)
 
     await user.click(pane.getByRole('tab', { name: 'Live' }))
+    expect(pane.getByRole('tab', { name: 'Live' })).toHaveAttribute('aria-selected', 'true')
     await waitFor(() => expect(streamCalls.filter((c) => c.method === 'POST')).toHaveLength(1))
     expect(streamCalls[0]!.body).toMatchObject({
       surface: 'game',
@@ -1286,8 +1373,8 @@ describe('GamePage', () => {
     const tab = (name: string) => pane().getByRole('tab', { name })
     const stop = () => pane().queryByRole('button', { name: 'Stop live analysis' })
 
-    // Clicking Live is asking for its answer, so the search starts and the pane lands on
-    // Live — with the pickers that steer the search, and without the run's rows.
+    // Live: the search starts and the pane is on Live — with the pickers that steer the
+    // search, and without the run's rows.
     await user.click(tab('Live'))
     await waitFor(() => expect(streamCalls.filter((c) => c.method === 'POST')).toHaveLength(1))
     expect(tab('Live')).toHaveAttribute('aria-selected', 'true')
@@ -1309,10 +1396,15 @@ describe('GamePage', () => {
     expect(tab('Live')).toHaveAttribute('aria-selected', 'true')
     expect(streamCalls.filter((c) => c.method === 'POST')).toHaveLength(1)
 
-    // Stopped: the Live tab would be an empty box, so the pane goes back to Run.
+    // Stopped: the stored lines are what is left to read, so the pane goes back to Run.
     await user.click(stop()!)
     expect(stop()).not.toBeInTheDocument()
     expect(tab('Run')).toHaveAttribute('aria-selected', 'true')
+
+    // And Live again starts a fresh search.
+    await user.click(tab('Live'))
+    await waitFor(() => expect(streamCalls.filter((c) => c.method === 'POST')).toHaveLength(2))
+    expect(tab('Live')).toHaveAttribute('aria-selected', 'true')
   })
 
   it('lands the engine pane on Live when the board leaves the game line mid-search', async () => {
@@ -1753,7 +1845,7 @@ describe('GamePage', () => {
     expect(screen.getByText('d5')).toBeInTheDocument()
     // And so is what the app has *done* — the run happened, whatever it found: the button
     // that asks for another.
-    expect(screen.getByRole('button', { name: 'Analyse' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Analyse…' })).toBeInTheDocument()
 
     act(() => setEngineHidden(false))
     expect(document.querySelector('[data-classification="blunder"]')).toBeInTheDocument()
@@ -1834,14 +1926,21 @@ describe('the board’s controls', () => {
     const [top, bottom] = screen.getAllByTestId('player-row')
     // What the board is showing goes with the board, above it — icon-only at the row's own
     // height, each naming its key in its tooltip.
-    for (const name of ['Board settings', 'Flip the board', 'Hints', 'Type a move (M)']) {
+    for (const name of ['Flip the board', 'Hints', 'Type a move (M)']) {
       const button = within(top!).getByRole('button', { name })
       expect(controlRow()).not.toContainElement(button)
-      // One square box for all four: they are buttons of equal weight side by side, and a
-      // wider one among them reads as a difference in kind that is not there.
+      // One square box for the three that act on the board: they are buttons of equal
+      // weight side by side, and a wider one among them reads as a difference in kind.
       expect(button).toHaveClass('size-6')
       expect(button.querySelector('svg')).toHaveClass('size-4')
     }
+    // The settings gear opens something, so it goes last, at the same height, with a ⌄.
+    const settings = within(top!).getByRole('button', { name: 'Board settings' })
+    expect(controlRow()).not.toContainElement(settings)
+    expect(settings).toHaveClass('h-6')
+    expect(settings).toHaveAttribute('aria-haspopup', 'dialog')
+    expect(settings.querySelectorAll('svg')).toHaveLength(2)
+    expect(settings.parentElement!.lastElementChild).toBe(settings)
     // Where you are and what it is worth, directly above the transport that changes it.
     expect(within(bottom!).getByText('ply 0 / 4')).toBeInTheDocument()
     expect(within(bottom!).getByText(/^[+−-]\d/)).toBeInTheDocument()
@@ -1976,8 +2075,8 @@ describe('GamePage practice', () => {
     const dialog = await screen.findByRole('dialog', { name: 'Practise from here' })
     // Maia cannot answer here, so the engine is the one preselected, and why Maia is greyed
     // is said rather than left to a tooltip.
-    expect(within(dialog).getByRole('button', { name: 'stockfish' })).toHaveAttribute(
-      'aria-pressed',
+    expect(within(dialog).getByRole('radio', { name: 'stockfish' })).toHaveAttribute(
+      'aria-checked',
       'true',
     )
     expect(dialog).toHaveTextContent('no human-move model is chosen')
@@ -2015,7 +2114,9 @@ describe('GamePage practice', () => {
     expect(await screen.findByTestId('maia-panel')).toBeInTheDocument()
     expect(screen.getByTestId('practice-bar')).toBeInTheDocument()
     await waitFor(() => expect(streamCalls.filter((c) => c.method === 'POST')).toHaveLength(1))
-    expect(screen.getByRole('button', { name: 'Stop live analysis' })).toBeInTheDocument()
+    expect(
+      within(screen.getByTestId('maia-panel')).getByRole('button', { name: 'Stop live analysis' }),
+    ).toBeInTheDocument()
 
     // Hiding it again stops the search, which would otherwise still be the answer.
     await user.keyboard('h')
@@ -2034,7 +2135,7 @@ describe('GamePage practice', () => {
     await user.keyboard('{Home}')
     await user.click(screen.getByRole('button', { name: /Practise/ }))
     const dialog = await screen.findByRole('dialog', { name: 'Practise from here' })
-    await user.click(within(dialog).getByRole('button', { name: 'Black' }))
+    await user.click(within(dialog).getByRole('radio', { name: 'Black' }))
     await user.click(within(dialog).getByRole('button', { name: 'Play' }))
 
     // White is to move and White is the computer's: it answers first.
@@ -2069,7 +2170,8 @@ describe('GamePage typed moves', () => {
 
     // Nonsense is answered in the row, not swallowed.
     await user.type(box, 'zz')
-    expect(screen.getByRole('status')).toHaveTextContent('No such move')
+    // In the box's own status line (the PGN tool keeps a quiet status region of its own).
+    expect(screen.getByText(/No such move/).closest('[role="status"]')).not.toBeNull()
 
     // Escape closes the box without leaving the line it was typing.
     await user.keyboard('{Escape}')
@@ -2427,7 +2529,7 @@ describe('the game view below md', () => {
 
     // It moved to the phone header, which is pinned — so it is reachable from every tab.
     await user.click(tab('Engine'))
-    await user.click(screen.getByRole('button', { name: 'PGN' }))
+    await user.click(screen.getByRole('button', { name: 'Copy PGN' }))
     expect(writeText).toHaveBeenCalled()
   })
 
@@ -2471,7 +2573,7 @@ describe('the game view below md', () => {
     // the rule: one column below `md`, over the desktop's quarter/three-quarters pair.
     const split = screen.getByTestId('maia-engine-lines').parentElement
     expect(split).toHaveClass('max-md:grid-cols-1')
-    expect(split).toHaveClass('grid-cols-[minmax(9rem,1fr)_minmax(0,3fr)]')
+    expect(split).toHaveClass('grid-cols-[minmax(8.25rem,22%)_minmax(0,1fr)]')
     // Two panes divided by a rule, not two cards floating with a gap: the divider is on the
     // engine pane's left edge and turns into a top edge where the two stack.
     expect(split!.className).not.toContain('gap-')
@@ -2569,11 +2671,12 @@ describe('GamePage notes', () => {
     await screen.findByText('Scandinavian Defense')
 
     // The payload's one note sits at count 1 — the position after 1.e4 — and the track's
-    // tab row states how many there are beside the two tabs.
+    // tab row states how many there are beside the two tabs: a fact of the strip, after the
+    // tablist rather than inside it (nothing but tabs sits in the tab group).
     await user.click(notesTab())
-    expect(
-      within(screen.getByRole('tablist', { name: 'Book and notes' })).getByText('1 note'),
-    ).toBeInTheDocument()
+    const tablist = screen.getByRole('tablist', { name: 'Book and notes' })
+    expect(within(tablist.parentElement!).getByText('1 note')).toBeInTheDocument()
+    expect(within(tablist).queryByText('1 note')).not.toBeInTheDocument()
 
     // A row is where the note hangs and the note itself, clamped. Its tags are not repeated
     // here: clicking the row loads it into the composer below, which is where they are read

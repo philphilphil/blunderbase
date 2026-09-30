@@ -58,7 +58,7 @@ describe('BoardSettingsButton', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Board settings' }))
 
     expect(screen.getByRole('dialog')).toBeInTheDocument()
-    await userEvent.click(screen.getByLabelText('Maia move'))
+    await userEvent.click(screen.getByRole('checkbox', { name: 'Maia move' }))
 
     expect(JSON.parse(window.localStorage.getItem(BOARD_ARROW_KEY) ?? '{}')).toMatchObject({
       engine: true,
@@ -105,7 +105,7 @@ describe('BoardSettingsButton', () => {
     expect(level).toHaveValue('60')
     expect(level).toBeEnabled()
 
-    await userEvent.click(screen.getByLabelText('Move sounds'))
+    await userEvent.click(screen.getByRole('checkbox', { name: 'Move sounds' }))
     expect(JSON.parse(window.localStorage.getItem(MOVE_SOUND_KEY) ?? '{}')).toMatchObject({
       enabled: false,
     })
@@ -151,7 +151,7 @@ describe('BoardSettingsButton', () => {
     render(<BoardSettingsButton />)
     fireEvent.click(screen.getByRole('button', { name: 'Board settings' }))
 
-    const box = screen.getByLabelText('Move sounds')
+    const box = screen.getByRole('checkbox', { name: 'Move sounds' })
     fireEvent.click(box)
     vi.advanceTimersByTime(200)
     expect(playMoveSound).not.toHaveBeenCalled()

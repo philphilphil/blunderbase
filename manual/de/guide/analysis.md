@@ -1,6 +1,6 @@
 # Analyse
 
-## Warum zwei Engines?
+## Warum zwei Engines? { #why-are-there-two-engines }
 
 |  | Stockfish | Maia |
 |---|---|---|
@@ -10,7 +10,7 @@
 | Varianten? | ja | nie |
 
 Jede Zahl in dieser Tabelle ist eine Einstellung: Budget und Variantenzahl unter **Analyse
-→ Engine-Durchläufe**, die Spielstärken unter **Analyse → Maia**.
+› Engine-Durchläufe**, die Spielstärken unter **Analyse › Maia**.
 
 ## Welche Analyse bekommt eine Partie? { #which-pass-does-a-game-get }
 
@@ -19,7 +19,7 @@ Knotenbudget und Variantenzahl aus **Engine-Durchläufe**, in der Reihenfolge de
 Warteschlange. Ausgewählte Zeilen unter **Partien** bekommen dasselbe über **Analyse
 einreihen**.
 
-Reicht dir das nicht, öffne die Partie und drück **Analysieren** (oder `A`). Du wählst die
+Reicht dir das nicht, öffne die Partie und drück **Analysieren …** (oder `A`). Du wählst die
 Engine, die Zahl der Varianten, wann jeder Zug endet – nach so vielen Sekunden, bei einer
 Tiefe oder nach so vielen Knoten – und ob ein Zug, alles ab einem Zug oder die ganze Partie
 angesehen wird; den Dialog beschreibt [Eine Partie analysieren](game.md#ask-for-a-deeper-look).
@@ -41,7 +41,7 @@ Eine Grenze in Sekunden hängt vom Rechner ab: Zehn Sekunden auf einem schnellen
 zehn Sekunden in einem Browser-Tab sind nicht dieselbe Suche. Tiefe und Knoten bedeuten
 überall dasselbe.
 
-## Was hat ein Zug gekostet?
+## Was hat ein Zug gekostet? { #what-did-a-move-cost }
 
 Gewinnprozent vor dem Zug minus Gewinnprozent danach. Die voreingestellten Schwellen:
 
@@ -53,29 +53,36 @@ Gewinnprozent vor dem Zug minus Gewinnprozent danach. Die voreingestellten Schwe
 
 ## Was ist noch zu analysieren? { #what-is-left-to-analyse }
 
-**Analyse → Abdeckung** zeigt, wie viel der Bibliothek eine Engine schon gesehen hat und was
-der Rest kosten würde. **Nachtragen** reiht die Importanalyse für jede Partie ein, die
-noch keine Analyse hat; Partien, die schon eine haben, werden übersprungen. Bei einer
-großen Bibliothek auf einem langsamen Server dauert das lange – dafür steht die Schätzung
-auf der Karte. **Fehlende Stufen nachtragen** tut dasselbe für Maia. Antwortet Maia dabei
-nicht, wird es einmal wiederholt und landet dann unter **Fehlgeschlagene Durchläufe**; die
-Stufen gelten weiter als fehlend, und das nächste Nachtragen fragt sie erneut an.
-**Warteschlange leeren** leert sie, und **Fehlgeschlagene Durchläufe** listet auf, was du wiederholen
-kannst; eine Wiederholung läuft mit derselben Engine, Grenze, Zugauswahl und Variantenzahl
-wie der fehlgeschlagene Versuch.
+**Analyse › Abdeckung** zeigt, wie viel der Bibliothek eine Engine schon gesehen hat und was
+der Rest kosten würde. Darunter folgen drei Karten; jede endet in einer Zeile mit der Zahl
+der Partien, die sie einreihen würde, der geschätzten Zeit und rechts ihrer Schaltfläche.
+Gibt es nichts zu tun, ist die Schaltfläche ausgegraut und nennt beim Darüberfahren den
+Grund. **Nachtragen** reiht die Importanalyse für jede Partie ein, die noch keine Analyse
+hat; Partien, die schon eine haben, werden übersprungen. Bei einer großen Bibliothek auf
+einem langsamen Server dauert das lange – dafür steht die Schätzung neben der Schaltfläche.
+**Fehlende Stufen nachtragen** tut dasselbe für Maia. Antwortet Maia dabei nicht, wird es
+einmal wiederholt und landet dann unter **Fehlgeschlagene Durchläufe**; die Stufen gelten
+weiter als fehlend, und das nächste Nachtragen fragt sie erneut an. **Warteschlange
+leeren** leert sie, und **Fehlgeschlagene Durchläufe** listet auf, was du mit **Alle erneut
+versuchen** wiederholen kannst; eine Wiederholung läuft mit derselben Engine, Grenze,
+Zugauswahl und Variantenzahl wie der fehlgeschlagene Versuch.
+
+**Maia-Stufen** listet jede gefragte Stufe in einer eigenen Zeile auf, mit der Zahl der
+Partien, die sie tragen. Stufen, die die Bibliothek noch aus einer älteren Einstellung hat,
+fasst eine Zeile darunter zusammen; ein Druck darauf zeigt sie einzeln.
 
 ## Wie viel rechnet ein Durchlauf? { #how-much-work-does-a-pass-do }
 
-**Analyse → Engine-Durchläufe → Analysedurchlauf** legt das Knotenbudget der Importanalyse
+Die Karte **Analysedurchlauf** unter **Analyse › Engine-Durchläufe** legt das Knotenbudget der Importanalyse
 fest (voreingestellt 500.000), wie viele Varianten sie behält (1 bis 5, voreingestellt
 zwei) und die drei Schwellen von oben. Budget und Variantenzahl werden beim Einreihen auf
 den Durchlauf kopiert; eine Änderung gilt also für den nächsten. Von hier nimmt auch
-**Analysieren** seine Knotenzahl, wenn du Knoten wählst, und die Variantenzahl, solange du
+**Analysieren …** seine Knotenzahl, wenn du Knoten wählst, und die Variantenzahl, solange du
 keine eintippst.
 
 ## Die Engine bei neuen Partien ausblenden { #hide-the-engine-on-new-games }
 
-Auf derselben Seite steht **Neue Partien → Engine ausblenden bei**, und jede Auswahl nennt
+Auf derselben Seite steht **Neue Partien › Engine ausblenden bei**, und jede Auswahl nennt
 die Bedenkzeiten, für die sie gilt: **Nichts**, **Jede Partie**, **Blitz, Schnellschach und
 Klassisch**, **Schnellschach und Klassisch** oder **Nur Klassisch**. Eine Partie, die du von
 da an mit einer dieser Bedenkzeiten importierst, wird wie gewohnt analysiert, kommt aber
@@ -95,24 +102,26 @@ gespeichert wird.
 
 ## Was wird Maia gefragt? { #what-is-maia-asked }
 
-**Analyse → Maia** legt fest, welche Spielstärken gefragt werden – bis zu fünf Wertungen
-zwischen 1100 und 2000, eine frische Installation fragt nur 2000 –, **Maia beim
-Analysedurchlauf** – voreingestellt an; dann schaut Maia bei jedem Durchlauf mit, bei der
-Importanalyse wie bei denen, die du anforderst – und **Nach beiden Seiten fragen**:
-aus betrachtet nur deine Züge, an sagt auch die des Gegners voraus. Eine Variante liefert
+**Analyse › Maia** legt fest, welche Spielstärken gefragt werden – bis zu fünf Wertungen
+zwischen 1100 und 2000, eine frische Installation fragt nur 2000. Trag eine unter **Eine
+Stufe hinzufügen** ein und drück **Hinzufügen**, oder nimm eine mit dem × daran heraus.
+Danach kommen zwei Schalter: **Maia beim Analysedurchlauf** – voreingestellt an; dann schaut
+Maia bei jedem Durchlauf mit, bei der Importanalyse wie bei denen, die du anforderst – und
+**Nach beiden Seiten fragen**: aus betrachtet nur deine Züge, an sagt auch die des Gegners
+voraus. **Speichern** übernimmt die Änderungen. Eine Variante liefert
 Maia nie: ein Blick ohne Suche ergibt eine Verteilung von Zügen, keine Fortsetzung. Ein
 *Nachtrag* ergänzt fehlende Spielstärken bei einer Partie, die schon eine Bewertung hat.
 
 ## Fernschach { #correspondence }
 
-**Analyse → Fernschach** schaltet den Fernschachmodus ein, hält die Zahlen, mit denen eine
+**Analyse › Fernschach** schaltet den Fernschachmodus ein, hält die Zahlen, mit denen eine
 neue Partie und eine neue Suche starten, und legt fest, welche Engines auf eine Stellung
 angesetzt werden dürfen. Ist er aus – die Voreinstellung –, gibt es **Fernschach**
 nicht in der Seitenleiste, und seine Seiten schicken dich zur Übersicht zurück.
 
 | Einstellung | |
 |---|---|
-| **Fernschachmodus** | An ergänzt den Eintrag in der Seitenleiste unter **Live** |
+| **Fernschachmodus anzeigen** | Ein Schalter; an ergänzt den Eintrag in der Seitenleiste unter **Live** |
 | **Linien pro Suche** | Wie viele Kandidatenvarianten eine Engine behält, wenn sie auf eine Stellung eines Fernschachbaums angesetzt wird, 1 bis 5, voreingestellt drei |
 | **Knoten pro Aufgabe** | Was eine Aufgabe kostet, voreingestellt vierzig Millionen: ein bis zwei Minuten einer modernen Engine – gerade so, dass eine Erweiterung über ein Dutzend Stellungen fertig wird, während du noch aufs Brett schaust. Der Wert wird beim Einreihen auf die Aufgabe kopiert; änderst du ihn, gilt er für die nächste |
 | **Linien pro Aufgabe** | Wie viele Kandidatenvarianten eine Aufgabe behält, 1 bis 5, voreingestellt drei – und damit, wie breit eine Erweiterung sein kann, denn die Kinder entstehen aus diesen Varianten |

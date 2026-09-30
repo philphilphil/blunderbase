@@ -66,22 +66,37 @@ Full reasoning in `docs/ARCHITECTURE.md`. The short version:
 - **Colours come from `web/src/index.css` only.** Every colour is a `--bb-*` token with a
   semantic alias (`bg-elevated`, `text-dim`, `border-edge-strong`, …); no component names a
   hex. Dark is the default theme, `:root.light` overrides. Design source: `docs/design/`.
-- **The control and type standard** (full rules: `docs/design/README.md`, "Polish pass").
-  Read it before adding UI; the parts that get missed:
+- **The control and type standard** (full rules: `docs/design/README.md`, "Polish pass" and
+  "Clarity pass"). Read it before adding UI; the parts that get missed:
   - Buttons are `components/ui/button.tsx`, never a hand-built `<button>` with classes.
-    `secondary` is the tool button, `sm` the size for toolbars, control rows and footers
-    (a card's footer too); `xs` only in pane-title strips; one filled `default` per region;
-    `ghost` only where a border would be noise (icon actions inside table rows).
+    `secondary` is the tool button (a raised face), `sm` the size for toolbars, control
+    rows and footers (a card's footer too); `xs` only in pane-title strips; one filled
+    `default` per region, last in its group; `ghost` only where a face would be noise (icon
+    actions inside rows and strips); `destructive-outline` for a red toolbar command,
+    filled `destructive` only in a confirm dialog. `outline` is retired.
+  - A face means pressable, a sunk field (`Input`, `Textarea`, `NativeSelect`) means type
+    here, a border alone is a chip, nothing is data (`Badge`/`Readout` have no border).
+    Every control kind has its primitive in `components/ui/`: `Segmented` (one of N),
+    `ButtonGroup` (do one of these), `PickerButton`/`PickerSelect` (a value from a list),
+    `ActionMenu`, `Switch`, `Checkbox`, `FilterChip`, `TextLink` (every link), `Pager`,
+    `SortableHead`; pane tabs are `PaneTabList`/`PaneTab`; Speed is `SpeedPicker`.
+    `lib/ui/grammar.test.ts` fails on a hand-built radio or tab, a copied link class,
+    `variant="outline"`, `hover:bg-selected`, a focus fill or a per-site focus ring.
   - Text sizes are the named scale — `text-meta` / `label` / `data` / `lead` / `heading` /
     `value` — never `text-[…rem]` and never Tailwind's `text-xs`/`text-sm`; `scale.test.ts`
     fails on both. UI labels are sans; mono is for numbers, moves and IDs.
-  - Selection is `bg-selected text-ink` (a `Button` gets it from `aria-pressed`), hover is
-    `hover:bg-raised`, radii are `rounded-md` for controls and `rounded-sm` for inline badges.
+  - Each state has one channel: location is accent text on `bg-nav-current` (the rail
+    only); a chosen value is `Segmented`'s raised thumb; on and selection is `bg-selected
+    text-ink` (a `Button` gets it from `aria-pressed`; a selected row adds `shadow-row-bar`);
+    hover is `hover:bg-raised` (`control-hover` on a face); focus is the global solid ring;
+    primary is the filled accent. Radii are `rounded-md` for controls and `rounded-sm` for
+    inline badges.
   - A screen that switches how a list is drawn uses `components/ui/view-toggle.tsx` and
     `lib/ui/viewPreference.ts`, the way Notes and Collections do.
 - Components carry a doc comment saying *why* they are shaped the way they are; keep that
   habit — the reasoning is the part that is not obvious from the JSX.
-- Native `select`/`textarea` styled with Tailwind is the norm over heavy widgets.
+- Native `select`/`textarea` (`NativeSelect`, `PickerSelect`, `Textarea`) is the norm over
+  heavy widgets.
 - **Every string a person reads goes through Lingui.** `<Trans>` for JSX text, `useLingui()`'s
   `t` for props and toasts, `msg` for labels in module-level tables, the global `t` only in
   helpers with no React. English is the source text; `pnpm i18n` refreshes the catalogs under
@@ -126,13 +141,6 @@ Full reasoning in `docs/ARCHITECTURE.md`. The short version:
   LF by `.gitattributes` because `docker/entrypoint.sh` and `scripts/*.sh` run under `sh`.
 - Do not commit unless asked. When asked, plain imperative subjects in the style of the
   log (`fix(web): …`, `chore: …`).
-- **Do not drive the app in a browser.** No Playwright, no browser automation, no starting
-  a server to click through the UI. Run `make test` and the lint/typecheck commands above,
-  say plainly what that does and does not prove, and then hand it to the owner to try —
-  and wait for their answer before going further. The owner is at a real browser and the
-  app is one keystroke away for them; an agent driving a second copy is slower, tests a
-  browser nobody uses, and fights the owner's own `make run` for port 8765. If a change
-  can only be judged in a browser, say so and stop there.
 - **Releases are always triggered by the owner.** Never write the changelog, run
   `make release` or `make publish` on your own initiative — only when told to, and then
   follow the steps below.

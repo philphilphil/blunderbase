@@ -3,13 +3,23 @@ import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 import { describe, expect, it } from 'vitest'
 
-import { ShortcutsButton, ShortcutsOverlayProvider } from './ShortcutsOverlay'
+import { ShortcutsOverlayProvider, useShortcutsOverlay } from './ShortcutsOverlay'
+
+/** Anything that raises the list the way the account menu's row does. */
+function Opener() {
+  const shortcuts = useShortcutsOverlay()
+  return (
+    <button type="button" onClick={shortcuts.open}>
+      Keyboard shortcuts
+    </button>
+  )
+}
 
 function mount(at = '/stats') {
   return render(
     <MemoryRouter initialEntries={[at]}>
       <ShortcutsOverlayProvider>
-        <ShortcutsButton />
+        <Opener />
         <input aria-label="Somewhere to type" />
       </ShortcutsOverlayProvider>
     </MemoryRouter>,
@@ -29,7 +39,7 @@ describe('the shortcuts overlay', () => {
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   })
 
-  it('comes up on the titlebar button', async () => {
+  it('comes up from the account menu’s row (anything holding the overlay’s open)', async () => {
     const user = userEvent.setup()
     mount()
 

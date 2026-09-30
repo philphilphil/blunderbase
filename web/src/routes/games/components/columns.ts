@@ -1,6 +1,6 @@
 /**
- * The 14 columns of the library table, at the widths design 2b draws them (emitted as
- * `rem`), with two departures from the design.
+ * The 15 columns of the library table, at the widths design 2b draws them (emitted as
+ * `rem`), with two departures from the design and one addition (`Collections`).
  *
  * Two of the design's columns — per-game accuracy and ACPL — have no backend behind them:
  * `/games?cards=true` carries the eval curve and the three worst moments, not a per-game
@@ -37,7 +37,7 @@ export interface Column {
 }
 
 /**
- * Thirteen columns do not fit on a 375px screen, so below `md` a row stops being a line of
+ * Fifteen columns do not fit on a 375px screen, so below `md` a row stops being a line of
  * a table and becomes a two-line card laid out on this grid:
  *
  * ```
@@ -106,24 +106,39 @@ export const COLUMNS: Column[] = [
   // Still `tier` inside, so nothing keyed on the column id moves; no sort, because with one
   // pass "analysed or not" is all there is to rank, and the Analysed filter already says it.
   { id: 'tier', label: msg`Analysis`, width: 84, phone: null },
-  { id: 'flags', label: msg`Flags`, width: 'flex', phone: CARD.flags },
+  // Three badges at most (a card carries three worst moments), or the Analyse button.
+  { id: 'flags', label: msg`Flags`, width: 120, phone: CARD.flags },
+  // A game's collections, apart from its flags: flags are the engine's verdict, a
+  // collection is the owner's filing, and one cell holding both read as one kind of thing.
+  // Last and flexible, as plain names, since it is the one column whose width is whatever
+  // is left. The phone drops it and carries the chips on the date's line instead (`GameRow`).
+  { id: 'collections', label: msg`Collections`, width: 'flex', phone: null },
 ]
 
 /**
  * The columns this reading of the table has.
  *
- * With the engine hidden (⇧E, `lib/ui/engineVisibility`) `Worst` goes: it is the largest
- * win percentage the owner gave away in the game, which is the engine's verdict on it in a
- * single number, and a column of dashes is not hidden — it is a column advertising what it
- * will not tell you. The header, the rows and the loading skeleton all lay themselves out
- * from this one list, so they cannot disagree about how many cells a row has.
+ * With the engine hidden (⇧E, `lib/ui/engineVisibility`) `Worst` and `Flags` go: they are
+ * the engine's verdict on the game, and a column of blanks is not hidden — it is a column
+ * advertising what it will not tell you. `Collections` goes while there are none to be in,
+ * for the same reason. Whichever column is left last takes the rest of the width, and the
+ * row puts its delete button there (`GameRow`). The header, the rows and the loading
+ * skeleton all lay themselves out from this one list, so they cannot disagree about how
+ * many cells a row has.
  *
- * `Flags` stays in the list because the cell is not only flags: it also carries the game's
- * collection chips, the "analyse" affordance and the row's delete button. `GameRow` empties
- * what is engine about it and keeps the rest.
+ * On a phone the card's Flags slot also carries the "analyse" affordance, so while Flags is
+ * gone the Analysis cell takes that slot: the card keeps a way to queue a game.
  */
-export function columnsFor(engineHidden: boolean): Column[] {
-  return engineHidden ? COLUMNS.filter((column) => column.id !== 'worst') : COLUMNS
+export function columnsFor(engineHidden: boolean, collections = true): Column[] {
+  const kept = COLUMNS.filter(
+    (column) =>
+      !(engineHidden && (column.id === 'worst' || column.id === 'flags')) &&
+      !(!collections && column.id === 'collections'),
+  ).map((column) => (engineHidden && column.id === 'tier' ? { ...column, phone: CARD.flags } : column))
+  const last = kept.length - 1
+  return kept.map((column, index) =>
+    index === last && column.width !== 'flex' ? { ...column, width: 'flex' as const } : column,
+  )
 }
 
 /**
@@ -135,16 +150,22 @@ export function columnsFor(engineHidden: boolean): Column[] {
  */
 export function cellStyle(column: Column): React.CSSProperties {
   return column.width === 'flex'
-    ? { flex: 1, minWidth: 0 }
+    ? { flex: 1 }
     : ({ '--cell-width': remWidth(column.width) } as React.CSSProperties)
 }
 
 /**
  * The classes that go with `cellStyle`: the column's width from `md` up, and below it
  * either the cell's place in the phone card or nothing at all.
+ *
+ * The flexible last column keeps a floor from `md` up (`min-w-28`, 112 design px): the
+ * table scrolls sideways where the columns do not fit (`GamesTable`), and without a floor
+ * Flags, with the row's delete in it, would be squeezed to nothing at the far end of that
+ * scroll. As a class rather than inline so the phone card's grid column stays free.
  */
 export function cellClass(column: Column): string {
-  const width = column.width === 'flex' ? '' : 'md:w-[var(--cell-width)] md:flex-none'
+  const width =
+    column.width === 'flex' ? 'min-w-0 md:min-w-28' : 'md:w-[var(--cell-width)] md:flex-none'
   return `${width} ${column.phone ?? 'max-md:hidden'}`.trim()
 }
 

@@ -8,7 +8,8 @@
  * the node budget, the line count — is the deployment's and is not asked again here.
  *
  * The two verbs share the dialog because they differ only in how many tasks come out of
- * it; the sentence under the title says which.
+ * it; the sentence under the title says which. The footer is every dialog's: Cancel as
+ * the secondary face, then the one primary.
  */
 import { Trans, useLingui } from '@lingui/react/macro'
 import { Loader2 } from 'lucide-react'
@@ -73,7 +74,7 @@ export function TaskDialog({
           <p className="text-meta leading-[1.5] text-dim-2">
             <Trans>
               Any engine that is switched on, on this machine or on a runner. The budget and
-              the line count are the ones under Analysis → Correspondence.
+              the line count are the ones under Analysis › Correspondence.
             </Trans>
           </p>
         </div>
@@ -83,10 +84,14 @@ export function TaskDialog({
           </p>
         ) : null}
         <div className="flex justify-end gap-2">
-          <Button type="button" variant="outline" onClick={onClose}>
+          <Button type="button" variant="secondary" onClick={onClose}>
             <Trans>Cancel</Trans>
           </Button>
-          <Button type="submit" disabled={pending || engineId === null}>
+          <Button
+            type="submit"
+            disabled={pending || engineId === null}
+            title={engineId === null ? t`Pick the engine the task runs on` : undefined}
+          >
             {pending ? <Loader2 className="animate-spin" aria-hidden /> : null}
             {verb === 'task' ? <Trans>Queue task</Trans> : <Trans>Refresh</Trans>}
           </Button>

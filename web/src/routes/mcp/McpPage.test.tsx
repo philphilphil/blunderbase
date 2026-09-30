@@ -199,7 +199,7 @@ describe('McpPage', () => {
     })
     renderPage(<McpPage />)
 
-    await userEvent.click(await screen.findByRole('button', { name: /Revoke/ }))
+    await userEvent.click(await screen.findByRole('button', { name: 'Revoke…' }))
     expect(requested(fetchMock)).not.toContain('DELETE /mcp-keys/1')
     expect(screen.getByText(/stops its token dead/)).toBeInTheDocument()
 

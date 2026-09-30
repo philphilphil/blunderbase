@@ -2,7 +2,7 @@ import type { MessageDescriptor } from '@lingui/core'
 import { useLingui } from '@lingui/react/macro'
 import type { LucideIcon } from 'lucide-react'
 
-import { cn } from '@/lib/utils'
+import { Segmented } from './segmented'
 
 export interface ViewOption<V extends string> {
   id: V
@@ -21,9 +21,10 @@ export interface ViewOption<V extends string> {
  * one list, one of which is always on. Labels are hidden below `sm` — the icons carry it on
  * a phone, where the row is already tight.
  *
- * The chosen view lights the way every selected control does (`bg-selected text-ink`, the
- * accent on its icon — docs/design/README.md, "One selected state"), and the others stay at
- * `soft`, the floor for a control's idle text.
+ * It is a `Segmented` (one component for every one-of-N choice, docs/design/README.md,
+ * "Controls"): the chosen view is the raised thumb in the sunken track, the others stay at
+ * `soft`, the floor for a control's idle text. This wrapper only keeps the view tables'
+ * shape (a message for the label and one for the hover hint) that Notes and Collections share.
  */
 export function ViewToggle<V extends string>({
   views,
@@ -39,31 +40,17 @@ export function ViewToggle<V extends string>({
 }) {
   const { i18n } = useLingui()
   return (
-    <div
-      role="radiogroup"
-      aria-label={label}
-      className="flex items-center rounded-md border border-edge bg-elevated p-px"
-    >
-      {views.map((option) => {
-        const on = value === option.id
-        return (
-          <button
-            key={option.id}
-            type="button"
-            role="radio"
-            aria-checked={on}
-            title={i18n._(option.hint)}
-            onClick={() => onChange(option.id)}
-            className={cn(
-              'flex items-center gap-1.5 rounded-sm px-2 py-[0.1875rem] text-label transition-colors',
-              on ? 'bg-selected text-ink [&_svg]:text-accent-teal' : 'text-soft hover:bg-raised hover:text-ink',
-            )}
-          >
-            <option.icon className="size-3.5" aria-hidden />
-            <span className="max-sm:sr-only">{i18n._(option.label)}</span>
-          </button>
-        )
-      })}
-    </div>
+    <Segmented
+      label={label}
+      value={value}
+      onChange={onChange}
+      labelClassName="max-sm:sr-only"
+      options={views.map((view) => ({
+        value: view.id,
+        label: i18n._(view.label),
+        title: i18n._(view.hint),
+        icon: view.icon,
+      }))}
+    />
   )
 }

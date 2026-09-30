@@ -6,29 +6,36 @@
  * A rating band has no place here — every game is the owner's, at the owner's rating — and
  * the speeds include correspondence, which the lichess database does not have.
  *
- * Speeds are chips because they are a set (`@/components/ui/chip`). When the games were
- * played is the library's own date chip — the same popover, the same fields, the same quick
- * picks (`DateRangePanel`) — because "which days" is one question wherever it is asked, and
- * a screen that asked it differently was the one people tripped over. Today is among the
+ * All three are pickers that name themselves ("Speed: All", "Date: All games",
+ * "Collection: League"), because they sit in the explorer's filter form beside two labelled
+ * segments and a picker is the one control that carries its own label. Speed is the app's
+ * one `SpeedPicker`, the same on Stats and the Dashboard. When the games were played is the
+ * library's own date picker — the same popover, the same fields, the same quick picks
+ * (`DateRangePanel`) — because "which days" is one question wherever it is asked, and a
+ * screen that asked it differently was the one people tripped over. Today is among the
  * picks for "what did I face today, and where did I go wrong in the opening", which no
  * rolling window answers. A pick is kept in the URL as the pick, so a link to "the last 30
  * days" still means that next month; typed dates are kept as dates. Every pick runs to now.
  *
  * The third lens is a collection — "what do I play in the league" — and it is a native
- * select rather than chips because the list is the owner's own, of any length and any
- * names. It is only drawn once there is a collection to pick, and it lives in the URL too.
+ * select under the picker's face (`PickerSelect`) because the list is the owner's own, of
+ * any length and any names. It is only drawn once there is a collection to pick, and it
+ * lives in the URL too.
+ *
+ * The pickers stand side by side and wrap; once the filter form's container is wide
+ * enough for two columns (`ExplorerPage`, `@min-[25.5rem]`) they stack into the second
+ * column, one beside each labelled segment.
  */
 import type { MessageDescriptor } from '@lingui/core'
 import { msg } from '@lingui/core/macro'
 import { useLingui } from '@lingui/react/macro'
 
 import { CollectionSwatch } from '@/components/collections/CollectionChip'
-import { ChipRow, FilterChip } from '@/components/ui/chip'
+import { SpeedPicker } from '@/components/filters/SpeedPicker'
+import { PickerSelect } from '@/components/ui/native-select'
 import { SPEEDS } from '@/lib/api/types'
 import type { Collection, Speed } from '@/lib/api/types'
 import type { DayPreset } from '@/lib/days'
-import { toggleFilter } from '@/lib/filters'
-import { cn } from '@/lib/utils'
 import { DATE_PANEL_WIDTH, DateRangePanel } from '@/routes/games/components/DateRangePanel'
 import { FilterPopover } from '@/routes/games/components/FilterPopover'
 
@@ -41,17 +48,6 @@ const PERIOD_SUMMARY: Record<DayPreset, MessageDescriptor> = {
   '30d': msg`Last 30 days`,
   '90d': msg`Last 90 days`,
   '1y': msg`Last year`,
-}
-
-const SPEED_LABELS: Record<Speed, MessageDescriptor> = {
-  bullet: msg`bullet`,
-  blitz: msg`blitz`,
-  rapid: msg`rapid`,
-  classical: msg`classical`,
-  correspondence: msg({
-    message: 'corr.',
-    comment: 'Short for "correspondence", the speed of a game played over days',
-  }),
 }
 
 export function OwnFilters({
@@ -97,74 +93,53 @@ export function OwnFilters({
       ? i18n._(PERIOD_SUMMARY[period])
       : null
   return (
-    // `max-md:relative` anchors the date popover to these rows on a phone, as the library's
-    // filter bar does for its chips (`FilterPopover`).
-    <div className="flex flex-col gap-1.5 max-md:relative">
-      <ChipRow label={t`speed`}>
-        {SPEEDS.map((speed) => (
-          <FilterChip
-            key={speed}
-            label={i18n._(SPEED_LABELS[speed])}
-            name={speed === 'correspondence' ? t`correspondence` : undefined}
-            on={speeds.includes(speed)}
-            onClick={() => onSpeeds(toggleFilter(speeds, speed, SPEEDS))}
-          />
-        ))}
-      </ChipRow>
-      {/* Date and collection share a line: each is one control, and two short rows of one
-          control apiece read as more filtering than there is. "Date" and "Collection" are
-          the library's own names for the same two chips. */}
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5">
-        <ChipRow label={t`Date`}>
-          <FilterPopover
-            label={t`Date`}
-            placeholder={t`All games`}
-            value={summary}
+    // On a phone the popovers anchor to the whole filter form (`max-md:relative` there),
+    // as the library's filter bar does for its pickers (`FilterPopover`). From `md` up the
+    // tree pane is the window's right-hand column, so the panels hang from the picker's
+    // right edge (`align="end"`): opened rightwards, they ran off the pane and the window.
+    <div className="flex min-w-0 flex-wrap items-start gap-1.5 @min-[25.5rem]:flex-col">
+      <SpeedPicker speeds={SPEEDS} value={speeds} onChange={onSpeeds} align="end" />
+      {/* "Date" is the library's own name for the same picker. */}
+      <FilterPopover
+        label={t`Date`}
+        placeholder={t`All games`}
+        value={summary}
+        onClear={() => onPeriod(null)}
+        width={DATE_PANEL_WIDTH}
+        align="end"
+      >
+        {(close) => (
+          <DateRangePanel
+            close={close}
             onClear={() => onPeriod(null)}
-            width={DATE_PANEL_WIDTH}
-          >
-            {(close) => (
-              <DateRangePanel
-                close={close}
-                onClear={() => onPeriod(null)}
-                heading={t`Played between`}
-                from={shown?.from}
-                to={shown?.to}
-                preset={range ? null : period}
-                // Editing a field starts from what it showed, so nudging a pick's first day
-                // keeps the rest of it; both emptied is no range, which is every game again.
-                onRange={(from, to) => onRange(from || to ? { from, to } : null)}
-                onPreset={onPeriod}
-                fromLabel={t`Played from`}
-                toLabel={t`Played until`}
-              />
-            )}
-          </FilterPopover>
-        </ChipRow>
-        {collections.length > 0 && onCollection ? (
-          <ChipRow label={t`Collection`} trailing>
-            {chosen ? <CollectionSwatch color={chosen.color} /> : null}
-            <select
-              aria-label={t`Collection`}
-              value={chosen ? String(chosen.id) : ''}
-              onChange={(event) =>
-                onCollection(event.target.value === '' ? null : Number(event.target.value))
-              }
-              className={cn(
-                'h-[1.625rem] max-w-[14rem] rounded-md border bg-elevated px-1.5 text-label outline-none transition-colors focus-visible:border-accent-teal/50',
-                chosen ? 'border-accent-teal/30 text-ink' : 'border-edge text-soft hover:text-ink',
-              )}
-            >
-              <option value="">{t`All games`}</option>
-              {collections.map((entry) => (
-                <option key={entry.id} value={String(entry.id)}>
-                  {entry.name}
-                </option>
-              ))}
-            </select>
-          </ChipRow>
-        ) : null}
-      </div>
+            heading={t`Played between`}
+            from={shown?.from}
+            to={shown?.to}
+            preset={range ? null : period}
+            // Editing a field starts from what it showed, so nudging a pick's first day
+            // keeps the rest of it; both emptied is no range, which is every game again.
+            onRange={(from, to) => onRange(from || to ? { from, to } : null)}
+            onPreset={onPeriod}
+            fromLabel={t`Played from`}
+            toLabel={t`Played until`}
+          />
+        )}
+      </FilterPopover>
+      {collections.length > 0 && onCollection ? (
+        <PickerSelect
+          label={t`Collection`}
+          value={chosen ? String(chosen.id) : ''}
+          set={chosen !== null}
+          leading={chosen ? <CollectionSwatch color={chosen.color} /> : undefined}
+          onChange={(next) => onCollection(next === '' ? null : Number(next))}
+          options={[
+            { value: '', label: t`All games` },
+            ...collections.map((entry) => ({ value: String(entry.id), label: entry.name })),
+          ]}
+          // A long collection name is cut at the pane's edge rather than widening the form.
+          className="max-w-full overflow-hidden"
+        />
+      ) : null}
     </div>
   )
 }

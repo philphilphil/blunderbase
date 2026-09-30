@@ -11,6 +11,7 @@ import type { I18n, MessageDescriptor } from '@lingui/core'
 import { msg } from '@lingui/core/macro'
 import { Trans, useLingui } from '@lingui/react/macro'
 
+import { COLUMN_HEAD } from '@/components/ui/row'
 import { SPEEDS, type StatsBucket } from '@/lib/api/types'
 import { cn } from '@/lib/utils'
 
@@ -128,7 +129,8 @@ export function TimeControlCard({ query }: { query: StatsQuery }) {
       compact
       title={t`Performance by time control`}
       aside={
-        <span className="font-mono text-meta tabular text-dim-2">
+        // Words, so sans like every readout of words; mono is for figures.
+        <span className="text-label text-dim">
           <Trans>score · blunders</Trans>
         </span>
       }
@@ -145,7 +147,12 @@ export function TimeControlCard({ query }: { query: StatsQuery }) {
             "Blitz" over "1,284" over "48.2" over "1.4" over "1612" and lose the only thing
             the table is for — reading one speed against another down a column. */}
         <div className="flex min-h-0 flex-1 flex-col max-md:overflow-x-auto">
-          <div className="flex h-[1.125rem] flex-none items-center gap-2.5 border-b border-hairline text-meta tracking-[0.06em] text-dim-2 uppercase max-md:min-w-[22rem]">
+          <div
+            className={cn(
+              COLUMN_HEAD,
+              'flex h-[1.125rem] flex-none items-center gap-2.5 border-b border-hairline max-md:min-w-[22rem]',
+            )}
+          >
             <span className="w-[4.75rem] flex-none">
               <Trans comment="Table column: the time control a bucket of games was played at">
                 Control
@@ -172,28 +179,21 @@ export function TimeControlCard({ query }: { query: StatsQuery }) {
               const played = Math.max(1, row.wins + row.draws + row.losses)
               const highlight = busiest?.key === row.key && rows.length > 1
               const { wins, draws, losses } = row
+              // A table of facts: no hover, since nothing here is clickable. The most-played
+              // row had been boxed in accent with no word saying why, which read as a
+              // selection; its emphasis moves onto the figure that earns it, its Games count
+              // set bright and semibold, and its title says what that means.
               return (
                 <div
                   key={row.key}
-                  className={cn(
-                    'flex h-[1.25rem] items-center gap-2.5 rounded-[0.25rem] px-0.5',
-                    highlight
-                      ? 'bg-accent-teal/6 shadow-[inset_0_0_0_0.0625rem_color-mix(in_srgb,var(--bb-accent)_22%,transparent)]'
-                      : 'hover:bg-elevated-2',
-                  )}
+                  title={highlight ? t`Your most played time control` : undefined}
+                  className="flex h-[1.25rem] items-center gap-2.5 px-0.5"
                 >
-                  <span
-                    className={cn(
-                      'w-[4.75rem] flex-none truncate',
-                      highlight ? 'text-bright' : 'text-body',
-                    )}
-                  >
-                    {row.label}
-                  </span>
+                  <span className="w-[4.75rem] flex-none truncate text-body">{row.label}</span>
                   <span
                     className={cn(
                       'w-11 flex-none text-right',
-                      highlight ? 'text-body' : 'text-soft',
+                      highlight ? 'font-semibold text-bright' : 'text-soft',
                     )}
                   >
                     {row.games}

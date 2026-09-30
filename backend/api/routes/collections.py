@@ -67,6 +67,7 @@ def create_collection(session: SessionDep, body: CollectionCreate) -> Any:
         name=body.name,
         color=body.color,
         description=body.description,
+        pinned=body.pinned,
         rule=_rule(body.rule),
         apply_to_existing=body.apply_to_existing,
         game_ids=body.game_ids,
@@ -98,6 +99,8 @@ def update_collection(session: SessionDep, collection_id: int, body: CollectionU
         changes["color"] = body.color
     if "description" in sent:
         changes["description"] = body.description
+    if "pinned" in sent and body.pinned is not None:
+        changes["pinned"] = body.pinned
     if "rule" in sent:
         changes["rule"] = _rule(body.rule)
     collection = collections_service.update_collection(session, collection_id, **changes)

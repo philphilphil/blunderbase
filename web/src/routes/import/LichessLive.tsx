@@ -11,13 +11,18 @@
  *
  * A token pasted before the button existed still reads the explorer but carries no name,
  * so it is offered a reconnect rather than shown as connected to nobody.
+ *
+ * Its buttons are secondary faces: the box's own Sync is one, and the Accounts region's one
+ * primary is Sync all. The stream's state is a status dot, green while games arrive live,
+ * because blue is kept for interaction and choice.
  */
 import { Trans, useLingui } from '@lingui/react/macro'
 
+import { StatusDot } from '@/components/badges/StatusDot'
 import { ConnectLichessButton } from '@/components/lichess/ConnectLichess'
+import { Button } from '@/components/ui/button'
 import { useDisconnectLichess, useLichessConnection, useSyncSchedule } from '@/lib/api/queries'
 import { useRuntimeCapabilities } from '@/lib/runtime/capabilities'
-import { cn } from '@/lib/utils'
 
 export function LichessLive() {
   const { t } = useLingui()
@@ -37,7 +42,7 @@ export function LichessLive() {
             ? t`Connect again to import games as soon as they end.`
             : t`Connect Lichess to import games as soon as they end.`}
         </p>
-        <ConnectLichessButton reconnect={connected} />
+        <ConnectLichessButton reconnect={connected} variant="secondary" />
       </div>
     )
   }
@@ -59,26 +64,32 @@ export function LichessLive() {
             Connected as <span className="font-medium text-ink">{username}</span>
           </Trans>
         </span>
-        <button
+        <Button
           type="button"
+          variant="secondary"
+          size="sm"
           onClick={() => disconnect.mutate()}
           disabled={disconnect.isPending}
-          className="text-label text-dim hover:text-ink disabled:text-faint-2"
+          title={disconnect.isPending ? t`Disconnecting` : undefined}
         >
           <Trans>Disconnect</Trans>
-        </button>
+        </Button>
       </div>
       <p className="flex items-center gap-1.5 text-label text-dim" data-stream={stream}>
-        <span
-          aria-hidden
-          className={cn(
-            'size-1.5 rounded-full',
-            stream === 'live' ? 'bg-accent-teal' : stream === 'rejected' ? 'bg-blunder' : 'bg-faint',
-          )}
+        <StatusDot
+          tone={
+            stream === 'live'
+              ? 'healthy'
+              : stream === 'connecting'
+                ? 'waiting'
+                : stream === 'rejected'
+                  ? 'error'
+                  : 'away'
+          }
         />
         {status}
       </p>
-      {stream === 'rejected' ? <ConnectLichessButton reconnect /> : null}
+      {stream === 'rejected' ? <ConnectLichessButton reconnect variant="secondary" /> : null}
       {disconnect.error ? (
         <p className="text-label text-blunder">{disconnect.error.message}</p>
       ) : null}

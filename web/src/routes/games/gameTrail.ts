@@ -82,25 +82,41 @@ function subscribe(listener: () => void) {
   return () => listeners.delete(listener)
 }
 
+/** The list a game was opened from: where to go back to, and the address to name it by. */
+export interface LibraryOrigin {
+  /** The table this game was opened from (its filters, sort and page), or bare `/games`. */
+  address: string
+  /**
+   * That address's query (`?` left off), which `useLibraryPlace` reads to name the place:
+   * "Games", a saved cut, a collection, or "Games (filtered)". Empty for bare `/games`.
+   */
+  search: string
+}
+
 /**
- * Where the game screen's "Library" crumb leads: the table this game was opened from —
+ * Where the game screen's trail and back link lead: the table this game was opened from —
  * its filters, sort and page — or the bare library for a game reached any other way.
  *
  * The page is worked out from where the reader now stands in the run rather than copied
  * from the address, so a reader who stepped with `]` off the end of page 2 goes back to
  * page 3, where the game they are on is.
  */
-export function useLibraryAddress(gameId: number | null): string {
+export function useLibraryOrigin(gameId: number | null): LibraryOrigin {
   const read = useCallback(() => trail, [])
   const here = useSyncExternalStore(subscribe, read, read)
   if (here === null || gameId === null || here.gameId !== gameId || !here.library) {
-    return LIBRARY
+    return { address: LIBRARY, search: '' }
   }
   const { search, rowsPerPage } = here.library
   const params = new URLSearchParams(search)
   if (rowsPerPage > 0) writePageParam(params, Math.floor(here.offset / rowsPerPage) + 1)
   const query = params.toString()
-  return query ? `${LIBRARY}?${query}` : LIBRARY
+  return { address: query ? `${LIBRARY}?${query}` : LIBRARY, search: query }
+}
+
+/** `useLibraryOrigin`'s address alone. */
+export function useLibraryAddress(gameId: number | null): string {
+  return useLibraryOrigin(gameId).address
 }
 
 export interface TrailPosition {

@@ -6,6 +6,7 @@ import { useState, type FormEvent } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { NativeSelect } from '@/components/ui/native-select'
 import { probeEngine } from '@/lib/api/endpoints'
 import { useAddEngine } from '@/lib/api/queries'
 import type { EngineKind, EngineResponse, ProbeResponse } from '@/lib/api/types'
@@ -22,6 +23,9 @@ import type { EngineKind, EngineResponse, ProbeResponse } from '@/lib/api/types'
  * person. Which job it does is not asked here: a new engine fills any role still empty
  * (`services.engines.assign_default_roles`), and the rest is decided under "What runs what"
  * where both roles are seen together.
+ *
+ * The footer is every form's: Cancel as a secondary face, then the one primary, Add engine.
+ * Cancel had been a bare word in the head, where it read as a caption.
  */
 export function AddEngineForm({
   onAdded,
@@ -61,19 +65,9 @@ export function AddEngineForm({
       onSubmit={submit}
       className="flex flex-col gap-3 rounded-xl border border-line bg-panel px-3.5 py-3.5"
     >
-      <div className="flex items-center gap-2.5">
-        <span className="text-data font-semibold text-ink">
-          <Trans>Add an engine</Trans>
-        </span>
-        <div className="flex-1" />
-        <button
-          type="button"
-          onClick={onCancel}
-          className="text-label text-dim transition-colors hover:text-ink"
-        >
-          <Trans>Cancel</Trans>
-        </button>
-      </div>
+      <h2 className="text-data font-semibold text-ink">
+        <Trans>Add an engine</Trans>
+      </h2>
 
       <div className="flex flex-col gap-1.5">
         <Label htmlFor="add-engine-path">
@@ -94,8 +88,9 @@ export function AddEngineForm({
           />
           <Button
             type="button"
-            variant="outline"
+            variant="secondary"
             disabled={!path.trim() || probe.isPending}
+            title={!path.trim() ? t`Type a path first` : undefined}
             onClick={() => probe.mutate()}
           >
             {probe.isPending ? <Loader2 className="animate-spin" aria-hidden /> : <Search aria-hidden />}
@@ -144,15 +139,15 @@ export function AddEngineForm({
           <Label htmlFor="add-engine-kind">
             <Trans>Kind</Trans>
           </Label>
-          <select
+          <NativeSelect
             id="add-engine-kind"
             value={kind}
             onChange={(event) => setKind(event.target.value as EngineKind)}
-            className="h-8 rounded-md border border-input bg-elevated px-2 text-data text-ink outline-none transition-colors focus-visible:border-accent-teal/50"
+            className="h-8"
           >
             <option value="uci">{t`Normal engine`}</option>
             <option value="maia">{t`Human moves (Maia)`}</option>
-          </select>
+          </NativeSelect>
         </div>
       </div>
 
@@ -166,6 +161,9 @@ export function AddEngineForm({
             path.
           </Trans>
         </p>
+        <Button type="button" variant="secondary" size="sm" onClick={onCancel}>
+          <Trans>Cancel</Trans>
+        </Button>
         <Button type="submit" size="sm" disabled={add.isPending}>
           {add.isPending ? <Loader2 className="animate-spin" aria-hidden /> : <Plus aria-hidden />}
           <Trans>Add engine</Trans>

@@ -1910,6 +1910,21 @@ def test_finishing_a_run_stores_the_game_card_in_the_same_commit(session: Sessio
     assert [moment["ply"] for moment in game.card["worst_moments"]] == [2, 0]
 
 
+def test_a_card_says_a_game_is_in_the_queue_until_its_run_finishes(session: Session) -> None:
+    _engine(session)
+    game = _game(session)
+    other = _game(session, plies=4)
+    assert games_service.game_cards(session, [game, other])[0]["queued"] is False
+
+    run = analysis.request_analysis(session, game_id=game.id, priority=analysis.IMPORT_PRIORITY)
+
+    cards = games_service.game_cards(session, [game, other])
+    assert [card["queued"] for card in cards] == [True, False]
+    assert games_service.game_card(session, game)["queued"] is True
+    analysis.complete_run(session, run, [MoveEval(ply=0, win_after=52.0, win_loss=4.0)])
+    assert games_service.game_cards(session, [game])[0]["queued"] is False
+
+
 def test_the_card_a_run_stores_covers_every_run_over_the_game(session: Session) -> None:
     _engine(session)
     game = _game(session)

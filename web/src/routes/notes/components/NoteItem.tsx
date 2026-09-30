@@ -31,10 +31,11 @@ import { msg } from '@lingui/core/macro'
 import { Trans, useLingui } from '@lingui/react/macro'
 import { Library, Network, Pencil, Trash2 } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
-import { Link } from 'react-router-dom'
 
 import { MiniBoard } from '@/components/board/MiniBoard'
-import { Badge } from '@/components/ui/badge'
+import { Readout } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { TextLink } from '@/components/ui/text-link'
 import type { NoteResponse } from '@/lib/api/types'
 import { useNotation } from '@/lib/chess/notationPrefs'
 import { relative } from '@/lib/mcp/status'
@@ -51,6 +52,7 @@ import {
   scopeOf,
 } from '../presentation'
 import { DeleteConfirm, NoteEditor } from './NoteEditor'
+import { TagChip } from './TagChip'
 
 const SOURCE_LABELS: Record<string, MessageDescriptor> = {
   mcp: msg`via MCP`,
@@ -105,52 +107,59 @@ export function NoteItem({
 
   const parts = {
     heads: (
+      // The kind, the model-game mark, who wrote it and when are facts, so all four are flat
+      // readouts; "game" and "loose" are drawn alike and the word carries the difference.
+      // They had worn a box (and "loose" a dashed one), which put them in the same shape as
+      // the tags under them, and a tag is the one thing on the card that can be pressed.
       <div className="flex flex-wrap items-center gap-1.5">
-        <Badge variant={scope === 'free' ? 'dashed' : 'default'}>{i18n._(SCOPE_BADGES[scope])}</Badge>
+        <Readout className="text-meta">{i18n._(SCOPE_BADGES[scope])}</Readout>
         {note.game?.is_owner_game === false ? (
-          <Badge variant="dashed" title={t`Written on a model game, not one of yours`}>
+          <Readout className="text-meta" title={t`Written on a model game, not one of yours`}>
             <Trans>model game</Trans>
-          </Badge>
+          </Readout>
         ) : null}
         {note.source && SOURCE_LABELS[note.source] ? (
-          <span
-            className="text-meta text-faint"
+          <Readout
+            className="text-meta"
             title={i18n._(SOURCE_TITLES[note.source] ?? SOURCE_LABELS[note.source]!)}
           >
             {i18n._(SOURCE_LABELS[note.source]!)}
-          </span>
+          </Readout>
         ) : null}
         <span className="flex-1" />
-        <span
-          className="font-mono text-meta text-dim-2"
-          title={t`written ${when}`}
-        >
+        <Readout num title={t`written ${when}`}>
           {relative(note.created_at)}
-        </span>
+        </Readout>
         {editing ? null : (
-          <>
-            <button
-              type="button"
+          // Ghost icons: a face on two tools repeated on every card would be a wall of
+          // buttons. The negative margin keeps their 24px target from growing the line;
+          // `ml-auto` keeps them at the right edge when a narrow card wraps them.
+          <span className="-my-1 ml-auto flex items-center">
+            <Button
+              variant="ghost"
+              size="icon-xs"
               onClick={() => setEditing(true)}
               aria-label={t`Rewrite this note`}
               title={t`Rewrite this note`}
-              className="text-faint transition-colors hover:text-ink"
+              className="text-dim"
             >
               <Pencil className="size-3.5" aria-hidden />
-            </button>
-            <button
-              type="button"
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon-xs"
               onClick={() => setConfirming((was) => !was)}
               aria-label={t`Forget this note`}
+              aria-expanded={confirming}
               title={t`Forget this note`}
               className={cn(
-                'transition-colors hover:text-blunder',
-                confirming ? 'text-blunder' : 'text-faint',
+                'hover:not-disabled:text-blunder',
+                confirming ? 'text-blunder' : 'text-dim',
               )}
             >
               <Trash2 className="size-3.5" aria-hidden />
-            </button>
-          </>
+            </Button>
+          </span>
         )}
       </div>
     ),
@@ -174,16 +183,7 @@ export function NoteItem({
       !editing && note.tags.length ? (
         <div className="flex flex-wrap gap-1">
           {note.tags.map((tag) => (
-            <button
-              key={tag}
-              type="button"
-              onClick={() => onTagClick?.(tag)}
-              disabled={!onTagClick}
-              title={onTagClick ? t`Show only notes tagged ${tag}` : undefined}
-              className="rounded-sm border border-edge bg-elevated px-1.5 py-px text-meta text-soft transition-colors enabled:hover:bg-raised enabled:hover:text-ink"
-            >
-              {tag}
-            </button>
+            <TagChip key={tag} tag={tag} onClick={onTagClick} />
           ))}
         </div>
       ) : null,
@@ -271,6 +271,10 @@ export function NoteItem({
  * line under four bands of small grey type. Drawn while the note is being rewritten as
  * well: where a note came from does not change when its text does, and a row that
  * disappears under the editor takes the reader's place with it.
+ *
+ * Both are quiet links (`TextLink tone="quiet"`): soft text and a faint `›` that turn
+ * accent only under the pointer. They repeat on every card, and two blue lines per card
+ * made the stream blue and out-shouted the notes themselves.
  */
 function Provenance({ note, move }: { note: NoteResponse; move: string | null }) {
   const { t } = useLingui()
@@ -292,32 +296,34 @@ function Provenance({ note, move }: { note: NoteResponse; move: string | null })
       ) : null}
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
         {origin ? (
-          <Link
+          <TextLink
             to={origin}
+            tone="quiet"
             title={move ? t`Open ${from} at ${move}` : t`Open ${from}`}
-            className="flex min-w-0 items-center gap-1.5 text-dim transition-colors hover:text-accent-teal"
+            className="min-w-0 gap-1.5"
           >
-            <Library className="size-3 flex-none" aria-hidden />
+            <Library className="size-3 flex-none text-dim" aria-hidden />
             <span className="truncate">
               {move ? (
                 <Trans>
-                  Written on <span className="font-mono tabular text-soft-2">{move}</span> in {from}
+                  Written on <span className="font-mono tabular">{move}</span> in {from}
                 </Trans>
               ) : (
                 <Trans>Written in {from}</Trans>
               )}
             </span>
-          </Link>
+          </TextLink>
         ) : null}
         {explorer ? (
-          <Link
+          <TextLink
             to={explorer}
+            tone="quiet"
             title={t`Open this position in the opening explorer`}
-            className="flex flex-none items-center gap-1.5 text-dim transition-colors hover:text-accent-teal"
+            className="flex-none gap-1.5"
           >
-            <Network className="size-3" aria-hidden />
+            <Network className="size-3 flex-none text-dim" aria-hidden />
             {reach ?? t`In the opening explorer`}
-          </Link>
+          </TextLink>
         ) : null}
       </div>
     </div>

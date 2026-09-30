@@ -4,9 +4,11 @@
  * One component because two dialogs ask the same question with different kinds: a
  * correspondence search stops at minutes, depth, nodes or nothing at all, and the game's
  * Analyse… stops *each move* at seconds, depth or nodes. The kinds, their labels and what
- * switching kind resets the value to are the caller's; the shape — pressed chips, then a
- * box that disappears for a kind with no number — is the same everywhere, so a reader who
- * learned it in one dialog knows it in the other.
+ * switching kind resets the value to are the caller's; the shape — the one-of-N `Segmented`
+ * (a sunken track with the chosen kind raised), then a box that disappears for a kind with
+ * no number — is the same everywhere, so a reader who learned it in one dialog knows it in
+ * the other. The kinds had been pressed chips, the same blue as a selection of data; a
+ * limit's kind is a setting's value, which the neutral thumb says.
  *
  * Kept controlled: which kind resets to which value is a promise the dialog makes in its
  * own doc comment, and a field that remembered its own defaults would split that promise.
@@ -16,6 +18,7 @@ import type { ReactNode } from 'react'
 
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Segmented } from '@/components/ui/segmented'
 import { cn } from '@/lib/utils'
 
 export interface LimitKindOption<K extends string> {
@@ -55,24 +58,13 @@ export function LimitField<K extends string>({
     <div className={cn('flex min-w-0 flex-1 flex-col gap-1.5', className)}>
       <Label>{label}</Label>
       <div className="flex flex-wrap items-center gap-2">
-        <div role="group" aria-label={groupLabel} className="flex gap-1">
-          {kinds.map((option) => (
-            <button
-              key={option.kind}
-              type="button"
-              aria-pressed={kind === option.kind}
-              onClick={() => onKindChange(option.kind)}
-              className={cn(
-                'rounded-md border px-2 py-1 text-label transition-colors',
-                kind === option.kind
-                  ? 'border-accent-teal/40 bg-selected text-ink'
-                  : 'border-edge text-dim hover:border-edge-hover hover:text-ink',
-              )}
-            >
-              {option.label}
-            </button>
-          ))}
-        </div>
+        <Segmented
+          label={groupLabel}
+          value={kind}
+          onChange={onKindChange}
+          options={kinds.map((option) => ({ value: option.kind, label: option.label }))}
+          className="h-8"
+        />
         {current?.unbounded ? null : (
           <Input
             aria-label={t`Limit`}

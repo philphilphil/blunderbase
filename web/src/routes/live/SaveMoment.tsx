@@ -10,9 +10,10 @@
 import { Trans, useLingui } from '@lingui/react/macro'
 import { Check, Loader2, StickyNote } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
-import { Link } from 'react-router-dom'
 
 import { Button } from '@/components/ui/button'
+import { TextLink } from '@/components/ui/text-link'
+import { Textarea } from '@/components/ui/textarea'
 import { useSaveNote } from '@/lib/api/queries'
 import { commitsOnEnter } from '@/lib/ui/shortcuts'
 
@@ -66,17 +67,17 @@ export function SaveMoment({ active }: SaveMomentProps) {
         <span className="inline-flex items-center gap-1.5 text-label text-good">
           <Check className="size-3" aria-hidden />
           <Trans>Saved</Trans>
-          <Link
-            to={`/notes?note=${saved}`}
-            className="text-accent-teal transition-colors hover:text-accent-link"
-          >
+          <TextLink to={`/notes?note=${saved}`}>
             <Trans>open it</Trans>
-          </Link>
+          </TextLink>
         </span>
       ) : null}
 
-      <button
+      {/* A secondary face ending in "…": it opens a small form that asks for the words. */}
+      <Button
         type="button"
+        size="sm"
+        variant="secondary"
         disabled={!active}
         aria-expanded={open}
         title={
@@ -88,21 +89,21 @@ export function SaveMoment({ active }: SaveMomentProps) {
           setSaved(null)
           setOpen((was) => !was)
         }}
-        className="inline-flex items-center gap-2 rounded-md border border-edge px-2.5 py-[0.3125rem] text-label text-soft transition-colors hover:border-edge-hover hover:text-ink disabled:cursor-not-allowed disabled:text-faint"
+        className="aria-expanded:bg-raised aria-expanded:shadow-none"
       >
-        <StickyNote className="size-3.5" aria-hidden />
-        <Trans>Save this moment</Trans>
-      </button>
+        <StickyNote aria-hidden />
+        <Trans>Save this moment…</Trans>
+      </Button>
 
       {open ? (
         // The panel hangs off the button's right edge, which is not the screen's — the
         // flip control sits to its right — so below `md` it is narrow enough that 19rem
         // of it cannot reach past the left edge of a phone.
         <div className="bb-pop-in absolute top-[calc(100%+0.375rem)] right-0 z-30 flex w-[19rem] flex-col gap-2 rounded-lg border border-edge bg-elevated p-2.5 shadow-[0_1.125rem_2.5rem_-1.125rem_var(--bb-shadow)] max-md:w-[15rem]">
-          <span className="text-meta tracking-[.1em] text-faint uppercase">
+          <span className="text-label font-medium text-dim">
             <Trans>About this position</Trans>
           </span>
-          <textarea
+          <Textarea
             autoFocus
             rows={4}
             value={text}
@@ -116,15 +117,21 @@ export function SaveMoment({ active }: SaveMomentProps) {
             }}
             aria-label={t`Note about this position`}
             placeholder={t`What is worth remembering here?`}
-            className="w-full resize-y rounded-md border border-input bg-panel px-2.5 py-2 text-data leading-[1.55] text-ink outline-none focus-visible:border-accent-teal/50"
+            className="resize-y leading-[1.55]"
           />
-          <div className="flex items-center gap-1.5">
-            <Button size="sm" onClick={commit} disabled={save.isPending || !text.trim()}>
+          {/* Every form's footer: Cancel as the secondary face, then the one primary. */}
+          <div className="flex items-center justify-end gap-2">
+            <Button size="sm" variant="secondary" onClick={() => setOpen(false)}>
+              <Trans>Cancel</Trans>
+            </Button>
+            <Button
+              size="sm"
+              onClick={commit}
+              disabled={save.isPending || !text.trim()}
+              title={text.trim() ? undefined : t`Write something first`}
+            >
               {save.isPending ? <Loader2 className="size-3 animate-spin" aria-hidden /> : null}
               <Trans>Save note</Trans>
-            </Button>
-            <Button size="sm" variant="ghost" onClick={() => setOpen(false)}>
-              <Trans>Cancel</Trans>
             </Button>
           </div>
           {save.isError ? (

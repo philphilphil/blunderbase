@@ -9,7 +9,7 @@
  *
  * Which of them is a button and which is a line in the ⋯ menu is decided by how often it is
  * pressed. **Add to library** is the one affirmative act on a model game's screen and exists
- * only while the game is one, so it is a button in the row with its word in the accent. The
+ * only while the game is one, so it is the row's one primary button. The
  * way back to the explorer, the tree behind a finished correspondence game and the game's
  * collections are pressed once a session at most, and they are what `useStudioMenu` hands
  * to `RowMenu` — a row that carried them as buttons was a row that wrapped.
@@ -19,10 +19,11 @@
  * states of "Add to library" belong here rather than to the page that places it.
  */
 import { Trans, useLingui } from '@lingui/react/macro'
+import { Plus } from 'lucide-react'
 import { useState, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 
-import { buttonVariants } from '@/components/ui/button'
+import { Button } from '@/components/ui/button'
 import { SETTING_DEFAULTS } from '@/lib/api/appSettings'
 import {
   useAppSettings,
@@ -30,20 +31,16 @@ import {
   useImportReferenceGame,
 } from '@/lib/api/queries'
 import { CorrespondenceTreeDialog } from '@/routes/correspondence/components/CorrespondenceTreeDialog'
-import { cn } from '@/lib/utils'
 
 import type { StudioGame } from '../GamePage'
 import { GameCollectionsDialog } from './GameCollectionsDialog'
 import type { RowMenuItem } from './RowMenu'
 
 /**
- * The board row's button: the app's tool button at the row's `sm`, with the phone's taller
- * target below `md` — the same metrics as everything else in that band (`BoardPanel`).
+ * The board row's metrics on a `Button` at the row's `sm`: the phone's taller target below
+ * `md` — the same as everything else in that band (`BoardPanel`).
  */
-const BUTTON = cn(
-  buttonVariants({ variant: 'secondary', size: 'sm' }),
-  'flex-none max-md:h-auto max-md:py-1.5',
-)
+const BUTTON_EXTRA = 'flex-none max-md:h-auto max-md:py-1.5'
 
 export function StudioActions({
   game,
@@ -165,32 +162,30 @@ function AddToLibrary({
   })
 
   return (
-    <button
-      type="button"
+    <Button
+      // The one affirmative act on a model game's screen, so the row's one primary (the
+      // filled accent): accent *text* is a link's, and this does something. A failed add
+      // turns to the red outline — an error is one of the few things strong colour is for.
+      variant={add.isError ? 'destructive-outline' : 'default'}
+      size="sm"
       onClick={() => add.mutate({ source, gameId: id })}
       disabled={add.isPending}
       title={
-        add.error?.message ??
-        t`Kept as somebody else’s game: analysed and annotated like your own, counted in no statistic.`
+        add.isPending
+          ? t`Adding this game to your library…`
+          : (add.error?.message ??
+            t`Kept as somebody else’s game: analysed and annotated like your own, counted in no statistic.`)
       }
-      // The accent on the word only: the one affirmative act on a model game's screen, and
-      // the one control in the row that is doing something rather than showing something.
-      // Not a blue frame or fill, which would make it read as a toggle already on. A failed
-      // add keeps its red frame — an error is one of the few things strong colour is for.
-      className={cn(
-        BUTTON,
-        add.isError
-          ? 'border-blunder/40 bg-blunder/10 text-blunder hover:bg-blunder/15 hover:text-blunder'
-          : 'text-accent-teal hover:text-accent-link',
-      )}
+      className={BUTTON_EXTRA}
     >
+      <Plus aria-hidden />
       {add.isPending ? (
         <Trans>Adding…</Trans>
       ) : add.isError ? (
         <Trans>Could not add — retry</Trans>
       ) : (
-        <Trans>+ Add to library</Trans>
+        <Trans>Add to library</Trans>
       )}
-    </button>
+    </Button>
   )
 }

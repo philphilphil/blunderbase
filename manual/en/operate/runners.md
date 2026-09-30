@@ -1,6 +1,6 @@
 # Machines
 
-**Compute → Machines** is where engines run, how much runs at once, and what is running
+**Compute › Machines** is where engines run, how much runs at once, and what is running
 now: one card per host. [Engines](engines.md) is what is installed; this page is what it
 runs on.
 
@@ -12,7 +12,11 @@ with what each is doing. Then **this browser**, which becomes a machine the mome
 install the engine that ships with the app, and each **remote runner** with its slots and
 the engines it advertised. A slot is one engine job or one analysis board.
 
-**Remote runner** and **How remote runners work** are in the title bar.
+**Remote runner** and **How remote runners work** (the ⓘ) are in the title bar. A browser or
+runner card opens with a press on its row, and the open one is highlighted. On this
+browser's card, **Install browser Stockfish** installs the engine, **Start** and **Stop**
+connect and disconnect it, and **Uninstall…** asks before it revokes the browser and forgets
+it.
 
 ## How much at once
 
@@ -48,7 +52,7 @@ and the line says so. Lower the cap, or give a row fewer threads on Engines. Thr
 per engine; how many processes is per machine. While
 [correspondence mode](../guide/analysis.md#correspondence) is off only the engine holding
 Analysis is priced, because nothing else runs here unless you pick another in a game's
-**Analyse**.
+**Analyse…**.
 
 A remote runner's slots are set when it is registered and can be changed on its card
 (**Rename or resize**); the machine's threads are in its own `runner.yaml`, so the budget
@@ -280,7 +284,8 @@ the queue shows it waiting on that machine, and updating the runner is the fix.
 $ blunderbase runners revoke gpu-box
 ```
 
-**Revoke** on the runner's card on the Machines page does the same. Either way the
+**Revoke…** on the runner's card on the Machines page does the same, once you confirm with
+**Revoke**. Either way the
 token stops working and the engines it
 advertised are deleted.
 

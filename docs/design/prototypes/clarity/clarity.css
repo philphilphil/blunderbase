@@ -1,0 +1,1207 @@
+/* ==========================================================================================
+ * Clarity pass: core overlay (spec: scratchpad/clarity/spec.md; README.md in this folder)
+ *
+ * Every rule here is scoped to html.clarity, so removing the class shows the captured current
+ * design unchanged. Decision variants: html.clarity-<decision>-a / -b, set by clarity.js from the
+ * URL query (?clarity=1&theme=dark&tabs=a&segment=a&shell=a&collections=a).
+ *
+ * The captured pages carry Tailwind 4, whose utilities live in @layer. These rules are unlayered,
+ * so they win over any utility without !important; they therefore restate hover, pressed, on and
+ * disabled themselves wherever they set a rest look. Colours only through var(--bb-*). The new
+ * tokens (spec §3.1: control, control-hover, control-edge, control-edge-strong, control-shade,
+ * field, field-shade, nav-current) are defined once, below, as the index.css change would.
+ *
+ * ------------------------------------------------------------------------------------------
+ * HOOK-CLASS CATALOGUE. Put a hook on an element and it takes the grammar. Stable selectors
+ * that already match without a hook are listed after "auto:".
+ *
+ *  Shell (applied by clarity.js on every screen; screens never add these)
+ *   .cl-shell .cl-bar .cl-body .cl-rail .cl-main       the frame, bar, rail, main
+ *   .cl-bar-menu .cl-bar-brand .cl-bar-demo .cl-bar-sep  captured bar pieces
+ *   .cl-crumbs (captured trail, hidden)  .cl-title (new: trail › title)  .cl-page-actions
+ *   .cl-bar-spacer .cl-bar-divider .cl-queue .cl-engine-chip .cl-theme .cl-kbar-search
+ *   .cl-shortcuts .cl-account-orig                        captured globals (hidden in clarity)
+ *   .cl-engine-switch  .cl-search-field  .cl-bar-queue .cl-rail-queue  .cl-avatar-btn
+ *   .cl-rail-brand .cl-demo  .cl-nav-heading(-first)  .cl-nav-row  .cl-nav-fold  .cl-nav-sub
+ *   .cl-nav-fold-label  .cl-current (the one lit leaf)  .cl-parent (plain parent of the leaf)
+ *   .cl-pinned .cl-pinned-row (?pin=N on games.html = Games showing that collection)
+ *   .cl-fold-extra .cl-fold-more (a route fold past 4 rows)  .cl-fold-hidden
+ *   .cl-rail-footer: .cl-status-line (.cl-engines-line + .cl-rail-queue) .cl-account-row .cl-utility .cl-conn-dot
+ *   .cl-bar.cl-detail (phone: back link, no ☰)  .cl-account-menu .cl-menu-item .cl-menu-field
+ *   .cl-new  = built by clarity.js, hidden unless html.clarity
+ *   .cl-shell-a / .cl-shell-b / .cl-collections-a = shown only in that variant
+ *
+ *  Control grammar (screens add these to their markup; spec §3)
+ *   .cl-btn                 secondary: the tool button, a raised FACE (+ [aria-pressed=true] = on)
+ *   .cl-btn-icon            an icon-only face: the strong control edge (auto: faces with size-6/7/8)
+ *   .cl-btn-primary         the one filled accent action per region
+ *   (disabled, any variant) one look: no face, quiet border, faint text, not-allowed (5.4b)
+ *   .cl-btn-ghost           icon action in a row or strip: no face until hover
+ *   .cl-btn-danger          destructive-outline: red text on a face
+ *   .cl-btn-destructive     filled red, only a confirm dialog's button
+ *   .cl-group > .cl-btn     attached button group (transport, flag nav): faced cells
+ *   .cl-tabs > .cl-tab      pane tab strip; selected = [aria-selected=true] | [aria-pressed=true] | .is-selected
+ *     .cl-tab-count .cl-strip-facts .cl-strip-rule .cl-strip-tools
+ *     auto: [role=tablist].h-[2.1875rem] > [role=tab]; .h-[2.1875rem] > button.relative.h-full.px-3
+ *   .cl-seg > .cl-seg-item  segmented one-of-N; chosen = [aria-pressed|aria-checked|aria-selected=true] | .is-on
+ *     .cl-seg-xs (h-6)      auto: [role=group].h-7.overflow-hidden.rounded-md, [role=radiogroup].rounded-md.border,
+ *                           [role=group][aria-label^="Whose games"]
+ *   .cl-switch              button[role=switch][aria-checked] or label with input.cl-switch-input;
+ *     .cl-switch-label .cl-switch-track .cl-switch-thumb
+ *   .cl-picker              value picker: face + trailing ⇅; .is-set / [data-set] = non-default value,
+ *     .cl-picker-value       [aria-expanded=true] = open; .cl-picker-clear = the × segment
+ *     .cl-picker-ghost       strip size: no face at rest (auto inside .bb-pane-title / 35px strips)
+ *   .cl-menu-trigger        a labelled action menu: face + trailing ⌄
+ *   .cl-chip                any-of set member: bordered, no face; [aria-pressed=true] = on (+ ✓);
+ *                           blue fill only once the set is narrowed (all on = neutral + dim ✓)
+ *     auto: button[aria-pressed].h-6.rounded-md.border.px-2 (the FilterChip)
+ *   .cl-readout             a fact as flat text (.cl-readout-num = mono figures)
+ *   .cl-badge               a fact as a borderless tint (.cl-badge-info/-good/-warn/-bad)
+ *     auto: [data-slot=badge] loses its border
+ *   .cl-link / .cl-link-ext in-app link with › / external link with ↗
+ *     auto: main a.text-accent-teal
+ *   .cl-link-quiet          repeated metadata link: soft text, faint ›, accent on hover
+ *   .cl-link-inline         a link inside a sentence: underlined at rest, no chevron (= .cld-prose-link)
+ *   .cl-input               field: SUNK (--bb-field + top inner shade)  auto: [data-slot=input|textarea]
+ *   .cl-select              native select drawn as a field
+ *   .cl-check               checkbox on a span/button [aria-checked=true|mixed]; auto: input[type=checkbox]
+ *   .cl-th / .cl-th-sort / .cl-th-active   column heads          auto: [data-slot=table-head]
+ *   .cl-row                 clickable row; selected = [aria-selected=true] | .is-selected; .cl-row-cursor
+ *   .cl-pager               pagination: faced ‹ ›, flat position readout
+ *   .cl-dot.is-ok/.is-busy/.is-warn/.is-err/.is-idle/.is-none   status dot (green = alive)
+ *  auto (Button component, by its class signature):
+ *   secondary + outline -> FACE; default -> primary. Sizes are never changed.
+ * ========================================================================================== */
+
+/* ------------------------------------------------------------------ 1. tokens (spec §3.1) */
+html.clarity {
+  --bb-control: #3c3d3e;
+  --bb-control-hover: #444546;
+  --bb-control-edge: #5d5f5e;
+  --bb-control-edge-strong: #777975; /* = edge-hover; 3.14:1 on the panel. Only where the boundary is the
+                                        whole signal: switch-off track, checkbox, icon-only faces */
+  --bb-control-shade: rgb(0 0 0 / 0.4);
+  --bb-field: #212222; /* = surface-2: a field is sunk, a face is raised */
+  --bb-field-shade: rgb(0 0 0 / 0.25); /* 1px inner TOP shade: the inverse of the face's bottom shade */
+  --bb-nav-current: #3a3b3c;
+  --cl-accent-45: color-mix(in srgb, var(--bb-accent) 45%, transparent);
+  --cl-accent-60: color-mix(in srgb, var(--bb-accent) 60%, transparent);
+  --cl-face-shadow: inset 0 -1px 0 var(--bb-control-shade);
+  /* mask shapes for glyphs drawn by CSS (the shape only; the colour is background-color) */
+  --cl-i-updown: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m7 15 5 5 5-5'/%3E%3Cpath d='m7 9 5-5 5 5'/%3E%3C/svg%3E");
+  --cl-i-down: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  --cl-i-right: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m9 18 6-6-6-6'/%3E%3C/svg%3E");
+  --cl-i-out: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M7 7h10v10'/%3E%3Cpath d='M7 17 17 7'/%3E%3C/svg%3E");
+  --cl-i-check: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 6 9 17l-5-5'/%3E%3C/svg%3E");
+  --cl-i-minus: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='3' stroke-linecap='round'%3E%3Cpath d='M5 12h14'/%3E%3C/svg%3E");
+}
+html.clarity.light {
+  --bb-control: #ffffff;
+  --bb-control-hover: #f6f6f4;
+  --bb-control-edge: #aeaea9;
+  --bb-control-edge-strong: #828282; /* 3.34:1 on the panel, >= 3 on surface and void */
+  --bb-control-shade: rgb(0 0 0 / 0.14); /* 0.14, not 0.10: a face must stay distinct from a white KPI tile at 1x */
+  --bb-field: #f3f3f0; /* below the surface (1.07) and the white face, so field = sunk, face = raised */
+  --bb-field-shade: rgb(0 0 0 / 0.06);
+  --bb-nav-current: #e2e2de;
+}
+
+/* ------------------------------------------------------------- 2. visibility plumbing */
+html:not(.clarity) .cl-new { display: none !important; }
+html.clarity:not(.clarity-shell-a) .cl-shell-a { display: none !important; }
+html.clarity:not(.clarity-shell-b) .cl-shell-b { display: none !important; }
+html.clarity:not(.clarity-collections-a) .cl-collections-a { display: none !important; }
+
+/* ------------------------------------------------------------- 3. focus: one solid ring */
+html.clarity :focus-visible {
+  outline: 0.125rem solid var(--bb-accent);
+  outline-offset: 0.125rem;
+}
+html.clarity :is(.cl-tab, [role=tab], .cl-nav-row, .cl-nav-sub, .cl-row, .cl-seg-item, .cl-menu-item):focus-visible {
+  outline-offset: -0.125rem;
+}
+
+/* =========================================================================================
+ * 4. THE SHELL
+ * ======================================================================================= */
+
+/* ---- 4.1 what hides in clarity mode (both variants): theme and shortcuts go to the account
+        menu, the boxed queue / engine chip / ⌘K / account square are replaced, the rail's
+        Engines group becomes one line in its foot, Workspace loses its heading. */
+html.clarity .cl-bar > :is(.cl-crumbs, .cl-queue, .cl-engine-chip, .cl-theme, .cl-kbar-search, .cl-shortcuts, .cl-account-orig),
+html.clarity .cl-rail > :is(.cl-engines-heading, .cl-engines-roster, .cl-nav-heading-first, .cl-nav-gap),
+html.clarity .cl-theme-phone {
+  display: none !important;
+}
+
+/* ---- 4.2 the bar: order is title … actions │ globals */
+html.clarity .cl-bar { gap: 0.625rem; }
+html.clarity .cl-bar > .cl-bar-menu { order: 0; }
+html.clarity .cl-bar > .cl-bar-brand { order: 1; }
+html.clarity .cl-bar > .cl-bar-demo { order: 2; }
+html.clarity .cl-bar > .cl-bar-sep { order: 3; }
+html.clarity .cl-bar > .cl-title { order: 4; }
+html.clarity .cl-bar > .cl-bar-spacer { order: 5; flex: 1 1 0; }
+html.clarity .cl-bar > .cl-page-actions { order: 6; margin-left: 0; }
+html.clarity .cl-bar > .cl-bar-divider { order: 7; }
+html.clarity .cl-bar > .cl-bar-queue { order: 8; }
+html.clarity .cl-bar > .cl-engine-switch { order: 9; }
+html.clarity .cl-bar > .cl-search-bar { order: 10; }
+html.clarity .cl-bar > .cl-avatar-btn { order: 11; }
+
+html.clarity .cl-bar-divider {
+  width: 1px;
+  height: 1.125rem;
+  flex: none;
+  background: var(--bb-line);
+  margin: 0 0.125rem;
+}
+
+/* the page title: the trail in soft data text with › separators, the page's own name as a title */
+html.clarity .cl-title {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 0.375rem;
+  white-space: nowrap;
+}
+/* The trail holds only places, so every crumb is a link (the game's date went to its header).
+   A crumb is soft at rest and says "link" on hover: ink + underline. */
+html.clarity .cl-title-crumb {
+  font-size: var(--text-data);
+  line-height: var(--text-data--line-height);
+  color: var(--bb-muted);
+  flex: none;
+  transition: color 0.15s;
+  text-underline-offset: 0.125rem;
+}
+html.clarity a.cl-title-crumb:hover { color: var(--bb-text); text-decoration: underline; }
+html.clarity .cl-title-crumb.cl-mono { font-family: var(--font-mono); }
+html.clarity .cl-title-sep { display: inline-flex; color: var(--bb-faint); flex: none; }
+html.clarity .cl-title-sep svg { width: 0.75rem; height: 0.75rem; }
+html.clarity .cl-title-name {
+  font-size: var(--text-heading);
+  line-height: var(--text-heading--line-height);
+  font-weight: 600;
+  color: var(--bb-text);
+  letter-spacing: -0.005em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+/* The switch. Drawn as the app's own engines-page Toggle (routes/engines/Toggle.tsx), promoted:
+   off = a grey track with a strong edge and a faint thumb on the left; on = a muted accent track
+   (accent 25%, edge accent 45%) with an accent thumb on the right. Muted on purpose: the bar's
+   primary stays the only saturated blue block, and "on" still reads at a glance. */
+html.clarity .cl-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4375rem;
+  flex: none;
+  cursor: pointer;
+  background: none;
+  border: 0;
+  padding: 0.125rem 0;
+  font-size: var(--text-label);
+  line-height: var(--text-label--line-height);
+  color: var(--bb-muted);
+  border-radius: 0.25rem;
+}
+html.clarity .cl-switch:hover { color: var(--bb-text); }
+html.clarity .cl-switch-track {
+  position: relative;
+  display: inline-block;
+  flex: none;
+  width: 1.75rem;
+  height: 1rem;
+  border-radius: 999px;
+  background: var(--bb-elevated);
+  border: 1px solid var(--bb-control-edge-strong);
+  transition: background-color 0.15s, border-color 0.15s;
+}
+html.clarity .cl-switch-thumb {
+  position: absolute;
+  top: 50%;
+  left: 0.125rem;
+  width: 0.625rem;
+  height: 0.625rem;
+  margin-top: -0.3125rem;
+  border-radius: 999px;
+  background: var(--bb-faint);
+  box-shadow: none;
+  transition: left 0.15s, background-color 0.15s;
+}
+html.clarity :is(.cl-switch[aria-checked=true], .cl-switch.is-on) .cl-switch-track,
+html.clarity .cl-switch-input:checked + .cl-switch-track {
+  background: color-mix(in srgb, var(--bb-accent) 25%, transparent);
+  border-color: var(--cl-accent-45);
+}
+html.clarity :is(.cl-switch[aria-checked=true], .cl-switch.is-on) .cl-switch-thumb,
+html.clarity .cl-switch-input:checked + .cl-switch-track .cl-switch-thumb {
+  left: calc(100% - 0.75rem);
+  background: var(--bb-accent);
+}
+html.clarity :is(.cl-switch[aria-checked=true], .cl-switch.is-on) .cl-switch-label { color: var(--bb-text); }
+html.clarity .cl-switch-input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+html.clarity .cl-switch:has(.cl-switch-input:focus-visible) .cl-switch-track,
+html.clarity .cl-switch:focus-visible .cl-switch-track {
+  outline: 0.125rem solid var(--bb-accent);
+  outline-offset: 0.125rem;
+}
+html.clarity .cl-switch:focus-visible { outline: none; }
+html.clarity .cl-switch:is([disabled], [aria-disabled=true]) { opacity: 0.5; cursor: not-allowed; }
+
+/* search: a button shaped like a field, so it reads as "type here" and not as a status chip */
+html.clarity .cl-search-field {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  height: 1.75rem;
+  padding: 0 0.5rem;
+  border: 1px solid var(--bb-edge-input);
+  border-radius: 0.25rem;
+  background: var(--bb-field);
+  box-shadow: inset 0 1px 0 var(--bb-field-shade);
+  font-size: var(--text-data);
+  line-height: var(--text-data--line-height);
+  color: var(--bb-dim);
+  cursor: text;
+  transition: border-color 0.15s, color 0.15s;
+  text-align: left;
+  white-space: nowrap;
+}
+html.clarity .cl-search-field:hover { border-color: var(--bb-edge-hover); color: var(--bb-body); }
+html.clarity .cl-search-icon { width: 0.875rem; height: 0.875rem; flex: none; }
+html.clarity .cl-search-text { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+html.clarity .cl-search-kbd {
+  font-family: var(--font-mono);
+  font-size: var(--text-meta);
+  line-height: var(--text-meta--line-height);
+  color: var(--bb-dim-2); /* dim-2, not faint: 4.81 / 4.51 */
+}
+html.clarity .cl-search-bar { width: 11rem; flex: none; }
+html.clarity .cl-search-rail { width: 100%; margin: 0.4375rem 0 0.3125rem; flex: none; }
+
+/* the queue as a readout: state word, meter, count. No box: it is not a control. */
+html.clarity :is(.cl-bar-queue, .cl-rail-queue) {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: var(--text-label);
+  line-height: var(--text-label--line-height);
+  flex: none;
+}
+html.clarity .cl-q-state { display: inline-flex; align-items: center; gap: 0.25rem; color: var(--bb-dim-2); }
+html.clarity .is-busy .cl-q-state { color: var(--bb-text); }
+html.clarity .is-paused .cl-q-state { color: var(--bb-mistake); }
+html.clarity .cl-q-spin { width: 0.75rem; height: 0.75rem; animation: cl-spin 1s linear infinite; }
+@keyframes cl-spin { to { transform: rotate(360deg); } }
+/* the meter shows only while there is work: idle, "Idle 0/0" is the whole story, and an empty
+   trough beside a number reads as a slider */
+html.clarity .cl-q-meter { display: flex; align-items: center; }
+html.clarity .is-idle .cl-q-meter { display: none; }
+html.clarity .cl-q-meter > [role=img] { width: 3rem; background: var(--bb-track); }
+html.clarity .cl-q-count { font-family: var(--font-mono); font-variant-numeric: tabular-nums; color: var(--bb-dim-2); }
+html.clarity .is-busy .cl-q-count { color: var(--bb-text); }
+html.clarity .cl-bar-queue { gap: 0.375rem; }
+
+/* avatar: the owner's initials, a disc (a person), never a square (a tool) */
+html.clarity .cl-avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: 999px;
+  background: var(--bb-avatar);
+  color: var(--bb-body);
+  font-size: var(--text-meta);
+  line-height: 1;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+html.clarity .cl-avatar-btn {
+  display: inline-flex;
+  flex: none;
+  padding: 0;
+  border: 0;
+  background: none;
+  border-radius: 999px;
+  cursor: pointer;
+}
+html.clarity .cl-avatar-btn:hover .cl-avatar { color: var(--bb-text); box-shadow: 0 0 0 1px var(--bb-edge-hover); }
+/* D3-B: what belongs to the page and what belongs to the app are kept apart by space and a rule */
+html.clarity.clarity-shell-b .cl-bar.cl-has-actions > .cl-bar-divider { margin: 0 0.375rem 0 0.75rem; }
+
+/* ---- 4.3 D3-A: the rail carries the app, the bar carries the page */
+@media (min-width: 768px) {
+  html.clarity.clarity-shell-a .cl-shell {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr);
+  }
+  html.clarity.clarity-shell-a .cl-body { display: contents; }
+  /* the title starts on the page's gutter (PageBody's px-6), so the heading sits over the
+     column it names */
+  html.clarity.clarity-shell-a .cl-bar { grid-column: 2; grid-row: 1; min-width: 0; padding-left: 1.5rem; }
+  /* The rail must fit 1440x900 with any fold open (checked by core-rail.mjs). Below that height
+     the middle scrolls, with a visible thin scrollbar, while the brand row and the foot stay put.
+     (Real code: a flex-1 overflow-y-auto section between BrandRow and NavFooter; the prototype
+     scrolls the whole nav under a sticky brand row and foot.) */
+  html.clarity.clarity-shell-a .cl-rail {
+    grid-column: 1;
+    grid-row: 1 / span 2;
+    padding-top: 0;
+    padding-bottom: 0;
+    overflow-x: hidden;
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: var(--bb-scroll-thumb) transparent;
+  }
+  html.clarity.clarity-shell-a .cl-rail-brand { position: sticky; top: 0; z-index: 2; background: var(--bb-panel); }
+  html.clarity.clarity-shell-a .cl-rail-footer {
+    position: sticky;
+    bottom: 0;
+    z-index: 2;
+    margin: 0 -0.5rem;
+    padding: 0.375rem 0.75rem 0.3125rem;
+    background: var(--bb-panel);
+  }
+  html.clarity.clarity-shell-a .cl-main { grid-column: 2; grid-row: 2; min-height: 0; }
+  html.clarity.clarity-shell-a .cl-bar > :is(.cl-bar-menu, .cl-bar-brand, .cl-bar-demo, .cl-bar-sep) { display: none !important; }
+  html.clarity.clarity-shell-a .cl-bar:not(.cl-has-actions) > .cl-bar-divider { display: none; }
+}
+
+html.clarity .cl-rail-brand {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex: none;
+  height: 2.625rem;
+  margin: 0 -0.5rem;
+  padding: 0 0.75rem;
+  border-bottom: 1px solid var(--bb-edge-strong);
+}
+html.clarity .cl-rail-brand-link { display: flex; align-items: center; gap: 0.5rem; min-width: 0; }
+html.clarity .cl-rail-logo { width: 1.1875rem; height: 1.1875rem; flex: none; }
+html.clarity.dark .cl-rail-logo { filter: invert(1) hue-rotate(180deg); }
+html.clarity .cl-rail-name {
+  font-size: var(--text-lead);
+  line-height: var(--text-lead--line-height);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--bb-text);
+}
+/* Demo: a flat tint (a fact about this instance, and a way out: ↗), not a bordered control */
+html.clarity :is(.cl-demo, .cl-bar-demo) {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.1875rem;
+  flex: none;
+  margin-left: auto;
+  padding: 0.0625rem 0.375rem;
+  border: 0;
+  border-radius: 0.1875rem;
+  background: var(--bb-chip-info);
+  color: var(--bb-info);
+  font-size: var(--text-label);
+  line-height: var(--text-label--line-height);
+  font-weight: 500;
+  transition: color 0.15s;
+}
+html.clarity :is(.cl-demo, .cl-bar-demo):hover { color: var(--bb-text); }
+html.clarity .cl-bar-demo { margin-left: 0; }
+html.clarity .cl-bar-demo > span { display: none; }
+html.clarity .cl-bar-demo::after {
+  content: '';
+  width: 0.75rem;
+  height: 0.75rem;
+  background-color: currentColor;
+  mask: var(--cl-i-out) center / contain no-repeat;
+}
+html.clarity .cl-demo-arrow { width: 0.75rem; height: 0.75rem; }
+
+/* ---- 4.4 the rail (both variants): one mark for "you are here" */
+html.clarity .cl-rail > .cl-nav-heading {
+  padding: 0.625rem 0.5rem 0.1875rem;
+  font-size: var(--text-label);
+  line-height: var(--text-label--line-height);
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--bb-dim);
+}
+/* Idle rows keep today's quiet weight (text-soft, size-3.5 text-dim icons): the rail must not
+   compete with the page, and the lit leaf has to be the only bright row. */
+html.clarity .cl-nav-row {
+  color: var(--bb-muted);
+  background: transparent;
+}
+html.clarity .cl-nav-row > svg {
+  width: 0.875rem;
+  height: 0.875rem;
+  color: var(--bb-dim);
+  transition: color 0.15s;
+}
+html.clarity .cl-nav-row:hover { background: transparent; color: var(--bb-text); }
+html.clarity .cl-nav-row:hover > svg { color: var(--bb-body-3); }
+html.clarity .cl-nav-row.cl-parent { color: var(--bb-text); background: transparent; }
+html.clarity .cl-nav-row.cl-parent > svg { color: var(--bb-body-3); }
+html.clarity .cl-nav-sub {
+  color: var(--bb-muted);
+  background: transparent;
+}
+html.clarity .cl-nav-sub:hover { background: transparent; color: var(--bb-text); }
+html.clarity :is(.cl-nav-row, .cl-nav-sub).cl-current,
+html.clarity :is(.cl-nav-row, .cl-nav-sub).cl-current:hover {
+  background: var(--bb-nav-current);
+  color: var(--bb-accent);
+  font-weight: 500;
+}
+html.clarity .cl-nav-row.cl-current > svg { color: var(--bb-accent); }
+/* counts beside a row stay figures, and stay grey on the lit row */
+html.clarity .cl-current .font-mono { color: var(--bb-dim); font-weight: 400; }
+
+/* Pinned collections (D4-A): places you can be in. Same sub-row metrics as every fold row (one
+   DotRow: indent, a 0.5rem marker slot, text-data, mono count), but told apart twice from a
+   route fold: no fold rule on the left (it is always there, not opened by the route), and the
+   marker is the collection's square swatch (CollectionChip's shape) where a saved filter has a
+   round dot. Cap 2, or 1 with correspondence on. */
+html.clarity .cl-pinned {
+  display: flex;
+  flex-direction: column;
+  margin-left: 0.75rem;
+  padding-left: 0.25rem;
+  border-left: 1px solid transparent;
+}
+html.clarity .cl-pinned-row {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  border-radius: 0.25rem;
+  padding: 0.375rem;
+  font-size: var(--text-data);
+  line-height: var(--text-data--line-height);
+  transition: color 0.15s;
+}
+html.clarity .cl-pinned-dot { width: 0.5rem; height: 0.5rem; border-radius: 0.125rem; flex: none; background: var(--bb-accent); }
+/* the saved-filter dot takes the same 0.5rem slot, so fold text starts at one x everywhere */
+html.clarity .cl-nav-fold:not(.cl-pinned) a > span.rounded-full:first-child { margin: 0 0.0625rem; }
+html.clarity .cl-fold-hidden, html.clarity .cl-fold-extra { display: none !important; }
+html.clarity .cl-fold-more { color: var(--bb-dim); }
+html.clarity .cl-fold-more::after {
+  content: '';
+  width: 0.75rem;
+  height: 0.75rem;
+  background-color: currentColor;
+  mask: var(--cl-i-right) center / contain no-repeat;
+}
+html.clarity .cl-pinned-dot[data-color=good] { background: var(--bb-good); }
+html.clarity .cl-pinned-dot[data-color=otb] { background: var(--bb-otb); }
+html.clarity .cl-pinned-dot[data-color=blunder] { background: var(--bb-blunder); }
+html.clarity .cl-pinned-dot[data-color=mistake] { background: var(--bb-mistake); }
+html.clarity .cl-pinned-dot[data-color=info] { background: var(--bb-info); }
+html.clarity .cl-pinned-dot[data-color=way-back] { background: var(--bb-way-back); }
+html.clarity .cl-pinned-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+html.clarity .cl-pinned-count {
+  font-family: var(--font-mono);
+  font-size: var(--text-meta);
+  line-height: var(--text-meta--line-height);
+  font-variant-numeric: tabular-nums;
+  color: var(--bb-dim);
+}
+
+/* The rail foot, three short rows (~100px, was ~150):
+     1. status line: engines link (dot, names, ›) on the left, the queue readout on the right
+        (D3-A; in D3-B the queue is in the bar and the line is the engines link alone)
+     2. account row: one line, h-7: a size-5 disc, the name, ⌃ (the menu opens upward; ⇅ is
+        reserved for pickers). "lichess · owner" lives in the menu's head.
+     3. utility row, as today: fold · Manual · GitHub · connection dot · version */
+html.clarity .cl-rail-footer { gap: 0.125rem; }
+html.clarity .cl-status-line {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+  padding: 0.125rem 0.25rem;
+}
+html.clarity .cl-engines-line {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 0.375rem;
+  min-width: 0;
+  border-radius: 0.25rem;
+  font-size: var(--text-label);
+  line-height: var(--text-label--line-height);
+  color: var(--bb-dim);
+  transition: color 0.15s;
+}
+html.clarity .cl-engines-line:hover { color: var(--bb-text); }
+html.clarity .cl-engines-line:hover .cl-engines-text { text-decoration: underline; text-underline-offset: 0.125rem; }
+html.clarity .cl-engines-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+html.clarity .cl-engines-chev { width: 0.75rem; height: 0.75rem; color: var(--bb-faint); flex: none; margin-left: -0.125rem; }
+html.clarity .cl-rail-queue { flex: none; gap: 0.3125rem; }
+html.clarity .cl-account-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  height: 1.75rem;
+  padding: 0 0.25rem;
+  border: 0;
+  border-radius: 0.25rem;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color 0.15s;
+}
+html.clarity .cl-account-row:hover,
+html.clarity .cl-account-row[aria-expanded=true] { background: var(--bb-raised); }
+html.clarity .cl-account-row .cl-avatar { width: 1.25rem; height: 1.25rem; }
+html.clarity .cl-account-name {
+  flex: 1;
+  min-width: 0;
+  font-size: var(--text-data);
+  line-height: var(--text-data--line-height);
+  color: var(--bb-body);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+html.clarity .cl-account-row:hover .cl-account-name { color: var(--bb-text); }
+html.clarity .cl-account-chev { width: 0.75rem; height: 0.75rem; color: var(--bb-dim); flex: none; }
+html.clarity .cl-utility { padding-top: 0.0625rem; }
+/* the connection dot: green is alive; blue is for interaction only. Shown in both shells. */
+html.clarity .cl-conn-dot { display: inline-block; flex: none; background: var(--bb-good); }
+
+/* status dots (spec §4: live / running / healthy) */
+html.clarity .cl-dot { width: 0.375rem; height: 0.375rem; border-radius: 999px; flex: none; background: var(--bb-faint); }
+html.clarity .cl-dot.is-ok { background: var(--bb-good); }
+html.clarity .cl-dot.is-busy { background: var(--bb-good); animation: cl-pulse 1.6s ease-in-out infinite; }
+html.clarity .cl-dot.is-warn { background: var(--bb-mistake); }
+html.clarity .cl-dot.is-err { background: var(--bb-blunder); }
+html.clarity .cl-dot.is-idle { background: var(--bb-dim); }
+html.clarity .cl-dot.is-none { background: transparent; box-shadow: inset 0 0 0 1px var(--bb-faint); }
+@keyframes cl-pulse { 50% { opacity: 0.4; } }
+
+/* ---- 4.5 the account menu (home of Appearance and Keyboard shortcuts) */
+html.clarity .cl-account-menu {
+  position: fixed;
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+  width: 18.5rem;
+  padding: 0.25rem;
+  background: var(--bb-panel);
+  border: 1px solid var(--bb-line);
+  border-radius: 0.25rem;
+  box-shadow: 0 0.75rem 2rem var(--bb-shadow);
+}
+html.clarity .cl-account-menu[hidden] { display: none; }
+html.clarity .cl-menu-head { display: flex; align-items: center; gap: 0.5rem; padding: 0.375rem 0.5rem 0.25rem; }
+html.clarity .cl-menu-who { display: flex; flex-direction: column; flex: 1; min-width: 0; }
+html.clarity .cl-menu-name { font-size: var(--text-label); line-height: var(--text-label--line-height); font-weight: 500; color: var(--bb-text); }
+html.clarity :is(.cl-menu-sub, .cl-menu-count) { font-size: var(--text-meta); line-height: var(--text-meta--line-height); color: var(--bb-dim); }
+html.clarity .cl-menu-count { font-family: var(--font-mono); color: var(--bb-dim-2); }
+html.clarity .cl-menu-rule { height: 1px; margin: 0.125rem 0; background: var(--bb-hairline); }
+html.clarity .cl-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  padding: 0.375rem 0.5rem;
+  border: 0;
+  border-radius: 0.25rem;
+  background: transparent;
+  text-align: left;
+  font-size: var(--text-label);
+  line-height: var(--text-label--line-height);
+  color: var(--bb-muted);
+  cursor: pointer;
+}
+html.clarity .cl-menu-item:hover { background: var(--bb-raised); color: var(--bb-text); }
+html.clarity :is(.cl-menu-item, .cl-menu-field-label) > svg { width: 0.875rem; height: 0.875rem; flex: none; }
+html.clarity .cl-menu-label { flex: 1; }
+html.clarity .cl-menu-kbd {
+  font-family: var(--font-mono);
+  font-size: var(--text-meta);
+  color: var(--bb-dim);
+  padding: 0 0.3125rem;
+  border-radius: 0.1875rem;
+  background: var(--bb-chip-neutral);
+}
+html.clarity .cl-menu-field {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.25rem 0.25rem 0.25rem 0.5rem;
+  font-size: var(--text-label);
+  line-height: var(--text-label--line-height);
+  color: var(--bb-muted);
+}
+html.clarity .cl-menu-field-label { display: inline-flex; align-items: center; gap: 0.5rem; flex: 1; white-space: nowrap; }
+html.clarity .cl-menu-field .cl-seg-item svg { width: 0.75rem; height: 0.75rem; }
+
+/* ---- 4.6 phone (below md): the same bar in both variants. Kept simple in the prototype. */
+@media (max-width: 767.98px) {
+  html.clarity .cl-bar > :is(.cl-bar-brand, .cl-bar-demo, .cl-bar-sep, .cl-bar-queue, .cl-avatar-btn, .cl-page-actions, .cl-bar-divider) { display: none !important; }
+  html.clarity .cl-bar > .cl-search-bar { display: flex !important; width: auto; border: 0; background: none; padding: 0 0.25rem; }
+  html.clarity .cl-bar > .cl-search-bar :is(.cl-search-text, .cl-search-kbd) { display: none; }
+  html.clarity .cl-engine-switch .cl-switch-label { display: none; }
+  html.clarity .cl-title { flex: 1; min-width: 6rem; }
+  html.clarity .cl-title-name { min-width: 6rem; }
+  /* a detail page leads with a back link that names its parent (‹ Games) and drops the ☰: the
+     back link is the way out, and the drawer is one step away on the parent */
+  html.clarity .cl-bar.cl-detail > .cl-bar-menu { display: none !important; }
+  html.clarity .cl-title-sep, html.clarity .cl-title-crumb:not(:first-child) { display: none; }
+  html.clarity .cl-title-crumb:first-child { display: inline-flex; align-items: center; color: var(--bb-accent); }
+  html.clarity .cl-title-crumb:first-child::before {
+    content: '';
+    width: 0.875rem;
+    height: 0.875rem;
+    background-color: currentColor;
+    mask: var(--cl-i-right) center / contain no-repeat;
+    transform: scaleX(-1);
+  }
+}
+
+/* =========================================================================================
+ * 5. THE CONTROL GRAMMAR (spec §3). Hooks first; the stable selectors ride along at lower
+ *    specificity (:where) so a hook on the same element always wins.
+ * ======================================================================================= */
+
+/* ---- 5.1 secondary: the tool button, a raised face */
+html.clarity .cl-btn,
+html.clarity :where([class*="shrink-0 items-center justify-center whitespace-nowrap rounded-md"]):where(.bg-elevated.border, .border-edge-input) {
+  border: 1px solid var(--bb-control-edge);
+  background: var(--bb-control);
+  box-shadow: var(--cl-face-shadow);
+  color: var(--bb-body);
+}
+html.clarity .cl-btn:hover,
+html.clarity :where([class*="shrink-0 items-center justify-center whitespace-nowrap rounded-md"]):where(.bg-elevated.border, .border-edge-input):hover {
+  background: var(--bb-control-hover);
+  color: var(--bb-text);
+  border-color: var(--bb-control-edge);
+}
+html.clarity .cl-btn:active,
+html.clarity :where([class*="shrink-0 items-center justify-center whitespace-nowrap rounded-md"]):where(.bg-elevated.border, .border-edge-input):active {
+  background: var(--bb-raised-2);
+  box-shadow: none;
+}
+html.clarity .cl-btn[aria-pressed=true],
+html.clarity :where([class*="shrink-0 items-center justify-center whitespace-nowrap rounded-md"]):where(.bg-elevated.border, .border-edge-input)[aria-pressed=true] {
+  background: var(--bb-selected);
+  color: var(--bb-text);
+  border-color: var(--cl-accent-45);
+  box-shadow: none;
+}
+html.clarity .cl-btn[aria-pressed=true] svg,
+html.clarity :where([class*="shrink-0 items-center justify-center whitespace-nowrap rounded-md"]):where(.bg-elevated.border, .border-edge-input)[aria-pressed=true] svg {
+  color: var(--bb-accent);
+}
+/* icon-only faces (pager ‹ ›, ⋯, icon squares) have no label to say what they are, so their
+   boundary is the whole signal: the strong control edge (>= 3:1) */
+html.clarity .cl-btn-icon,
+html.clarity :where([class*="shrink-0 items-center justify-center whitespace-nowrap rounded-md"]):where(.bg-elevated.border, .border-edge-input):where(.size-6, .size-7, .size-8) {
+  border-color: var(--bb-control-edge-strong);
+}
+
+/* ---- 5.2 primary: the one filled action per region (disabled: see 5.4b) */
+html.clarity .cl-btn-primary,
+html.clarity :where([class*="shrink-0 items-center justify-center whitespace-nowrap rounded-md"]).bg-accent-teal {
+  border: 1px solid transparent;
+  background: var(--bb-accent);
+  color: var(--bb-accent-ink);
+  font-weight: 600;
+  box-shadow: none;
+}
+html.clarity .cl-btn-primary:hover,
+html.clarity :where([class*="shrink-0 items-center justify-center whitespace-nowrap rounded-md"]).bg-accent-teal:hover {
+  background: var(--bb-accent-hover);
+  color: var(--bb-accent-ink);
+}
+html.clarity .cl-btn-primary:active,
+html.clarity :where([class*="shrink-0 items-center justify-center whitespace-nowrap rounded-md"]).bg-accent-teal:active {
+  filter: brightness(0.95);
+}
+
+/* ---- 5.3 ghost: icon actions in rows and strips; no face until hovered */
+html.clarity .cl-btn-ghost {
+  border: 1px solid transparent;
+  background: transparent;
+  box-shadow: none;
+  color: var(--bb-muted);
+}
+html.clarity .cl-btn-ghost:hover { background: var(--bb-raised); color: var(--bb-text); }
+html.clarity .cl-btn-ghost:active { background: var(--bb-raised-2); }
+html.clarity .cl-btn-ghost[aria-pressed=true] { background: var(--bb-selected); color: var(--bb-text); }
+html.clarity .cl-btn-ghost[aria-pressed=true] svg { color: var(--bb-accent); }
+html.clarity .cl-btn-ghost:is(:disabled, [aria-disabled=true]) { opacity: 0.5; cursor: not-allowed; background: transparent; }
+
+/* ---- 5.4 destructive */
+html.clarity .cl-btn-danger {
+  border: 1px solid color-mix(in srgb, var(--bb-blunder) 40%, transparent);
+  background: var(--bb-control);
+  box-shadow: var(--cl-face-shadow);
+  color: var(--bb-blunder);
+}
+html.clarity .cl-btn-danger:hover { background: color-mix(in srgb, var(--bb-blunder) 10%, var(--bb-control)); color: var(--bb-blunder); }
+html.clarity .cl-btn-danger:active { background: color-mix(in srgb, var(--bb-blunder) 15%, var(--bb-control)); box-shadow: none; }
+html.clarity .cl-btn-destructive { border: 1px solid transparent; background: var(--bb-blunder); color: var(--bb-blunder-ink); box-shadow: none; }
+html.clarity .cl-btn-destructive:hover { background: color-mix(in srgb, var(--bb-blunder) 85%, transparent); }
+
+/* ---- 5.4b disabled: ONE look for every button variant (secondary, primary, danger, filled red,
+        picker, menu trigger). It keeps the silhouette (size, radius, a quiet border) and loses the
+        face: no fill, no shade, faint text. No face = not pressable (principle 3), so a disabled
+        primary can never pass for an enabled secondary, in light least of all. Hover does
+        nothing; the cursor says not-allowed and the title says why (button.tsx drops
+        disabled:pointer-events-none for disabled:cursor-not-allowed + enabled:hover:). */
+html.clarity :is(.cl-btn, .cl-btn-primary, .cl-btn-danger, .cl-btn-destructive, .cl-picker, .cl-menu-trigger):is(:disabled, [aria-disabled=true]),
+html.clarity :is(.cl-btn, .cl-btn-primary, .cl-btn-danger, .cl-btn-destructive, .cl-picker, .cl-menu-trigger):is(:disabled, [aria-disabled=true]):is(:hover, :active),
+html.clarity :where([class*="shrink-0 items-center justify-center whitespace-nowrap rounded-md"]):is(.bg-elevated.border, .border-edge-input, .bg-accent-teal):is(:disabled, [aria-disabled=true]),
+html.clarity :where([class*="shrink-0 items-center justify-center whitespace-nowrap rounded-md"]):is(.bg-elevated.border, .border-edge-input, .bg-accent-teal):is(:disabled, [aria-disabled=true]):is(:hover, :active) {
+  opacity: 1;
+  filter: none;
+  border-color: var(--bb-edge);
+  background: transparent;
+  box-shadow: none;
+  color: var(--bb-faint-2);
+  cursor: not-allowed;
+  pointer-events: auto;
+}
+html.clarity :is(.cl-btn, .cl-btn-primary, .cl-btn-danger, .cl-btn-destructive, .cl-picker, .cl-menu-trigger):is(:disabled, [aria-disabled=true]) svg,
+html.clarity :where([class*="shrink-0 items-center justify-center whitespace-nowrap rounded-md"]):is(.bg-elevated.border, .border-edge-input, .bg-accent-teal):is(:disabled, [aria-disabled=true]) svg {
+  color: var(--bb-faint-2);
+  opacity: 0.7;
+}
+html.clarity :is(.cl-picker, .cl-menu-trigger):is(:disabled, [aria-disabled=true])::after { background-color: var(--bb-faint-2); }
+
+/* ---- 5.5 button group: "do one of these", attached faced cells. Never a sunken track. */
+html.clarity .cl-group {
+  display: inline-flex;
+  align-items: stretch;
+  overflow: hidden;
+  border: 1px solid var(--bb-control-edge);
+  border-radius: 0.25rem;
+  background: transparent; /* the cells carry the face, so a disabled cell can lose it */
+  box-shadow: var(--cl-face-shadow);
+}
+html.clarity .cl-group > :is(.cl-btn, button, a) {
+  border: 0;
+  border-radius: 0;
+  background: var(--bb-control);
+  box-shadow: none;
+  color: var(--bb-body);
+}
+html.clarity .cl-group > :is(.cl-btn, button, a) + :is(.cl-btn, button, a) { border-left: 1px solid var(--bb-control-edge); }
+html.clarity .cl-group > :is(.cl-btn, button, a):hover { background: var(--bb-control-hover); color: var(--bb-text); }
+html.clarity .cl-group > :is(.cl-btn, button, a):active { background: var(--bb-raised-2); }
+html.clarity .cl-group > :is(.cl-btn, button, a):is(:disabled, [aria-disabled=true]),
+html.clarity .cl-group > :is(.cl-btn, button, a):is(:disabled, [aria-disabled=true]):hover {
+  opacity: 1;
+  background: transparent;
+  color: var(--bb-faint-2);
+  cursor: not-allowed;
+  pointer-events: auto;
+}
+html.clarity .cl-group > :is(.cl-btn, button, a):is(:disabled, [aria-disabled=true]) svg { opacity: 0.7; }
+
+/* ---- 5.6 tabs (D1). A tab never has a face, a border box or a blue fill. */
+html.clarity :is(.cl-tab, :where([role=tablist].h-\[2\.1875rem\] > [role=tab], .h-\[2\.1875rem\] > button.relative.h-full.px-3)) {
+  position: relative;
+  color: var(--bb-muted);
+  font-weight: 400;
+  background: transparent;
+  box-shadow: none;
+  transition: color 0.15s, background-color 0.15s;
+}
+html.clarity :is(.cl-tab, :where([role=tablist].h-\[2\.1875rem\] > [role=tab], .h-\[2\.1875rem\] > button.relative.h-full.px-3)):is([aria-selected=true], [aria-pressed=true], .is-selected) {
+  color: var(--bb-text);
+  font-weight: 500;
+}
+html.clarity :is(.cl-tab, :where([role=tablist].h-\[2\.1875rem\] > [role=tab], .h-\[2\.1875rem\] > button.relative.h-full.px-3)):is(:disabled, [aria-disabled=true]) {
+  color: var(--bb-faint-2);
+  cursor: not-allowed;
+  background: transparent;
+}
+
+/* D1-A folder tab: the pane's surface pushed into the strip, side rules, a 2px accent top edge.
+   Every tab carries border-x (transparent when idle), so the label never shifts 1px on select.
+   The accent edge hangs 1px below the strip's top: under a stacked pane (Evaluation / Move time)
+   a 1px surface gap keeps it on the tab and off the rule above, so it cannot read as the
+   underline of the move list. */
+html.clarity.clarity-tabs-a :is(.cl-tab, :where([role=tablist].h-\[2\.1875rem\] > [role=tab], .h-\[2\.1875rem\] > button.relative.h-full.px-3)) {
+  border-left: 1px solid transparent;
+  border-right: 1px solid transparent;
+}
+html.clarity.clarity-tabs-a :is(.cl-tab, :where([role=tablist].h-\[2\.1875rem\] > [role=tab], .h-\[2\.1875rem\] > button.relative.h-full.px-3)):not([aria-selected=true], [aria-pressed=true], .is-selected):hover {
+  color: var(--bb-text);
+  background: var(--bb-raised);
+}
+html.clarity.clarity-tabs-a :is(.cl-tab, :where([role=tablist].h-\[2\.1875rem\] > [role=tab], .h-\[2\.1875rem\] > button.relative.h-full.px-3)):is([aria-selected=true], [aria-pressed=true], .is-selected) {
+  background: var(--bb-surface);
+  border-left-color: var(--bb-line);
+  border-right-color: var(--bb-line);
+  box-shadow: inset 0 1px 0 var(--bb-surface), inset 0 0.1875rem 0 var(--bb-accent);
+}
+/* the first tab sits on the pane's own left edge (a wrapper span counts: Run/Live) */
+html.clarity.clarity-tabs-a :is(.cl-tab, :where([role=tablist].h-\[2\.1875rem\] > [role=tab], .h-\[2\.1875rem\] > button.relative.h-full.px-3)):is(:first-child, .cl-tab-wrap:first-child > *):is([aria-selected=true], [aria-pressed=true], .is-selected) {
+  border-left-color: transparent;
+}
+html.clarity.clarity-tabs-a :is(.cl-tab, :where([role=tablist].h-\[2\.1875rem\] > [role=tab], .h-\[2\.1875rem\] > button.relative.h-full.px-3)):is([aria-selected=true], [aria-pressed=true], .is-selected)::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -1px;
+  height: 1px;
+  background: var(--bb-surface);
+}
+
+/* D1-B underline: one colour strip; the chosen tab carries a 2px accent line on the strip's rule */
+html.clarity.clarity-tabs-b :is(.cl-tab, :where([role=tablist].h-\[2\.1875rem\] > [role=tab], .h-\[2\.1875rem\] > button.relative.h-full.px-3)):hover { color: var(--bb-text); background: transparent; }
+html.clarity.clarity-tabs-b :is(.cl-tab, :where([role=tablist].h-\[2\.1875rem\] > [role=tab], .h-\[2\.1875rem\] > button.relative.h-full.px-3)):is([aria-selected=true], [aria-pressed=true], .is-selected) {
+  background: transparent;
+}
+html.clarity.clarity-tabs-b :is(.cl-tab, :where([role=tablist].h-\[2\.1875rem\] > [role=tab], .h-\[2\.1875rem\] > button.relative.h-full.px-3)):is([aria-selected=true], [aria-pressed=true], .is-selected)::after {
+  content: '';
+  position: absolute;
+  left: 0.5rem;
+  right: 0.5rem;
+  bottom: -1px;
+  height: 0.125rem;
+  background: var(--bb-accent);
+}
+html.clarity.clarity-tabs-b :is(.cl-tab, :where([role=tablist].h-\[2\.1875rem\] > [role=tab], .h-\[2\.1875rem\] > button.relative.h-full.px-3)):not([aria-selected=true], [aria-pressed=true], .is-selected)::after {
+  content: none;
+}
+
+/* the strip's other slots: facts, a rule, then tools */
+html.clarity .cl-strip-facts { font-size: var(--text-meta); line-height: var(--text-meta--line-height); color: var(--bb-dim-2); }
+html.clarity .cl-strip-rule { width: 1px; height: 1rem; flex: none; background: var(--bb-hairline); }
+
+/* ---- 5.7 segmented one-of-N (D2): a sunken track, a raised thumb, no dividers */
+html.clarity :is(.cl-seg, :where([role=group].h-7.overflow-hidden.rounded-md, [role=radiogroup].rounded-md.border, [role=group][aria-label^="Whose games"])) {
+  display: inline-flex;
+  align-items: stretch;
+  gap: 0.125rem;
+  height: 1.75rem;
+  padding: 0.125rem;
+  border: 1px solid var(--bb-hairline);
+  border-radius: 0.25rem;
+  background: var(--bb-void);
+  overflow: visible;
+  font-family: var(--font-sans);
+  box-shadow: none;
+}
+html.clarity .cl-seg.cl-seg-xs { height: 1.5rem; }
+html.clarity :is(.cl-seg, :where([role=group].h-7.overflow-hidden.rounded-md, [role=radiogroup].rounded-md.border, [role=group][aria-label^="Whose games"])) > :is(button, a, .cl-seg-item) {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.3125rem;
+  padding: 0 0.5rem;
+  border: 0;
+  border-radius: 0.1875rem;
+  background: transparent;
+  box-shadow: none;
+  color: var(--bb-muted);
+  font-family: var(--font-sans);
+  font-size: var(--text-label);
+  line-height: var(--text-label--line-height);
+  font-weight: 400;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: color 0.15s, background-color 0.15s;
+}
+html.clarity :is(.cl-seg, :where([role=group].h-7.overflow-hidden.rounded-md, [role=radiogroup].rounded-md.border, [role=group][aria-label^="Whose games"])) > :is(button, a, .cl-seg-item):hover { color: var(--bb-text); background: transparent; }
+html.clarity :is(.cl-seg, :where([role=group].h-7.overflow-hidden.rounded-md, [role=radiogroup].rounded-md.border, [role=group][aria-label^="Whose games"])) > :is(button, a, .cl-seg-item):active { background: var(--bb-raised-2); }
+html.clarity :is(.cl-seg, :where([role=group].h-7.overflow-hidden.rounded-md, [role=radiogroup].rounded-md.border, [role=group][aria-label^="Whose games"])) > :is(button, a, .cl-seg-item) svg { color: currentColor; }
+html.clarity :is(.cl-seg, :where([role=group].h-7.overflow-hidden.rounded-md, [role=radiogroup].rounded-md.border, [role=group][aria-label^="Whose games"])) > :is(button, a, .cl-seg-item):is(:disabled, [aria-disabled=true]) { color: var(--bb-faint-2); cursor: not-allowed; }
+
+/* D2-A: a neutral raised thumb (a setting's value, not a selection of data) */
+html.clarity.clarity-segment-a :is(.cl-seg, :where([role=group].h-7.overflow-hidden.rounded-md, [role=radiogroup].rounded-md.border, [role=group][aria-label^="Whose games"])) > :is(button, a, .cl-seg-item):is([aria-pressed=true], [aria-checked=true], [aria-selected=true], .is-on) {
+  background: var(--bb-control);
+  color: var(--bb-text);
+  font-weight: 500;
+  box-shadow: 0 0 0 1px var(--bb-control-edge), inset 0 -1px 0 var(--bb-control-shade);
+}
+html.clarity.clarity-segment-a :is(.cl-seg, :where([role=group].h-7.overflow-hidden.rounded-md, [role=radiogroup].rounded-md.border, [role=group][aria-label^="Whose games"])) > :is(button, a, .cl-seg-item):is([aria-pressed=true], [aria-checked=true], [aria-selected=true], .is-on) svg {
+  color: var(--bb-body-3);
+}
+/* D2-B: a blue raised thumb (today's colour logic, a clearer shape) */
+html.clarity.clarity-segment-b :is(.cl-seg, :where([role=group].h-7.overflow-hidden.rounded-md, [role=radiogroup].rounded-md.border, [role=group][aria-label^="Whose games"])) > :is(button, a, .cl-seg-item):is([aria-pressed=true], [aria-checked=true], [aria-selected=true], .is-on) {
+  background: var(--bb-selected);
+  color: var(--bb-text);
+  font-weight: 500;
+  box-shadow: inset 0 0 0 1px var(--cl-accent-60), inset 0 -1px 0 var(--bb-control-shade);
+}
+html.clarity.clarity-segment-b :is(.cl-seg, :where([role=group].h-7.overflow-hidden.rounded-md, [role=radiogroup].rounded-md.border, [role=group][aria-label^="Whose games"])) > :is(button, a, .cl-seg-item):is([aria-pressed=true], [aria-checked=true], [aria-selected=true], .is-on) svg {
+  color: var(--bb-accent);
+}
+
+/* ---- 5.8 picker (a value from a list: face + ⇅) and action menu (face + ⌄) */
+html.clarity :is(.cl-picker, .cl-menu-trigger) {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  border: 1px solid var(--bb-control-edge);
+  background: var(--bb-control);
+  box-shadow: var(--cl-face-shadow);
+  color: var(--bb-body);
+  border-radius: 0.25rem;
+  white-space: nowrap;
+}
+html.clarity :is(.cl-picker, .cl-menu-trigger):hover { background: var(--bb-control-hover); color: var(--bb-text); }
+html.clarity :is(.cl-picker, .cl-menu-trigger)[aria-expanded=true] { background: var(--bb-raised); box-shadow: none; }
+html.clarity :is(.cl-picker, .cl-menu-trigger)::after {
+  content: '';
+  flex: none;
+  width: 0.75rem;
+  height: 0.75rem;
+  margin-right: -0.125rem;
+  background-color: var(--bb-dim);
+  mask: var(--cl-i-updown) center / contain no-repeat;
+}
+html.clarity .cl-menu-trigger::after { mask-image: var(--cl-i-down); }
+html.clarity .cl-picker:is(.is-set, [data-set]) {
+  background: var(--bb-selected);
+  border-color: var(--cl-accent-45);
+  box-shadow: none;
+  color: var(--bb-text);
+}
+html.clarity .cl-picker-value { color: var(--bb-text); font-weight: 500; }
+html.clarity .cl-picker:is(.is-set, [data-set]) .cl-picker-value { color: var(--bb-text); }
+/* In a pane strip a picker is quiet: no face at rest, the ⇅ still says "a value from a list",
+   and the face comes up on hover or while open. Pane strips held quiet text tools before; three
+   raised boxes in a 35px strip are noise. (PickerButton size "strip"; auto inside pane titles.) */
+html.clarity :is(.cl-picker-ghost, :where(.bb-pane-title, .h-\[2\.1875rem\]) .cl-picker:not(.is-set, [data-set])) {
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+}
+html.clarity :is(.cl-picker-ghost, :where(.bb-pane-title, .h-\[2\.1875rem\]) .cl-picker:not(.is-set, [data-set])):is(:hover, [aria-expanded=true], :focus-within) {
+  border-color: var(--bb-control-edge);
+  background: var(--bb-control-hover);
+  box-shadow: var(--cl-face-shadow);
+}
+html.clarity .cl-picker-clear { border-left: 1px solid var(--cl-accent-45); color: var(--bb-muted); }
+html.clarity .cl-picker-clear:hover { color: var(--bb-text); background: var(--bb-raised); }
+html.clarity .cl-select {
+  border: 1px solid var(--bb-edge-input);
+  background-color: var(--bb-field);
+  color: var(--bb-body);
+  border-radius: 0.25rem;
+  box-shadow: inset 0 1px 0 var(--bb-field-shade);
+}
+
+/* ---- 5.9 chip: "any of these", bordered, no face; on = selected fill + ✓ */
+html.clarity :is(.cl-chip, :where(button[aria-pressed].h-6.rounded-md.border.px-2)) {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  border: 1px solid var(--bb-edge);
+  background: transparent;
+  box-shadow: none;
+  color: var(--bb-muted);
+  border-radius: 0.25rem;
+}
+html.clarity :is(.cl-chip, :where(button[aria-pressed].h-6.rounded-md.border.px-2)):hover { border-color: var(--bb-edge-hover); color: var(--bb-text); background: transparent; }
+html.clarity :is(.cl-chip, :where(button[aria-pressed].h-6.rounded-md.border.px-2)):is([aria-pressed=true], .is-on) {
+  background: var(--bb-selected);
+  border-color: var(--cl-accent-45);
+  color: var(--bb-text);
+}
+html.clarity :is(.cl-chip, :where(button[aria-pressed].h-6.rounded-md.border.px-2)):is([aria-pressed=true], .is-on)::before {
+  content: '';
+  flex: none;
+  width: 0.75rem;
+  height: 0.75rem;
+  margin-left: -0.125rem;
+  background-color: var(--bb-accent);
+  mask: var(--cl-i-check) center / contain no-repeat;
+}
+html.clarity :is(.cl-chip, :where(button[aria-pressed].h-6.rounded-md.border.px-2)):is(:disabled, [aria-disabled=true]) { opacity: 0.5; cursor: not-allowed; }
+/* A filter's blue means "this narrows the data" (the PickerButton's set state follows the same
+   rule). A chip set with every member on narrows nothing, so its members stay neutral and the ✓
+   alone says "on"; the fill appears once the set is narrowed. Not a lie: ✓ is on, no ✓ is off. */
+html.clarity :not(:has(> :is(.cl-chip, button[aria-pressed].h-6.rounded-md.border.px-2):is([aria-pressed=false]))) > :is(.cl-chip, :where(button[aria-pressed].h-6.rounded-md.border.px-2)):is([aria-pressed=true], .is-on) {
+  background: transparent;
+  border-color: var(--bb-edge);
+  color: var(--bb-body);
+}
+html.clarity :not(:has(> :is(.cl-chip, button[aria-pressed].h-6.rounded-md.border.px-2):is([aria-pressed=false]))) > :is(.cl-chip, :where(button[aria-pressed].h-6.rounded-md.border.px-2)):is([aria-pressed=true], .is-on)::before {
+  background-color: var(--bb-dim);
+}
+html.clarity :not(:has(> :is(.cl-chip, button[aria-pressed].h-6.rounded-md.border.px-2):is([aria-pressed=false]))) > :is(.cl-chip, :where(button[aria-pressed].h-6.rounded-md.border.px-2)):is([aria-pressed=true], .is-on):hover {
+  border-color: var(--bb-edge-hover);
+  color: var(--bb-text);
+}
+
+/* ---- 5.10 readout and badge: facts. No border, no face, not focusable. */
+html.clarity .cl-readout {
+  border: 0 !important;
+  background: transparent !important;
+  box-shadow: none;
+  padding-left: 0;
+  padding-right: 0;
+  font-family: var(--font-sans);
+  font-size: var(--text-label);
+  line-height: var(--text-label--line-height);
+  color: var(--bb-dim);
+}
+html.clarity .cl-readout.cl-readout-num { font-family: var(--font-mono); font-size: var(--text-meta); line-height: var(--text-meta--line-height); }
+html.clarity :is(.cl-badge, :where([data-slot=badge])) { border-color: transparent; box-shadow: none; }
+html.clarity .cl-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  border: 0;
+  border-radius: 0.1875rem;
+  background: var(--bb-chip-neutral);
+  padding: 0 0.375rem;
+  font-size: var(--text-meta);
+  line-height: 1rem;
+  color: var(--bb-dim);
+}
+html.clarity .cl-badge-info { background: var(--bb-chip-info); color: var(--bb-info); }
+html.clarity .cl-badge-good { background: color-mix(in srgb, var(--bb-good) 12%, transparent); color: var(--bb-good); }
+html.clarity .cl-badge-warn { background: color-mix(in srgb, var(--bb-mistake) 12%, transparent); color: var(--bb-mistake); }
+html.clarity .cl-badge-bad { background: color-mix(in srgb, var(--bb-blunder) 12%, transparent); color: var(--bb-blunder); }
+
+/* ---- 5.11 link: navigation and nothing else; › in-app, ↗ out */
+html.clarity :is(.cl-link, .cl-link-ext, :where(.cl-main a.text-accent-teal)) {
+  color: var(--bb-accent);
+  text-underline-offset: 0.125rem;
+}
+html.clarity :is(.cl-link, .cl-link-ext, :where(.cl-main a.text-accent-teal)):hover {
+  color: var(--bb-accent-link);
+  text-decoration: underline;
+}
+html.clarity :is(.cl-link, .cl-link-ext, :where(.cl-main a.text-accent-teal:not(.cl-no-chevron)))::after {
+  content: '';
+  display: inline-block;
+  width: 0.75rem;
+  height: 0.75rem;
+  margin-left: 0.0625rem;
+  vertical-align: -0.125rem;
+  background-color: currentColor;
+  mask: var(--cl-i-right) center / contain no-repeat;
+}
+html.clarity :is(.cl-link-ext, :where(.cl-main a.text-accent-teal[target=_blank]))::after { mask-image: var(--cl-i-out); }
+
+/* Two more link weights (TextLink tone / placement):
+   quiet  = repeated metadata links in dense lists (note card feet, recent-game rows, sync-history
+            counts): text-soft with a text-faint ›, turning accent + underline on hover. The one
+            primary "go there" of a region keeps the accent link.
+   inline = a link inside a sentence: accent, underlined at rest (decoration at 40%), no chevron. */
+html.clarity .cl-link-quiet,
+html.clarity .cl-main a.text-accent-teal.cl-link-quiet {
+  color: var(--bb-muted);
+  text-decoration: none;
+  text-underline-offset: 0.125rem;
+}
+html.clarity .cl-link-quiet::after {
+  content: '';
+  display: inline-block;
+  width: 0.75rem;
+  height: 0.75rem;
+  margin-left: 0.0625rem;
+  vertical-align: -0.125rem;
+  background-color: var(--bb-faint);
+  mask: var(--cl-i-right) center / contain no-repeat;
+}
+html.clarity .cl-link-quiet:hover,
+html.clarity .cl-main a.text-accent-teal.cl-link-quiet:hover { color: var(--bb-accent); text-decoration: underline; }
+html.clarity .cl-link-quiet:hover::after { background-color: currentColor; }
+html.clarity :is(.cl-link-inline, .cld-prose-link) {
+  color: var(--bb-accent);
+  text-decoration: underline;
+  text-decoration-color: color-mix(in srgb, currentColor 40%, transparent);
+  text-underline-offset: 0.125rem;
+}
+html.clarity :is(.cl-link-inline, .cld-prose-link):hover { color: var(--bb-accent-link); text-decoration-color: currentColor; }
+html.clarity :is(.cl-link-inline, .cld-prose-link)::after { content: none !important; }
+
+/* ---- 5.12 input, textarea and native select: a field is SUNK. Its own fill (--bb-field, below
+        the surface in light) and a 1px inner top shade: the inverse of a face's bottom shade, so
+        field = sunk and button = raised in both themes, not just by border. */
+html.clarity :is(.cl-input, :where([data-slot=input], [data-slot=textarea])) {
+  border: 1px solid var(--bb-edge-input);
+  background: var(--bb-field);
+  color: var(--bb-body);
+  box-shadow: inset 0 1px 0 var(--bb-field-shade);
+}
+html.clarity :is(.cl-input, :where([data-slot=input])):hover { border-color: var(--bb-edge-hover); }
+html.clarity :is(.cl-input, :where([data-slot=input])):focus-visible { border-color: var(--bb-accent); }
+html.clarity :is(.cl-input, :where([data-slot=input]))::placeholder { color: var(--bb-faint); }
+
+/* ---- 5.13 checkbox: an input, so drawn like a field (flat, sunk), never a face. Off = an
+        outlined box whose strong edge (>= 3:1) is the whole signal; on/mixed = accent + glyph. */
+html.clarity input[type=checkbox]:not(.cl-switch-input) { accent-color: var(--bb-accent); }
+html.clarity .cl-check {
+  position: relative;
+  display: inline-flex;
+  flex: none;
+  width: 1rem;
+  height: 1rem;
+  padding: 0;
+  border: 1px solid var(--bb-control-edge-strong);
+  border-radius: 0.1875rem;
+  background: var(--bb-field);
+  box-shadow: none;
+}
+html.clarity .cl-check:hover { border-color: var(--bb-muted); }
+html.clarity .cl-check:is([aria-checked=true], [aria-checked=mixed], .is-on) { background: var(--bb-accent); border-color: var(--bb-accent); }
+html.clarity .cl-check:is([aria-checked=true], [aria-checked=mixed], .is-on)::after {
+  content: '';
+  position: absolute;
+  inset: 0.0625rem;
+  background-color: var(--bb-accent-ink);
+  mask: var(--cl-i-check) center / contain no-repeat;
+}
+html.clarity .cl-check[aria-checked=mixed]::after { mask-image: var(--cl-i-minus); }
+html.clarity .cl-check > * { display: none; }
+
+/* ---- 5.14 table header: non-sortable = column caps; sortable = soft, lifts on hover */
+html.clarity :is(.cl-th, :where([data-slot=table-head])) {
+  font-size: var(--text-meta);
+  line-height: var(--text-meta--line-height);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--bb-dim);
+  font-weight: 400;
+}
+html.clarity .cl-th-sort { color: var(--bb-muted); cursor: pointer; }
+html.clarity .cl-th-sort:hover { background: var(--bb-raised); color: var(--bb-text); }
+html.clarity .cl-th-sort:hover::after {
+  content: '';
+  display: inline-block;
+  width: 0.625rem;
+  height: 0.625rem;
+  margin-left: 0.25rem;
+  vertical-align: -0.0625rem;
+  background-color: var(--bb-faint);
+  mask: var(--cl-i-updown) center / contain no-repeat;
+}
+html.clarity .cl-th-active, html.clarity .cl-th-active:hover { color: var(--bb-text); }
+html.clarity .cl-th-active:hover::after { content: none; }
+
+/* ---- 5.15 clickable row: hover = raised, selected = selected fill + inset accent bar */
+html.clarity .cl-row { background: transparent; }
+html.clarity .cl-row:hover { background: var(--bb-raised); }
+html.clarity .cl-row:is([aria-selected=true], .is-selected),
+html.clarity .cl-row:is([aria-selected=true], .is-selected):hover {
+  background: var(--bb-selected);
+  box-shadow: inset 0.125rem 0 0 var(--bb-accent);
+}
+html.clarity .cl-row-cursor { background: var(--bb-row-active); box-shadow: inset 0.125rem 0 0 var(--bb-accent); }
+
+/* ---- 5.16 pagination: faced ‹ ›, a flat position */
+html.clarity .cl-pager { display: inline-flex; align-items: center; gap: 0.375rem; }
+html.clarity .cl-pager-pos { font-family: var(--font-mono); font-size: var(--text-data); color: var(--bb-body); font-variant-numeric: tabular-nums; }

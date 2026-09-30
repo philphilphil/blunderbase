@@ -5,7 +5,7 @@ is the one being played: a move every few days, for months, on the ICCF server o
 else that gives you that much time. The work is not the move list — it is the tree of
 candidate moves behind it, which is what this screen keeps.
 
-The mode is off until you switch it on under **Analysis → Correspondence**, see
+The mode is off until you switch it on under **Analysis › Correspondence**, see
 [Analysis](analysis.md#correspondence). With it on, **Correspondence** sits in the sidebar
 under **Live**; with it off there is no entry and the pages send you home.
 
@@ -27,25 +27,25 @@ point of view whichever colour you have. It also carries a chip per engine at wo
 game, with the depth or the node count it is at, so the list says at a glance where your
 machine's attention is.
 
-At the top of the page is the **capacity strip**, and the title bar offers **New game**,
-**Import PGN** and **Pause all**.
+At the top of the page is the **capacity strip**, and the title bar offers **Pause all**,
+**Import PGN…** and **New game…**.
 
 ## Start a game
 
-**New game** asks for what a correspondence game is:
+**New game…** asks for what a correspondence game is:
 
 | Field | |
 |---|---|
 | **White**, **Black** | The names, spelled as the server spells them |
-| **You are** | White or Black. Required: whose move it is and every deadline are counted from it |
+| **Which one is you** | One of the two names you just typed. Required: whose move it is and every deadline are counted from it |
 | **Event** | The tournament, written into the PGN's `Event` header |
-| **Link** | The game's page on the server, kept as `Site` |
-| **ICCF id** | The game number. With one the game's source is **ICCF** and the number identifies it; without one it is a manual game and otherwise identical |
+| **Link to the game** | The game's page on the server, kept as `Site` |
+| **ICCF game number** | With one the game's source is **ICCF** and the number identifies it; without one it is a manual game and otherwise identical |
 | **Time control** | Free text, as the tournament states it — `10 days/move`, `40 days/10 moves` |
 | **Starting position** | A FEN, for a thematic tournament. Blank is the ordinary array |
 | **Reply due** | When your next move is due, as the server shows it. Blank is no deadline — Blunderbase never computes one, see [Enter the moves](#enter-the-moves) |
 
-**Import PGN** takes the text the server exports — pasted into the box — and fills the same
+**Import PGN…** takes the text the server exports — pasted into the box — and fills the same
 fields from its headers: the moves become the played line, and `Event` and `Site` come from
 the PGN unless you type over them. It is the quicker way in for a game already under way.
 
@@ -59,7 +59,9 @@ Two buttons in the header move the game, and both take one move:
 - **Opponent played…** enters the move that arrived.
 - **Play this move** sends the move you have selected in the tree, and is the move you are
   making. It plays it on the board here; the server the game is on stays where you actually
-  submit it.
+  submit it. It is the header's one blue button, last in the row, and names the move once
+  you have selected a candidate (**Play Nf3**). While it is off, pointing at it says why:
+  not your move, or no candidate selected yet.
 
 The deadline is yours to type. The server the game is played on is the only clock there
 is — ICCF banks days and adds an increment per move, other servers do it their own way —
@@ -68,7 +70,8 @@ the opponent's move arrives, read the date off the server's page and put it in t
 the header; nothing is due until you do. When you play your move the deadline is cleared:
 it was the deadline for that move, and while the opponent is thinking there is none.
 
-**Take back the last move** undoes a move entered by mistake. The move stays in the tree with
+**Take back the last move** (the curved arrow before **Opponent played…**) undoes a move
+entered by mistake. The move stays in the tree with
 its comments and everything analysed under it; it is only no longer part of the played line.
 
 ## The tree
@@ -138,7 +141,13 @@ to the line, not to your browser: it is saved with the node, so the tree you tid
 machine is tidy on the next, and it still works on a finished game. A folded line opens by
 itself while the position you have selected is inside it.
 
-**Export PGN** writes the whole tree out: the played line as the mainline, every other node
+A move that has fallen 1.5 pawns or more behind its best sibling is faded: it has left the
+decision. **Prune weak…** in the **Tree** strip lists every faded line, move by move, and
+deletes them only when you confirm. Nothing is ever pruned on its own, a move the game played
+is never offered, and neither is a line an engine is still working in.
+
+**Export PGN**, the download icon at the end of the **Tree** strip, writes the whole tree
+out: the played line as the mainline, every other node
 as a variation under the move it answers, your comments as comments, your marks as NAGs and
 each node's evaluation as `{[%eval 0.25]}` — the spelling Lichess uses, so any reader that
 knows the convention shows the numbers. A starting position survives as a `FEN` header.
@@ -199,7 +208,7 @@ running or paused there is refused, and a finished game takes no searches at all
 is frozen.
 
 Each search on this machine holds one of its engine slots — **Queue processes** under
-**Compute → Machines** on this server's card, the same slots the analysis passes and
+**Compute › Machines** on this server's card, the same slots the analysis passes and
 the analysis boards use — and each search on a runner holds one of that runner's slots,
 shared with its queue work and never taken from a run already going. With all of them busy
 a new search is **queued** and starts by itself the moment one comes free. A search that
@@ -263,7 +272,7 @@ browser: the expansion lives on the queued rows and not in the page. **Expand…
 tree does the same for the position you have selected, without going through the menu.
 
 Tasks go into the queue ahead of the automatic pass every imported game gets and behind a
-run you asked for from a game's **Analyse** and are sitting and waiting for, and among themselves **the nearest deadline is
+run you asked for from a game's **Analyse…** and are sitting and waiting for, and among themselves **the nearest deadline is
 worked first** — one game due tomorrow comes out of the queue before one due next week,
 however they were queued. A node with a task waiting on it carries a queue mark; one being
 worked on carries a spinner. **Cancel** takes a waiting task back out of the queue; one an
@@ -339,9 +348,10 @@ installation: how many of this machine's engine slots searches are holding, sear
 waiting for one, engines parked warm and the memory they hold, how many tasks are out and
 how many of them an engine has already, and a line per remote host. Tasks are counted
 beside the searches rather than with them: they hold a slot only for a minute or two, and
-may be holding one on another machine. The same figures
-sit along the foot of the sidebar, so they are answered from every screen. Both the strip
-and the list follow the searches as they report — there is no page here to refresh.
+may be holding one on another machine. The searches in use out of the slots also show on
+the **Correspondence** line under the engines at the foot of the sidebar (`1/2`), and
+pointing at it lists the same figures, so they are answered from every screen. Both follow the searches as they report —
+there is no page here to refresh.
 
 ## Pause all
 

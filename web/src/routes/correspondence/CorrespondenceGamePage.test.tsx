@@ -228,6 +228,21 @@ describe('the correspondence game view', () => {
     expect(screen.getByLabelText('Reply due')).toHaveValue('2026-09-14')
   })
 
+  it('draws the notes strip as real tabs, the arrow keys moving between them', async () => {
+    draw()
+    const position = await screen.findByRole('tab', { name: /This position/ })
+    expect(position).toHaveAttribute('aria-selected', 'true')
+    expect(screen.getByRole('tabpanel')).toHaveAttribute(
+      'aria-labelledby',
+      'correspondence-notes-tab-position',
+    )
+    position.focus()
+    await userEvent.keyboard('{ArrowRight}')
+    expect(screen.getByRole('tab', { name: /This game/ })).toHaveAttribute('aria-selected', 'true')
+    // The arrow belonged to the strip: it did not walk the tree as well.
+    expect(screen.getByTestId('tree-node-2')).not.toHaveAttribute('data-selected')
+  })
+
   it('says that no engine has been here, which is the whole of step one', async () => {
     draw()
     expect(
@@ -281,7 +296,7 @@ describe('the correspondence game view', () => {
   it('finishes the game with a result and how it ended', async () => {
     draw()
     await userEvent.click(await screen.findByRole('button', { name: /Finish…/ }))
-    await userEvent.click(screen.getByRole('button', { name: '1-0' }))
+    await userEvent.click(screen.getByRole('radio', { name: '1-0' }))
     await userEvent.type(screen.getByLabelText('How it ended'), 'Resignation')
     await userEvent.click(screen.getByRole('button', { name: 'Finish game' }))
 
@@ -305,7 +320,7 @@ describe('the correspondence game view', () => {
 
   it('shows the opening reference at the selected node, and a row sends its move to the tree', async () => {
     draw()
-    await userEvent.click(await screen.findByRole('button', { name: 'Book' }))
+    await userEvent.click(await screen.findByRole('tab', { name: 'Book' }))
     const table = await screen.findByTestId('correspondence-book-masters')
     expect(within(table).getByText('1.e4')).toBeInTheDocument()
 
@@ -353,7 +368,7 @@ describe('the correspondence game view', () => {
       tree: node({ children: [e4] }),
     }
     draw()
-    await userEvent.click(await screen.findByRole('button', { name: 'Book' }))
+    await userEvent.click(await screen.findByRole('tab', { name: 'Book' }))
     const table = await screen.findByTestId('correspondence-book-masters')
     expect(within(table).getByText('2.e4')).toBeInTheDocument()
     expect(within(table).queryByText('1.e4')).not.toBeInTheDocument()
@@ -361,7 +376,7 @@ describe('the correspondence game view', () => {
 
   it('walks into the branch the tree already has rather than adding it twice', async () => {
     draw()
-    await userEvent.click(await screen.findByRole('button', { name: 'Book' }))
+    await userEvent.click(await screen.findByRole('tab', { name: 'Book' }))
     const table = await screen.findByTestId('correspondence-book-masters')
     await userEvent.click(within(table).getByText('1.e4'))
 
@@ -411,8 +426,9 @@ describe('the correspondence game view: tasks and expansion', () => {
     await userEvent.click(
       within(screen.getByTestId('tree-menu')).getByRole('menuitem', { name: 'Queue task…' }),
     )
-    expect(screen.getByRole('button', { name: 'Stockfish 17' })).toHaveAttribute(
-      'aria-pressed',
+    // The engine picker is the one-of-N `Segmented`: the engine it opened on is the checked radio.
+    expect(screen.getByRole('radio', { name: 'Stockfish 17' })).toHaveAttribute(
+      'aria-checked',
       'true',
     )
     await userEvent.click(screen.getByRole('button', { name: 'Queue task' }))
@@ -461,7 +477,7 @@ describe('the correspondence game view: tasks and expansion', () => {
   it('expands the selected node from the pane’s own button', async () => {
     draw()
     await userEvent.click(await screen.findByRole('button', { name: 'Expand…' }))
-    await userEvent.click(screen.getByRole('button', { name: '2' }))
+    await userEvent.click(screen.getByRole('radio', { name: '2' }))
     await userEvent.click(screen.getByRole('button', { name: 'Expand' }))
 
     await waitFor(() => expect(posted).toHaveLength(1))

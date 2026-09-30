@@ -1,21 +1,26 @@
 /**
  * ⇧E: the engine, off.
  *
- * One button in the titlebar and one key, because the mode is not about a screen — it is
+ * One switch in the titlebar and one key, because the mode is not about a screen — it is
  * about how the next hour of reading is going to go. Somebody who wants to annotate a game
  * before Stockfish tells them the answer has to be able to say so *before* opening the
  * game, from wherever they are standing, and have it still be true on the next game and
- * after a reload. That is why it is here beside the theme rather than in the board's own
- * toolbar next to Hints, which is the same wish for one position and dies with the route.
+ * after a reload. That is why it is the one global in the bar rather than in the board's
+ * own toolbar next to Hints, which is the same wish for one position and dies with the route.
+ *
+ * A labelled switch, "Hide engine", off by default. It used to be a lit `Computer` chip,
+ * lit while the engine spoke: a permanent accent block beside every page's primary, a glyph
+ * that read as the theme's monitor, and on pages with no evaluations it read as "stop
+ * Stockfish". Now the ordinary state is a grey track, and the unusual spoiler-free mode is
+ * the one that lights, named by its own words; on is `aria-checked`, and it means hidden.
  *
  * What it hides is `lib/ui/engineVisibility`'s business; this file is the affordance and
  * the key. Both are needed: a mode with only a shortcut is a mode only its author uses,
  * and a mode with only a button is one you have to reach for the mouse to leave.
  *
- * It stays visible on a phone, unlike the theme control beside it. There is no second copy
- * of it in the rail's footer, and the two screens it changes are exactly the two a phone is
- * most likely to be reading — so the ~26px it costs the row is bought back the first time
- * somebody wants their own verdict to stand.
+ * It stays in the bar on a phone, without its word (`compact`: an eye in the thumb and the
+ * name for screen readers). There is no second copy of it anywhere, and the two screens it
+ * changes are exactly the two a phone is most likely to be reading.
  *
  * The keypress says what it did. On the game and the library the change is unmissable, but
  * the key works on Settings and on Import too, where nothing on screen would move and a
@@ -23,10 +28,11 @@
  * because the whole point is knowing whether the next game will speak.
  */
 import { useLingui } from '@lingui/react/macro'
-import { Computer } from 'lucide-react'
+import { Eye, EyeOff } from 'lucide-react'
 import { useEffect } from 'react'
 
-import { toggleEngineHidden, useEngineHidden } from '@/lib/ui/engineVisibility'
+import { Switch } from '@/components/ui/switch'
+import { setEngineHidden, toggleEngineHidden, useEngineHidden } from '@/lib/ui/engineVisibility'
 import { isTyping } from '@/lib/ui/shortcuts'
 import { toast } from '@/lib/toast'
 import { cn } from '@/lib/utils'
@@ -43,7 +49,14 @@ function isEngineChord(event: KeyboardEvent): boolean {
   return event.key.toLowerCase() === 'e'
 }
 
-export function EngineToggle({ className }: { className?: string }) {
+export function EngineToggle({
+  compact = false,
+  className,
+}: {
+  /** The phone bar's form: no word beside the track, an eye inside the thumb. */
+  compact?: boolean
+  className?: string
+}) {
   const hidden = useEngineHidden()
   const { t } = useLingui()
 
@@ -63,40 +76,28 @@ export function EngineToggle({ className }: { className?: string }) {
     return () => document.removeEventListener('keydown', onKeyDown)
   }, [hiddenSaid, shownSaid])
 
-  const label = hidden ? t`Show the engine (⇧E)` : t`Hide the engine (⇧E)`
-  // No toast on this path, unlike the key's: the button that was pressed has already
+  // No toast on this path, unlike the key's: the switch that was pressed has already
   // changed under the finger, and a toast for it would be the app reading its own label
   // back at the person who just read it.
+  const Glyph = hidden ? EyeOff : Eye
   return (
-    <button
-      type="button"
-      onClick={() => toggleEngineHidden()}
-      // The button is the engine, not the mode: pressed means the engine is speaking, which
-      // is what the lit chip says too.
-      aria-pressed={!hidden}
-      aria-label={label}
-      title={
-        hidden
-          ? t`The engine is hidden. Press to show it again (⇧E).`
-          : t`Hide the engine's evaluations, flags and panels (⇧E)`
+    <Switch
+      checked={hidden}
+      onCheckedChange={(next) => setEngineHidden(next)}
+      label={t`Hide engine`}
+      hideLabel={compact}
+      title={t`Hide engine evaluations, lines and flags (⇧E)`}
+      thumbIcon={
+        compact ? (
+          <Glyph
+            aria-hidden
+            strokeWidth={3}
+            className={hidden ? 'size-2 text-accent-ink' : 'size-2 text-panel'}
+          />
+        ) : undefined
       }
-      className={cn(
-        'flex flex-none items-center rounded-md border px-[0.4375rem] py-[0.3125rem] transition-colors',
-        // Lit while the engine is on. It is the ordinary state, so the titlebar carries a
-        // lit chip most of the time — which is the right way round for a switch whose icon
-        // is the engine itself: the computer is on, and pressing it turns it off. Read the
-        // other way (lit while hidden) the same chip would have to mean "the computer you
-        // can see is the one that is not talking to you".
-        //
-        // One icon in both states, so the chip going dark is the whole of the difference
-        // and there is nothing else to decode.
-        hidden
-          ? 'border-edge bg-elevated text-dim hover:border-edge-hover hover:text-ink'
-          : 'border-accent-teal/30 bg-accent-teal/10 text-accent-teal',
-        className,
-      )}
-    >
-      <Computer className="size-3" aria-hidden />
-    </button>
+      // The word first, then the track: the bar reads left to right into its last control.
+      className={cn('flex-row-reverse', className)}
+    />
   )
 }

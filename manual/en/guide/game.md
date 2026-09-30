@@ -10,40 +10,55 @@ game. `F` flips the board, `[` and `]` open the
 previous and next game in your list. The full list is under [Settings](settings.md).
 
 The controls sit around the board rather than under it. The row with your opponent's name,
-above the board, carries the four things that change what the board *shows*: board settings,
-flip, hints and the keyboard for typing a move. The row with your own name, below it, carries
-where you are in the game and what the position is worth. The row under that is what you do
-to the game — analyse, note, practise — and, hard right, the buttons that step through it.
-What this game rarely needs, such as the way back to the explorer, is behind the **⋯**.
+above the board, carries the three things that change what the board *shows* — flip, hints
+and the keyboard for typing a move, each lit while it is on — and, last, after a thin rule,
+the board settings, whose **⌄** says it opens a panel. The row with your own name, below
+the board, carries where you are in the game and what the position is worth. The row under
+that is what you do to the game — **Note**, **Practise…** — and, hard right, two sets of
+joined buttons: **⏮ ◀ ▶ ⏭** step through the game, and **‹⚐ ⚐›** jump to the previous and
+next flagged move. A button that has nowhere to go (⏮ at the start) loses its face and says
+why when you point at it. What this game rarely needs, such as the way back to the
+explorer, is behind the **⋯**.
 
 The line between the board and the column on its right can be dragged; its grip turns blue
 when you point at it. Reached with Tab, the arrow keys nudge it, and a double-click puts it
 back where it started. The width is remembered in this browser. The board and the move
 column each keep a minimum width, so neither can be squeezed out.
 
-The bar across the top names the opening, where the game came from, its time control and
-how it ended. On a Lichess or Chess.com game the source there is a link that opens the
-game on that site in a new tab, and a small arrow shows when you point at it; on a phone
-the same link is the arrow beside the PGN button.
+The title bar says where the game came from and whose it is: the list you opened it from —
+**Games**, a saved filter such as **Games › Losses as black**, or **Collections › League
+2026** — and then the players as the page's title. Click the list to go back to it, with
+its filters, sort and page as you left them. On a phone the bar shows **‹ Games** (or
+**‹ Collections**) instead.
+
+The line under it describes the game: the opening, its ECO code, where it came from, its
+time control, the date it was played and how it ended. On a Lichess or Chess.com game the
+source is a link, marked **↗**, that opens the game on that site in a new tab; on a phone
+the same link is the arrow beside the **Copy PGN** button.
+When you opened the game from a list, **‹ ›** at the start of the line open the previous
+and next game in it (`[` and `]`); on a wide window the list's name stands beside them.
 A game that is in a [collection](collections.md) carries that collection's chip there
-too, and the chip opens the games list filtered to that collection. Like the bar's other items, the chips give
+too, and the chip opens the games list filtered to that collection. Like the line's other items, the chips give
 way when the window is too narrow for them.
 
 A chess960 game, or one that was set up from a position, starts the board from that
 position, and its moves are numbered from it: a game that begins with Black to move on move
-12 opens on `12…`. The PGN button writes the start position into the export (`SetUp` and
+12 opens on `12…`. **Copy PGN** writes the start position into the export (`SetUp` and
 `FEN`), so another program reads the game back the same way.
 
 ## What the badges mean
 
-The move column marks a move `??`, `?`, `?!` or `!` and tints the flagged rows. The
-**Flagged** tab beside **Moves** shows only those. What earns each badge is in
-[Analysis](analysis.md).
+The move column marks a move `??`, `?`, `?!` or `!` and tints the flagged rows. It has two
+tabs, **Moves** and **Flagged**; **Flagged** shows only those moves, with their count on
+the tab. What earns each badge is in [Analysis](analysis.md). The same strip says how many
+plies the game has and, at its right end, carries **Copy PGN** (the copy icon, or `C`),
+which puts the whole game on the clipboard as PGN; the icon turns into a tick when it has.
 
 ## Read the evaluation graph
 
-The curve under the board is the evaluation move by move; clicking it seeks. Its shape and
-its marks are board settings.
+The curve under the board is the evaluation move by move, on the pane's **Evaluation**
+tab; clicking it seeks. **only mine**, at the right of that pane's tabs, marks only your
+own flagged moves on the curve. Its shape and its marks are board settings.
 
 ## See how long each move took
 
@@ -64,12 +79,13 @@ not counted. Clicking seeks, as on the evaluation. `T` opens this tab and `V` go
 
 The lines under the board are what the stored pass found: as many as that pass kept, two
 by default for the pass every game gets on import, as many as you chose for one you asked
-for. Point at one and it is drawn on the board, in whatever form you chose under
-**Line preview**.
+for. Point at one and it is drawn on the board, in whatever form you chose: the picker
+with the eye in the pane's title (**Arrows**, **Overlay**, **Playthrough**, **Peek** or
+**Off**) sets that, and the rest of it is under **Line preview** in the board settings.
 
 ## Ask for a deeper look { #ask-for-a-deeper-look }
 
-**Analyse**, at the right end of the engine pane's title on the **Run** tab, or `A`, opens
+**Analyse…**, at the right end of the engine pane's title on the **Run** tab, or `A`, opens
 a dialog that queues a run of your own over this game. While the
 engine is hidden the pane is gone, and the button moves to the row under the board. The run
 goes ahead of every import pass still waiting, and the button spins until it is done; until
@@ -109,7 +125,7 @@ caret rather than the game.
 
 ## Practise from a position
 
-**Practise**, in the row under the board, or `P`, plays the position on the board out against
+**Practise…**, in the row under the board, or `P`, plays the position on the board out against
 the computer. The dialog asks three things:
 
 | | |
@@ -139,11 +155,12 @@ pin it.
 ## Run the live engine
 
 The engine pane has two tabs, **Run** and **Live**: what the stored pass found, and what
-an engine finds now, which stores nothing. Clicking **Live**, or `E`, starts the live engine
-on the position in front of you and moves the pane there. While it runs the **Live** tab
-carries a small square: click it, or press `E` again, to stop the search and go back to
-**Run**. You can also click **Run** to look at the stored lines while the engine keeps
-going — the dot on the **Live** tab keeps pulsing until you stop it.
+an engine finds now, which stores nothing. Clicking **Live**, or pressing `E` from anywhere
+on the screen, starts the live engine on the position in front of you and moves the pane to
+**Live**.
+While it runs, a square stands beside the tabs: click it, or press `E` again, to stop the
+search and go back to **Run**. You can also click **Run** to look at the stored lines while
+the engine keeps going — the green dot on the **Live** tab keeps pulsing until you stop it.
 
 On the **Live** tab the engine's name and the line count in the title are pickers: click
 the name to choose which engine searches, the count to choose how many lines it shows.
@@ -154,14 +171,15 @@ you are in.
 ## What a human would play
 
 The Maia panel gives five moves with the odds of each at the level you pick, not the best
-move. It shows no line; see [Analysis](analysis.md). `L` sets every level side by side, and
-pressed again goes back to the one you picked.
+move. It shows no line; see [Analysis](analysis.md). The level in the panel's title is a
+picker: choose another level, or **All levels, side by side** to set every level next to
+each other. `L` does the same, and pressed again goes back to the one you picked.
 
 ## Read a game without the engine
 
-`⇧E`, or the computer in the title bar, takes every engine verdict off this screen: the
+`⇧E`, or the **Hide engine** switch in the title bar, takes every engine verdict off this screen: the
 evaluation bar and the score, the `??` badges and the tinted rows, the graph, the engine
-and Maia panels. The moves, the clocks and your notes stay, and so does **Analyse** —
+and Maia panels. The moves, the clocks and your notes stay, and so does **Analyse…** —
 write down what you think went wrong, then ask and see. The mode
 holds until you press it again; the whole of it is under
 [Settings](settings.md#hide-the-engine).

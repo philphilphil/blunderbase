@@ -1,0 +1,304 @@
+<!doctype html>
+<!--
+  Clarity prototype viewer. Pick a screen, flip Current ⇄ Proposal (space), switch each decision
+  between A and B, change the theme, or put current and proposal side by side. The screens are
+  static captures of the current design (screens/*.html); the proposal is an overlay
+  (clarity.css, clarity.js, clarity-<screen>.css) that applies only under html.clarity.
+  State lives in the URL hash, so a link reopens exactly what was on screen.
+-->
+<html lang="en" class="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Clarity prototype</title>
+<link rel="icon" type="image/png" href="assets/favicon.png">
+<style>
+@font-face { font-family: 'Geist Variable'; font-weight: 100 900; font-style: normal; src: url(assets/geist-latin-wght-normal.woff2) format('woff2'); }
+@font-face { font-family: 'Geist Variable'; font-weight: 100 900; font-style: normal; src: url(assets/geist-latin-ext-wght-normal.woff2) format('woff2'); unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+1E00-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF; }
+@font-face { font-family: 'Geist Mono Variable'; font-weight: 100 900; font-style: normal; src: url(assets/geist-mono-latin-wght-normal.woff2) format('woff2'); }
+
+/* The current design's tokens (web/src/index.css), plus the clarity pass's new ones. */
+:root {
+  --bb-void: #1d1e1f; --bb-panel: #2c2d2e; --bb-surface: #232424; --bb-surface-2: #212222;
+  --bb-raised: #363738; --bb-raised-2: #313232; --bb-selected: #2b4760; --bb-avatar: #3a3b3b;
+  --bb-hairline: #3a3c3b; --bb-line: #3e4040; --bb-edge: #474949; --bb-edge-strong: #555756;
+  --bb-edge-hover: #777975; --bb-edge-input: #4d4f4e;
+  --bb-text: #eeeeea; --bb-body: #d8d8d3; --bb-body-3: #c6c6c1; --bb-muted: #b6b5b0;
+  --bb-dim: #a3a29c; --bb-dim-2: #9a998f; --bb-faint: #8b8a82; --bb-faint-2: #7c7b73;
+  --bb-accent: #83b7e3; --bb-accent-hover: #9cc7ea; --bb-accent-ink: #10202c;
+  --bb-track: #3a3c3b; --bb-shadow: rgb(0 0 0 / 0.5); --bb-chip-neutral: #2e2f2f;
+  --bb-control: #3c3d3e; --bb-control-hover: #444546; --bb-control-edge: #5d5f5e;
+  --bb-control-shade: rgb(0 0 0 / 0.4);
+  --font-sans: 'Geist Variable', ui-sans-serif, system-ui, sans-serif;
+  --font-mono: 'Geist Mono Variable', ui-monospace, monospace;
+  color-scheme: dark;
+}
+:root.light {
+  --bb-void: #e4e4e1; --bb-panel: #efefec; --bb-surface: #fbfbfa; --bb-surface-2: #f7f7f5;
+  --bb-raised: #e5e5e1; --bb-raised-2: #e2e2de; --bb-selected: #d3e1f0; --bb-avatar: #dcdcd8;
+  --bb-hairline: #dcdcd8; --bb-line: #d1d1cd; --bb-edge: #c5c5c0; --bb-edge-strong: #b6b6b1;
+  --bb-edge-hover: #91918c; --bb-edge-input: #bcbcb7;
+  --bb-text: #202020; --bb-body: #3b3b39; --bb-body-3: #4e4e4b; --bb-muted: #5c5c59;
+  --bb-dim: #696966; --bb-dim-2: #6d6d69; --bb-faint: #767672; --bb-faint-2: #8c8c87;
+  --bb-accent: #245f9e; --bb-accent-hover: #1d4e83; --bb-accent-ink: #ffffff;
+  --bb-track: #dededa; --bb-shadow: rgb(30 30 28 / 0.16); --bb-chip-neutral: #eaeae6;
+  --bb-control: #ffffff; --bb-control-hover: #f6f6f4; --bb-control-edge: #aeaea9;
+  --bb-control-shade: rgb(0 0 0 / 0.1);
+  color-scheme: light;
+}
+html { font-size: 120%; height: 100%; }
+* { box-sizing: border-box; }
+body {
+  margin: 0; height: 100%; display: flex; flex-direction: column;
+  background: var(--bb-void); color: var(--bb-body);
+  font-family: var(--font-sans); font-size: 0.75rem; line-height: 1rem;
+  -webkit-font-smoothing: antialiased;
+}
+button { font: inherit; color: inherit; }
+:focus-visible { outline: 0.125rem solid var(--bb-accent); outline-offset: 0.125rem; }
+
+/* chrome: a bar and a control strip, the app's own pane idiom */
+.bar {
+  display: flex; align-items: center; gap: 0.75rem; flex: none; flex-wrap: wrap;
+  min-height: 2.625rem; padding: 0.3125rem 0.75rem;
+  background: var(--bb-panel); border-bottom: 1px solid var(--bb-edge-strong);
+}
+.brand { display: flex; align-items: center; gap: 0.5rem; flex: none; }
+.brand img { width: 1.1875rem; height: 1.1875rem; }
+:root:not(.light) .brand img { filter: invert(1) hue-rotate(180deg); }
+.brand b { font-size: 0.8125rem; line-height: 1.25rem; font-weight: 600; color: var(--bb-text); letter-spacing: -0.01em; }
+.brand span { font-size: 0.6875rem; color: var(--bb-dim); }
+.rule { width: 1px; height: 1.125rem; background: var(--bb-line); flex: none; }
+.spacer { flex: 1; }
+.strip {
+  display: flex; align-items: center; gap: 0.5rem 1.25rem; flex: none; flex-wrap: wrap;
+  padding: 0.4375rem 0.75rem; background: var(--bb-panel); border-bottom: 1px solid var(--bb-edge-strong);
+}
+.label { font-size: 0.6875rem; line-height: 1rem; color: var(--bb-dim); white-space: nowrap; }
+.field { display: inline-flex; align-items: center; gap: 0.5rem; }
+.decision { display: inline-flex; align-items: center; gap: 0.5rem; }
+.decision .q { font-size: 0.6875rem; color: var(--bb-muted); white-space: nowrap; }
+.decision .rec { font-size: 0.625rem; color: var(--bb-faint); }
+
+/* the segmented control, the proposal's (a sunken track, a raised neutral thumb) */
+.seg {
+  display: inline-flex; align-items: stretch; gap: 0.125rem; height: 1.75rem; padding: 0.125rem;
+  border: 1px solid var(--bb-hairline); border-radius: 0.25rem; background: var(--bb-void); flex: none;
+}
+.seg button {
+  display: inline-flex; align-items: center; gap: 0.3125rem; padding: 0 0.5rem; border: 0;
+  border-radius: 0.1875rem; background: transparent; color: var(--bb-muted); cursor: pointer;
+  font-size: 0.6875rem; line-height: 1rem; white-space: nowrap;
+}
+.seg button:hover { color: var(--bb-text); }
+.seg button[aria-checked=true] {
+  background: var(--bb-control); color: var(--bb-text); font-weight: 500;
+  box-shadow: 0 0 0 1px var(--bb-control-edge), inset 0 -1px 0 var(--bb-control-shade);
+}
+.seg button:disabled { color: var(--bb-faint-2); cursor: not-allowed; }
+.seg.big { height: 2rem; }
+.seg.big button { font-size: 0.75rem; padding: 0 0.75rem; }
+/* the Current ⇄ Proposal switch is the one this page exists for: the proposal side is the accent */
+.seg.big button.prop[aria-checked=true] {
+  background: var(--bb-accent); color: var(--bb-accent-ink); font-weight: 600; box-shadow: none;
+}
+kbd {
+  font-family: var(--font-mono); font-size: 0.625rem; line-height: 0.875rem; color: var(--bb-dim);
+  padding: 0 0.3125rem; border-radius: 0.1875rem; background: var(--bb-chip-neutral);
+}
+.note { font-size: 0.625rem; color: var(--bb-faint); }
+
+/* the stage: one or two 1440×900 frames, scaled to fit */
+.stage { flex: 1; min-height: 0; display: flex; gap: 0.75rem; padding: 0.75rem; }
+.pane { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 0.375rem; }
+.pane-head { display: flex; align-items: baseline; gap: 0.5rem; font-size: 0.6875rem; color: var(--bb-dim); }
+.pane-head b { color: var(--bb-text); font-weight: 600; font-size: 0.75rem; }
+.box { position: relative; flex: 1; min-height: 0; overflow: hidden; }
+.box iframe {
+  position: absolute; top: 0; left: 0; border: 0; background: var(--bb-surface);
+  transform-origin: 0 0; box-shadow: 0 0 0 1px var(--bb-edge-strong), 0 0.75rem 2rem var(--bb-shadow);
+}
+.box.fill iframe { width: 100%; height: 100%; transform: none; }
+body:not(.side) #paneL .pane-head { display: none; }
+body:not(.side) #paneR { display: none; }
+</style>
+</head>
+<body>
+  <header class="bar">
+    <div class="brand"><img src="assets/logo.png" alt=""><b>Blunderbase</b><span>clarity prototype</span></div>
+    <div class="rule"></div>
+    <div class="field"><span class="label">Screen</span><div class="seg" id="screens" role="radiogroup" aria-label="Screen"></div></div>
+    <div class="spacer"></div>
+    <div class="field">
+      <div class="seg big" id="view" role="radiogroup" aria-label="Current or proposal">
+        <button type="button" role="radio" data-v="current">Current</button>
+        <button type="button" role="radio" data-v="proposal" class="prop">Proposal</button>
+      </div>
+      <kbd title="Space flips between current and proposal">space</kbd>
+    </div>
+    <div class="rule"></div>
+    <div class="field"><span class="label">Layout</span>
+      <div class="seg" id="mode" role="radiogroup" aria-label="Layout">
+        <button type="button" role="radio" data-v="single">One</button>
+        <button type="button" role="radio" data-v="side">Side by side</button>
+      </div>
+    </div>
+    <div class="field"><span class="label">Theme</span>
+      <div class="seg" id="theme" role="radiogroup" aria-label="Theme">
+        <button type="button" role="radio" data-v="dark">Dark</button>
+        <button type="button" role="radio" data-v="light">Light</button>
+      </div>
+    </div>
+  </header>
+  <div class="strip" id="decisions"></div>
+  <main class="stage">
+    <section class="pane" id="paneL"><div class="pane-head"><b>Current</b>as it ships today</div><div class="box" id="boxL"><iframe id="frameL" title="Screen"></iframe></div></section>
+    <section class="pane" id="paneR"><div class="pane-head"><b>Proposal</b>the clarity pass, with the decisions above</div><div class="box" id="boxR"><iframe id="frameR" title="Proposal"></iframe></div></section>
+  </main>
+<script>
+(function () {
+  var SCREENS = [
+    ['dashboard', 'Dashboard'], ['games', 'Games'], ['game', 'Game'], ['stats', 'Stats'],
+    ['notes', 'Notes'], ['explorer', 'Explorer'], ['import', 'Import'],
+  ]
+  var DECISIONS = [
+    { id: 'shell', q: 'Where does the app’s own chrome live?', a: 'Rail carries the app', b: 'Slim full-width bar',
+      ta: 'Full-height rail: brand, search, then a three-row foot (engines · queue, account, utility); the bar holds only the page (title … actions │ Hide engine).',
+      tb: 'Today’s full-width bar, quieter: brand, title … actions │ queue readout, Hide engine, search field, initials.' },
+    { id: 'tabs', q: 'How is the selected pane tab marked?', a: 'Folder tab', b: 'Underline',
+      ta: 'The selected tab is the pane’s surface pushed into the strip, with side rules and a 2px accent top edge (Game screen).',
+      tb: 'One-colour strip; the selected tab carries a 2px accent line on the strip’s rule (Game screen).' },
+    { id: 'segment', q: 'How is the chosen option of a one-of-N choice drawn?', a: 'Neutral thumb', b: 'Blue thumb',
+      ta: 'A raised neutral thumb in a sunken track: a value, not a selection, so blue is left for on and selected.',
+      tb: 'A raised blue thumb in the same sunken track: today’s colour, a clearer shape.' },
+    { id: 'collections', q: 'Do collections appear in the rail?', a: 'Pinned list', b: 'One row',
+      ta: 'Up to two collections under Collections (square swatch, no fold rule), each a place you can be in: click one on Games and the rail and title say Collections › name. The demo has none, so these are samples.',
+      tb: 'Collections stays a single row, as today.' },
+  ]
+  var DEF = { screen: 'dashboard', view: 'proposal', mode: 'single', theme: 'dark', fit: 'fit', shell: 'a', tabs: 'a', segment: 'a', collections: 'a' }
+  var st = Object.assign({}, DEF)
+  var frameL = document.getElementById('frameL')
+  var frameR = document.getElementById('frameR')
+
+  function readHash() {
+    var p = new URLSearchParams(location.hash.slice(1))
+    Object.keys(DEF).forEach(function (k) { if (p.get(k)) st[k] = p.get(k) })
+    if (!SCREENS.some(function (s) { return s[0] === st.screen })) st.screen = DEF.screen
+  }
+  function writeHash() {
+    var q = Object.keys(DEF).map(function (k) { return k + '=' + st[k] }).join('&')
+    history.replaceState(null, '', '#' + q)
+  }
+  function frameState(proposal) {
+    return { clarity: proposal ? '1' : '0', theme: st.theme, shell: st.shell, tabs: st.tabs, segment: st.segment, collections: st.collections }
+  }
+  function src(proposal) {
+    var s = frameState(proposal)
+    return 'screens/' + st.screen + '.html?' + Object.keys(s).map(function (k) { return k + '=' + s[k] }).join('&')
+  }
+  var loaded = { L: '', R: '' }
+  function load(frame, key, proposal) {
+    var want = st.screen
+    if (loaded[key] !== want) { loaded[key] = want; frame.src = src(proposal) }
+    else if (frame.contentWindow) frame.contentWindow.postMessage({ type: 'clarity-state', state: frameState(proposal) }, '*')
+  }
+  function render() {
+    document.documentElement.classList.toggle('light', st.theme === 'light')
+    document.body.classList.toggle('side', st.mode === 'side')
+    mark('screens', st.screen); mark('view', st.view); mark('mode', st.mode); mark('theme', st.theme); mark('fit', st.fit)
+    DECISIONS.forEach(function (d) { mark('dec-' + d.id, st[d.id]) })
+    document.querySelectorAll('#view button').forEach(function (b) { b.disabled = st.mode === 'side' })
+    document.getElementById('boxL').classList.toggle('fill', st.fit === 'fill')
+    document.getElementById('boxR').classList.toggle('fill', st.fit === 'fill')
+    load(frameL, 'L', st.mode === 'side' ? false : st.view === 'proposal')
+    if (st.mode === 'side') load(frameR, 'R', true)
+    writeHash()
+    fit()
+  }
+  function mark(id, v) {
+    document.querySelectorAll('#' + id + ' button').forEach(function (b) { b.setAttribute('aria-checked', String(b.dataset.v === v)) })
+  }
+  function fit() {
+    ;[['boxL', frameL], ['boxR', frameR]].forEach(function (x) {
+      var box = document.getElementById(x[0])
+      var f = x[1]
+      if (st.fit === 'fill') { f.style.width = ''; f.style.height = ''; f.style.transform = ''; f.style.left = ''; return }
+      var r = box.getBoundingClientRect()
+      if (!r.width) return
+      var k = Math.min(r.width / 1440, r.height / 900)
+      f.style.width = '1440px'; f.style.height = '900px'
+      f.style.transform = 'scale(' + k + ')'
+      f.style.left = Math.max(0, (r.width - 1440 * k) / 2) + 'px'
+    })
+  }
+  function seg(el, items, key) {
+    items.forEach(function (it) {
+      var b = document.createElement('button')
+      b.type = 'button'; b.setAttribute('role', 'radio'); b.dataset.v = it[0]; b.textContent = it[1]
+      if (it[2]) b.title = it[2]
+      el.appendChild(b)
+    })
+    bind(el, key)
+  }
+  function bind(el, key) {
+    el.addEventListener('click', function (e) {
+      var b = e.target.closest('button'); if (!b || b.disabled) return
+      st[key] = b.dataset.v; render()
+    })
+  }
+  seg(document.getElementById('screens'), SCREENS.map(function (s, i) { return [s[0], s[1], 'Key ' + (i + 1)] }), 'screen')
+  bind(document.getElementById('view'), 'view')
+  bind(document.getElementById('mode'), 'mode')
+  bind(document.getElementById('theme'), 'theme')
+  var strip = document.getElementById('decisions')
+  DECISIONS.forEach(function (d) {
+    var w = document.createElement('div'); w.className = 'decision'
+    w.innerHTML = '<span class="q">' + d.q + '</span><div class="seg" id="dec-' + d.id + '" role="radiogroup" aria-label="' + d.q + '"></div>'
+    strip.appendChild(w)
+    seg(w.querySelector('.seg'), [['a', 'A · ' + d.a + ' ★', d.ta + ' (recommended)'], ['b', 'B · ' + d.b, d.tb]], d.id)
+  })
+  var n = document.createElement('span'); n.className = 'note'
+  n.textContent = '★ recommended. Hover an option for what it does. Keys: space current/proposal, 1–7 screen, t theme, s side by side.'
+  strip.appendChild(n)
+  var sp = document.createElement('span'); sp.className = 'spacer'; strip.appendChild(sp)
+  var sz = document.createElement('div'); sz.className = 'field'
+  sz.innerHTML = '<span class="label">Size</span><div class="seg" id="fit" role="radiogroup" aria-label="Size">' +
+    '<button type="button" role="radio" data-v="fit" title="The screen at 1440×900, scaled to fit">1440×900</button>' +
+    '<button type="button" role="radio" data-v="fill" title="The screen at this window’s size">Window</button></div>'
+  strip.appendChild(sz)
+  bind(document.getElementById('fit'), 'fit')
+
+  function key(k) {
+    if (k === ' ') { if (st.mode === 'side') return; st.view = st.view === 'proposal' ? 'current' : 'proposal'; render() }
+    else if (k === 't') { st.theme = st.theme === 'dark' ? 'light' : 'dark'; render() }
+    else if (k === 's') { st.mode = st.mode === 'side' ? 'single' : 'side'; render() }
+    else if (/^[1-7]$/.test(k)) { st.screen = SCREENS[+k - 1][0]; render() }
+  }
+  document.addEventListener('keydown', function (e) {
+    if (e.metaKey || e.ctrlKey || e.altKey) return
+    if (e.key === ' ' || e.key === 't' || e.key === 's' || /^[1-7]$/.test(e.key)) { e.preventDefault(); key(e.key) }
+  })
+  window.addEventListener('message', function (e) {
+    var d = e.data
+    if (!d || typeof d !== 'object') return
+    var which = e.source === frameR.contentWindow ? 'R' : 'L'
+    if (d.type === 'clarity-key') key(d.key)
+    else if (d.type === 'clarity-theme') { st.theme = d.theme; render() }
+    else if (d.type === 'clarity-screen') {
+      // a rail link inside a frame moved it to another screen: follow it everywhere
+      loaded[which] = d.screen
+      if (d.screen && d.screen !== st.screen && SCREENS.some(function (s) { return s[0] === d.screen })) { st.screen = d.screen; render() }
+      else {
+        var proposal = which === 'R' || (st.mode !== 'side' && st.view === 'proposal')
+        e.source.postMessage({ type: 'clarity-state', state: frameState(proposal) }, '*')
+      }
+    }
+  })
+  window.addEventListener('resize', fit)
+  window.addEventListener('hashchange', function () { readHash(); render() })
+  readHash()
+  render()
+})()
+</script>
+</body>
+</html>

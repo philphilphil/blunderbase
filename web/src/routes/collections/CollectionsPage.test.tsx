@@ -137,7 +137,7 @@ describe('CollectionsPage', () => {
 
     expect(within(screen.getByTestId('crumbs')).getByText('Collections')).toBeInTheDocument()
     expect(
-      within(screen.getByTestId('titlebar')).getByRole('button', { name: 'New collection' }),
+      within(screen.getByTestId('titlebar')).getByRole('button', { name: 'New collection…' }),
     ).toBeInTheDocument()
     const asked = vi
       .mocked(fetch)
@@ -260,7 +260,7 @@ describe('CollectionsPage', () => {
     await card('45-45 League')
 
     await user.click(
-      within(screen.getByTestId('titlebar')).getByRole('button', { name: 'New collection' }),
+      within(screen.getByTestId('titlebar')).getByRole('button', { name: 'New collection…' }),
     )
     expect(await screen.findByRole('dialog', { name: 'New collection' })).toBeInTheDocument()
   })
@@ -274,9 +274,13 @@ describe('CollectionsPage', () => {
     expect(within(empty).getByText('No collections yet')).toBeInTheDocument()
     expect(within(empty).getByText(/A game can be in several/)).toBeInTheDocument()
     expect(within(empty).getByText(/Make a collection/)).toBeInTheDocument()
-    expect(within(empty).getByText(/Add to…/)).toBeInTheDocument()
+    expect(within(empty).getByText(/use Add to under the table/)).toBeInTheDocument()
 
-    await user.click(within(empty).getByRole('button', { name: 'New collection' }))
+    // The one door is the empty shelf's own: the bar does not offer it a second time.
+    expect(
+      within(screen.getByTestId('titlebar')).queryByRole('button', { name: 'New collection…' }),
+    ).not.toBeInTheDocument()
+    await user.click(within(empty).getByRole('button', { name: 'New collection…' }))
     expect(await screen.findByRole('dialog', { name: 'New collection' })).toBeInTheDocument()
   })
 

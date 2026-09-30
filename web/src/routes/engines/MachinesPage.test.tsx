@@ -259,7 +259,7 @@ describe('MachinesPage — runners', () => {
     })
     renderPage()
     await userEvent.click(await screen.findByRole('button', { name: /expand gpu-box/i }))
-    await userEvent.click(screen.getByRole('button', { name: 'Revoke' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Revoke…' }))
     // The confirmation row is where the second click lands, so it is where the refusal has
     // to be readable — the row otherwise looks exactly as it did before the click.
     await userEvent.click(screen.getByRole('button', { name: 'Revoke' }))

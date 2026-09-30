@@ -26,6 +26,7 @@ import {
   type KeyboardEvent,
 } from 'react'
 
+import { Button } from '@/components/ui/button'
 import { place, type Box, type Size } from '@/lib/tour/place'
 import { useTour } from '@/lib/tour/TourProvider'
 import { cn } from '@/lib/utils'
@@ -81,9 +82,6 @@ function Scrim({ hole, viewport }: { hole: Box; viewport: Size }) {
     </>
   )
 }
-
-const BUTTON =
-  'rounded-md border border-input bg-elevated px-2.5 py-[0.3125rem] text-label text-soft transition-colors hover:border-edge-hover hover:text-ink'
 
 export function TourCoachmark() {
   const { step, position, total, anchor, next, back, dismiss } = useTour()
@@ -210,22 +208,20 @@ export function TourCoachmark() {
               {position} of {total}
             </Trans>
           </span>
-          <button type="button" onClick={dismiss} className="text-label text-dim hover:text-ink">
+          {/* The control standard: Skip a quiet ghost, Back a face, the way on the one
+              filled button, last in the row. */}
+          <Button variant="ghost" size="xs" onClick={dismiss} className="text-dim">
             <Trans>Skip</Trans>
-          </button>
+          </Button>
           <span className="flex-1" />
           {position > 1 ? (
-            <button type="button" onClick={back} className={BUTTON}>
+            <Button variant="secondary" size="xs" onClick={back}>
               <Trans>Back</Trans>
-            </button>
+            </Button>
           ) : null}
-          <button
-            type="button"
-            onClick={last ? dismiss : next}
-            className="rounded-md bg-accent-teal px-2.5 py-[0.3125rem] text-label font-semibold text-accent-ink transition-colors hover:bg-accent-hover"
-          >
+          <Button size="xs" onClick={last ? dismiss : next}>
             {last ? <Trans>Done</Trans> : <Trans>Next</Trans>}
-          </button>
+          </Button>
         </div>
       </div>
     </div>

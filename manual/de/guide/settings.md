@@ -2,34 +2,38 @@
 
 ## Sprache wechseln { #change-the-language }
 
-Im Kontomenü unter **Sprache** wechselst du zwischen Deutsch und Englisch. Die Einstellung
+Das Einstellungsmenü öffnet sich über **Einstellungen** unten in der linken Leiste. In der Zeile
+**Sprache** wechselst du zwischen Deutsch und Englisch. Die Einstellung
 gehört zum Browser, nicht zum Konto: das Handy auf Deutsch und der Rechner auf Englisch ist
 also kein Problem. Die Seite lädt dabei neu, speichere eine offene Notiz vorher.
 
 ## Erscheinungsbild wechseln { #switch-the-theme }
 
-Ebenfalls im Kontomenü: **Dunkel**, **Hell** oder **Dem System folgen**. Dunkel ist die
-Voreinstellung.
+Ebenfalls im Einstellungsmenü, in der Zeile **Erscheinungsbild**: **Dunkel**, **Hell** oder
+**System**. System richtet sich nach der Einstellung deines Rechners und wechselt mit ihr.
+Dunkel ist die Voreinstellung.
 
 ## Die Engine ausblenden { #hide-the-engine }
 
-Der leuchtende Computer in der Titelleiste, oder `⇧E` von überall, blendet alles aus, was
-eine Engine über deine Partien gesagt hat – damit du eine Partie erst selbst kommentierst
-und dich danach überprüfst. Der Modus bleibt an, bis du ihn wieder ausschaltest, gilt für
-jede Partie und übersteht das Neuladen. Er gehört zu diesem Browser.
+Der Schalter **Engine ausblenden** ganz rechts in der oberen Leiste, oder `⇧E` von
+überall, blendet alles aus, was eine Engine über deine Partien gesagt hat – damit du eine
+Partie erst selbst kommentierst und dich danach überprüfst. Er ist aus, bis du ihn
+einschaltest. Dann bleibt er an, bis du ihn wieder ausschaltest, gilt für jede Partie und
+übersteht das Neuladen. Er gehört zu diesem Browser. Auf dem Handy steht kein Wort neben
+dem Schalter; ein Auge darin zeigt, wie er steht.
 
 Ausgeblendet verliert die Partieansicht den Bewertungsbalken und die Bewertung, die
 `??`-Markierungen und die eingefärbten Zeilen, den Bewertungsverlauf, die Bereiche von
-Engine und Maia und die Live-Engine; die Partienliste verliert die Spalte **Verlust** und
-ihre Symbole, und die Übersicht verliert die schlimmsten Momente und bei jeder der neuesten
+Engine und Maia und die Live-Engine; die Partienliste verliert die Spalten **Verlust** und
+**Symbole**, und die Übersicht verliert die schlimmsten Momente und bei jeder der neuesten
 Partien den Verlust und das Symbol. Es bleibt die Partie selbst – die Züge, die Uhren, deine Notizen – und das,
 was Blunderbase *getan* hat: die Markierung, die sagt, was gelaufen ist und wie weit es
-geschaut hat, und **Analysieren**. Genau das drückst du, wenn dein eigenes Urteil
+geschaut hat, und **Analysieren …**. Genau das drückst du, wenn dein eigenes Urteil
 geschrieben ist.
 
 Wenn du die Ruhe nur bei *neuen* Partien willst – jede erst durchgehen, wie sie
 hereinkommt, dann die Engine für sie einschalten –, ist das eine Einstellung der
-Bibliothek und nicht des Browsers: **Analyse → Engine-Durchläufe → Neue Partien**,
+Bibliothek und nicht des Browsers: **Analyse › Engine-Durchläufe › Neue Partien**,
 beschrieben unter [Analyse](analysis.md#hide-the-engine-on-new-games).
 
 ## Das Brett einstellen { #set-up-the-board }
@@ -47,21 +51,22 @@ diesem Browser.
 
 ## Die Tour wiederholen { #replay-the-tour }
 
-**Tour erneut anzeigen** im Kontomenü startet die Tour in fünf Schritten neu. **Zurück** und
+**Tour erneut anzeigen** im Einstellungsmenü startet die Tour in fünf Schritten neu. **Zurück** und
 **Weiter** führen hindurch, **Überspringen** oder `Esc` beendet sie. Schritte, deren
 Bedienelement gerade nicht auf dem Bildschirm ist, werden ausgelassen.
 
 ## Die Befehlspalette { #the-command-palette }
 
-⌘K öffnet die Befehlspalette. Ohne Eingabe listet sie die Seiten; ab zwei Zeichen findet
+⌘K oder **Alles durchsuchen** oben in der linken Leiste öffnet die Befehlspalette. Ohne
+Eingabe listet sie die Seiten, jede mit ihrer Taste `⌘1`–`⌘6`, sofern sie eine hat; ab zwei Zeichen findet
 sie auch Partien, Gegner, Eröffnungen und Notizen, deine gespeicherten Filter, deine
 Sammlungen und die Statistik-Berichte. Wer „Sammlung“ tippt, bekommt alle Sammlungen
 aufgelistet. `↵` öffnet den markierten Eintrag.
 
 ## Alle Tastenkürzel { #every-keyboard-shortcut }
 
-`?` oder die Tastatur-Schaltfläche in der Titelleiste zeigt die Tasten, die auf dem
-aktuellen Bildschirm gelten.
+`?` oder **Tastenkürzel** im Einstellungsmenü zeigt die Tasten, die auf dem aktuellen Bildschirm
+gelten.
 
 ### Überall { #anywhere }
 

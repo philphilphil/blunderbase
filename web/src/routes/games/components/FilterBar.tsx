@@ -1,27 +1,35 @@
 /**
- * Design 2b's filter bar: the free-text box and one chip per filter group. Every chip writes
- * straight into the page's `LibraryFilters`, which the page mirrors into the URL.
+ * Design 2b's filter bar: one picker per filter group, then the commands that act on the
+ * cut and the free-text box. Every picker writes straight into the page's `LibraryFilters`,
+ * which the page mirrors into the URL.
  *
- * Collection is one more chip rather than a control of its own: the library under
+ * The row reads left to right as the control grammar has it (docs/design/README.md,
+ * "Controls"): Mine / Others / All is a `Segmented` (one value of three, all on screen),
+ * closed by a hairline rule because it decides *which* library rather than narrowing one;
+ * every filter is a `PickerButton` (a value from a list, ⇅); and the right-hand cluster
+ * holds the commands (Clear, Make a collection…, Save filter…) beside the text field they
+ * save along with the pickers, so Save filter never wraps alone to the far left of row two.
+ *
+ * Collection is one more picker rather than a control of its own: the library under
  * `?collection=` is the same list, narrowed, so picking one here and opening a card on the
- * Collections screen land on the same table, and every other chip narrows inside it the way
- * it narrows the whole library.
+ * Collections screen land on the same table, and every other picker narrows inside it the
+ * way it narrows the whole library.
  */
 import type { I18n, MessageDescriptor } from '@lingui/core'
 import { msg } from '@lingui/core/macro'
 import { Trans, useLingui } from '@lingui/react/macro'
+import { Bookmark, FolderPlus } from 'lucide-react'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 
 import { Button } from '@/components/ui/button'
 import { CollectionSwatch } from '@/components/collections/CollectionChip'
-import { Input } from '@/components/ui/input'
+import { Input, SearchInput } from '@/components/ui/input'
+import { Segmented } from '@/components/ui/segmented'
 import { useCollections } from '@/lib/api/queries'
 import type { Collection, Color, Whose } from '@/lib/api/types'
 import { collectionPath, ruleFromFilters } from '@/lib/collections'
 import { presetOf, presetStart } from '@/lib/days'
-import { cn } from '@/lib/utils'
-import { Segmented } from '@/routes/stats/kit/states'
 
 import {
   clearGroup,
@@ -49,29 +57,32 @@ export interface FilterBarProps {
   onChange: (next: LibraryFilters) => void
   /** The page's own end of the row — its search box — pushed to the right edge. */
   trailing?: ReactNode
+  /** The page's Clear button, first in the right-hand cluster while anything is set. */
+  clear?: ReactNode
 }
 
 /** The two sides, title-cased the way the popover sets its options. */
 const COLOR_LABELS: Record<Color, MessageDescriptor> = { white: msg`White`, black: msg`Black` }
 
-export function FilterBar({ filters, onChange, trailing }: FilterBarProps) {
+export function FilterBar({ filters, onChange, trailing, clear }: FilterBarProps) {
   const { i18n } = useLingui()
   const patch = (next: Partial<LibraryFilters>) => onChange(prune({ ...filters, ...next }))
   const collectionName = useCollectionNames()
 
   return (
     // `max-md:relative` is what a `FilterPopover` anchors its panel to on a phone; see the
-    // comment there. The chips already wrap, which is all a narrow bar needs of them.
-    <div className="flex flex-wrap items-center gap-[0.4375rem] max-md:relative">
-      {/* In front of the chips rather than among them, because it is not a filter that
+    // comment there. The pickers already wrap, which is all a narrow bar needs of them.
+    <div className="flex flex-wrap items-center gap-2 max-md:relative">
+      {/* In front of the pickers rather than among them, because it is not a filter that
           narrows one cut of the library: it decides which library — the owner's own games
           (the default, and the only ones any statistic counts), the games added from the
-          reference books, or both together. The same segmented control the explorer uses
-          for its source, since it answers the same kind of question. */}
+          reference books, or both together. The rule after it says so: a page-level view
+          switch, then the filters. */}
       <WhoseToggle
         value={filters.whose ?? 'mine'}
         onChange={(whose) => patch({ whose: whose === 'mine' ? undefined : whose })}
       />
+      <span aria-hidden className="mx-0.5 h-4 w-px flex-none bg-hairline" />
 
       {FILTER_GROUPS.map((group) => (
         <FilterPopover
@@ -106,12 +117,12 @@ export function FilterBar({ filters, onChange, trailing }: FilterBarProps) {
         </FilterPopover>
       ))}
 
-      <SaveFilter filters={filters} collectionName={collectionName} />
-      <MakeCollection filters={filters} />
-
-      {trailing ? (
-        <div className="ml-auto flex items-center gap-[0.4375rem] max-md:w-full">{trailing}</div>
-      ) : null}
+      <div className="ml-auto flex flex-wrap items-center justify-end gap-2 max-md:w-full max-md:justify-start">
+        {clear}
+        <MakeCollection filters={filters} />
+        <SaveFilter filters={filters} collectionName={collectionName} />
+        {trailing}
+      </div>
     </div>
   )
 }
@@ -147,7 +158,7 @@ function CollectionPanel({
       ) : rows.length === 0 ? (
         <span className="text-label text-dim">
           <Trans>
-            No collections yet. Select games and use Add to… under the table, or start one on
+            No collections yet. Select games and use Add to under the table, or start one on
             the Collections page.
           </Trans>
         </span>
@@ -189,8 +200,11 @@ function CollectionPanel({
  * Only there when the filter has something a rule can hold. With nothing rule-able set the
  * Collections screen's "New collection" and a selection's Add to… are the doors, and a link
  * that opened an empty form here would read as "these games" when it meant none of them.
- * Saving sets the Collection chip to the new collection, every game in it: the list is then
- * what was just kept, which is the proof the owner wants of what the rule caught.
+ * Saving sets the Collection picker to the new collection, every game in it: the list is
+ * then what was just kept, which is the proof the owner wants of what the rule caught.
+ *
+ * A command that opens a dialog, so a tool button whose label ends in "…" (it had been
+ * accent text, which the control grammar keeps for links).
  */
 function MakeCollection({ filters }: { filters: LibraryFilters }) {
   const { t } = useLingui()
@@ -201,13 +215,14 @@ function MakeCollection({ filters }: { filters: LibraryFilters }) {
   return (
     <>
       <Button
-        variant="link"
-        size="xs"
+        type="button"
+        variant="secondary"
+        size="sm"
         title={t`Keep the games this filter finds as a collection, and add new ones as they arrive`}
         onClick={() => setOpen(true)}
-        className="px-1"
       >
-        <Trans>Make a collection</Trans>
+        <FolderPlus aria-hidden />
+        <Trans>Make a collection…</Trans>
       </Button>
       {open ? (
         <CollectionDialog
@@ -236,8 +251,9 @@ const WHOSE_OPTIONS: { label: MessageDescriptor; value: Whose; title: MessageDes
 
 /**
  * Mine / Others / All, as the app's one `Segmented` — the control the explorer's own
- * source switch and the stats windows are — so it has the same height as the chips beside
- * it, the same sans label and the same selected blue, rather than a mono copy of its own.
+ * source switch and the stats windows are — so it has the same height as the pickers beside
+ * it and the same raised thumb for the chosen value, and never reads as a filter set (it
+ * does not turn blue: choosing which library is not narrowing one).
  */
 function WhoseToggle({ value, onChange }: { value: Whose; onChange: (whose: Whose) => void }) {
   const { t, i18n } = useLingui()
@@ -256,10 +272,14 @@ function WhoseToggle({ value, onChange }: { value: Whose; onChange: (whose: Whos
 }
 
 /**
- * Design 2b's `Save filter`, sitting where the mock puts it: after the chips, before the
- * spacer. It names the current cut and adds it to the sidebar's "Saved filters" rail
- * (`../savedFilters`). Nothing to save is not an error — with no filter set there is no
- * cut, so the link says so rather than pretending.
+ * "Save filter…": names the current cut and adds it to the rail's Filters fold under Games
+ * (`../savedFilters`). It sits in the row's right-hand cluster beside the text field, since
+ * that is saved with the pickers.
+ *
+ * A command that asks something first, so a tool button with a `Bookmark` and a trailing
+ * "…" rather than the accent text it was (accent text is a link). Nothing to save is not an
+ * error: with no filter set there is no cut, so the button takes the one disabled look (no
+ * face) and its title says why, rather than pretending or vanishing.
  */
 function SaveFilter({
   filters,
@@ -296,10 +316,13 @@ function SaveFilter({
 
   return (
     <div ref={host} className="relative max-md:static">
-      <button
+      <Button
         type="button"
+        variant="secondary"
+        size="sm"
         disabled={!active}
         aria-expanded={open}
+        aria-haspopup="dialog"
         title={
           active
             ? t`Keep this cut of the library in the sidebar`
@@ -309,20 +332,21 @@ function SaveFilter({
           setLabel(suggestLabel(filters, collectionName))
           setOpen((current) => !current)
         }}
-        className="px-1 text-label text-accent-teal transition-colors hover:text-accent-link disabled:cursor-not-allowed disabled:text-dim-2"
+        className="aria-expanded:bg-raised aria-expanded:shadow-none"
       >
-        <Trans>Save filter</Trans>
-      </button>
+        <Bookmark aria-hidden />
+        <Trans>Save filter…</Trans>
+      </Button>
       {open ? (
-        // Anchored to the bar rather than to the chip below `md`, like every other panel
-        // on this bar — this one sits at its right-hand end, where a 250px panel has the
-        // least room of all.
-        <div className="bb-pop-in absolute top-[calc(100%+0.375rem)] left-0 z-30 flex flex-col gap-2.5 rounded-md border border-edge bg-elevated p-2.5 shadow-[0_1.125rem_2.5rem_-1.125rem_var(--bb-shadow)] md:w-[15.625rem] max-md:right-0">
+        // Anchored to the button's right edge, since it sits near the bar's right end; to
+        // the bar below `md`, like every other panel on this bar.
+        <div className="bb-pop-in absolute top-[calc(100%+0.375rem)] right-0 z-30 flex flex-col gap-2.5 rounded-md border border-edge bg-elevated p-2.5 shadow-[0_1.125rem_2.5rem_-1.125rem_var(--bb-shadow)] md:w-[15.625rem] max-md:left-0">
           <PopoverLabel>
             <Trans>Save this cut as</Trans>
           </PopoverLabel>
           <Input
             autoFocus
+            inputSize="sm"
             aria-label={t`Filter name`}
             value={label}
             maxLength={MAX_LABEL_LENGTH}
@@ -330,7 +354,6 @@ function SaveFilter({
             onKeyDown={(event) => {
               if (event.key === 'Enter') commit()
             }}
-            className="h-7 text-data"
           />
           <Button type="button" size="sm" disabled={label.trim() === ''} onClick={commit}>
             <Trans context="button">Save</Trans>
@@ -436,7 +459,8 @@ function GroupPanel({
             placeholder={t`B22, or just C6`}
             value={filters.eco ?? ''}
             onChange={(event) => patch({ eco: event.target.value.toUpperCase() || undefined })}
-            className="h-7 font-mono text-data"
+            inputSize="sm"
+            className="font-mono"
           />
           <span className="text-label text-dim">
             <Trans>
@@ -467,7 +491,8 @@ function GroupPanel({
             placeholder="600+0"
             value={filters.time_control ?? ''}
             onChange={(event) => patch({ time_control: event.target.value || undefined })}
-            className="h-7 font-mono text-data"
+            inputSize="sm"
+            className="font-mono"
           />
           {/* With the clock because that is how a league names its games — "rated 45+45" —
               and a casual 45+45 with a friend is exactly what it wants kept out. */}
@@ -542,14 +567,20 @@ function resolve<T extends string>(
 
 /**
  * A text input that only commits after the typing stops, so every keystroke is not a
- * request. Used for the two free-text filters.
+ * request. Used for the free-text filters of Games and Notes, and the opponent fields in
+ * their pickers.
+ *
+ * Drawn as a `SearchInput` (a sunk field with a leading magnifier), because every one of
+ * them searches; the caller's placeholder scopes it ("Filter games: …", "Filter notes…") so
+ * a page's box never reads as the rail's "Search everything". `className` goes on the input
+ * and `wrapperClassName` sizes the whole field.
  */
 export function DebouncedInput({
   value,
   onCommit,
   delay = 300,
   ...props
-}: Omit<React.ComponentProps<typeof Input>, 'value' | 'onChange'> & {
+}: Omit<React.ComponentProps<typeof SearchInput>, 'value' | 'onChange'> & {
   value: string
   onCommit: (value: string) => void
   delay?: number
@@ -567,11 +598,11 @@ export function DebouncedInput({
   }, [draft, delay])
 
   return (
-    <Input
+    <SearchInput
+      inputSize="sm"
       {...props}
       value={draft}
       onChange={(event) => setDraft(event.target.value)}
-      className={cn('h-7 text-data', props.className)}
     />
   )
 }

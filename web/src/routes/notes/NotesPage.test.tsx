@@ -296,6 +296,17 @@ describe('NotesPage', () => {
     await waitFor(() => expect(listedWith().some((url) => url.includes('tags=endgame'))).toBe(true))
   })
 
+  it('filters by the words typed into "Filter notes…"', async () => {
+    const user = userEvent.setup()
+    draw()
+    await screen.findByText('Loose thought about rook endings.')
+
+    await user.type(screen.getByRole('textbox', { name: 'Filter notes' }), 'rook')
+
+    // `q=` in the address, `query=` to the API.
+    await waitFor(() => expect(listedWith().some((url) => url.includes('query=rook'))).toBe(true))
+  })
+
   it('fetches the note a link named when the filters do not show it', async () => {
     draw('/notes?note=99&scope=game')
 
@@ -313,7 +324,10 @@ describe('NotesPage', () => {
     draw('/notes?scope=free')
     await screen.findByText('Loose thought about rook endings.')
 
-    await user.click(screen.getByRole('button', { name: /markdown/i }))
+    // One "Export" menu in the bar, the formats inside it.
+    expect(screen.queryByRole('button', { name: /markdown/i })).toBeNull()
+    await user.click(screen.getByRole('button', { name: /^Export/ }))
+    await user.click(screen.getByRole('menuitem', { name: /markdown/i }))
 
     await waitFor(() => {
       const exported = vi

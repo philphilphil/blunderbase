@@ -14,6 +14,9 @@ import type { RunnerCreated } from '@/lib/api/types'
  * The token is in the create response and nowhere else — only its SHA-256 is stored — so it
  * is held in this component's own state and dies with the panel. Nothing writes it to the
  * query cache, and there is no second reading of it to offer later.
+ *
+ * The form's footer is every form's: Cancel as a secondary face, then the one primary.
+ * Once registered, Done is the panel's one primary, and each Copy is a secondary face.
  */
 export function CreateRunnerForm({ onCancel }: { onCancel: () => void }) {
   const { t } = useLingui()
@@ -93,19 +96,9 @@ export function CreateRunnerForm({ onCancel }: { onCancel: () => void }) {
       onSubmit={submit}
       className="flex flex-col gap-3 rounded-xl border border-line bg-panel px-3.5 py-3.5"
     >
-      <div className="flex items-center gap-2.5">
-        <span className="text-data font-semibold text-ink">
-          <Trans>Add a remote runner</Trans>
-        </span>
-        <div className="flex-1" />
-        <button
-          type="button"
-          onClick={onCancel}
-          className="text-label text-dim transition-colors hover:text-ink"
-        >
-          <Trans>Cancel</Trans>
-        </button>
-      </div>
+      <h2 className="text-data font-semibold text-ink">
+        <Trans>Add a remote runner</Trans>
+      </h2>
 
       <div className="grid gap-2.5 sm:grid-cols-[minmax(0,1fr)_6.875rem]">
         <div className="flex flex-col gap-1.5">
@@ -147,6 +140,9 @@ export function CreateRunnerForm({ onCancel }: { onCancel: () => void }) {
             once.
           </Trans>
         </p>
+        <Button type="button" variant="secondary" size="sm" onClick={onCancel}>
+          <Trans>Cancel</Trans>
+        </Button>
         <Button type="submit" size="sm" disabled={create.isPending}>
           {create.isPending ? <Loader2 className="animate-spin" aria-hidden /> : <Plus aria-hidden />}
           <Trans>Register remote runner</Trans>
@@ -204,12 +200,15 @@ function CopyField({
       <div className="flex items-center gap-2">
         <Label>{label}</Label>
         <div className="flex-1" />
-        <Button type="button" variant="outline" size="sm" onClick={() => void copy()}>
+        <Button type="button" variant="secondary" size="sm" onClick={() => void copy()}>
           <Copy aria-hidden />
           {copied ? t`Copied` : copyLabel}
         </Button>
       </div>
-      <div className="rounded-md border border-edge bg-elevated px-3 py-2">{children}</div>
+      {/* Sunk like a field: it is text to take away, not a card and not a control. */}
+      <div className="rounded-md border border-edge-input bg-field px-3 py-2 shadow-field">
+        {children}
+      </div>
     </div>
   )
 }

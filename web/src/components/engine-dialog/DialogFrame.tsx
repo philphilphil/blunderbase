@@ -62,6 +62,16 @@ export function Frame({
   )
 }
 
+/**
+ * The row of buttons that ends every engine dialog: Cancel (`secondary`) and then the one
+ * primary, right-aligned with `gap-2` (docs/design/README.md, "Controls"). One component so
+ * Cancel is drawn one way and stands in one place in every dialog; it had been an outline
+ * here and a ghost there. Children are the buttons, Cancel first.
+ */
+export function DialogFooter({ children, className }: { children: ReactNode; className?: string }) {
+  return <div className={cn('flex flex-wrap items-center justify-end gap-2', className)}>{children}</div>
+}
+
 /** The label is tied to its box by id, so the form reads as a form to anything but a mouse. */
 export function Field({
   id,

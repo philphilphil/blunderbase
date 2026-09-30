@@ -9,8 +9,8 @@
 | gives | as many lines as the run keeps (2 by default, up to 5) | 5 moves per level, each with odds |
 | lines? | yes | never |
 
-Every number in that table is a setting: the budget and lines under **Analysis → Engine
-passes**, the levels under **Analysis → Maia**.
+Every number in that table is a setting: the budget and lines under **Analysis › Engine
+passes**, the levels under **Analysis › Maia**.
 
 ## Which pass does a game get?
 
@@ -18,7 +18,7 @@ Every game that arrives gets the import pass: the engine holding the **Analysis*
 the node budget and the line count from **Engine passes**, in the queue's own order.
 Selected rows in **Games** get the same with **Queue analysis**.
 
-When that is not enough, open the game and press **Analyse** (or `A`). You pick the
+When that is not enough, open the game and press **Analyse…** (or `A`). You pick the
 engine, the lines, where each move stops — after so many seconds, at a depth or after so
 many nodes — and whether to look at one move, from a move to the end, or the whole game;
 the dialog is described under [Analysing a game](game.md#ask-for-a-deeper-look). A run you
@@ -50,26 +50,33 @@ Win% before the move minus win% after it. The default thresholds:
 
 ## What is left to analyse?
 
-**Analysis → Coverage** says how much of the library an engine has been over and what
-finishing it would cost. **Backfill** queues the import pass over every game that has no
-pass yet; a game that already has one is skipped. On a large library and a slow server that
-is a long wait, which is what the estimate on the card is for. **Fill missing levels** does
-the same for Maia. A fill whose Maia does not answer is retried once and then listed under
-**Failed runs**, and its levels still count as missing, so the next fill asks again.
-**Clear the queue** empties it, and **Failed runs** lists what to retry;
-a retry runs again with the engine, limit, moves and lines it failed with.
+**Analysis › Coverage** says how much of the library an engine has been over and what
+finishing it would cost. Three cards follow, each ending in a row with how many games it
+would queue, the estimated time, and its button on the right; a button with nothing to do
+is greyed, and pointing at it says why. **Backfill** queues the import pass over every game
+that has no pass yet; a game that already has one is skipped. On a large library and a slow
+server that is a long wait, which is what the estimate beside the button is for. **Fill
+missing levels** does the same for Maia. A fill whose Maia does not answer is retried once
+and then listed under **Failed runs**, and its levels still count as missing, so the next
+fill asks again. **Clear the queue** empties it, and **Failed runs** lists what to retry,
+with **Retry them all**; a retry runs again with the engine, limit, moves and lines it
+failed with.
+
+**Maia levels** lists each level you ask, one per line, with how many games carry it. Levels
+the library still holds from an older setup are summed up in one line under it; press it to
+see them.
 
 ## How much work does a pass do?
 
-**Analysis → Engine passes → Analysis pass** sets the import pass's node budget (500,000 by
+The **Analysis pass** card on **Analysis › Engine passes** sets the import pass's node budget (500,000 by
 default) and how many lines it keeps (1 to 5, two by default), and the three thresholds
 above. The budget and the lines are copied onto a pass when it is queued, so a change
-applies to the next one. They are also where **Analyse** starts when you pick nodes, and
+applies to the next one. They are also where **Analyse…** starts when you pick nodes, and
 the lines it offers before you type a number.
 
 ## Hide the engine on new games
 
-The same page has **New games → Hide the engine on**, and each choice names the speeds it
+The same page has **New games › Hide the engine on**, and each choice names the speeds it
 covers: **Nothing**, **Every game**, **Blitz, rapid and classical**, **Rapid and classical**
 or **Classical only**. A game you import from then on at one of those speeds is analysed as
 usual but arrives quiet: no evaluation, badge, graph or line until you press **Show the
@@ -87,23 +94,24 @@ browser, and this is stored on each game.
 
 ## What is Maia asked?
 
-**Analysis → Maia** sets which human levels are asked, up to five ratings between 1100 and
-2000 (a fresh installation asks 2000 only), **Maia on the analysis pass** — on by default,
-it adds a Maia look to every pass, the import pass and the ones you ask for alike — and
-**Ask about both sides**: off looks at your moves only, on predicts the
-opponent's too. It never answers with a line: one look and no search gives a
+**Analysis › Maia** sets which human levels are asked, up to five ratings between 1100 and
+2000 (a fresh installation asks 2000 only): type one under **Add a level** and press
+**Add**, or remove one with the × on it. Two switches follow: **Maia on the analysis pass** —
+on by default, it adds a Maia look to every pass, the import pass and the ones you ask for
+alike — and **Ask about both sides**: off looks at your moves only, on predicts the
+opponent's too. **Save** keeps the changes. It never answers with a line: one look and no search gives a
 spread of moves, not a continuation. A *fill* pass adds levels to a game that already has
 an evaluation.
 
 ## Correspondence
 
-**Analysis → Correspondence** switches the correspondence mode on, holds the numbers a new
+**Analysis › Correspondence** switches the correspondence mode on, holds the numbers a new
 game and a new search start with, and says which engines may be set on a position. Off —
 the default — there is no **Correspondence** in the sidebar and its pages send you home.
 
 | Setting | |
 |---|---|
-| **Correspondence mode** | On adds the sidebar entry under **Live** |
+| **Show correspondence mode** | A switch; on adds the sidebar entry under **Live** |
 | **Lines per search** | How many candidate lines an engine keeps when it is set on one position of a correspondence tree, 1 to 5, three by default |
 | **Nodes per task** | What one task costs, forty million by default: a minute or two of a modern engine, which is what makes an expansion of a dozen positions finish while you are still looking at the board. It is copied onto a task when the task is queued, so changing it sizes the next one |
 | **Lines per task** | How many candidate lines a task keeps, 1 to 5, three by default — and therefore how wide an expansion can be, since the children are made from those lines |

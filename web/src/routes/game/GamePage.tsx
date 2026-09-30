@@ -8,7 +8,7 @@ import { BOARD_SETTINGS_ID } from '@/components/board/BoardSettings'
 import { LichessConnectCard } from '@/components/lichess/ConnectLichess'
 import { SetPageChrome } from '@/components/shell/PageChrome'
 import { PageBody } from '@/components/shell/PageHeader'
-import { buttonVariants } from '@/components/ui/button'
+import { Button } from '@/components/ui/button'
 import { liveBest, liveScore, useStreamSession } from '@/lib/analysis'
 import {
   useDeleteLine,
@@ -32,11 +32,12 @@ import { useLinePreview, type HoveredLine } from '@/lib/board/useLinePreview'
 import { isFlagged } from '@/lib/chess/classification'
 import { whiteWinPercent } from '@/lib/chess/evaluation'
 import { useNotation } from '@/lib/chess/notationPrefs'
+import { useLibraryPlace } from '@/lib/libraryPlace'
 import { useEngineHidden } from '@/lib/ui/engineVisibility'
 import { useIsMobile } from '@/lib/ui/media'
 import { WAY_BACK } from '@/lib/ui/wayBack'
 import { cn } from '@/lib/utils'
-import { advanceTrail, useGameTrail, useLibraryAddress } from '@/routes/games/gameTrail'
+import { advanceTrail, useGameTrail, useLibraryOrigin } from '@/routes/games/gameTrail'
 import { tokenTrouble } from '@/routes/explorer/reference'
 
 import { buildAnalysisLine, lineStartingWith, withBoardMove } from './analysisLine'
@@ -70,7 +71,6 @@ import {
   evalAtCursor,
   evalCurve,
   flaggedSide,
-  formatGameDate,
   formatVariation,
   gameAnalysisSummary,
   gameStart,
@@ -1397,11 +1397,11 @@ export function GameStudio({ game: from }: { game: StudioGame }) {
    * Which claim the engine pane shows: the stored run's or the live search's (`MaiaPanel`).
    *
    * The search moves it and the reader moves it. Switching the search on lands on Live,
-   * because that is what was just asked for; switching it off lands back on Run, because a
-   * Live tab with nothing running on it is an empty box. For the same reason clicking Live
-   * with the search off switches it on: there is no Live tab worth looking at without one.
-   * Between those the reader may click Run to look at the stored lines while the search
-   * keeps going. Leaving the game line
+   * because that is what was just asked for; switching it off lands back on Run, because
+   * the stored lines are what is left to read. Clicking Live starts the search as well
+   * (`showEnginePaneTab`): an idle Live pane had nothing to show but a Start button, so the
+   * click that asks for it was always followed by a second one. The reader may click Run
+   * to look at the stored lines while the search keeps going. Leaving the game line
    * lands on Live as well while a search is running: the run never looked at where the
    * board has gone, and the search is the only thing here with an opinion about it.
    */
@@ -1414,6 +1414,18 @@ export function GameStudio({ game: from }: { game: StudioGame }) {
       setEnginePaneTab(on ? 'live' : 'run')
     },
     [setStreamEnabled],
+  )
+  // Run only shows the stored lines and leaves a running search alone; Live starts one, but
+  // not where the engine is hidden or nothing is on the board — there the idle pane says why.
+  const showEnginePaneTab = useCallback(
+    (tab: EnginePaneTab) => {
+      if (tab === 'live' && !stream.enabled && !engineHidden && boardPosition?.fen) {
+        setLiveSearch(true)
+      } else {
+        setEnginePaneTab(tab)
+      }
+    },
+    [boardPosition, engineHidden, setLiveSearch, stream.enabled],
   )
   /**
    * Show or hide the engine during a practice game — the strip's button, Hints and `H`.
@@ -1437,22 +1449,13 @@ export function GameStudio({ game: from }: { game: StudioGame }) {
     setWasExploring(exploring)
     if (exploring && stream.enabled) setEnginePaneTab('live')
   }
-  const onEnginePaneTab = useCallback(
-    (tab: EnginePaneTab) => {
-      if (tab === 'live' && !stream.enabled) setLiveSearch(true)
-      else setEnginePaneTab(tab)
-    },
-    [setLiveSearch, stream.enabled],
-  )
   const search = useMemo(
     () => ({
       stream: { ...stream, setEnabled: setLiveSearch },
-      // Off — by the switch, by ⇧E, by the session ending — the Live tab is an empty box,
-      // so it is not shown: Run, whatever was chosen last.
-      tab: stream.enabled ? enginePaneTab : ('run' as const),
-      onTabChange: onEnginePaneTab,
+      tab: enginePaneTab,
+      onTabChange: showEnginePaneTab,
     }),
-    [enginePaneTab, onEnginePaneTab, setLiveSearch, stream],
+    [enginePaneTab, setLiveSearch, showEnginePaneTab, stream],
   )
   /**
    * What the last search said, or nothing at all while the engine is hidden. The session is
@@ -1695,9 +1698,16 @@ export function GameStudio({ game: from }: { game: StudioGame }) {
    * held would send the reader somewhere they never asked to go.
    */
   const trail = useGameTrail(gameId)
-  // The "Library" crumb goes back to the table this game was opened from — its filters,
-  // sort and page — and to the bare library when it was reached some other way.
-  const libraryAddress = useLibraryAddress(gameId)
+  // The trail goes back to the table this game was opened from — its filters, sort and
+  // page — and to the bare library when it was reached some other way. It is named the way
+  // the rail and the Games title name that list (`useLibraryPlace`), so "where am I" has one
+  // answer: `Games`, `Games › Losses as black`, `Collections › League 2026`.
+  const libraryOrigin = useLibraryOrigin(gameId)
+  const libraryAddress = libraryOrigin.address
+  const libraryPlace = useLibraryPlace(libraryOrigin.search)
+  // The run `[` and `]` walk, by the name its place goes by: the trail's last step.
+  const runLabel = libraryPlace.crumbs.at(-1)?.label
+  const runName = typeof runLabel === 'string' ? runLabel : t`Games`
   const goToGame = useCallback(
     (delta: number, id: number | null) => {
       if (id === null) return
@@ -1886,6 +1896,7 @@ export function GameStudio({ game: from }: { game: StudioGame }) {
       trail={
         trail
           ? {
+              name: runName,
               onPrevious: trail.previous != null ? () => goToGame(-1, trail.previous) : null,
               onNext: trail.next != null ? () => goToGame(1, trail.next) : null,
             }
@@ -1993,22 +2004,21 @@ export function GameStudio({ game: from }: { game: StudioGame }) {
               transport: it starts a game, it does not move through this one. Gone while a
               practice game is on — the strip carries Stop. */}
           {practiceGame ? null : (
-            <button
-              type="button"
+            <Button
+              variant="secondary"
+              size="sm"
               onClick={() => setPracticeOpen(true)}
               title={t`Play this position out against the computer (P)`}
               // The row's tool button. The phone's taller target stays (`max-md:`), which is
-              // what the control row's two-line wrap there is measured with.
-              className={cn(
-                buttonVariants({ variant: 'secondary', size: 'sm' }),
-                'max-md:h-auto max-md:py-1.5',
-              )}
+              // what the control row's two-line wrap there is measured with. The "…" says it
+              // opens a dialog, where the game is set up, rather than starting one.
+              className="flex-none max-md:h-auto max-md:py-1.5"
             >
               <Swords aria-hidden />
               <Trans comment="Button in the transport row that opens the practice dialog">
-                Practise
+                Practise…
               </Trans>
-            </button>
+            </Button>
           )}
           {/* The way to hear the engine on a game that was imported with it held back.
               Nothing while the game is not, and never for a reference game, which has no
@@ -2204,16 +2214,27 @@ export function GameStudio({ game: from }: { game: StudioGame }) {
     />
   )
 
+  // The trail is the list this game was opened from, named as the rail names it, its last
+  // step linked back to that exact table; the players are the title. The date is not a place
+  // (nothing lists "5 Sept 2026"), so it left the trail for the header line.
+  const placeCrumbs = libraryPlace.crumbs.map((crumb, index, all) =>
+    index === all.length - 1 ? { ...crumb, to: libraryAddress } : crumb,
+  )
   const chrome = (
     <SetPageChrome
       breadcrumb={
         readOnly
           ? [{ label: t`Explorer`, to: backToExplorer ?? '/explorer' }, { label: players }]
-          : [
-              { label: t`Library`, to: libraryAddress },
-              { label: formatGameDate(detail.game.played_at), mono: true },
-              { label: players },
-            ]
+          : [...placeCrumbs, { label: players }]
+      }
+      // The phone bar's way out names where it goes: the list the game came from.
+      back={
+        readOnly
+          ? { label: t`Explorer`, to: backToExplorer ?? '/explorer' }
+          : {
+              label: libraryPlace.kind === 'collection' ? t`Collections` : t`Games`,
+              to: libraryAddress,
+            }
       }
       // A model game is read in the same studio but arrived from the explorer, so the manual
       // answers the question that brought the reader here rather than the one about their

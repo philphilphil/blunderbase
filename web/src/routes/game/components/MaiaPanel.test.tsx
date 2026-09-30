@@ -152,10 +152,13 @@ describe('MaiaPanel', () => {
 
     const played = screen.getByTestId('maia-played-row')
     expect(within(played).getByText('d5')).toHaveClass('text-blunder')
-    expect(played.style.borderLeftColor).toBe('var(--bb-blunder)')
-    // The engine's own choice is teal on the same list, unplayed and unmarked.
+    // The played mark is a neutral edge: an accent edge on a tinted row read as selected.
+    expect(played.style.borderLeftColor).toBe('var(--bb-muted)')
+    // The engine's own choice is ink on the same list, its verdict in the `!` chip: accent
+    // text is a link's, and a SAN takes a colour only for a flagged move.
     const rows = screen.getAllByTestId('maia-row')
-    expect(within(rows[0]).getByText('c6')).toHaveClass('text-accent-teal')
+    expect(within(rows[0]).getByText('c6')).toHaveClass('text-ink')
+    expect(within(rows[0]).getByText('c6')).not.toHaveClass('text-accent-teal')
   })
 
   it('leaves a move with no probability and no verdict in its neutral treatment', () => {
@@ -418,7 +421,7 @@ describe('MaiaPanel level picker', () => {
     // would fix it — hiding it would make a level the owner chose look impossible.
     const missing = within(picker).getByRole('option', { name: /1500 — re-analyse to add/ })
     expect(missing).toBeDisabled()
-    expect(within(picker).getByRole('option', { name: '1100' })).toBeEnabled()
+    expect(within(picker).getByRole('option', { name: 'Maia 1100' })).toBeEnabled()
   })
 
   it('hands the picked level over as a number', async () => {
@@ -474,17 +477,31 @@ describe('MaiaPanel compare mode', () => {
 
   it('offers the comparison only once there is more than one level to compare', () => {
     draw({ comparison: [COMPARISON[0]!] })
-    expect(screen.queryByTestId('maia-compare-toggle')).not.toBeInTheDocument()
+    expect(
+      within(screen.getByLabelText('Maia level')).queryByRole('option', {
+        name: 'All levels, side by side',
+      }),
+    ).not.toBeInTheDocument()
   })
 
-  it('turns compare on through the header', async () => {
+  it('turns compare on through the level picker, as one more of its values', async () => {
     const onCompareChange = vi.fn()
     draw({ onCompareChange })
 
-    const toggle = screen.getByTestId('maia-compare-toggle')
-    expect(toggle).toHaveAttribute('aria-pressed', 'false')
-    await userEvent.click(toggle)
+    const picker = screen.getByLabelText('Maia level')
+    expect(picker).toHaveValue('1100')
+    await userEvent.selectOptions(picker, 'compare')
     expect(onCompareChange).toHaveBeenCalledWith(true)
+  })
+
+  it('turns compare off again by picking a level', async () => {
+    const onCompareChange = vi.fn()
+    const onSelectLevel = vi.fn()
+    draw({ compare: true, onCompareChange, onSelectLevel })
+
+    await userEvent.selectOptions(screen.getByLabelText('Maia level'), '1700')
+    expect(onCompareChange).toHaveBeenCalledWith(false)
+    expect(onSelectLevel).toHaveBeenCalledWith(1700)
   })
 
   it('reads every level side by side, and gives the card over to it', () => {
@@ -499,9 +516,9 @@ describe('MaiaPanel compare mode', () => {
     // The engine column has stood down: the verdict it carries is in every column's
     // colour, and five columns in a quarter of the width would be five ellipses.
     expect(screen.queryByText('stockfish')).not.toBeInTheDocument()
-    expect(screen.getByTestId('maia-compare-toggle')).toHaveAttribute('aria-pressed', 'true')
-    // Nothing to switch to while every level is on screen at once.
-    expect(screen.queryByLabelText('Maia level')).not.toBeInTheDocument()
+    // The picker says which reading is on: every level, and a level is one pick away.
+    expect(screen.getByLabelText('Maia level')).toHaveValue('compare')
+    expect(screen.getByTestId('maia-level-picker')).toHaveTextContent('All levels')
   })
 
   it('puts the played move on the column that did not rank it, with its rank there', () => {

@@ -26,10 +26,15 @@
  * is the owner's side of the board only (`CollectionSummary`), so it can count fewer games
  * than the collection holds — a reference game put in by hand, or one of theirs whose side
  * is not known yet — and says so on hover.
+ *
+ * "New collection…" is in one place at a time (the control grammar's one command, one
+ * home): the bar, while there are collections or they are still loading; the empty shelf's
+ * own filled button when there are none, and then not in the bar as well, where it had been
+ * two equal doors to the same dialog one above the other.
  */
 import { msg, plural } from '@lingui/core/macro'
 import { Plural, Trans, useLingui } from '@lingui/react/macro'
-import { BarChart3, LayoutGrid, Pencil, Table2 } from 'lucide-react'
+import { BarChart3, LayoutGrid, Pencil, Plus, Table2 } from 'lucide-react'
 import { useState, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 
@@ -38,6 +43,7 @@ import { RuleChips } from '@/components/collections/RuleChips'
 import { SetPageChrome } from '@/components/shell/PageChrome'
 import { PageBody } from '@/components/shell/PageHeader'
 import { Button } from '@/components/ui/button'
+import { COLUMN_HEAD, ROW } from '@/components/ui/row'
 import { ViewToggle, type ViewOption } from '@/components/ui/view-toggle'
 import { useCollectionOverview } from '@/lib/api/queries'
 import type { CollectionDetail } from '@/lib/api/types'
@@ -73,6 +79,7 @@ export function CollectionsPage() {
   /** The collection whose Edit is open. Deleting it from there leaves the reader here. */
   const [editing, setEditing] = useState<CollectionDetail | null>(null)
   const collections = overview.data?.collections ?? []
+  const emptyShelf = overview.isSuccess && collections.length === 0
 
   return (
     <PageBody>
@@ -80,9 +87,12 @@ export function CollectionsPage() {
         breadcrumb={[{ label: t`Collections` }]}
         manual="guide/collections"
         actions={
-          <Button type="button" size="sm" variant="secondary" onClick={() => setCreating(true)}>
-            <Trans>New collection</Trans>
-          </Button>
+          emptyShelf ? null : (
+            <Button type="button" size="sm" variant="secondary" onClick={() => setCreating(true)}>
+              <Plus aria-hidden />
+              <Trans>New collection…</Trans>
+            </Button>
+          )
         }
       />
 
@@ -176,7 +186,8 @@ function NameLink({ collection, className }: { collection: CollectionDetail; cla
       to={collectionPath(collection.id)}
       title={t`Open the games in ${collectionName}`}
       className={cn(
-        'after:absolute after:inset-0 focus-visible:outline-none focus-visible:after:outline-2 focus-visible:after:outline-accent-teal/55',
+        // The ring goes on the stretched `::after`, around the whole card or row it opens.
+        'after:absolute after:inset-0 focus-visible:outline-none focus-visible:after:outline-2 focus-visible:after:outline-offset-2 focus-visible:after:outline-accent-teal',
         className,
       )}
     >
@@ -434,7 +445,7 @@ const COLUMNS =
   'md:grid-cols-[minmax(0,1fr)_4rem_6rem_7.5rem_5rem_3.5rem] ' +
   'xl:grid-cols-[minmax(0,1fr)_4rem_6rem_7.5rem_5.5rem_5.5rem_minmax(0,12rem)_5rem_3.5rem]'
 
-const HEAD = 'text-meta tracking-[0.06em] text-dim-2 uppercase'
+const HEAD = COLUMN_HEAD
 
 /** The column names, once over the rows. Nothing to align below `md`, so nothing drawn. */
 function TableHeader() {
@@ -486,7 +497,8 @@ function CollectionRow({
       <div
         className={cn(
           COLUMNS,
-          'relative flex flex-wrap items-center gap-x-3 gap-y-0.5 px-3 py-1.5 text-data transition-colors hover:bg-raised/60',
+          'relative flex flex-wrap items-center gap-x-3 gap-y-0.5 px-3 py-1.5 text-data',
+          ROW,
         )}
       >
         <span className="flex min-w-0 items-center gap-2 max-md:basis-full">
@@ -540,11 +552,12 @@ function EmptyShelf({ onNew }: { onNew: () => void }) {
       <p className="text-data leading-relaxed text-dim">
         <Trans>
           Start one here, or from the games list: filter it to what the collection should hold
-          and press Make a collection, or tick games and use Add to….
+          and press Make a collection…, or tick games and use Add to under the table.
         </Trans>
       </p>
       <Button type="button" size="sm" onClick={onNew}>
-        <Trans>New collection</Trans>
+        <Plus aria-hidden />
+        <Trans>New collection…</Trans>
       </Button>
     </div>
   )

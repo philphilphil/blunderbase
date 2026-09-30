@@ -18,6 +18,7 @@ import { useCorrespondenceSearchToasts } from '@/routes/correspondence/useSearch
 import { CommandPaletteProvider } from './CommandPalette'
 import { ShortcutsOverlayProvider } from './ShortcutsOverlay'
 import { usePageChrome } from './PageChrome'
+import { pageForKey } from './pageKeys'
 import { NavDrawer, SideNav } from './SideNav'
 import { TitleTooltips } from './TitleTooltips'
 import { TopBar } from './TopBar'
@@ -46,10 +47,10 @@ const TOAST_CLASSES = {
 
 /**
  * A page's own buttons on a phone. The titlebar is the page's heading and carries them from
- * `md` up (`SetPageChrome`'s `actions`), but at 375px it has no room left beside the rail
- * button, the queue, search and the account — so below `md` they stand in one row of their
- * own under it, on the page's canvas. Rendered here or in the titlebar, never both: a button
- * mounted twice would be two sets of ids and two of whatever state it keeps.
+ * `md` up (`SetPageChrome`'s `actions`), but at 375px it has no room left beside the way
+ * back, the title, the engine switch and search — so below `md` they stand in one row of
+ * their own under it, on the page's canvas. Rendered here or in the titlebar, never both: a
+ * button mounted twice would be two sets of ids and two of whatever state it keeps.
  */
 function PhoneActions() {
   const { actions } = usePageChrome()
@@ -63,27 +64,34 @@ function PhoneActions() {
 }
 
 /**
- * Layout 1a "Studio": a 42px titlebar over a 200px rail and the page's own canvas. The
- * titlebar and the rail are chrome (`--bb-panel`), the page is canvas (`--bb-surface`), and
- * the boundary between the two is a rule — that pair is the whole visual grammar of the
- * shell, and every pane inside a page repeats it.
+ * The frame: the rail carries the app, the bar carries the page (the clarity pass, decision
+ * D3-A). From `md` it is an explicit two-column grid: the 200px rail runs the full height
+ * on the left, holding the brand, search, the destinations and, in its foot, the engines,
+ * the queue and the account; the right column is the 42px bar over the page's canvas, and
+ * the bar holds only this page's title, its actions and the Hide engine switch. The frame
+ * that never changes is one column and the strip that changes with every page is the
+ * other, which is what made the Apple sidebar's navigation read so plainly; the rail's
+ * brand row is 42px with its own strong rule, so that band still runs the whole width and
+ * the window keeps today's silhouette. The rail and the bar are chrome (`--bb-panel`), the
+ * page is canvas (`--bb-surface`), and the boundary is a rule: that pair is the whole visual
+ * grammar of the shell, and every pane inside a page repeats it.
  *
  * Every route renders inside the `<Outlet />`, so a page never has to know about the
  * chrome — it fills the titlebar through `<SetPageChrome>` instead.
  *
- * The ⌘K palette wraps the lot rather than sitting in the titlebar: the shortcut is
- * global, and the dialog has to outlive whichever route is under it. The `?` overlay is
- * mounted inside it for the same reason — and inside rather than outside, so the list can
- * be raised from anywhere the palette can be.
+ * The ⌘K palette wraps the lot rather than sitting in the rail: the shortcut is global,
+ * and the dialog has to outlive whichever route is under it. The `?` overlay is mounted
+ * inside it for the same reason — and inside rather than outside, so the list can be
+ * raised from anywhere the palette can be.
  *
- * Below `md` the rail has nowhere to stand, so it becomes a drawer over the page. Whether
- * it is up is the shell's state and not the titlebar's: the button that opens it is in the
- * titlebar but the drawer itself covers everything, and the two would otherwise have to
- * reach across the layout for each other.
+ * Below `md` the rail has nowhere to stand, so the bar runs the full width and the rail
+ * becomes a drawer over the page. Whether it is up is the shell's state and not the
+ * titlebar's: the button that opens it is in the titlebar but the drawer itself covers
+ * everything, and the two would otherwise have to reach across the layout for each other.
  *
  * The orientation tour wraps the lot for the reason the palette does and one more: its
  * steps walk from screen to screen, so it has to outlive every route under it, and the
- * account menu — which is where "Show the tour again" lives — is inside the titlebar.
+ * account menu — which is where "Show the tour again" lives — is in the rail's foot.
  */
 export function AppShell() {
   const capabilities = useRuntimeCapabilities()
@@ -149,21 +157,13 @@ export function AppShell() {
   }, [location.pathname])
 
   useEffect(() => {
-    const routes: Record<string, string> = {
-      '1': '/',
-      '2': '/games',
-      '3': '/explorer',
-      '4': '/notes',
-      '5': '/stats',
-      // After the five that were there first rather than beside Games, where the rail
-      // puts it: a number learned for Explorer or Stats keeps meaning what it meant.
-      '6': '/collections',
-    }
     const onKeyDown = (event: KeyboardEvent) => {
       if (!(event.metaKey || event.ctrlKey) || event.altKey) return
       const target = event.target instanceof Element ? event.target : null
       if (target?.closest('input, textarea, select, [contenteditable="true"]')) return
-      const route = event.shiftKey && event.key.toLowerCase() === 'i' ? '/library/import' : routes[event.key]
+      // The numbers are `PAGE_KEYS`, the table the rail's titles and the palette print.
+      const route =
+        event.shiftKey && event.key.toLowerCase() === 'i' ? '/library/import' : pageForKey(event.key)
       if (!route) return
       event.preventDefault()
       navigate(route)
@@ -182,15 +182,15 @@ export function AppShell() {
           >
             <Trans>Skip to content</Trans>
           </a>
-          <div className="flex h-full min-h-0 flex-col bg-surface">
-            <TopBar onOpenNav={openNav} />
-            <div className="flex min-h-0 flex-1">
-              <SideNav />
+          <div className="flex h-full min-h-0 flex-col bg-surface md:grid md:grid-cols-[auto_minmax(0,1fr)] md:grid-rows-[minmax(0,1fr)]">
+            <SideNav />
+            <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+              <TopBar onOpenNav={openNav} />
               <main
                 ref={main}
                 id="main-content"
                 tabIndex={-1}
-                className="flex min-w-0 flex-1 flex-col overflow-hidden outline-none"
+                className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden outline-none"
               >
                 <PhoneActions />
                 <Suspense

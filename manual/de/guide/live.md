@@ -1,33 +1,39 @@
 # Live
 
-## Was ist das Live-Brett?
+## Was ist das Live-Brett? { #what-is-the-live-board }
 
 Ein Brett, das die App selbst nicht bewegt. **Live** zeigt, was ein MCP-Client darauf gelegt
 hat, damit du und der Assistent, der deine Bibliothek liest, über dieselbe Stellung
 sprecht. Solange nichts darauf liegt, ist es leer; läuft eine Sitzung, steht in der
-Seitenleiste **läuft**. **Brett drehen** dreht es nur für dich.
+Seitenleiste **läuft**, und ebenso mit grünem Punkt in der Zeile über dem Brett. **Drehen**
+dreht es nur für dich.
 
-## Etwas aufs Brett legen
+Die Titelleiste sagt, ob diese Seite das Brett gerade hört: **live** mit grünem Punkt,
+**verbindet** in Orange oder **offline – neuer Versuch** in Rot. **Zurücksetzen** räumt das
+Brett ab. Hat dein Assistent mehrere Stellungen aufgelegt, blätterst du mit **Zurück** und
+**Weiter** zwischen ihnen.
+
+## Etwas aufs Brett legen { #put-something-on-it }
 
 Bitte deinen Assistenten darum. `show_game` legt eine gespeicherte Partie aufs Brett,
 `show_position` eine FEN. Er kann dabei Pfeile zeichnen, Felder einfärben und die Partie
 Zug für Zug weiterschalten. Wie du überhaupt einen Client verbindest, steht unter
 [Dein KI-Assistent](coach.md).
 
-## Das Feld „Trainer“
+## Das Feld „Trainer“ { #the-coach-panel }
 
 Das Feld mit der Überschrift **Trainer** zeigt, was dein Assistent mit `annotate` schreibt,
 während er es schreibt. Sonst schreibt dort niemand.
 
-## Den Moment festhalten
+## Den Moment festhalten { #save-the-moment }
 
-**Diesen Moment speichern** legt eine Notiz zur Stellung auf dem Brett an. Die Stellung
+**Diesen Moment speichern …** legt eine Notiz zur Stellung auf dem Brett an. Die Stellung
 wird auf dem Server abgegriffen, zusammen mit der verfolgten Partie und einer eventuellen
 Abweichung davon. Die Notiz hängt also an dem, was wirklich auf dem Brett lag, nicht an dem,
 was dieser Tab zuletzt empfangen hat. Schreib auf, was du behalten willst, und drücke
 **Notiz speichern**. Danach ist es eine gewöhnliche Notiz, siehe [Notizen](notes.md).
 
-## Das Feld „Sitzung“
+## Das Feld „Sitzung“ { #the-session-panel }
 
 **Sitzung** nennt die verfolgte Partie oder die freie Stellung, ihre Quelle, Halbzug und
 Zugrecht, den letzten Zug, wie viele Pfeile und Felder gezeichnet sind und ob das Brett die

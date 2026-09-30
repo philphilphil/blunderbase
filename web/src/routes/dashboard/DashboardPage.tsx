@@ -1,12 +1,14 @@
 /**
- * The overview.
+ * The dashboard.
  *
  * Two columns: the wide one carries the rating graphs and the worst recent moments, the
  * 326-design-pixel operational rail carries the recent-games list, the analysis queue and
  * the trend card. The page prints no heading of its own — the titlebar's crumb is its name,
- * and its two buttons, Import PGN and Sync all, follow the name in that bar
- * (`SetPageChrome`'s `actions`). The subtitle that used to sit under the heading went with
- * it: the game count is the rail's, and every panel says for itself when it is empty or
+ * "Dashboard", the same word as the rail row that lit it (it had read "Overview", which is
+ * also a Stats report, so the bar and the rail named one place two ways). Its two commands
+ * sit right-aligned in that bar (`SetPageChrome`'s `actions`): Import PGN a secondary face
+ * with its Download glyph, Sync all the one filled primary, last. The subtitle that used
+ * to sit under the heading went with it: the game count is the rail's, and every panel says for itself when it is empty or
  * cannot reach the backend.
  *
  * Every panel fetches its own data and owns its own loading, empty and error state, so one
@@ -26,6 +28,7 @@
  * the page is for, then the recent games, the queue and the trends under them.
  */
 import { Trans, useLingui } from '@lingui/react/macro'
+import { Download } from 'lucide-react'
 import { Link } from 'react-router-dom'
 
 import { SetPageChrome } from '@/components/shell/PageChrome'
@@ -47,12 +50,13 @@ export function DashboardPage() {
   return (
     <PageBody className="gap-[1.1875rem]">
       <SetPageChrome
-        breadcrumb={[{ label: t`Overview` }]}
+        breadcrumb={[{ label: t`Dashboard` }]}
         manual="guide/dashboard"
         actions={
           <>
             <Button asChild variant="secondary" size="sm">
               <Link to="/library/import">
+                <Download aria-hidden />
                 <Trans>Import PGN</Trans>
               </Link>
             </Button>

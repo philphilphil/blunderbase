@@ -10,14 +10,16 @@ download in every case.
 
 ## The Engines page
 
-**Compute → Engines** is what is installed, in two parts from top to bottom.
+**Compute › Engines** is what is installed, in two parts from top to bottom.
 
 *What runs what*: one row each for Analysis and Human moves, naming the engine assigned
 to it and, when it cannot run, saying why in words.
 
 **Engines**: every configured engine — its kind, the machine it runs on, its `Threads`
-and `Hash`, which jobs it holds, and whether it is on. A row opens the engine's card.
-`Threads` and `Hash` are on the row because they are what one *process* of the engine
+and `Hash`, which jobs it holds, and whether it is on. A row opens the engine's card under
+it, and the open row is highlighted. The card's **Enabled** switch turns the engine on and
+off; **Save changes** keeps an edited name, path or option; **Remove engine…**, in red,
+asks before it deletes the row, and only **Remove** in its place does. `Threads` and `Hash` are on the row because they are what one *process* of the engine
 costs; how many processes a machine runs at once is not decided here but on
 [Machines](runners.md), the page beside this one.
 
@@ -46,10 +48,10 @@ assigned.
 
 | Role | What it runs |
 |---|---|
-| Analysis | The pass every imported game gets, and the engine **Analyse** on a game and the correspondence pickers suggest |
+| Analysis | The pass every imported game gets, and the engine **Analyse…** on a game and the correspondence pickers suggest |
 | Human moves | Maia — what a player of your rating would have played |
 
-A run you ask for with **Analyse** can use any engine that is switched on and speaks UCI;
+A run you ask for with **Analyse…** can use any engine that is switched on and speaks UCI;
 the role only decides which one the dialog opens on.
 
 Assign them at the top of the Engines page. **Nothing falls back.** If the engine holding a role is
@@ -66,6 +68,8 @@ What each role costs and when it runs is [Analysis](../guide/analysis.md).
 On an engine's card, open **More settings**.
 
 - **Probe** re-reads the binary's declared options. Use it after the engine is upgraded.
+  The search field above the list narrows it by name, and **Only set** shows only the
+  options this engine stores.
 - **Test run** searches one position with this engine and shows what came back. Set the
   **Position**, **Nodes** and **Lines**; a Maia engine offers **Ratings** instead.
 
@@ -124,7 +128,7 @@ included. So the engine
 picked for a task — in **Queue task…**, **Expand…** or **Refresh subtree…** — may live on a
 runner, and where you have a runner that is where it belongs: the tasks go to the other
 machine and this one keeps its cores for the searches and for the passes. Tasks sit in the middle of the queue, ahead of the pass every import gets
-and behind a run somebody asked for with **Analyse** and is waiting on, and among themselves the game with the
+and behind a run somebody asked for with **Analyse…** and is waiting on, and among themselves the game with the
 nearest deadline is worked first. **Clear the queue** on the Analysis page drops the tasks
 still waiting along with everything else waiting, and each of their nodes says so.
 
@@ -166,7 +170,7 @@ To use it:
 
 3. Give it the **Human moves** role.
 
-The rating Maia is asked at is a single application setting, **Analysis → Maia**, not a
+The rating Maia is asked at is a single application setting, **Analysis › Maia**, not a
 per-engine one, so nothing ever asks about two different players. It is clamped to
 1100–2000, and an engine that declares its own bounds narrows that further.
 

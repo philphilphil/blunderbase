@@ -26,7 +26,8 @@ import { ArrowUpRight, ChevronRight } from 'lucide-react'
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 
-import { Badge } from '@/components/ui/badge'
+import { Readout } from '@/components/ui/badge'
+import { COLUMN_HEAD, ROW } from '@/components/ui/row'
 import type { NoteResponse } from '@/lib/api/types'
 import { relative } from '@/lib/mcp/status'
 import { cn } from '@/lib/utils'
@@ -34,20 +35,26 @@ import { formatGameDate, formatResult, outcomeTone } from '@/routes/games/format
 
 import { gameLabel, noteHref, oneLine, originLabel, SCOPE_BADGES, scopeOf } from '../presentation'
 import { NoteItem } from './NoteItem'
+import { TagChip } from './TagChip'
 
 /**
  * Written · note · about · opponent · result · played · tags · open. Played and tags come in
- * at `xl`, where there is room for them without squeezing the note's line to nothing.
+ * at 90rem (1440px), where there is room for them without squeezing the note's line to
+ * nothing. At `xl` (1280) they left the note one character wide beside the rail: the fixed
+ * columns are in the app's 120% rem, so they take a fifth more than the breakpoint assumed.
  */
 export const LIST_COLUMNS =
   'md:grid md:items-center md:gap-x-3 ' +
   'md:grid-cols-[4.5rem_minmax(0,1fr)_10rem_minmax(0,11rem)_2.75rem_1.25rem] ' +
-  'xl:grid-cols-[4.5rem_minmax(0,1fr)_10rem_minmax(0,11rem)_2.75rem_4.5rem_minmax(0,9rem)_1.25rem]'
+  'min-[90rem]:grid-cols-[4.5rem_minmax(0,1fr)_10rem_minmax(0,11rem)_2.75rem_4.5rem_minmax(0,9rem)_1.25rem]'
 
-const HEAD = 'text-meta tracking-[0.06em] text-dim-2 uppercase'
+const HEAD = COLUMN_HEAD
 
 /**
  * The column names, once over the whole list. Nothing to align below `md`, so nothing drawn.
+ * They are the app's one column-head style (`COLUMN_HEAD`): caps are for column heads and
+ * only for them, which is why the date rules between the sections are sentence case now.
+ * None is sortable: the list is in the order it was written, cut by those rules.
  *
  * Held to the panels' own box — the same cap, and a transparent border where theirs is
  * drawn — because the note column is `1fr`: a header even a pixel wider than the rows
@@ -74,10 +81,10 @@ export function NoteListHeader() {
       <span className={cn(HEAD, 'text-center')}>
         <Trans>Res</Trans>
       </span>
-      <span className={cn(HEAD, 'max-xl:hidden')}>
+      <span className={cn(HEAD, 'max-[90rem]:hidden')}>
         <Trans>Played</Trans>
       </span>
-      <span className={cn(HEAD, 'max-xl:hidden')}>
+      <span className={cn(HEAD, 'max-[90rem]:hidden')}>
         <Trans>Tags</Trans>
       </span>
       <span />
@@ -124,16 +131,14 @@ export function NoteRow({
       <div
         className={cn(
           LIST_COLUMNS,
-          'flex flex-wrap items-center gap-x-2 gap-y-0.5 px-3 py-1.5 text-data transition-colors hover:bg-raised',
+          ROW,
+          'flex flex-wrap items-center gap-x-2 gap-y-0.5 px-3 py-1.5 text-data',
           open && 'bg-raised/40',
         )}
       >
-        <span
-          className="font-mono text-meta text-dim-2 max-md:order-last max-md:ml-auto"
-          title={t`written ${when}`}
-        >
+        <Readout num className="max-md:order-last max-md:ml-auto" title={t`written ${when}`}>
           {relative(note.created_at)}
-        </span>
+        </Readout>
 
         <button
           type="button"
@@ -150,9 +155,8 @@ export function NoteRow({
         </button>
 
         <span className="flex min-w-0 items-center gap-1.5">
-          <Badge variant={scope === 'free' ? 'dashed' : 'default'}>
-            {i18n._(SCOPE_BADGES[scope])}
-          </Badge>
+          {/* A fact, so flat text, drawn alike for every kind (see `NoteItem`). */}
+          <Readout className="text-meta">{i18n._(SCOPE_BADGES[scope])}</Readout>
           {move ? (
             <span className="truncate font-mono text-label tabular text-soft-2">{move}</span>
           ) : null}
@@ -194,22 +198,13 @@ export function NoteRow({
           {game ? formatResult(game.result) : '—'}
         </span>
 
-        <span className="font-mono text-label tabular text-dim max-xl:hidden">
+        <span className="font-mono text-label tabular text-dim max-[90rem]:hidden">
           {game ? formatGameDate(game.date) : '—'}
         </span>
 
-        <span className="flex min-w-0 gap-1 overflow-hidden max-xl:hidden">
+        <span className="flex min-w-0 gap-1 overflow-hidden max-[90rem]:hidden">
           {note.tags.map((tag) => (
-            <button
-              key={tag}
-              type="button"
-              onClick={() => onTagClick?.(tag)}
-              disabled={!onTagClick}
-              title={onTagClick ? t`Show only notes tagged ${tag}` : undefined}
-              className="flex-none rounded-sm border border-edge bg-elevated px-1.5 py-px text-meta text-soft transition-colors enabled:hover:bg-raised enabled:hover:text-ink"
-            >
-              {tag}
-            </button>
+            <TagChip key={tag} tag={tag} onClick={onTagClick} />
           ))}
         </span>
 

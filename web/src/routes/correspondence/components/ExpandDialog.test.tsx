@@ -81,7 +81,7 @@ describe('the expand dialog', () => {
   it('sends the width and the stages that were chosen', async () => {
     const props = draw()
     await userEvent.type(screen.getByLabelText('Width'), '4')
-    await userEvent.click(screen.getByRole('button', { name: '2' }))
+    await userEvent.click(screen.getByRole('radio', { name: '2' }))
     await userEvent.click(screen.getByRole('button', { name: 'Expand' }))
     expect(props.onExpand).toHaveBeenCalledWith({ width: 4, stages: 2, tasks: true, engine_id: 1 })
   })
@@ -90,7 +90,8 @@ describe('the expand dialog', () => {
     // A task is ordinary queue work: the remote engine is live here, with its host beside
     // it, where the search dialog would grey it out.
     const props = draw()
-    const remote = screen.getByRole('button', { name: /gpu-box/ })
+    // The engine picker is the one-of-N `Segmented`: each engine is a radio.
+    const remote = screen.getByRole('radio', { name: /gpu-box/ })
     expect(remote).toBeEnabled()
     await userEvent.click(remote)
     await userEvent.click(screen.getByRole('button', { name: 'Expand' }))
@@ -99,8 +100,9 @@ describe('the expand dialog', () => {
 
   it('can put the moves in the tree and calculate nothing, and then asks for no engine', async () => {
     const props = draw()
-    await userEvent.click(screen.getByRole('checkbox'))
-    expect(screen.queryByRole('group', { name: 'Engine' })).not.toBeInTheDocument()
+    await userEvent.click(screen.getByRole('checkbox', { name: 'Queue tasks' }))
+    // The engine picker goes with its hint, whatever role the picker itself carries.
+    expect(screen.queryByText(/Every task of this expansion runs on it/)).not.toBeInTheDocument()
     await userEvent.click(screen.getByRole('button', { name: 'Expand' }))
     expect(props.onExpand).toHaveBeenCalledWith({
       width: null,
@@ -113,7 +115,7 @@ describe('the expand dialog', () => {
   it('says how many positions the two numbers come to, because nobody does that sum', async () => {
     draw()
     expect(screen.getByText(/Up to 3 positions/)).toBeInTheDocument()
-    await userEvent.click(screen.getByRole('button', { name: '3' }))
+    await userEvent.click(screen.getByRole('radio', { name: '3' }))
     expect(screen.getByText(/Up to 39 positions/)).toBeInTheDocument()
     expect(expansionSize(5, 3)).toBe(155)
   })

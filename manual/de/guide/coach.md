@@ -1,24 +1,26 @@
 # Dein KI-Assistent
 
-## Was ist die Seite „Assistent“?
+## Was ist die Seite „Assistent“? { #what-is-the-assistant-page }
 
 Blunderbase enthält keine eigene KI. Unter **Assistent** verbindest du die, die du ohnehin
 benutzt: jeden Client, der MCP spricht. Blunderbase stellt unter `/mcp` streamable HTTP
 bereit, unter derselben Adresse wie die Web-App. Der Assistent liest also dieselbe Datenbank
 wie die App: deine Partien, keine Allgemeinplätze.
 
-## Einen Schlüssel erzeugen
+## Einen Schlüssel erzeugen { #mint-a-key }
 
-Gib unter **Bearer-Schlüssel** einen Namen ein und erzeuge den Schlüssel. Das Geheimnis
-wird nur einmal angezeigt, kopiere es also, bevor du **Fertig** drückst. Erzeuge einen
-Schlüssel pro Client; **Widerrufen** zieht einen einzelnen zurück. Dein Browser-Passwort
-wird für MCP nicht akzeptiert.
+Gib unter **Bearer-Schlüssel** einen Namen ein und drück **Erstellen**. Das Geheimnis wird
+nur einmal angezeigt, kopiere es also mit **Schlüssel kopieren**, bevor du **Fertig**
+drückst. Erzeuge einen Schlüssel pro Client. **Widerrufen …** an einem Schlüssel fragt
+erst nach, und **Widerrufen** an seiner Stelle zieht genau diesen zurück. Dein
+Browser-Passwort wird für MCP nicht akzeptiert.
 
-## Einen Client verbinden
+## Einen Client verbinden { #connect-a-client }
 
 Die Seite zeigt fertige Schnipsel mit dem gerade erzeugten Schlüssel: einen Einzeiler für
-Claude Code, zwei Zeilen für Codex und JSON für jeden anderen Client. Kopiere den, den du
-brauchst.
+Claude Code, zwei Zeilen für Codex und JSON für jeden anderen Client. Die Schaltfläche
+daneben (**Befehl kopieren**, **Befehle kopieren**, **Konfiguration kopieren**) kopiert genau
+diesen Block.
 
 ## Was kann der Assistent? { #what-can-the-coach-do }
 
@@ -39,13 +41,13 @@ von Hand hineingelegt hast; die übrigen bleiben bei deinen eigenen Partien dari
 Statistiken. `search_games`, `get_last_games` und `get_stats` nehmen außerdem `rated`, für
 nur gewertete oder nur ungewertete Partien. Eine Sammlung anlegen, umbenennen oder löschen kannst nur du, in der App.
 
-## Was er nicht kann
+## Was er nicht kann { #what-it-cannot-do }
 
 Alles, was Geheimnisse oder die Installation selbst betrifft. `runners_status` sagt ihm,
 welche Engine-Rechner verbunden sind und worauf der Rückstau wartet; einen Runner anmelden
 oder widerrufen kannst nur du. Engines, Schlüssel und Einstellungen ändert er nie.
 
-## Die schreibgeschützte Demo
+## Die schreibgeschützte Demo { #the-read-only-demo }
 
 Eine Installation, die als öffentliche Demo läuft, beantwortet jede Leseanfrage und lehnt
 jede Schreibanfrage ab. Ein Assistent, der darauf zeigt, kann also nachsehen, aber nicht

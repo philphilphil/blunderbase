@@ -5,7 +5,8 @@ import { describe, expect, it, vi } from 'vitest'
 import type { CorrespondenceSearchEngine } from '@/lib/api/types'
 import { I18nProvider } from '@/lib/i18n/I18nProvider'
 
-import { AnalyseDialog, parseLimit, type AnalyseDialogProps } from './AnalyseDialog'
+import { AnalyseDialog, type AnalyseDialogProps } from './AnalyseDialog'
+import { parseLimit } from './analyseLimit'
 
 const ENGINES: CorrespondenceSearchEngine[] = [
   { engine_id: 1, name: 'Stockfish 17', default: false },
@@ -38,11 +39,12 @@ describe('AnalyseDialog', () => {
   it('opens on the analysis role’s engine, depth 24 and the whole game', async () => {
     const { onQueue } = draw()
     // A runner's engine is fine: a run is queue work, not a search that drives a board.
-    expect(screen.getByRole('button', { name: /gpu-box/ })).toHaveAttribute('aria-pressed', 'true')
-    expect(screen.getByRole('button', { name: 'Depth' })).toHaveAttribute('aria-pressed', 'true')
+    // Each one-of-N is the one `Segmented`: radios, the chosen one checked.
+    expect(screen.getByRole('radio', { name: /gpu-box/ })).toHaveAttribute('aria-checked', 'true')
+    expect(screen.getByRole('radio', { name: 'Depth' })).toHaveAttribute('aria-checked', 'true')
     expect(screen.getByLabelText('Limit')).toHaveValue(24)
     expect(screen.getByLabelText('Lines')).toHaveAttribute('placeholder', '2')
-    expect(screen.getByRole('button', { name: 'Whole game' })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByRole('radio', { name: 'Whole game' })).toHaveAttribute('aria-checked', 'true')
 
     await userEvent.click(screen.getByRole('button', { name: 'Analyse' }))
     expect(onQueue).toHaveBeenCalledWith({ engine_id: 2, depth: 24 })
@@ -60,7 +62,7 @@ describe('AnalyseDialog', () => {
         },
       ],
     })
-    expect(screen.getByRole('button', { name: /Stockfish 17/ })).toBeDisabled()
+    expect(screen.getByRole('radio', { name: /Stockfish 17/ })).toBeDisabled()
     expect(
       screen.getByText("Stockfish 17: 'Stockfish 17' has no binary at /usr/bin/stockfish"),
     ).toBeInTheDocument()
@@ -70,9 +72,9 @@ describe('AnalyseDialog', () => {
 
   it('resets the number to the kind’s own default when the kind changes', async () => {
     const { onQueue } = draw()
-    await userEvent.click(screen.getByRole('button', { name: 'Seconds' }))
+    await userEvent.click(screen.getByRole('radio', { name: 'Seconds' }))
     expect(screen.getByLabelText('Limit')).toHaveValue(5)
-    await userEvent.click(screen.getByRole('button', { name: 'Nodes' }))
+    await userEvent.click(screen.getByRole('radio', { name: 'Nodes' }))
     // The import pass's budget, so "nodes" starts from the number the library already has.
     expect(screen.getByLabelText('Limit')).toHaveValue(500_000)
     await userEvent.click(screen.getByRole('button', { name: 'Analyse' }))
@@ -83,7 +85,7 @@ describe('AnalyseDialog', () => {
     // A game set up with Black to move at move 2 (offset 3): its ply 5 is White's move 5,
     // not Black's move 3 as ply parity from the initial array would have it.
     const { onQueue } = draw({ cursorSan: 'Nc3', plyOffset: 3 })
-    await userEvent.click(screen.getByRole('button', { name: 'This move' }))
+    await userEvent.click(screen.getByRole('radio', { name: 'This move' }))
     expect(screen.getByText(/5\. Nc3/)).toBeInTheDocument()
     await userEvent.click(screen.getByRole('button', { name: 'Analyse' }))
     expect(onQueue).toHaveBeenLastCalledWith(
@@ -93,7 +95,7 @@ describe('AnalyseDialog', () => {
 
   it('sends this move and from here on as windows starting at the move on the board', async () => {
     const { onQueue } = draw()
-    await userEvent.click(screen.getByRole('button', { name: 'This move' }))
+    await userEvent.click(screen.getByRole('radio', { name: 'This move' }))
     expect(screen.getByText(/3… Nf6/)).toBeInTheDocument()
     await userEvent.type(screen.getByLabelText('Lines'), '4')
     await userEvent.click(screen.getByRole('button', { name: 'Analyse' }))
@@ -105,8 +107,8 @@ describe('AnalyseDialog', () => {
       ply_end: 6,
     })
 
-    await userEvent.click(screen.getByRole('button', { name: 'From here on' }))
-    await userEvent.click(screen.getByRole('button', { name: 'Stockfish 17' }))
+    await userEvent.click(screen.getByRole('radio', { name: 'From here on' }))
+    await userEvent.click(screen.getByRole('radio', { name: 'Stockfish 17' }))
     await userEvent.click(screen.getByRole('button', { name: 'Analyse' }))
     expect(onQueue).toHaveBeenLastCalledWith({
       engine_id: 1,
@@ -119,8 +121,8 @@ describe('AnalyseDialog', () => {
 
   it('has no move to offer at the starting position', () => {
     draw({ cursor: -1, cursorSan: null })
-    expect(screen.getByRole('button', { name: 'This move' })).toBeDisabled()
-    expect(screen.getByRole('button', { name: 'From here on' })).toBeDisabled()
+    expect(screen.getByRole('radio', { name: 'This move' })).toBeDisabled()
+    expect(screen.getByRole('radio', { name: 'From here on' })).toBeDisabled()
   })
 
   it('holds the button back on a limit or a line count it cannot send', async () => {

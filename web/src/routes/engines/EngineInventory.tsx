@@ -4,6 +4,7 @@ import { Trans, useLingui } from '@lingui/react/macro'
 import { ChevronRight } from 'lucide-react'
 
 import { StatusDot } from '@/components/badges/StatusDot'
+import { COLUMN_HEAD, ROW, ROW_SELECTED } from '@/components/ui/row'
 import type { EngineResponse } from '@/lib/api/types'
 import type { EngineHost } from '@/lib/engines/hosts'
 import { cn } from '@/lib/utils'
@@ -37,6 +38,11 @@ const COLUMNS =
  * "On" is deliberately narrower than "available". The roster knows the enabled flag and
  * runner connection, but a missing local binary is reported authoritatively by the role
  * strip when that engine is assigned. Calling every enabled row "Ready" would overclaim.
+ *
+ * The rows take the app's one row grammar (`ui/row.ts`): hover is `raised`, and the row
+ * whose editor is open is the selected row (the blue fill and the accent bar), since that is
+ * the one the detail under it belongs to. The head is a column head, in caps like every
+ * other. The state is green while on, the colour of alive everywhere else.
  */
 export function EngineInventory({
   engines,
@@ -61,12 +67,7 @@ export function EngineInventory({
   const local = localLabel ?? t`This server`
   return (
     <div className="overflow-hidden rounded-xl border border-line bg-panel">
-      <div
-        className={cn(
-          'grid gap-3 px-3 py-2 text-meta tracking-[0.06em] text-faint uppercase',
-          COLUMNS,
-        )}
-      >
+      <div className={cn('grid gap-3 px-3 py-2', COLUMN_HEAD, COLUMNS)}>
         <span>
           <Trans context="inventory column">Engine</Trans>
         </span>
@@ -102,9 +103,10 @@ export function EngineInventory({
               aria-label={expanded ? t`Collapse ${engineName}` : t`Edit ${engineName}`}
               onClick={() => onOpenDetail(expanded ? null : `engine:${engine.id}`)}
               className={cn(
-                'grid w-full items-center gap-3 px-3 py-2.5 text-left transition-colors hover:bg-raised',
+                'grid w-full items-center gap-3 px-3 py-2.5 text-left',
+                ROW,
+                expanded && ROW_SELECTED,
                 COLUMNS,
-                expanded && 'bg-raised-2',
               )}
             >
               <span className="flex min-w-0 items-center gap-2">

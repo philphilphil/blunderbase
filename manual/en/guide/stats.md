@@ -2,7 +2,9 @@
 
 ## What do the reports show?
 
-**Stats** shows one report at a time, chosen in the rail:
+**Stats** shows one report at a time, chosen in the rail. The title bar names it:
+**Stats › Overview**, **Stats › Clock behaviour**, and **Stats** there takes you back to the
+overview.
 
 | Report | Answers |
 |---|---|
@@ -20,18 +22,23 @@ PGN without those tags, keeps the rating you brought to it.
 
 Your own games, and only those an engine has been over — the **Games** tile says how many
 of the games in the window are analysed. Games marked as not yours count in nothing.
-If a report looks thin, check **Analysis → Coverage**.
+If a report looks thin, check **Analysis › Coverage**.
 
 ## Narrow the window
 
-Four controls sit above the report: **Window** (7 days, 30 days, 90 days, a year or all
-time), **Colour**, **Speed** and **Collection**. **vs previous** shows every number against
-the equally long window before this one; all time has nothing to compare against.
-A game with no date, such as a PGN whose `Date` is `????.??.??`, counts under all time and
-in no shorter window.
+The row above the report decides what every number on it counts. **Window** (all time, a
+year, 90 days or 30 days) and **Colour** (both, white or black) are one choice each. The
+**Speed** picker reads **Speed: All** until you narrow it; click it for a checkbox per speed,
+and it names the ones left on (**Speed: Blitz, Rapid**). The last speed cannot be turned off,
+and the **×** beside a narrowed picker puts every speed back. A game with no date, such as a
+PGN whose `Date` is `????.??.??`, counts under all time and in no shorter window.
 
-**Collection** appears once you have made a [collection](collections.md). It is
-**All games** unless you pick one; then every number on the report is over your games in
+At the end of the row, the **vs previous window** switch shows every number against the
+equally long window before this one. All time has nothing before it, so there the switch is
+off and greyed.
+
+The **Collection** picker appears once you have made a [collection](collections.md). It
+reads **Collection: All games** unless you pick one; then every number on the report is over your games in
 that collection alone, which is how a league season gets statistics of its own. A reference
 game you put in a collection by hand counts here no more than anywhere else in Stats. The
 **Stats** link on a collection's card ([Collections](collections.md#open-a-collections-games))
@@ -42,4 +49,5 @@ here like every other game: a collection narrows Stats, it never takes games out
 
 ## Export as CSV
 
-**Export CSV** downloads the report you are looking at, cut the way you cut it.
+**Export CSV**, in the title bar, downloads the report you are looking at, cut the way you
+cut it.

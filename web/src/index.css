@@ -77,6 +77,30 @@
   --bb-selected: #2b4760;
   --bb-avatar: #3a3b3b;
 
+  /* controls (the clarity pass, docs/design/README.md "Controls"). A raised face means
+     "press me", a sunk field means "type here", so the two get their own fills and a 1px
+     shade on opposite edges rather than sharing `elevated`, which sat 1.05:1 off the panel
+     and left the border as the only cue.
+     - control: the button face, 1.27:1 on the panel and 1.43:1 on the surface (light 1.15 / 1.04).
+     - control-hover: a face lifts on hover (1.44:1 on the panel); `raised` is darker than
+       the face in dark, so it would read as pressed.
+     - control-edge: a labelled face's border and the segment thumb's, 2.14 / 2.42:1 on
+       panel and surface (light 1.93 / 2.15). Under 3:1 on purpose: the label names it.
+     - control-edge-strong: where the boundary is the whole signal (switch track, checkbox,
+       icon-only faces), 3.14 / 3.54:1 (light 3.34 / 3.71, 3.02 on the void). WCAG 1.4.11.
+     - control-shade: the face's 1px inner bottom shade, the "raised" read without glass.
+     - field / field-shade: every input's fill and its 1px inner top shade (the inverse).
+     - nav-current: the rail's "you are here" pill, 1.23:1 off the panel; accent text on it
+       5.26:1 (light 1.13 and 5.04). Its own token so it never moves with hover. */
+  --bb-control: #3c3d3e;
+  --bb-control-hover: #444546;
+  --bb-control-edge: #5d5f5e;
+  --bb-control-edge-strong: #777975;
+  --bb-control-shade: rgb(0 0 0 / 0.4);
+  --bb-field: #212222;
+  --bb-field-shade: rgb(0 0 0 / 0.25);
+  --bb-nav-current: #3a3b3c;
+
   /* lines */
   --bb-hairline: #3a3c3b; /* dividers inside a pane */
   --bb-line: #3e4040; /* pane borders */
@@ -255,6 +279,18 @@
   --bb-selected: #d3e1f0; /* accent on it 4.93:1, ink 12.3:1 */
   --bb-avatar: #dcdcd8;
 
+  /* controls. The shade is 0.14, not 0.10, so a white face stays distinct from a white KPI
+     tile at 1x; the field sits below the surface (1.07:1) and the face (1.11:1), where
+     `surface-2` had sat above its card and matched the face. */
+  --bb-control: #ffffff;
+  --bb-control-hover: #f6f6f4;
+  --bb-control-edge: #aeaea9;
+  --bb-control-edge-strong: #828282;
+  --bb-control-shade: rgb(0 0 0 / 0.14);
+  --bb-field: #f3f3f0;
+  --bb-field-shade: rgb(0 0 0 / 0.06);
+  --bb-nav-current: #e2e2de;
+
   --bb-hairline: #dcdcd8;
   --bb-line: #d1d1cd;
   --bb-edge: #c5c5c0;
@@ -371,6 +407,25 @@
   --color-raised-2: var(--bb-raised-2);
   --color-selected: var(--bb-selected);
   --color-avatar: var(--bb-avatar);
+
+  /* controls: the face, the field and the rail's current row (see the tokens above) */
+  --color-control: var(--bb-control);
+  --color-control-hover: var(--bb-control-hover);
+  --color-control-edge: var(--bb-control-edge);
+  --color-control-edge-strong: var(--bb-control-edge-strong);
+  --color-field: var(--bb-field);
+  --color-nav-current: var(--bb-nav-current);
+
+  /* The control grammar's light, as utilities so no call site spells a shadow by hand:
+     `shadow-face` raises a button, `shadow-field` sinks an input, `shadow-thumb` is the
+     chosen segment's edge plus its shade, `shadow-tab-on` is the folder tab's 2px accent
+     top edge hung 1px below the strip's top, and `shadow-row-bar` is the selected row's
+     inset accent bar. */
+  --shadow-face: inset 0 -1px 0 var(--bb-control-shade);
+  --shadow-field: inset 0 1px 0 var(--bb-field-shade);
+  --shadow-thumb: 0 0 0 1px var(--bb-control-edge), inset 0 -1px 0 var(--bb-control-shade);
+  --shadow-tab-on: inset 0 1px 0 var(--bb-surface), inset 0 0.1875rem 0 var(--bb-accent);
+  --shadow-row-bar: inset 0.125rem 0 0 var(--bb-accent);
 
   /* lines */
   --color-hairline: var(--bb-hairline);
@@ -621,9 +676,15 @@
     color: var(--bb-text-bright);
   }
 
+  /*
+   * One focus ring, solid accent: 6.47:1 / 5.69:1 on the panel and 7.30 / 6.33 on the
+   * surface. The old 55 % mix was 2.37:1 on the light panel and failed 3:1. Controls in a
+   * clipped strip (tabs, rows, segments) pull it inside with
+   * `focus-visible:outline-offset-[-0.125rem]`; nothing marks focus with a fill.
+   */
   :focus-visible {
-    outline: 0.125rem solid color-mix(in srgb, var(--bb-accent) 55%, transparent);
-    outline-offset: 0.0625rem;
+    outline: 0.125rem solid var(--bb-accent);
+    outline-offset: 0.125rem;
   }
 }
 

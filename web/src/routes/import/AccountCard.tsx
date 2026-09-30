@@ -1,13 +1,19 @@
 /**
- * One connected account, as a box in the sources grid.
+ * One connected account, as a box in the Accounts grid.
  *
  * Everything that is true of the account all the time is one line — who it is, how many
  * games came from it, when it last ran — and the username stays an editable field because
  * "connect" and "sync" are the same button pressed twice: the adapters take a name and
  * keep their own cursor.
  *
+ * The box's name is its heading (the source's dot and its name), not a tinted chip: a chip
+ * in the corner read as a tag on the box rather than as what the box is. The count beside
+ * it is a readout. Its Sync / Connect is a secondary face, not a fill: the Accounts region's
+ * one primary is Sync all at its head, and three filled buttons in a row had said nothing
+ * about which one the region exists for.
+ *
  * Nothing else is per-source. What a run is told — how far back, how many, whether to
- * queue an evaluation pass — belongs to the strip above the grid; a box owns only its name
+ * queue an evaluation pass — belongs to the head above the grid; a box owns only its name
  * and its button. The one thing it grows is the sync in flight, in the box that is doing
  * it rather than in a block appended under the grid — and, on Lichess alone, the sign-in
  * line (`LichessLive`), because Lichess is the one source that can tell us a game ended.
@@ -19,6 +25,7 @@ import { Loader2, RefreshCw } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 
 import { SourceBadge } from '@/components/badges/SourceBadge'
+import { Readout } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -31,20 +38,8 @@ import { SyncCheckbox } from './SyncCheckbox'
 import { JobProgress, progressChrome } from './JobProgress'
 import { LichessLive } from './LichessLive'
 import type { SyncOptions } from './SourcesPanel'
+import { syncBody, usernameOf } from './syncRequest'
 import type { SourceProgress } from './useImportProgress'
-
-/**
- * The username a previous sync used, if that sync got far enough to record one.
- *
- * `ImportJob.message` carries the username the account adapter was given, but a failed
- * job overwrites it with the exception text
- * (`services/import_service.py`), so a failed sync must never seed the field or the next
- * Connect would post `AdapterError: …` as the username and fail again.
- */
-function usernameOf(job: ImportJob | undefined): string | undefined {
-  if (!job || job.status === 'failed') return undefined
-  return job.message?.trim() || undefined
-}
 
 const COPY: Record<
   'lichess' | 'chesscom' | 'fics',
@@ -107,20 +102,7 @@ export function AccountCard({
       return
     }
     setInvalid(null)
-    const games = Number.parseInt(options.maxGames, 10)
-    start.mutate({
-      source: source as Source,
-      body: {
-        // `all` is what every adapter takes for "ignore the stored cursor and read the
-        // archive from its first game" (`backend/adapters/__init__.py`). It beats the date,
-        // which is the other answer to the same question.
-        username: name,
-        since: options.fromTheBeginning ? 'all' : options.since.trim() || undefined,
-        max_games: Number.isFinite(games) && games > 0 ? games : undefined,
-        // Only ever sent to turn evaluation off; left out, the backend queues the pass.
-        analyze: options.skipEvaluation ? false : undefined,
-      },
-    })
+    start.mutate({ source: source as Source, body: syncBody(name, options) })
   }
 
   return (
@@ -132,22 +114,29 @@ export function AccountCard({
       )}
     >
       <div className="flex items-center gap-2">
-        {/* The badge is the name; a word beside it saying the same thing is noise. */}
-        <SourceBadge source={source} title={i18n._(copy.hint)} />
+        {/* The heading is the name; a word beside it saying the same thing is noise. */}
+        <h3 className="flex">
+          <SourceBadge
+            source={source}
+            variant="plain"
+            title={i18n._(copy.hint)}
+            className="gap-2 text-data font-medium text-ink"
+          />
+        </h3>
         <div className="flex-1" />
         {/* An account nobody has connected has no count to give, and a bare em dash in a
             box says less than the reason there is no number. */}
         {account ? (
-          <span className="font-mono text-label text-body tabular">
+          <Readout num className="text-label text-body">
             {account.games?.toLocaleString() ?? '—'}
             <span className="ml-1 font-sans text-dim">
               <Trans>games</Trans>
             </span>
-          </span>
+          </Readout>
         ) : (
-          <span className="text-label text-faint">
+          <Readout className="text-faint">
             <Trans>not connected</Trans>
-          </span>
+          </Readout>
         )}
       </div>
 
@@ -196,7 +185,14 @@ export function AccountCard({
           {when === null ? t`never synced` : t`synced ${when}`}
         </span>
         <div className="flex-1" />
-        <Button type="button" size="sm" disabled={running} onClick={submit}>
+        <Button
+          type="button"
+          variant="secondary"
+          size="sm"
+          disabled={running}
+          title={running ? t`This account is syncing` : undefined}
+          onClick={submit}
+        >
           {running ? <Loader2 className="animate-spin" aria-hidden /> : <RefreshCw aria-hidden />}
           {progress?.running ? t`Syncing` : account ? t`Sync` : t`Connect`}
         </Button>

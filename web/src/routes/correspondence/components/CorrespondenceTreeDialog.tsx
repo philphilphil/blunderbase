@@ -57,7 +57,14 @@ export function CorrespondenceTreeDialog({
             <Trans>what was considered while the game ran</Trans>
           </span>
           <div className="flex-1" />
-          <Button type="button" variant="ghost" size="icon" aria-label={t`Close`} onClick={onClose}>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            aria-label={t`Close`}
+            title={t`Close`}
+            onClick={onClose}
+          >
             <X aria-hidden />
           </Button>
         </div>

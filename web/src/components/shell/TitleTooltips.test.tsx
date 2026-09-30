@@ -73,6 +73,36 @@ describe('TitleTooltips', () => {
     expect(screen.getByRole('tooltip')).toHaveTextContent('Blunderbase on Codeberg')
   })
 
+  it('draws a rail row’s shortcut, and leaves the row named by its words alone', () => {
+    render(
+      <>
+        <a href="/games" title="Games ⌘2">
+          Games
+        </a>
+        <a href="/collections" aria-label="Collections" title="Collections ⌘6" />
+        <TitleTooltips />
+      </>,
+    )
+    const [games, collections] = screen.getAllByRole('link')
+
+    fireEvent.pointerOver(games!, { pointerType: 'mouse' })
+    act(() => {
+      vi.advanceTimersByTime(500)
+    })
+    expect(screen.getByRole('tooltip')).toHaveTextContent('Games ⌘2')
+    // The key is a hint, not part of the name a screen reader hears.
+    expect(games).toHaveAccessibleName('Games')
+    fireEvent.pointerOut(games!, { relatedTarget: document.body })
+
+    // Folded, the row is an icon named by its label, and still shows its key on hover.
+    fireEvent.pointerOver(collections!, { pointerType: 'mouse' })
+    act(() => {
+      vi.advanceTimersByTime(500)
+    })
+    expect(screen.getByRole('tooltip')).toHaveTextContent('Collections ⌘6')
+    expect(collections).toHaveAccessibleName('Collections')
+  })
+
   it('goes away on Escape and on a press, and never appears for touch', () => {
     render(
       <>

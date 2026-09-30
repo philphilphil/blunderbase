@@ -9,6 +9,7 @@ import {
   resetTrail,
   useGameTrail,
   useLibraryAddress,
+  useLibraryOrigin,
 } from './gameTrail'
 
 /** The library, in the order the table put it in. The stub serves windows of this. */
@@ -147,5 +148,22 @@ describe('the library address', () => {
     // `]` off the end of the first page: the crumb now names the second.
     advanceTrail(1, 14)
     expect(address(14).current).toBe('/games?color=black&page=2')
+  })
+
+  it('hands over the query to name the place by, with the address', () => {
+    expect(renderHook(() => useLibraryOrigin(14)).result.current).toEqual({
+      address: '/games',
+      search: '',
+    })
+    rememberTrail({
+      query: {},
+      offset: 3,
+      gameId: 13,
+      library: { search: 'collection=4&whose=all', rowsPerPage: 25 },
+    })
+    expect(renderHook(() => useLibraryOrigin(13)).result.current).toEqual({
+      address: '/games?collection=4&whose=all',
+      search: 'collection=4&whose=all',
+    })
   })
 })

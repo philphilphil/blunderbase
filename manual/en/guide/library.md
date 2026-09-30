@@ -4,9 +4,13 @@ Two pages: **Import**, where games come in, and **Manage**, where they go out or
 
 ## Import
 
+The page is three regions, top to bottom: **Accounts**, where synced games come from,
+**PGN file**, and the **Sync history** of both.
+
 ### Connect an account
 
-There is a box for Lichess, Chess.com and FICS. Put the username in, press **Connect**,
+Under **Accounts** there is a box for Lichess, Chess.com and FICS, each headed by the
+site's name and, once connected, how many games came from it. Put the username in, press **Connect**,
 then **Sync**. The same button syncs it again afterwards, resuming where the last finished
 run stopped. Every import is deduplicated on the way in, so a second sync of the same
 archive stores nothing twice.
@@ -20,7 +24,7 @@ version and never arrived comes in with one sync **From the beginning**.
 
 ### Sync options
 
-The strip above the boxes is read by every source:
+The head of **Accounts**, above the boxes, is read by every account:
 
 | Control | Effect |
 |---|---|
@@ -29,11 +33,22 @@ The strip above the boxes is read by every source:
 | **From the beginning** | Ignore the stored cursor and read the whole archive |
 | **Skip evaluation** | Store the games and queue no analysis pass |
 
+A PGN file takes none of these; its region has its own **Skip evaluation**.
+
+### Sync all
+
+**Sync all**, at the end of the head, presses **Sync** on every connected account whose box
+has **Include in sync** ticked, told what the head says. It syncs the account each box
+shows; a new username is connected with that box's own **Connect**. While it cannot be
+pressed, pointing at it says why: nothing is connected yet, every account is left out, or a
+sync is already running.
+
 ### Sync automatically
 
-**Sync automatically** presses **Sync** on every connected account for you, every so many
-minutes, one account at a time. The box shows the interval actually in force, which may be
-rounded up from what you typed.
+**Sync automatically**, the switch at the foot of **Accounts**, presses **Sync** on every
+connected account for you, every so many minutes, one account at a time. Switch it on and
+set the minutes in the box beside it. The box shows the interval actually in force, which
+may be rounded up from what you typed; switched off, it keeps the last number, greyed.
 
 ### Import Lichess games live
 
@@ -63,9 +78,12 @@ up from there.
 
 ### Import a PGN file
 
-Choose a file in the PGN box, or drop one anywhere in the window; several dropped at once
-are read as one file. Say whether the games are **Mine** or **Not mine** first. Games that
-are not yours are analysed and searchable like any other, but count in no statistic.
+Under **PGN file**, press **Choose file…**, or drop a file on that region or anywhere in the
+window; several at once are read as one file. Say whether the games are **Mine** or **Not
+mine**, tick **Skip evaluation** if the games should only be stored, then press **Upload**.
+**Upload** stays greyed until a file is chosen. Games that are not yours are analysed and
+searchable like any other, but count in no statistic. A file dropped elsewhere in the window
+asks the same question in a small dialog before it imports.
 
 The file may be UTF-8 or the Latin-1 / Windows-1252 that ChessBase and many older programs
 write; each file is read in whichever of the two it is, so accented names such as "Müller"
@@ -87,8 +105,10 @@ every other game.
 ### Read the sync history
 
 Every run, newest first: the source, when it started, how long it took, and how many games
-it saw, imported, skipped, refused as previously deleted and failed on. **Show failures**
-narrows it to the runs that went wrong.
+it saw, imported, skipped, refused as previously deleted and failed on, and its status as a
+coloured dot and a word (**Done**, **Failed**, **Stopped**). A run that lost games has an
+arrow in front of it: **Show failures** opens the games it could not store under that row.
+Past 25 runs the list turns pages with the arrows at its foot.
 
 ## Manage
 
@@ -107,9 +127,10 @@ before you press it. Restoring one needs the command line with Blunderbase stopp
 
 ### Reset the imported library
 
-**Reset imported Library** deletes every game with its analysis, its game notes and the
-sync history. Accounts, engines and position-only notes stay. It asks for your password,
-and there is no undo.
+**Reset imported Library…**, the red outlined button, deletes every game with its analysis,
+its game notes and the sync history. Accounts, engines and position-only notes stay. It
+asks first, with your password on a server, and only **Delete them** in that dialog
+deletes. There is no undo.
 
 ### Deleted games
 

@@ -2,7 +2,10 @@ import { Trans, useLingui } from '@lingui/react/macro'
 import { RotateCcw } from 'lucide-react'
 import { useMemo, useState } from 'react'
 
-import { Input } from '@/components/ui/input'
+import { Button } from '@/components/ui/button'
+import { Checkbox } from '@/components/ui/checkbox'
+import { Input, SearchInput } from '@/components/ui/input'
+import { NativeSelect } from '@/components/ui/native-select'
 import { cn } from '@/lib/utils'
 
 import { isEditable, type DeclaredOption, type OptionDraft } from './options'
@@ -10,7 +13,8 @@ import { isEditable, type DeclaredOption, type OptionDraft } from './options'
 /** The value column narrows below `md` so the option's own name keeps room to be read. */
 const VALUE_WIDTH = 'w-44 max-md:w-28'
 
-const SELECT_CLASS = `h-8 ${VALUE_WIDTH} rounded-md border border-input bg-elevated px-2 text-data text-ink outline-none transition-colors focus-visible:border-accent-teal/50`
+/** The same sunk field as the inputs beside it, at their height. */
+const SELECT_CLASS = `h-8 ${VALUE_WIDTH}`
 
 function range(option: DeclaredOption): string | null {
   if (option.type !== 'spin') return null
@@ -41,27 +45,27 @@ function Field({
   if (option.type === 'check') {
     const fallback = option.default || 'false'
     return (
-      <select
+      <NativeSelect
         aria-label={option.name}
         aria-invalid={invalid}
-        className={cn(SELECT_CLASS, invalid && 'border-blunder')}
+        className={SELECT_CLASS}
         value={value}
         onChange={(event) => onChange(event.target.value)}
       >
         <option value="">{t`default (${fallback})`}</option>
         <option value="true">true</option>
         <option value="false">false</option>
-      </select>
+      </NativeSelect>
     )
   }
 
   if (option.type === 'combo' && option.choices.length > 0) {
     const fallback = option.default || '—'
     return (
-      <select
+      <NativeSelect
         aria-label={option.name}
         aria-invalid={invalid}
-        className={cn(SELECT_CLASS, invalid && 'border-blunder')}
+        className={SELECT_CLASS}
         value={value}
         onChange={(event) => onChange(event.target.value)}
       >
@@ -71,7 +75,7 @@ function Field({
             {choice}
           </option>
         ))}
-      </select>
+      </NativeSelect>
     )
   }
 
@@ -93,6 +97,10 @@ function Field({
  *
  * An empty field means "whatever the engine defaults to" — the editor never writes a
  * default back, so an engine upgrade that changes one is followed rather than pinned.
+ *
+ * Every value is a sunk field (an input, or the native select for a check or a combo),
+ * the list is narrowed by a search field and an "Only set" checkbox (a filter you tick, not
+ * a lit chip), and each row's reset is a ghost icon, the grammar's action inside a row.
  */
 export function OptionsEditor({
   declared,
@@ -140,24 +148,20 @@ export function OptionsEditor({
   return (
     <div className="flex flex-col gap-2.5">
       <div className="flex items-center gap-2 max-md:flex-wrap">
-        <Input
+        <SearchInput
           value={filter}
-          placeholder={t`Filter options`}
-          className="h-7 w-48 max-md:w-36"
+          aria-label={t`Filter options`}
+          placeholder={t`Filter options…`}
+          inputSize="sm"
+          wrapperClassName="w-48 max-md:w-36"
           onChange={(event) => setFilter(event.target.value)}
         />
-        <button
-          type="button"
-          onClick={() => setOnlySet((only) => !only)}
-          className={cn(
-            'rounded-md border px-2 py-[0.1875rem] text-label transition-colors',
-            onlySet
-              ? 'border-accent-teal/30 bg-accent-teal/10 text-accent-teal'
-              : 'border-edge bg-elevated text-soft hover:text-ink',
-          )}
-        >
-          <Trans>Only set</Trans>
-        </button>
+        <Checkbox
+          checked={onlySet}
+          onCheckedChange={setOnlySet}
+          label={t`Only set`}
+          className="text-label"
+        />
         <div className="flex-1" />
         <span className="font-mono text-label text-dim tabular">
           <Trans>
@@ -184,14 +188,16 @@ export function OptionsEditor({
                 {errors[name] ?? t`this engine does not declare that option`}
               </span>
             </div>
-            <button
+            <Button
               type="button"
+              variant="ghost"
+              size="icon-xs"
               aria-label={t`Remove ${name}`}
+              title={t`Remove ${name}`}
               onClick={() => update(name, '')}
-              className="text-faint hover:text-ink"
             >
               <RotateCcw className="size-3.5" aria-hidden />
-            </button>
+            </Button>
           </li>
         ))}
 
@@ -231,15 +237,17 @@ export function OptionsEditor({
                 invalid={problem !== undefined}
                 onChange={(next) => update(option.name, next)}
               />
-              <button
+              <Button
                 type="button"
+                variant="ghost"
+                size="icon-xs"
                 aria-label={t`Reset ${optionName}`}
+                title={value === '' ? t`Already the engine's default` : t`Reset ${optionName}`}
                 disabled={value === ''}
                 onClick={() => update(option.name, '')}
-                className="text-faint transition-colors hover:text-ink disabled:opacity-30"
               >
                 <RotateCcw className="size-3.5" aria-hidden />
-              </button>
+              </Button>
             </li>
           )
         })}

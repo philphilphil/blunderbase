@@ -32,13 +32,14 @@
  */
 import { msg } from '@lingui/core/macro'
 import { Trans, useLingui } from '@lingui/react/macro'
-import { Download, FileText, LayoutGrid, List, Loader2, Rows3, StickyNote } from 'lucide-react'
+import { Download, FileDown, FileText, LayoutGrid, List, Loader2, Rows3, StickyNote } from 'lucide-react'
 import { useCallback, useMemo } from 'react'
 import { useSearchParams } from 'react-router-dom'
 
 import { SetPageChrome } from '@/components/shell/PageChrome'
 import { PageBody } from '@/components/shell/PageHeader'
-import { Button } from '@/components/ui/button'
+import { ActionMenu } from '@/components/ui/action-menu'
+import { Readout } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import { ViewToggle, type ViewOption } from '@/components/ui/view-toggle'
 import { saveDownload } from '@/lib/api/client'
@@ -76,15 +77,20 @@ const LIMIT = 120
  * `items-start` rather than stretched rows: notes are honestly different lengths, and a
  * short one padded out to match the paragraph beside it is the dead space that made the old
  * grid look wrong.
+ *
+ * `grid-cols-1` below `lg` rather than the implicit column: an implicit track is as wide as
+ * its widest unbreakable content, and a card's truncated provenance line counts at its full
+ * length there, which pushed the cards off the right edge of a phone.
  */
-const STREAM = 'grid items-start gap-2.5 max-w-[46rem] lg:max-w-[93rem] lg:grid-cols-2'
+const STREAM =
+  'grid grid-cols-1 items-start gap-2.5 max-w-[46rem] lg:max-w-[93rem] lg:grid-cols-2'
 
 /**
  * The sheet's columns. Sized so a tile holds a board at a legible size with four or five
  * lines of text under it, and so nothing is left alone in a row at the widths the app is
  * actually read at.
  */
-const SHEET = 'grid items-start gap-2.5 sm:grid-cols-2 xl:grid-cols-3 min-[110rem]:grid-cols-4'
+const SHEET = 'grid grid-cols-1 items-start gap-2.5 sm:grid-cols-2 xl:grid-cols-3 min-[110rem]:grid-cols-4'
 
 /**
  * The list: one bounded panel of rows per date rule, capped where a row stops gaining from
@@ -170,22 +176,27 @@ export function NotesPage() {
       <SetPageChrome
         breadcrumb={[{ label: t`Notes` }]}
         manual="guide/notes"
-        actions={<ExportButtons filters={filters} disabled={total === 0} />}
+        actions={<ExportMenu filters={filters} disabled={total === 0} />}
       />
 
       {/*
         The view selector leads the filter row rather than sitting in the titlebar's actions:
-        it belongs to the list under it, not to the page's verbs. `basis-[20rem]` on the bar
-        is what makes that behave on a phone — there is no room for a 20rem filter bar beside
-        the selector on a 375px screen, so the bar takes the next line whole.
+        it belongs to the list under it, not to the page's verbs. A hairline rule ends it, as
+        after Games' Mine/Others/All, so the switch does not read as the first of the filters.
+        `basis-[20rem]` on the bar is what makes that behave on a phone — there is no room
+        for a 20rem filter bar beside the selector on a 375px screen, so the bar takes the
+        next line whole (and the rule, with nothing after it on its line, goes). Hung from
+        the top, so when the bar wraps the switch stays on the first line rather than
+        floating between the two.
       */}
-      <div data-tour="notes" className="flex flex-wrap items-center gap-2">
+      <div data-tour="notes" className="flex flex-wrap items-start gap-2">
         <ViewToggle
           views={VIEWS}
           value={view}
           onChange={setNoteView}
           label={t`How to show the notes`}
         />
+        <span aria-hidden className="mt-1.5 h-4 w-px flex-none bg-hairline max-md:hidden" />
         <NoteFilterBar
           filters={filters}
           onChange={setFilters}
@@ -271,13 +282,16 @@ const VIEWS: readonly ViewOption<NoteView>[] = [
  * A rule rather than a heading, and that is the whole point of it — this is what replaced
  * the game headings. It sits on one line, spans whatever the list is, and cannot break a
  * grid row, because it is not in the grid.
+ *
+ * Sentence case in sans, not mono caps: it is a heading over a group, and caps are kept for
+ * column heads (the list's) and mono for figures, so a rule in either read as the wrong kind
+ * of thing (docs/design/README.md, clarity pass). The count at the end is a figure, so it
+ * keeps its mono.
  */
 function DateRule({ label, note, count }: { label: string; note?: string; count?: number }) {
   return (
     <div className="flex items-center gap-2.5 pt-1">
-      <span className="font-mono text-label tracking-[0.08em] text-dim-2 uppercase">
-        {label}
-      </span>
+      <span className="text-label font-medium text-dim">{label}</span>
       {note ? <span className="text-label text-faint">{note}</span> : null}
       <span className="h-px flex-1 bg-hairline" />
       {count === undefined ? null : (
@@ -308,51 +322,56 @@ function Empty({ filtered }: { filtered: boolean }) {
 /**
  * Markdown for a person, PGN for a board program — both over exactly the filters on
  * screen, so what is exported is what is being read.
+ *
+ * One "Export ⌄" menu rather than two boxes reading "Markdown" and "PGN": the pair named
+ * formats, not an action, and sat in the bar looking like two more views or filters. The
+ * menu's trigger says the verb, its items say the format, and each item's hint says what
+ * comes out of it. While a file is being made, and when making it failed, a readout beside
+ * the trigger says so: the menu has closed by then, so it cannot.
  */
-function ExportButtons({ filters, disabled }: { filters: NoteFilters; disabled: boolean }) {
+function ExportMenu({ filters, disabled }: { filters: NoteFilters; disabled: boolean }) {
   const { t } = useLingui()
   const exporting = useExportNotes({ onSuccess: (download) => saveDownload(download) })
-  const pending = exporting.isPending ? exporting.variables?.format : undefined
 
   const run = (format: NoteExportFormat) => {
     exporting.mutate({ format, query: toNoteExportQuery(filters) })
   }
 
   return (
-    <div className="flex items-center gap-1.5 max-md:flex-wrap max-md:gap-y-1">
-      {exporting.isError ? (
+    <div className="flex items-center gap-2 max-md:flex-wrap max-md:gap-y-1">
+      {exporting.isPending ? (
+        <Readout className="inline-flex items-center gap-1">
+          <Loader2 className="size-3 animate-spin" aria-hidden />
+          <Trans>Exporting…</Trans>
+        </Readout>
+      ) : exporting.isError ? (
         <span className="max-w-[16rem] truncate text-label text-blunder max-md:max-w-full max-md:basis-full">
           {exporting.error.message}
         </span>
       ) : null}
-      <Button
-        size="sm"
-        variant="outline"
+      <ActionMenu
+        label={t`Export`}
+        icon={FileDown}
+        align="end"
         disabled={disabled || exporting.isPending}
-        onClick={() => run('md')}
-        title={t`Every note these filters show, as Markdown`}
-      >
-        {pending === 'md' ? (
-          <Loader2 className="size-3 animate-spin" aria-hidden />
-        ) : (
-          <FileText className="size-3" aria-hidden />
-        )}
-        Markdown
-      </Button>
-      <Button
-        size="sm"
-        variant="outline"
-        disabled={disabled || exporting.isPending}
-        onClick={() => run('pgn')}
-        title={t`The same notes as PGN comments and variations`}
-      >
-        {pending === 'pgn' ? (
-          <Loader2 className="size-3 animate-spin" aria-hidden />
-        ) : (
-          <Download className="size-3" aria-hidden />
-        )}
-        PGN
-      </Button>
+        title={
+          disabled ? t`No notes to export under these filters` : t`Export every note these filters show`
+        }
+        items={[
+          {
+            label: t`Markdown`,
+            icon: FileText,
+            hint: '.md',
+            onSelect: () => run('md'),
+          },
+          {
+            label: t`PGN`,
+            icon: Download,
+            hint: t`comments and variations`,
+            onSelect: () => run('pgn'),
+          },
+        ]}
+      />
     </div>
   )
 }

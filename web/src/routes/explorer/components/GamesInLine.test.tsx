@@ -35,7 +35,7 @@ describe('GamesInLine', () => {
   it('names the game a row stands for', () => {
     render(
       <MemoryRouter>
-        <GamesInLine games={GAMES} loading={false} total={1} onOpenLibrary={null} />
+        <GamesInLine games={GAMES} loading={false} total={1} libraryHref={null} />
       </MemoryRouter>,
     )
 
@@ -46,5 +46,21 @@ describe('GamesInLine', () => {
     expect(row).toHaveTextContent('2184')
     expect(row).toHaveTextContent('Nbxd7+')
     expect(row).toHaveTextContent('1–0')
+    // No ECO to filter by, so there is nowhere to send the reader.
+    expect(screen.queryByRole('link', { name: /Open in Games/ })).not.toBeInTheDocument()
+  })
+
+  it('links to the Games page filtered to the line', () => {
+    render(
+      <MemoryRouter>
+        <GamesInLine games={GAMES} loading={false} total={1} libraryHref="/games?eco=C45" />
+      </MemoryRouter>,
+    )
+
+    // A real link, named for where it goes, so it can be opened in a new tab.
+    expect(screen.getByRole('link', { name: /Open in Games/ })).toHaveAttribute(
+      'href',
+      '/games?eco=C45',
+    )
   })
 })

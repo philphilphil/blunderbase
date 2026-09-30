@@ -138,9 +138,9 @@ $ blunderbase analyze --fen "rn1qkb1r/..." --engine sf-local --seconds 30
 ```
 
 Ohne `--game-id` und ohne `--fen` ist das der Nachtrag: die Importanalyse für jede Partie,
-die noch keine hat, mit Budget und Variantenzahl aus **Analyse → Engine-Durchläufe**, in der
+die noch keine hat, mit Budget und Variantenzahl aus **Analyse › Engine-Durchläufe**, in der
 Reihenfolge der Warteschlange. Mit einem von beiden ist es eine angeforderte Analyse, so wie
-**Analysieren** in einer Partie sie einreiht: vor jeder noch wartenden Importanalyse, mit
+**Analysieren …** in einer Partie sie einreiht: vor jeder noch wartenden Importanalyse, mit
 der Engine, den Varianten und der Grenze aus den Flags. Die Flags von `--engine` bis
 `--seconds` gehören nur dorthin: Ohne `--game-id` oder `--fen` lehnt der Befehl sie ab, statt
 einen Nachtrag einzureihen, der sie übergeht. Von `--nodes`, `--depth` und `--seconds` geht

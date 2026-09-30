@@ -4,10 +4,16 @@
  * The suggestions come from `GET /notes/tags`, which is every tag already in use with how
  * many notes carry it — offered through a native `<datalist>` so the list behaves like the
  * browser's own completion and needs no floating panel of its own.
+ *
+ * The whole box is one FIELD (the sunk fill and inner top shade every place you type into
+ * wears), since it is one place you type into; the chips inside it are bordered with no
+ * face, like the tag chips on a card, and its caret is found by the accent border the box
+ * takes while the input inside has focus.
  */
 import { useLingui } from '@lingui/react/macro'
 import { useId, useState } from 'react'
 
+import { FIELD } from '@/components/ui/input'
 import { cn } from '@/lib/utils'
 
 export interface TagEditorProps {
@@ -58,11 +64,17 @@ export function TagEditor({
   const offered = suggestions.filter((tag) => !taken.has(tag.toLowerCase()))
 
   return (
-    <div className={cn('flex flex-wrap items-center gap-1', className)}>
+    <div
+      className={cn(
+        FIELD,
+        'flex flex-wrap items-center gap-1 px-1.5 py-1 focus-within:border-accent-teal',
+        className,
+      )}
+    >
       {tags.map((tag) => (
         <span
           key={tag}
-          className="inline-flex items-center gap-1 rounded-sm border border-edge bg-elevated px-1.5 py-px text-meta text-soft"
+          className="inline-flex h-5 items-center gap-1 rounded-sm border border-edge px-1.5 text-meta text-soft"
         >
           {tag}
           <button

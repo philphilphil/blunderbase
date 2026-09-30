@@ -5,9 +5,15 @@ herauskommen oder verschwinden.
 
 ## Importieren { #import }
 
+Die Seite besteht aus drei Bereichen, von oben nach unten: **Konten**, aus denen
+synchronisierte Partien kommen, **PGN-Datei** und die **Synchronisierungs-Historie** von
+beiden.
+
 ### Ein Konto verbinden { #connect-an-account }
 
-Es gibt je ein Feld für Lichess, Chess.com und FICS. Benutzername eintragen, **Verbinden**
+Unter **Konten** gibt es je ein Feld für Lichess, Chess.com und FICS. Oben steht der Name der
+Seite und, sobald das Konto verbunden ist, wie viele Partien von dort kamen.
+Benutzername eintragen, **Verbinden**
 drücken, dann **Synchronisieren**. Dieselbe Schaltfläche synchronisiert später erneut und
 macht dort weiter, wo der letzte abgeschlossene Lauf aufgehört hat. Jeder Import prüft auf
 Duplikate, ein zweiter Durchlauf über dasselbe Archiv speichert also nichts doppelt.
@@ -21,9 +27,9 @@ Synchronisierung danach holt sie herein, egal wie lange sie gedauert hat. Fernpa
 schon vor dieser Version zu Ende gingen und nie angekommen sind, holt eine einzige
 Synchronisierung **Von Anfang an** nach.
 
-### Optionen für die Synchronisierung
+### Optionen für die Synchronisierung { #sync-options }
 
-Die Leiste über den Feldern gilt für alle Quellen:
+Die Kopfzeile von **Konten**, über den Feldern, gilt für alle Konten:
 
 | Option | Wirkung |
 |---|---|
@@ -32,11 +38,25 @@ Die Leiste über den Feldern gilt für alle Quellen:
 | **Von Anfang an** | Den gemerkten Stand ignorieren und das ganze Archiv lesen |
 | **Bewertung überspringen** | Partien nur speichern, keine Analyse einreihen |
 
-### Automatisch synchronisieren
+Für eine PGN-Datei gilt nichts davon; ihr Bereich hat ein eigenes **Bewertung
+überspringen**.
 
-**Automatisch synchronisieren** drückt für dich alle paar Minuten bei jedem verbundenen
-Konto auf **Synchronisieren**, ein Konto nach dem anderen. Das Feld zeigt das tatsächlich
-gültige Intervall; es kann aufgerundet sein.
+### Alle synchronisieren { #sync-all }
+
+**Alle synchronisieren** am Ende der Kopfzeile drückt bei jedem verbundenen Konto, in dessen
+Feld **Mit synchronisieren** angehakt ist, auf **Synchronisieren**, mit dem, was in der
+Kopfzeile steht. Synchronisiert wird das Konto, das im jeweiligen Feld steht; einen neuen
+Benutzernamen verbindest du mit **Verbinden** in seinem eigenen Feld. Ist die Schaltfläche
+ausgegraut, verrät sie beim Darüberfahren den Grund: Noch ist nichts verbunden, alle Konten
+sind ausgenommen, oder es läuft schon eine Synchronisierung.
+
+### Automatisch synchronisieren { #sync-automatically }
+
+**Automatisch synchronisieren**, der Schalter am Fuß von **Konten**, drückt für dich alle
+paar Minuten bei jedem verbundenen Konto auf **Synchronisieren**, ein Konto nach dem anderen.
+Schalte ihn ein und trag die Minuten ins Feld daneben ein. Das Feld zeigt das tatsächlich
+gültige Intervall; es kann aufgerundet sein. Ausgeschaltet behält es die letzte Zahl,
+ausgegraut.
 
 ### Lichess-Partien live importieren { #import-lichess-games-live }
 
@@ -61,18 +81,21 @@ von selbst. Erreichst du Blunderbase über einfaches `http` unter einer anderen 
 funktioniert trotzdem. Chess.com und FICS melden nicht, wann eine Partie endet, dort bleibt
 es beim Synchronisieren.
 
-### Eine Synchronisierung stoppen
+### Eine Synchronisierung stoppen { #stop-a-sync }
 
 Ein laufender Import zeigt seine Zähler in seinem Feld, daneben steht **Stoppen**. Er hält
 nach der gerade verarbeiteten Partie an. Was angekommen ist, bleibt, die Historie vermerkt
 **Gestoppt**, und **Synchronisieren** macht später an dieser Stelle weiter.
 
-### Eine PGN-Datei importieren
+### Eine PGN-Datei importieren { #import-a-pgn-file }
 
-Wähle im PGN-Feld eine Datei oder zieh eine irgendwo ins Fenster; mehrere auf einmal werden
-wie eine Datei gelesen. Gib vorher an, ob es **Meine** oder **Nicht meine** Partien sind.
-Fremde Partien werden analysiert und sind durchsuchbar wie alle anderen, zählen aber in
-keiner Statistik.
+Drück unter **PGN-Datei** auf **Datei wählen …** oder zieh eine Datei auf diesen Bereich oder
+irgendwo ins Fenster; mehrere auf einmal werden wie eine Datei gelesen. Gib an, ob es
+**Meine** oder **Nicht meine** Partien sind, hak **Bewertung überspringen** an, wenn die
+Partien nur gespeichert werden sollen, und drück **Hochladen**. Solange keine Datei gewählt
+ist, bleibt **Hochladen** ausgegraut. Fremde Partien werden analysiert und sind durchsuchbar
+wie alle anderen, zählen aber in keiner Statistik. Landet eine Datei anderswo im Fenster,
+stellt ein kleiner Dialog dieselbe Frage, bevor importiert wird.
 
 Ob die Datei in UTF-8 vorliegt oder in Latin-1 bzw. Windows-1252, wie ChessBase und viele
 ältere Programme sie schreiben, erkennt Blunderbase für jede Datei selbst. Namen mit
@@ -92,21 +115,24 @@ analysiert – ihr Baum ist der Ort, an dem die Arbeit der Engines liegt –, un
 Abschließen wird der übliche Analysedurchlauf eingereiht. Danach liest sie
 sich wie jede andere Partie.
 
-### Die Synchronisierungs-Historie
+### Die Synchronisierungs-Historie { #read-the-sync-history }
 
-Jeder Lauf, neueste zuerst: Quelle, Startzeit, Dauer und wie viele Partien er gesehen,
-importiert, übersprungen, als früher gelöscht abgewiesen oder nicht verarbeiten konnte.
-**Fehlschläge anzeigen** zeigt nur die Läufe, die schiefgegangen sind.
+Jeder Lauf, neueste zuerst: Quelle, Startzeit, Dauer, wie viele Partien er gesehen,
+importiert, übersprungen, als früher gelöscht abgewiesen oder nicht verarbeiten konnte, und
+sein Stand als farbiger Punkt mit einem Wort (**Fertig**, **Fehlgeschlagen**, **Gestoppt**).
+Vor einem Lauf, der Partien verloren hat, steht ein Pfeil: **Fehlschläge anzeigen** klappt
+unter der Zeile auf, welche Partien er nicht speichern konnte. Ab 25 Läufen blättern die
+Pfeile am Fuß der Liste weiter.
 
 ## Verwalten { #manage }
 
-### Als PGN exportieren
+### Als PGN exportieren { #export-a-portable-pgn }
 
 **PGN exportieren** lädt alle Partien herunter, mit Notizen als Kommentaren und
 gespeicherten Varianten als Varianten, für ein anderes Schachprogramm. Engine-Analysen und
 Einstellungen sind nicht Teil eines PGN.
 
-### Eine Datenbanksicherung herunterladen
+### Eine Datenbanksicherung herunterladen { #download-a-database-backup }
 
 **Sicherung herunterladen** erstellt eine konsistente Kopie der SQLite-Datei, mit Analysen,
 Konten und Einstellungen, sobald der Server den Schnappschuss vorbereitet hat. Die
@@ -114,13 +140,14 @@ geschätzte Größe steht vor dem Klick dabei. Zum Wiederherstellen brauchst du 
 Kommandozeile bei gestopptem Blunderbase: siehe
 [Backup and restore](../operate/backup.md).
 
-### Die importierte Bibliothek zurücksetzen
+### Die importierte Bibliothek zurücksetzen { #reset-the-imported-library }
 
-**Importierte Bibliothek zurücksetzen** löscht jede Partie samt Analyse, Partie-Notizen und
-Synchronisierungs-Historie. Konten, Engines und reine Stellungsnotizen bleiben. Die Aktion
-fragt nach deinem Passwort, und es gibt kein Rückgängig.
+**Importierte Bibliothek zurücksetzen …**, die rot umrandete Schaltfläche, löscht jede
+Partie samt Analyse, Partie-Notizen und Synchronisierungs-Historie. Konten, Engines und
+reine Stellungsnotizen bleiben. Vorher kommt eine Rückfrage, auf einem Server mit deinem
+Passwort, und erst **Partien löschen** in diesem Dialog löscht wirklich. Es gibt kein Rückgängig.
 
-### Gelöschte Partien
+### Gelöschte Partien { #deleted-games }
 
 **Gelöschte Partien** ist die Liste dessen, was ein Import nicht noch einmal speichern
 darf. Ohne sie würde die nächste Synchronisierung eine gelöschte Partie als neu wieder

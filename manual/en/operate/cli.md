@@ -135,8 +135,8 @@ $ blunderbase analyze --fen "rn1qkb1r/..." --engine sf-local --seconds 30
 ```
 
 Without `--game-id` or `--fen` this is the backfill: the import pass over every game that
-has none, at the budget and line count set under **Analysis → Engine passes**, in the
-queue's own order. With either, it is a run you ask for, as **Analyse** on a game queues
+has none, at the budget and line count set under **Analysis › Engine passes**, in the
+queue's own order. With either, it is a run you ask for, as **Analyse…** on a game queues
 it: ahead of every import pass still waiting, on the engine, lines and limit the flags
 name. The flags from `--engine` to `--seconds` belong to that case only: given without
 `--game-id` or `--fen`, the command refuses them rather than queue a backfill that ignores

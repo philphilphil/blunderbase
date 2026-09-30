@@ -39,7 +39,8 @@ import { cn } from '@/lib/utils'
 
 import type { NoteRow } from '../notesModel'
 import { BookPanel, type BookEntry, type BookMove } from './BookPanel'
-import { PANE_COUNT, PANE_TOOL, TAB, TAB_ON, TAB_ROW } from './paneTabs'
+import { PANE_TOOL, STRIP_FACTS, STRIP_RULE, TAB_ROW } from './paneTabs'
+import { PaneTab, PaneTabList } from './PaneTabList'
 
 export type NotesTrackTab = 'book' | 'notes'
 
@@ -144,34 +145,30 @@ export function NotesTrack({
       data-testid="notes-track"
       className={cn('flex min-h-0 min-w-0 flex-col', className)}
     >
-      <div role="tablist" aria-label={t`Book and notes`} className={cn(TAB_ROW, '@container')}>
-        <button
-          type="button"
-          role="tab"
-          id="notes-track-tab-notes"
-          aria-selected={active === 'notes'}
-          aria-controls="notes-track-pane"
-          onClick={() => setActive('notes')}
-          className={cn(TAB, active === 'notes' && TAB_ON)}
-        >
-          <Trans>Notes</Trans>
-        </button>
-        <button
-          type="button"
-          role="tab"
-          id="notes-track-tab-book"
-          aria-selected={active === 'book'}
-          aria-controls="notes-track-pane"
-          onClick={() => setActive('book')}
-          className={cn(TAB, active === 'book' && TAB_ON)}
-        >
-          <Trans>Book</Trans>
-        </button>
+      <div className={cn(TAB_ROW, '@container')}>
+        <PaneTabList label={t`Book and notes`}>
+          <PaneTab
+            id="notes-track-tab-notes"
+            controls="notes-track-pane"
+            selected={active === 'notes'}
+            onSelect={() => setActive('notes')}
+          >
+            <Trans>Notes</Trans>
+          </PaneTab>
+          <PaneTab
+            id="notes-track-tab-book"
+            controls="notes-track-pane"
+            selected={active === 'book'}
+            onSelect={() => setActive('book')}
+          >
+            <Trans>Book</Trans>
+          </PaneTab>
+        </PaneTabList>
         <span className="flex-1" />
-        {/* The count belongs to whichever pane is open, in the quietest type on the row —
-            and it is the part that leaves when the track is too narrow for it and the
-            explorer arrow both, since the arrow is the only way out of this pane. */}
-        <span className={cn('flex items-center', PANE_COUNT, '@max-[13rem]:hidden')}>
+        {/* The count belongs to whichever pane is open: a fact of the strip, in the quietest
+            type on the row — and it is the part that leaves when the track is too narrow for
+            it and the explorer arrow both, since the arrow is the only way out of this pane. */}
+        <span className={cn('flex items-center font-mono', STRIP_FACTS, '@max-[13rem]:hidden')}>
           {active === 'book' ? (
             <Plural value={games} one="# game" other="# games" />
           ) : (
@@ -185,6 +182,9 @@ export function NotesTrack({
           with two tabs and a count already on it — and the explorer it opens carries the way
           back to this game, so following it is not leaving the game behind.
         */}
+        {active === 'book' && onOpenInExplorer ? (
+          <span aria-hidden className={cn(STRIP_RULE, 'ml-2 self-center')} />
+        ) : null}
         {active === 'book' && onOpenInExplorer ? (
           <button
             type="button"

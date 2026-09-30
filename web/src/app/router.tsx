@@ -1,8 +1,9 @@
 import { Trans, useLingui } from '@lingui/react/macro'
 import type { ReactNode } from 'react'
-import { createBrowserRouter, Link, Navigate } from 'react-router-dom'
+import { createBrowserRouter, Navigate } from 'react-router-dom'
 
 import { AppShell } from '@/components/shell/AppShell'
+import { TextLink } from '@/components/ui/text-link'
 import { SetPageChrome } from '@/components/shell/PageChrome'
 import { PageBody } from '@/components/shell/PageHeader'
 import { SETTING_DEFAULTS } from '@/lib/api/appSettings'
@@ -41,9 +42,9 @@ function NotFound() {
       <p className="text-data text-body">
         <Trans>That route does not exist.</Trans>
       </p>
-      <Link to="/" className="text-data">
+      <TextLink to="/" className="text-data">
         <Trans>Back to the dashboard</Trans>
-      </Link>
+      </TextLink>
     </PageBody>
   )
 }

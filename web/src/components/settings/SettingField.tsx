@@ -59,7 +59,11 @@ export function SettingField({
   )
 }
 
-/** Revert only while there is something to revert, so a settled form is one button wide. */
+/**
+ * Revert only while there is something to revert, so a settled form is one button wide.
+ * Revert is a secondary face and Save the form's one primary, last; with nothing changed
+ * Save keeps the one disabled look and says so in its title.
+ */
 export function SaveRow({
   dirty,
   pending,
@@ -69,14 +73,20 @@ export function SaveRow({
   pending: boolean
   onRevert: () => void
 }) {
+  const { t } = useLingui()
   return (
     <div className="flex items-center justify-end gap-2">
       {dirty ? (
-        <Button type="button" variant="outline" size="sm" disabled={pending} onClick={onRevert}>
+        <Button type="button" variant="secondary" size="sm" disabled={pending} onClick={onRevert}>
           <RotateCcw aria-hidden /> <Trans>Revert</Trans>
         </Button>
       ) : null}
-      <Button type="submit" size="sm" disabled={!dirty || pending}>
+      <Button
+        type="submit"
+        size="sm"
+        disabled={!dirty || pending}
+        title={!dirty ? t`Nothing has changed` : undefined}
+      >
         {pending ? <Loader2 className="animate-spin" aria-hidden /> : <Save aria-hidden />}
         <Trans>Save</Trans>
       </Button>

@@ -32,17 +32,13 @@
 import type { MessageDescriptor } from '@lingui/core'
 import { msg } from '@lingui/core/macro'
 import { Trans, useLingui } from '@lingui/react/macro'
-import { Settings2, X } from 'lucide-react'
+import { ChevronDown, Settings2, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 
-import {
-  LinePreviewFields,
-  Range,
-  SettingsCheck,
-  SETTINGS_SELECT,
-} from '@/components/analysis/LinePreviewSettings'
+import { LinePreviewFields, Range, SettingsCheck } from '@/components/analysis/LinePreviewSettings'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
+import { NativeSelect } from '@/components/ui/native-select'
 import { setBoardArrowPrefs, useBoardArrowPrefs } from '@/lib/board/arrowPrefs'
 import { playMoveSound } from '@/lib/board/moveSound'
 import {
@@ -112,14 +108,29 @@ const GRAPH_MARKS: { value: EvalGraphMarks; label: MessageDescriptor }[] = [
  */
 export const BOARD_SETTINGS_ID = 'board-settings-button'
 
+/**
+ * The gear that opens the panel. A ghost in the board's header strip (with `chevron`), a
+ * secondary square in a control row: the caller picks which (`variant`, `size`), since the
+ * two rows are drawn to different heights.
+ *
+ * With `chevron` it ends in a ⌄ and stands after a rule, last among the board's tools: it
+ * opens something, where Flip, Hints and Type a move act on the board, so it must not share
+ * their silhouette (the clarity pass).
+ */
 export function BoardSettingsButton({
   className,
   // The gear's own size, for a caller that draws this button beside others and needs the
   // four icons to match (`BoardPanel`'s board toggles).
   iconClassName,
+  variant = 'secondary',
+  size = 'icon-sm',
+  chevron = false,
 }: {
   className?: string
   iconClassName?: string
+  variant?: 'secondary' | 'ghost'
+  size?: 'icon-sm' | 'icon-xs' | 'xs'
+  chevron?: boolean
 }) {
   const { t, i18n } = useLingui()
   const [open, setOpen] = useState(false)
@@ -171,20 +182,21 @@ export function BoardSettingsButton({
 
   return (
     <>
-      <button
-        type="button"
+      <Button
+        variant={variant}
+        size={size}
         id={BOARD_SETTINGS_ID}
         data-tour="board-settings"
         aria-label={t`Board settings`}
+        aria-haspopup="dialog"
+        aria-expanded={open}
         title={t`Board settings — notation, arrows, sound, the eval graph and line preview (S)`}
         onClick={() => setOpen(true)}
-        className={cn(
-          'flex-none rounded-md border border-edge bg-elevated px-2 py-[0.3125rem] text-dim transition-colors hover:text-ink max-md:py-1.5',
-          className,
-        )}
+        className={cn('flex-none', chevron && 'w-auto gap-0.5 px-1', className)}
       >
         <Settings2 className={cn('size-3.5', iconClassName)} aria-hidden />
-      </button>
+        {chevron ? <ChevronDown className="size-3 flex-none text-dim" aria-hidden /> : null}
+      </Button>
 
       {open ? (
         <div
@@ -230,20 +242,20 @@ export function BoardSettingsButton({
               </div>
               <div className="flex flex-col gap-1.5">
                 <Label htmlFor="notation-style">{t`Pieces`}</Label>
-                <select
+                <NativeSelect
                   id="notation-style"
                   value={notationValue}
                   onChange={(event) =>
                     setNotationPrefs({ style: event.target.value as NotationStyle })
                   }
-                  className={cn(SETTINGS_SELECT, 'w-56')}
+                  className="h-8 w-56"
                 >
                   {notationRows.map((row) => (
                     <option key={row.value} value={row.value}>
                       {i18n._(row.label)}
                     </option>
                   ))}
-                </select>
+                </NativeSelect>
               </div>
             </section>
 
@@ -260,10 +272,10 @@ export function BoardSettingsButton({
                   across in a glance, rather than three stacked paragraphs. */}
               <div className="flex flex-wrap gap-x-5 gap-y-2">
                 {ARROWS.map((arrow) => (
-                  <div key={arrow.key} className="flex items-baseline gap-2">
+                  <div key={arrow.key} className="flex items-center gap-2">
                     <span
                       aria-hidden
-                      className="size-2 flex-none translate-y-px rounded-full"
+                      className="size-2 flex-none rounded-full"
                       style={{ background: arrow.swatch }}
                     />
                     <SettingsCheck
@@ -330,37 +342,37 @@ export function BoardSettingsButton({
               <div className="flex flex-wrap gap-4">
                 <div className="flex flex-col gap-1.5">
                   <Label htmlFor="eval-graph-style">{t`Shape`}</Label>
-                  <select
+                  <NativeSelect
                     id="eval-graph-style"
                     value={graph.style}
                     onChange={(event) =>
                       setEvalGraphPrefs({ style: event.target.value as EvalGraphStyle })
                     }
-                    className={cn(SETTINGS_SELECT, 'w-48')}
+                    className="h-8 w-48"
                   >
                     {GRAPH_STYLES.map((style) => (
                       <option key={style.value} value={style.value}>
                         {i18n._(style.label)}
                       </option>
                     ))}
-                  </select>
+                  </NativeSelect>
                 </div>
                 <div className="flex flex-col gap-1.5">
                   <Label htmlFor="eval-graph-marks">{t`Marks`}</Label>
-                  <select
+                  <NativeSelect
                     id="eval-graph-marks"
                     value={graph.marks}
                     onChange={(event) =>
                       setEvalGraphPrefs({ marks: event.target.value as EvalGraphMarks })
                     }
-                    className={cn(SETTINGS_SELECT, 'w-36')}
+                    className="h-8 w-36"
                   >
                     {GRAPH_MARKS.map((mark) => (
                       <option key={mark.value} value={mark.value}>
                         {i18n._(mark.label)}
                       </option>
                     ))}
-                  </select>
+                  </NativeSelect>
                 </div>
               </div>
             </section>

@@ -9,15 +9,17 @@ your games, not generalities.
 
 ## Mint a key
 
-Under **Bearer keys**, give a key a name and mint it. The secret is shown once, so copy it
-before pressing **Done**. Mint one per client, and **Revoke** takes a single one back.
+Under **Bearer keys**, give a key a name and press **Create**. The secret is shown once, so
+copy it with **Copy key** before pressing **Done**. Mint one per client. **Revoke…** on a
+key asks first, and **Revoke** in its place takes that one key back.
 Your browser password is not accepted for MCP.
 
 ## Connect a client
 
 The page prints ready-made snippets carrying the key you just minted: a one-line command
-for Claude Code, two lines for Codex, and JSON for any other client. Copy the one you
-need.
+for Claude Code, two lines for Codex, and JSON for any other client. The **Copy** button
+beside each (**Copy command**, **Copy commands**, **Copy config**) copies exactly that
+block.
 
 ## What can the assistant do? { #what-can-the-coach-do }
 

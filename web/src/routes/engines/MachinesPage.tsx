@@ -14,6 +14,9 @@
  * calling the first two "local" would be false when the deployment itself is remote. The
  * server card is always open; the others keep their disclosure, sharing one `openDetail`
  * slot with the two forms so the page never regresses into a wall of expanded cards.
+ *
+ * The bar names the page `Compute › Machines` and carries its one primary, Remote runner,
+ * last, with the explainer's ⓘ before it as an icon face.
  */
 import { Trans, useLingui } from '@lingui/react/macro'
 import { Info, Plus } from 'lucide-react'
@@ -65,7 +68,7 @@ export function MachinesPage() {
               <Button
                 type="button"
                 size="icon-sm"
-                variant="outline"
+                variant="secondary"
                 aria-label={t`How remote runners work`}
                 title={t`How remote runners work`}
                 aria-expanded={openDetail === 'remote-info'}
@@ -103,7 +106,7 @@ export function MachinesPage() {
             </p>
             <Button
               type="button"
-              variant="outline"
+              variant="secondary"
               size="sm"
               className="mt-3"
               onClick={() => void status.refetch()}
