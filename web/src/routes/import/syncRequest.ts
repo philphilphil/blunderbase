@@ -3,6 +3,20 @@ import type { ImportJob } from '@/lib/api/types'
 import type { SyncOptions } from './SourcesPanel'
 
 /**
+ * The sources a sync can be started for — `pgn` is an upload and `manual` is by hand. One
+ * list for both Sync alls (the Import page's head and the dashboard's), so they cannot
+ * disagree about which sources there are or what each is called.
+ */
+export const SYNCABLE = ['lichess', 'chesscom', 'fics'] as const
+export type Syncable = (typeof SYNCABLE)[number]
+
+export const PLATFORM_LABEL: Record<Syncable, string> = {
+  lichess: 'Lichess',
+  chesscom: 'Chess.com',
+  fics: 'FICS',
+}
+
+/**
  * The username a previous sync used, if that sync got far enough to record one.
  *
  * `ImportJob.message` carries the username the account adapter was given, but a failed

@@ -374,10 +374,12 @@ describe('GamesTable queue state', () => {
     expect(screen.queryByRole('button', { name: 'Analyse' })).not.toBeInTheDocument()
   })
 
-  it('says so for a game queued from this page before its card knows', () => {
-    setup({ games: [fresh], queued: new Set([12]) })
-    expect(screen.getAllByText('In queue')).toHaveLength(2)
-    expect(screen.queryByRole('button', { name: 'Analyse' })).not.toBeInTheDocument()
+  // The card is the one answer: once a refetch says a run was cancelled or cleared, the row
+  // offers Analyse again rather than holding on to "In queue".
+  it('offers Analyse whenever the card says the game is not queued', () => {
+    setup({ games: [{ ...fresh, queued: false } as GameCard] })
+    expect(screen.queryByText('In queue')).not.toBeInTheDocument()
+    expect(screen.getAllByRole('button', { name: 'Analyse' }).length).toBeGreaterThan(0)
   })
 })
 

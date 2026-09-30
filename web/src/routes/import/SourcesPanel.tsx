@@ -38,11 +38,9 @@ import { AccountCard } from './AccountCard'
 import { accountFor } from './accountFor'
 import { AutoSyncControl } from './AutoSyncControl'
 import { SyncCheckbox } from './SyncCheckbox'
-import { syncBody, usernameOf } from './syncRequest'
+import { PLATFORM_LABEL, SYNCABLE, syncBody, usernameOf, type Syncable } from './syncRequest'
 import type { ImportProgressState } from './useImportProgress'
 
-const ACCOUNTS = ['lichess', 'chesscom', 'fics'] as const
-type AccountSource = (typeof ACCOUNTS)[number]
 
 /** What the strip above the grid says the next import should be told. */
 export interface SyncOptions {
@@ -70,7 +68,7 @@ export function SourcesPanel({
   const [fromTheBeginning, setFromTheBeginning] = useState(false)
   const running = Object.values(progress).some((source) => source?.running)
   const options: SyncOptions = { since, maxGames, skipEvaluation, fromTheBeginning }
-  const accountOf = (source: AccountSource) => accountFor(accounts, source, latestOf(source))
+  const accountOf = (source: Syncable) => accountFor(accounts, source, latestOf(source))
 
   return (
     <section
@@ -137,7 +135,7 @@ export function SourcesPanel({
           />
         </div>
         <SyncAll
-          targets={ACCOUNTS.flatMap((source) => {
+          targets={SYNCABLE.flatMap((source) => {
             const username = accountOf(source)?.username ?? usernameOf(latestOf(source))
             return username ? [{ source, username }] : []
           })}
@@ -149,7 +147,7 @@ export function SourcesPanel({
       {/* `items-start` so a box that grows a progress block while it syncs takes the room
           it needs instead of stretching the ones beside it to match. */}
       <div className="grid items-start gap-2.5 p-3.5 md:grid-cols-2 xl:grid-cols-3">
-        {ACCOUNTS.map((source) => (
+        {SYNCABLE.map((source) => (
           <AccountCard
             key={source}
             source={source}
@@ -168,11 +166,6 @@ export function SourcesPanel({
   )
 }
 
-const PLATFORM: Record<AccountSource, string> = {
-  lichess: 'Lichess',
-  chesscom: 'Chess.com',
-  fics: 'FICS',
-}
 
 /**
  * Sync all: every connected account that is included in sync, told what the head says.
@@ -188,7 +181,7 @@ function SyncAll({
   options,
   progress,
 }: {
-  targets: { source: AccountSource; username: string }[]
+  targets: { source: Syncable; username: string }[]
   options: SyncOptions
   progress: ImportProgressState
 }) {
@@ -228,7 +221,7 @@ function SyncAll({
         ? t`Every account is left out of sync`
         : syncing
           ? t`A sync is running`
-          : included.map((target) => `${PLATFORM[target.source]}: ${target.username}`).join(' · ')
+          : included.map((target) => `${PLATFORM_LABEL[target.source]}: ${target.username}`).join(' · ')
 
   return (
     <div className="flex items-center gap-2">

@@ -23,7 +23,7 @@
 import { Trans, useLingui } from '@lingui/react/macro'
 import { RotateCw } from 'lucide-react'
 import type * as React from 'react'
-import { useEffect, useRef } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
 
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
@@ -61,8 +61,6 @@ export interface GamesTableProps {
   onOpen: (id: number) => void
   onAnalyse: (id: number) => void
   analysing: Set<number>
-  /** Games queued from this page since the cards were fetched, whose cards do not say so yet. */
-  queued?: ReadonlySet<number>
   onDelete: (id: number) => void
   status: 'pending' | 'error' | 'success'
   error: Error | null
@@ -85,7 +83,6 @@ export function GamesTable({
   onOpen,
   onAnalyse,
   analysing,
-  queued,
   onDelete,
   status,
   error,
@@ -100,8 +97,18 @@ export function GamesTable({
   // and the skeleton are laid out from the same answer.
   const engineHidden = useEngineHidden()
   // No collections, no Collections column: an empty 160px strip down every row says nothing.
-  const collectionsColumn = (useCollections().data?.collections?.length ?? 0) > 0
-  const columns = columnsFor(engineHidden, collectionsColumn)
+  const collections = useCollections().data?.collections
+  const collectionsColumn = (collections?.length ?? 0) > 0
+  const columns = useMemo(
+    () => columnsFor(engineHidden, collectionsColumn),
+    [engineHidden, collectionsColumn],
+  )
+  // Every row's Collections cell reads its names from here, so a page of rows is one walk
+  // of the list and one subscription to it rather than one per row in a collection.
+  const collectionNames = useMemo(
+    () => new Map((collections ?? []).map((collection) => [collection.id, collection.name])),
+    [collections],
+  )
   const body = useRef<HTMLDivElement>(null)
   // Whether columns are still off to the right: the table scrolls sideways where they do
   // not fit, rather than cutting Source mid-word and leaving Analysis and Flags (with the
@@ -288,9 +295,10 @@ export function GamesTable({
               onAnalyse={onAnalyse}
               onDelete={onDelete}
               analysing={analysing.has(game.id)}
-              queued={game.queued === true || queued?.has(game.id) === true}
+              queued={game.queued === true}
               engineHidden={engineHidden}
-              collectionsColumn={collectionsColumn}
+              columns={columns}
+              collectionNames={collectionNames}
             />
           ))
         )}

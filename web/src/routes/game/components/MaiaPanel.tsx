@@ -12,6 +12,7 @@ import {
 import { LinePreviewRowChip } from '@/components/analysis/LinePreviewSettings'
 import { MiniBoard } from '@/components/board/MiniBoard'
 import { Readout } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
 import { PickerSelect, type PickerSelectOption } from '@/components/ui/native-select'
 import { liveLineId, type StreamSessionApi } from '@/lib/analysis'
 import type { GameRunSummary } from '@/lib/api/types'
@@ -36,7 +37,7 @@ import {
   type MaiaMove,
 } from '../gameModel'
 import { usePlyLabel, usePlyNumbering, usePlyOffset } from '../plyNumbering'
-import { PANE_TOOL, STRIP_RULE } from './paneTabs'
+import { STRIP_RULE } from './paneTabs'
 import { PaneTab, PaneTabList } from './PaneTabList'
 
 /** The human column's own colour — the purple `docs/design/README.md` gives Maia. */
@@ -675,17 +676,18 @@ function EnginePaneTabs({
         between the tabs and the facts.
       */}
       {enabled ? (
-        <button
-          type="button"
+        <Button
+          variant="ghost"
+          size="icon-xs"
           // Named in full: the practice bar has a Stop of its own on the same screen.
           aria-label={t`Stop live analysis`}
           title={t`Stop live analysis (E)`}
           data-testid="engine-pane-live-stop"
           onClick={() => search.stream.setEnabled(false)}
-          className={cn(PANE_TOOL, 'ml-0.5 self-center hover:text-blunder')}
+          className="ml-0.5 self-center hover:text-blunder"
         >
           <Square className="size-3" fill="currentColor" strokeWidth={0} aria-hidden />
-        </button>
+        </Button>
       ) : null}
     </>
   )

@@ -84,9 +84,6 @@ import { useGameLibrary } from './useGameLibrary'
  */
 const SEARCH_ID = 'games-search'
 
-/** No game queued from this page since the cards were last fetched. */
-const NONE_QUEUED: ReadonlySet<number> = new Set()
-
 export function GamesPage() {
   const { t } = useLingui()
   const navigate = useNavigate()
@@ -276,16 +273,10 @@ export function GamesPage() {
     })
   }, [rows])
 
-  // The games this page queued, until the next page of cards arrives. The table is not
-  // refetched on `analysis.queued` (`lib/events/invalidation`), so without this a row would
-  // go back to offering Analyse until its run finished. Tied to the `rows` it was set
-  // against: the next fetch, whose cards say `queued` themselves, replaces it on its own.
-  const [queuedHere, setQueuedHere] = useState<{ rows: unknown; ids: ReadonlySet<number> }>({
-    rows: null,
-    ids: new Set(),
-  })
-  const queuedIds = queuedHere.rows === rows ? queuedHere.ids : NONE_QUEUED
-
+  // A row's "In queue" is its card's `queued` and nothing kept here: the batch call refreshes
+  // the table before it answers (`useRequestAnalysisBatch`), and a run cancelled or cleared
+  // refreshes it from the socket, so the card is the one answer and cannot go stale apart
+  // from what the server says.
   const queueAnalysis = useCallback(
     async (ids: number[]) => {
       if (ids.length === 0) return
@@ -304,13 +295,6 @@ export function GamesPage() {
         const receipt = await analysis.mutateAsync({ game_ids: ids })
         queued = receipt.queued.length
         refused = receipt.refused.length
-        setQueuedHere((current) => ({
-          rows,
-          ids: new Set([
-            ...(current.rows === rows ? current.ids : []),
-            ...receipt.queued.map((run) => run.game_id),
-          ]),
-        }))
       } catch (error) {
         // A call that never landed refused the selection whole, and the backend always
         // says why — a selection over the batch cap, an analysis role with no engine behind it.
@@ -332,7 +316,7 @@ export function GamesPage() {
             : t`${queued} queued, ${refused} refused`,
       )
     },
-    [analysis, rows, t],
+    [analysis, t],
   )
 
   // Deleting goes through the dialog, which is what `doomed` is: the ids it is open over.
@@ -471,7 +455,6 @@ export function GamesPage() {
         onOpen={open}
         onAnalyse={(id) => void queueAnalysis([id])}
         analysing={analysing}
-        queued={queuedIds}
         onDelete={(id) => setDoomed([id])}
         status={library.status}
         error={library.error}

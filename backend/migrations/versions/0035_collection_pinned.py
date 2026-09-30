@@ -1,9 +1,8 @@
 """collections say whether the rail shows them
 
 `collections.pinned` is the owner's own choice of which collections sit under Collections in
-the rail. Until now the rail pinned the first two by name, so the upgrade pins exactly those
-(the first one only would be as right while correspondence mode is on, but the owner's
-screen is not known here, and two is what most of them saw) and the rail looks as it did.
+the rail. Before this the rail showed no collection at all, so every existing one comes in
+unpinned and the rail looks as it did until the owner pins one.
 
 Adding a column is a plain `ALTER TABLE` in SQLite, so the table is not rebuilt; the
 `sqlite_autoincrement` 0034 put on it is passed along anyway, in case a later Alembic
@@ -33,10 +32,6 @@ def upgrade() -> None:
         batch_op.add_column(
             sa.Column("pinned", sa.Boolean(), nullable=False, server_default=sa.false())
         )
-    op.execute(
-        "UPDATE collections SET pinned = 1 WHERE id IN "
-        "(SELECT id FROM collections ORDER BY lower(name), id LIMIT 2)"
-    )
 
 
 def downgrade() -> None:

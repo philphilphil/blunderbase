@@ -12,7 +12,15 @@ import {
   Settings,
   Users,
 } from 'lucide-react'
-import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from 'react'
+import {
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+  type FocusEvent,
+  type KeyboardEvent as ReactKeyboardEvent,
+} from 'react'
 import { createPortal } from 'react-dom'
 import { Link } from 'react-router-dom'
 
@@ -57,6 +65,13 @@ function Github({ className }: { className?: string }) {
 
 const ITEM =
   'flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-label text-soft transition-colors hover:bg-raised hover:text-ink focus-visible:outline-offset-[-0.125rem]'
+
+/** The menu's commands, which the arrow keys walk. */
+const MENU_ITEM = '[role="menuitem"]:not([disabled])'
+
+/** What opening the menu puts the focus on: the first control in it. */
+const FOCUSABLE =
+  'button:not([disabled]):not([tabindex="-1"]), a[href], [tabindex]:not([tabindex="-1"])'
 
 /** A setting row: its name on the left, the `Segmented` that sets it on the right. */
 const FIELD = 'flex items-center gap-2 py-1 pr-1 pl-2 text-label text-soft'
@@ -114,6 +129,13 @@ export function SettingsMenu({ variant = 'row' }: { variant?: 'row' | 'icon' }) 
     if (open) setPlace(placeAbove(trigger.current))
   }, [open])
 
+  // Portalled to the end of the page, the menu is not next in the tab order after its
+  // trigger, so opening it moves the focus in (onto the first control, Appearance) and
+  // Escape hands it back, as `ActionMenu` does for a menu that hangs off its trigger.
+  useEffect(() => {
+    if (open) menu.current?.querySelector<HTMLElement>(FOCUSABLE)?.focus()
+  }, [open])
+
   useEffect(() => {
     if (!open) return
     const onPointerDown = (event: MouseEvent) => {
@@ -122,7 +144,10 @@ export function SettingsMenu({ variant = 'row' }: { variant?: 'row' | 'icon' }) 
       setOpen(false)
     }
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setOpen(false)
+      if (event.key !== 'Escape') return
+      event.stopPropagation()
+      setOpen(false)
+      trigger.current?.focus()
     }
     const onResize = () => setOpen(false)
     document.addEventListener('mousedown', onPointerDown)
@@ -136,6 +161,25 @@ export function SettingsMenu({ variant = 'row' }: { variant?: 'row' | 'icon' }) 
   }, [open])
 
   const close = () => setOpen(false)
+
+  // The arrows walk the menu's items, as a `role=menu` promises; Tab walks every control in
+  // it, the settings' segments included, and leaving it by Tab closes it rather than
+  // leaving it open over the page behind the focus.
+  const onMenuKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
+    if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return
+    const items = Array.from(menu.current?.querySelectorAll<HTMLElement>(MENU_ITEM) ?? [])
+    if (items.length === 0) return
+    const at = items.indexOf(document.activeElement as HTMLElement)
+    const step = event.key === 'ArrowDown' ? 1 : -1
+    const next = at === -1 ? (step === 1 ? 0 : items.length - 1) : at + step
+    event.preventDefault()
+    items[(next + items.length) % items.length]?.focus()
+  }
+  const onMenuBlur = (event: FocusEvent<HTMLDivElement>) => {
+    const to = event.relatedTarget as Node | null
+    if (!to || menu.current?.contains(to) || trigger.current?.contains(to)) return
+    setOpen(false)
+  }
 
   return (
     <>
@@ -177,6 +221,8 @@ export function SettingsMenu({ variant = 'row' }: { variant?: 'row' | 'icon' }) 
               ref={menu}
               role="menu"
               aria-label={label}
+              onKeyDown={onMenuKeyDown}
+              onBlur={onMenuBlur}
               style={place}
               className="bb-card fixed z-[60] flex w-[20rem] max-w-[calc(100vw-1rem)] flex-col gap-0.5 p-1 shadow-[0_0.75rem_2rem_var(--bb-shadow)]"
             >

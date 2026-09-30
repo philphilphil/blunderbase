@@ -1449,6 +1449,14 @@ export function GameStudio({ game: from }: { game: StudioGame }) {
     setWasExploring(exploring)
     if (exploring && stream.enabled) setEnginePaneTab('live')
   }
+  // The search stopping by a way that is not `setLiveSearch` — ⇧E, the session ending or
+  // failing — lands back on Run the same way: the Live tab it left is an empty box. Only the
+  // stop, so a Live tab the reader chose while no search could start keeps saying why.
+  const [wasStreaming, setWasStreaming] = useState(stream.enabled)
+  if (stream.enabled !== wasStreaming) {
+    setWasStreaming(stream.enabled)
+    if (!stream.enabled) setEnginePaneTab('run')
+  }
   const search = useMemo(
     () => ({
       stream: { ...stream, setEnabled: setLiveSearch },

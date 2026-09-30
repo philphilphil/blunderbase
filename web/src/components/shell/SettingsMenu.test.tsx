@@ -107,6 +107,25 @@ describe('SettingsMenu', () => {
     expect(screen.getByRole('menu')).not.toHaveTextContent('kn1ghtmare')
   })
 
+  // Portalled to the end of the page, the menu is not next in the tab order after its
+  // trigger, so the focus has to be taken in and handed back.
+  it('takes the focus in when it opens, walks it with the arrows and hands it back on Escape', async () => {
+    draw()
+    const trigger = await screen.findByRole('button', { name: 'Settings' })
+    await openMenu()
+    const menu = screen.getByRole('menu')
+    expect(menu).toContainElement(document.activeElement as HTMLElement)
+
+    await userEvent.keyboard('{ArrowDown}')
+    expect(document.activeElement).toBe(
+      screen.getByRole('menuitem', { name: /Keyboard shortcuts/ }),
+    )
+
+    await userEvent.keyboard('{Escape}')
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument()
+    expect(document.activeElement).toBe(trigger)
+  })
+
   it('opens the manual at the chapter the page names', async () => {
     draw({ manual: 'guide/games' })
     await openMenu()

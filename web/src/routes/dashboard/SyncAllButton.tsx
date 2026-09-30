@@ -23,17 +23,8 @@ import { Link } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { useSyncSchedule, useImportJobs, useStartImport } from '@/lib/api/queries'
 import type { ImportJob, Source } from '@/lib/api/types'
+import { PLATFORM_LABEL, SYNCABLE, type Syncable } from '@/routes/import/syncRequest'
 import { useImportProgress } from '@/routes/import/useImportProgress'
-
-/** The sources a sync can be started for — `pgn` is an upload and `manual` is by hand. */
-const SYNCABLE = ['lichess', 'chesscom', 'fics'] as const
-type Syncable = (typeof SYNCABLE)[number]
-
-const PLATFORM_LABEL: Record<Syncable, string> = {
-  lichess: 'Lichess',
-  chesscom: 'Chess.com',
-  fics: 'FICS',
-}
 
 /** Enough history to find the last good sync of each source without paging. */
 const JOB_LIMIT = 25

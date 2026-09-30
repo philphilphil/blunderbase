@@ -62,11 +62,18 @@ const GAMES = [11, 12, 13].map(
 let receipt: BatchAnalysisResponse
 
 function stubFetch() {
+  // What the server has queued so far: the library's cards say `queued` for these, the way
+  // the real `/games` does once a batch has committed.
+  const queued = new Set<number>()
   const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
     const path = String(input).split('?')[0]!
-    if (path.endsWith('/api/analysis/batch')) return json(202, receipt)
+    if (path.endsWith('/api/analysis/batch')) {
+      for (const run of receipt.queued) queued.add(run.game_id)
+      return json(202, receipt)
+    }
     if (path.endsWith('/api/games')) {
-      return json(200, { games: GAMES, total: GAMES.length, limit: 50, offset: 0 })
+      const games = GAMES.map((game) => (queued.has(game.id) ? { ...game, queued: true } : game))
+      return json(200, { games, total: GAMES.length, limit: 50, offset: 0 })
     }
     return json(404, { error: 'not_found', detail: path })
   })

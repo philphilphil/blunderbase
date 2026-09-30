@@ -36,7 +36,6 @@ import { RunBadge } from '@/components/badges/RunBadge'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { ROW, ROW_SELECTED } from '@/components/ui/row'
-import { useCollections } from '@/lib/api/queries'
 import type { GameCard } from '@/lib/api/types'
 import { cn } from '@/lib/utils'
 
@@ -52,7 +51,7 @@ import {
   outcomeTone,
   worstDrop,
 } from '../format'
-import { cellClass, cellStyle, columnsFor, PHONE_CARD, ROW_HEIGHT, type Column } from './columns'
+import { cellClass, cellStyle, PHONE_CARD, ROW_HEIGHT, type Column } from './columns'
 
 /**
  * The `style` and `className` one cell carries: its width, its place, and its own look.
@@ -69,14 +68,21 @@ function cellOf(columns: readonly Column[], id: string, className?: string) {
  * A game's collections as plain names, comma-separated, in the collections list's order.
  * Text rather than chips: most of a table's rows are in one or two collections, and a
  * row of tinted chips at the end of every line competed with the flags for the eye. The
- * full list is in the title, for a cell too narrow to show it.
+ * full list is in the title, for a cell too narrow to show it. The names come from the
+ * table (`GamesTable`), which reads the collections list once for every row.
  */
-function CollectionNames({ ids, className }: { ids: readonly number[]; className?: string }) {
-  const { data } = useCollections()
-  const wanted = new Set(ids)
-  const names = (data?.collections ?? [])
-    .filter((collection) => wanted.has(collection.id))
-    .map((collection) => collection.name)
+function CollectionNames({
+  ids,
+  names: byId,
+  className,
+}: {
+  ids: readonly number[]
+  names: ReadonlyMap<number, string>
+  className?: string
+}) {
+  const names = [...byId.entries()]
+    .filter(([id]) => ids.includes(id))
+    .map(([, name]) => name)
     .join(', ')
   if (!names) return null
   return (
@@ -105,8 +111,10 @@ export interface GameRowProps {
    * "analyse" affordance where none has, and the delete button at the end of the row.
    */
   engineHidden?: boolean
-  /** Whether the table has its Collections column (it drops it while there are none). */
-  collectionsColumn?: boolean
+  /** The table's columns (`columnsFor`), worked out once by the table for every row. */
+  columns: readonly Column[]
+  /** Every collection's name by id, in the collections list's order, for the Collections cell. */
+  collectionNames: ReadonlyMap<number, string>
 }
 
 export const GameRow = memo(function GameRow({
@@ -119,10 +127,10 @@ export const GameRow = memo(function GameRow({
   analysing,
   queued = false,
   engineHidden = false,
-  collectionsColumn = true,
+  columns,
+  collectionNames,
 }: GameRowProps) {
   const { t } = useLingui()
-  const columns = columnsFor(engineHidden, collectionsColumn)
   const cell = (id: string, className?: string) => cellOf(columns, id, className)
   const has = (id: string) => columns.some((column) => column.id === id)
   // The row's delete sits at its end, in whichever cell that is (`columnsFor`).
@@ -135,7 +143,7 @@ export const GameRow = memo(function GameRow({
   // imported with it held back (`engine_hidden`, cleared on the game itself). The second
   // keeps the column and marks the cell instead, so the row says *why* it is quiet.
   const quiet = engineHidden || game.engine_hidden === true
-  // Most rows are in no collection; those never subscribe to the collections list at all.
+  // Most rows are in no collection; those never render the phone's chips at all.
   const inCollections = (game.collections?.length ?? 0) > 0
   // The owner's side, or null: a game added from the reference books has none, and a
   // game of theirs whose side is not yet known has none either. Their name is set bold
@@ -345,10 +353,16 @@ export const GameRow = memo(function GameRow({
       ) : null}
 
       {has('collections') ? (
-        <span {...cell('collections', 'flex items-center gap-2 text-soft')}>
+        // Contained inline: the table's body is as wide as its widest row's content (it
+        // scrolls sideways past that, `GamesTable`), and without this a game in five
+        // long-named collections would widen every row by the full list instead of
+        // truncating it. The cell's floor (`cellClass`) is what it adds to that width.
+        <span {...cell('collections', 'flex items-center gap-2 text-soft md:[contain:inline-size]')}>
           {/* The desktop copy. The phone card has no column for it, so there the chips ride
               on the date's line, which spans most of the card. */}
-          {inCollections ? <CollectionNames ids={game.collections ?? []} /> : null}
+          {inCollections ? (
+            <CollectionNames ids={game.collections ?? []} names={collectionNames} />
+          ) : null}
           {last === 'collections' ? remove : null}
         </span>
       ) : null}

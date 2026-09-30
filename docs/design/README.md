@@ -27,7 +27,7 @@ directory are local snapshots pulled 2026-08-25.
   The four taste decisions were all taken as **A**: a pane tab is a **folder tab** (the
   pane's surface pushed into the strip with a 2px accent top edge, D1-A); a chosen segment
   is a **neutral raised thumb** in a sunken track (D2-A); **the rail carries the app and
-  the bar carries the page** (D3-A); and **up to two collections are pinned in the rail**
+  the bar carries the page** (D3-A); and **the collections the owner pins sit in the rail**
   under Collections (D4-A). The spec with every contrast figure is the prototype's
   `clarity.css`; the controls are described under "Controls" below.
 
@@ -173,9 +173,10 @@ directory are local snapshots pulled 2026-08-25.
     plus `More` overflowed the 900px rail on Games; `shell/fit.mjs` in the clarity shots
     measured it). Row titles carry the page's shortcut
     ("Games ⌘2"), as the palette's page rows do.
-  - **Pinned collections** (clarity D4-A). The first two collections, in the Collections
-    page's order, always sit under the Collections row (one while correspondence mode is
-    on, none when there are none), at the fold's indent without its rule, each marked by
+  - **Pinned collections** (clarity D4-A). The collections the owner pinned ("Show in the
+    rail" in the collection's dialog; none after the upgrade that added it), in the
+    Collections page's order, always sit under the Collections row, at the fold's indent
+    without its rule, each marked by
     its square swatch where a saved filter has a round dot. A row opens
     `/games?collection=<id>&whose=all`; while Games shows exactly that, the row is the lit
     leaf, Collections its parent, Games unlit, and the title reads `Collections › <name>`.

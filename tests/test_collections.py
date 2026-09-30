@@ -991,7 +991,7 @@ def test_a_rule_set_before_the_stamp_existed_is_dated_by_its_collection(
     assert stamped[0] == stamped[1]
 
 
-def test_the_rail_keeps_the_two_collections_it_showed_before_pinning_existed(
+def test_the_upgrade_pins_no_collection_the_rail_never_showed(
     settings: Settings,
 ) -> None:
     upgrade_to_head(settings)
@@ -1011,7 +1011,7 @@ def test_the_rail_keeps_the_two_collections_it_showed_before_pinning_existed(
         pinned = connection.exec_driver_sql(
             "SELECT name FROM collections WHERE pinned ORDER BY name"
         ).scalars()
-        assert list(pinned) == ["Archive", "club"]
+        assert list(pinned) == []
 
 
 # --- the HTTP surface ----------------------------------------------------------------------

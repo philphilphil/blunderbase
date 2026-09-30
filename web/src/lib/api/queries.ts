@@ -724,7 +724,14 @@ export function useCancelRun(
   })
 }
 
-/** A selection's worth of games, queued in one call. Partly refused is still a success. */
+/**
+ * A selection's worth of games, queued in one call. Partly refused is still a success.
+ *
+ * The games table is refreshed here, once, and awaited before the call counts as answered:
+ * the socket's per-run `analysis.queued` frames leave the table alone on purpose
+ * (`lib/events/invalidation`), and a row reads "In queue" from its card. Awaiting it is what
+ * keeps the row from showing Analyse again between the answer and the refetch.
+ */
 export function useRequestAnalysisBatch(
   options?: UseMutationOptions<
     Awaited<ReturnType<typeof api.requestAnalysisBatch>>,
@@ -736,9 +743,12 @@ export function useRequestAnalysisBatch(
   return useMutation({
     mutationFn: (body: BatchAnalysisRequest) => api.requestAnalysisBatch(body),
     ...options,
-    onSuccess: (...args) => {
+    onSuccess: async (...args) => {
       void client.invalidateQueries({ queryKey: queryKeys.analysis() })
       options?.onSuccess?.(...args)
+      if (args[0].queued.length > 0) {
+        await client.invalidateQueries({ queryKey: queryKeys.games() })
+      }
     },
   })
 }
