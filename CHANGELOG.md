@@ -4,6 +4,11 @@ One line per change, newest first. Written by hand when a release is cut — see
 
 ## Unreleased
 
+## v1.9.1 — 2026-09-30
+
+- Added previous and next game buttons to correspondence games
+- Fixed the correspondence search timer standing at 0s
+
 ## v1.9.0 — 2026-09-30
 
 - Changed the app's look to a cleaner, clearer design
