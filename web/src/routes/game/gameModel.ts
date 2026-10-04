@@ -707,6 +707,38 @@ export function barLayout(plotWidth: number, plies: number): BarLayout {
   return { width, gap, rim: width >= 3.5 }
 }
 
+/** Where a column's `#` goes, and how big it is drawn. */
+export interface MateTip {
+  x: number
+  y: number
+  size: number
+}
+
+/** The narrowest column a `#` is drawn in: under this it is a smudge, not a sign. */
+export const MATE_TIP_MIN_WIDTH = 4
+
+/**
+ * The `#` inside the tip of a column whose position is a forced mate.
+ *
+ * A mate and a merely won position both run a column to the edge of the plot — the win
+ * percentage is near 100 either way — so the column alone cannot say which it was; the
+ * hover readout could, but only for the one being pointed at. The sign is the move list's
+ * own mate mark, set inside the column at its far end so it never sits on the plot's ground
+ * or on a neighbour, and sized to the column: as wide as the column allows, never more than
+ * `maxSize`. Too narrow a column, or too short a one, draws none.
+ */
+export function mateTip(
+  bar: { x: number; top: number; bottom: number; width: number; up: boolean },
+  maxSize: number,
+): MateTip | null {
+  if (bar.width < MATE_TIP_MIN_WIDTH) return null
+  const size = Math.min(maxSize, bar.width * 1.2)
+  if (bar.bottom - bar.top < size * 1.6) return null
+  // The glyph's centre, three quarters of its own height in from the column's far end.
+  const inset = size * 0.75
+  return { x: bar.x, y: bar.up ? bar.top + inset : bar.bottom - inset, size }
+}
+
 /**
  * The same game with everything an engine said about it taken off (⇧E,
  * `lib/ui/engineVisibility`).

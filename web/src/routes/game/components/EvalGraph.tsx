@@ -170,6 +170,7 @@ export function EvalGraph({
         value: p.win,
         classification: p.classification,
         side: p.side,
+        mate: p.score?.mate != null,
       })),
     [points],
   )

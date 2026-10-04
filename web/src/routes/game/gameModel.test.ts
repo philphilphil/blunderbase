@@ -4,6 +4,7 @@ import type { GameRunSummary, MomentResponse, MoveRow } from '@/lib/api/types'
 
 import {
   barLayout,
+  mateTip,
   bestRun,
   buildGameLine,
   collapsedThroughMove,
@@ -683,6 +684,31 @@ describe('barLayout', () => {
   it('never draws a column narrower than a hairline', () => {
     expect(barLayout(0, 200).width).toBe(0.75)
     expect(barLayout(240, 0).width).toBeGreaterThan(0)
+  })
+})
+
+describe('mateTip', () => {
+  // White mates: the column runs up to the top of the plot, and the sign sits inside it,
+  // just under the top, never on the ground above.
+  it('sets the sign inside the far end of a column, whichever way it points', () => {
+    // A 6px column: the sign is 1.2 × as tall (7.2), three quarters of that in from the end.
+    const up = mateTip({ x: 50, top: 0, bottom: 60, width: 6, up: true }, 10)
+    expect(up?.x).toBe(50)
+    expect(up?.size).toBeCloseTo(7.2, 5)
+    expect(up?.y).toBeCloseTo(5.4, 5)
+    const down = mateTip({ x: 50, top: 60, bottom: 120, width: 6, up: false }, 10)
+    expect(down?.y).toBeCloseTo(120 - 5.4, 5)
+  })
+
+  it('never draws the sign larger than it is asked to be', () => {
+    expect(mateTip({ x: 0, top: 0, bottom: 80, width: 20, up: true }, 8)?.size).toBe(8)
+  })
+
+  // A hairline column on a long game, or one too short to hold the glyph, gets nothing
+  // rather than a smudge spilling over its neighbours.
+  it('leaves out the sign where the column cannot hold it', () => {
+    expect(mateTip({ x: 0, top: 0, bottom: 80, width: 2, up: true }, 8)).toBeNull()
+    expect(mateTip({ x: 0, top: 0, bottom: 6, width: 6, up: true }, 8)).toBeNull()
   })
 })
 

@@ -5,7 +5,7 @@ import { GLYPHS, glyphFor } from '@/lib/chess/classification'
 import type { EvalGraphMarks } from '@/lib/ui/evalGraphPrefs'
 import { scalePx } from '@/lib/ui/scale'
 
-import { barLayout, pointSide, type Side } from '../gameModel'
+import { barLayout, mateTip, pointSide, type Side } from '../gameModel'
 import { EDGE_BLACK, EDGE_WHITE, FILL_BLACK, FILL_WHITE, GRAPH_BG } from './graphTokens'
 
 /**
@@ -32,6 +32,8 @@ export interface PlotPoint {
   classification: Classification | null
   /** Who played the move — a set-up game's ply 0 can be Black's; parity where absent. */
   side?: Side
+  /** The position is a forced mate, for either side — its column carries a `#`. */
+  mate?: boolean
 }
 
 /**
@@ -82,18 +84,40 @@ export function PlotBars({
         const y = yScale(point.value)
         if (x === undefined || y === undefined) return null
         const white = point.value >= axis
-        return (
+        const top = Math.min(y, baseline)
+        const height = Math.max(1, Math.abs(y - baseline))
+        const rect = (
           <rect
-            key={point.ply}
             x={x - width / 2}
-            y={Math.min(y, baseline)}
+            y={top}
             width={width}
-            height={Math.max(1, Math.abs(y - baseline))}
+            height={height}
             rx={width >= 3 ? 1 : 0}
             fill={white ? FILL_WHITE : FILL_BLACK}
             stroke={rim ? (white ? EDGE_WHITE : EDGE_BLACK) : undefined}
             strokeWidth={rim ? 0.75 : undefined}
           />
+        )
+        const tip = point.mate
+          ? mateTip({ x, top, bottom: top + height, width, up: white }, scalePx(8))
+          : null
+        if (!tip) return <g key={point.ply}>{rect}</g>
+        // The sign in the other side's colour, so it reads on either column in either theme.
+        return (
+          <g key={point.ply}>
+            {rect}
+            <text
+              x={tip.x}
+              y={tip.y}
+              textAnchor="middle"
+              dominantBaseline="central"
+              className="font-mono font-bold"
+              fontSize={tip.size}
+              fill={white ? FILL_BLACK : FILL_WHITE}
+            >
+              #
+            </text>
+          </g>
         )
       })}
     </g>
