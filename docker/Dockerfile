@@ -8,7 +8,7 @@
 # The compose files beside this one set that context, and `Dockerfile.dockerignore` is the
 # allowlist BuildKit applies to it.
 
-FROM node:22-bookworm-slim AS web-build
+FROM node:26-bookworm-slim AS web-build
 ENV COREPACK_ENABLE_DOWNLOAD_PROMPT=0 \
     CI=1
 WORKDIR /app/web
@@ -35,7 +35,7 @@ RUN pnpm build
 # else in this stage needs a resolver, and `manual/requirements.txt` is pinned for exactly
 # this — the Cloudflare build that publishes blunderbase.org/manual/ installs from the same
 # file. Keep it in step with the `docs` dependency group in pyproject.toml.
-FROM python:3.12-slim-bookworm AS manual-build
+FROM python:3.14-slim-bookworm AS manual-build
 WORKDIR /app
 # The pins alone decide the dependency layer, so editing a page does not reinstall MkDocs.
 COPY manual/requirements.txt ./manual/requirements.txt
@@ -45,7 +45,7 @@ COPY manual ./manual
 # `--strict`, so a dead cross-link fails the image build rather than shipping.
 RUN mkdocs build --strict
 
-FROM python:3.12-slim-bookworm AS python-deps
+FROM python:3.14-slim-bookworm AS python-deps
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
 ENV UV_LINK_MODE=copy \
     UV_COMPILE_BYTECODE=1 \
@@ -62,7 +62,7 @@ COPY backend ./backend
 COPY README.md ./
 RUN uv sync --frozen --no-dev
 
-FROM python:3.12-slim-bookworm AS runtime
+FROM python:3.14-slim-bookworm AS runtime
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     PATH=/app/.venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games \
