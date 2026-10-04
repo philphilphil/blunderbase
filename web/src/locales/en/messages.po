@@ -361,16 +361,24 @@ msgid "Line preview"
 msgstr "Line preview"
 
 #: src/components/analysis/LinePreviewSettings.tsx
+msgid "Pointing at a line"
+msgstr "Pointing at a line"
+
+#: src/components/analysis/LinePreviewSettings.tsx
 msgid "Row hover"
 msgstr "Row hover"
 
 #: src/components/analysis/LinePreviewSettings.tsx
-msgid "Hover a move to show its position"
-msgstr "Hover a move to show its position"
+msgid "Drawing"
+msgstr "Drawing"
 
 #: src/components/analysis/LinePreviewSettings.tsx
-msgid "Move badges"
-msgstr "Move badges"
+msgid "How much of the line is drawn, and how it is marked."
+msgstr "How much of the line is drawn, and how it is marked."
+
+#: src/components/analysis/LinePreviewSettings.tsx
+msgid "Plies drawn"
+msgstr "Plies drawn"
 
 #: src/components/analysis/LinePreviewSettings.tsx
 msgid "Colour arrows by side"
@@ -381,12 +389,8 @@ msgid "Fade with depth"
 msgstr "Fade with depth"
 
 #: src/components/analysis/LinePreviewSettings.tsx
-msgid "Plies drawn"
-msgstr "Plies drawn"
-
-#: src/components/analysis/LinePreviewSettings.tsx
-msgid "Look-ahead"
-msgstr "Look-ahead"
+msgid "Move badges"
+msgstr "Move badges"
 
 #: src/components/analysis/LinePreviewSettings.tsx
 msgid "Badge label"
@@ -399,6 +403,22 @@ msgstr "Move number"
 #: src/components/analysis/LinePreviewSettings.tsx
 msgid "Ply count"
 msgstr "Ply count"
+
+#: src/components/analysis/LinePreviewSettings.tsx
+msgid "One move of a line"
+msgstr "One move of a line"
+
+#: src/components/analysis/LinePreviewSettings.tsx
+msgid "Pointing at a single move inside a line."
+msgstr "Pointing at a single move inside a line."
+
+#: src/components/analysis/LinePreviewSettings.tsx
+msgid "Hover a move to show its position"
+msgstr "Hover a move to show its position"
+
+#: src/components/analysis/LinePreviewSettings.tsx
+msgid "Look-ahead"
+msgstr "Look-ahead"
 
 #: src/components/analysis/LinePreviewSettings.tsx
 msgid "Tempo"
@@ -549,18 +569,22 @@ msgid "Glyphs"
 msgstr "Glyphs"
 
 #: src/components/board/BoardSettings.tsx
+#: src/routes/correspondence/CorrespondenceGamePage.tsx
+#: src/routes/live/SessionMeta.tsx
+msgid "Board"
+msgstr "Board"
+
+#: src/components/board/BoardSettings.tsx
+msgid "Eval graph"
+msgstr "Eval graph"
+
+#: src/components/board/BoardSettings.tsx
 msgid "Board settings"
 msgstr "Board settings"
 
 #: src/components/board/BoardSettings.tsx
 msgid "Board settings — notation, arrows, sound, the eval graph and line preview (S)"
 msgstr "Board settings — notation, arrows, sound, the eval graph and line preview (S)"
-
-#: src/components/board/BoardSettings.tsx
-#: src/routes/correspondence/CorrespondenceGamePage.tsx
-#: src/routes/live/SessionMeta.tsx
-msgid "Board"
-msgstr "Board"
 
 #: src/components/board/BoardSettings.tsx
 msgid "This browser only."
@@ -609,6 +633,10 @@ msgid "Evaluation graph"
 msgstr "Evaluation graph"
 
 #: src/components/board/BoardSettings.tsx
+msgid "The game move by move, under the board."
+msgstr "The game move by move, under the board."
+
+#: src/components/board/BoardSettings.tsx
 msgid "Shape"
 msgstr "Shape"
 
@@ -616,10 +644,6 @@ msgstr "Shape"
 #: src/routes/live/SessionMeta.tsx
 msgid "Marks"
 msgstr "Marks"
-
-#: src/components/board/BoardSettings.tsx
-msgid "What pointing at an engine line does to the board."
-msgstr "What pointing at an engine line does to the board."
 
 #: src/components/board/MiniBoard.tsx
 msgid "Chess position"

@@ -39,15 +39,20 @@ beschrieben unter [Analyse](analysis.md#hide-the-engine-on-new-games).
 ## Das Brett einstellen { #set-up-the-board }
 
 Das Zahnrad unter dem Brett oder `S` öffnet die **Bretteinstellungen**. Sie gelten nur in
-diesem Browser.
+diesem Browser und wirken, sobald du sie änderst. Der Dialog hat drei Seiten, links
+untereinander aufgeführt (auf dem Handy oben nebeneinander); er öffnet wieder auf der
+Seite, auf der du ihn geschlossen hast.
 
-| Einstellung | Auswahl |
-|---|---|
-| **Pfeile** | Die Vorschläge der Engine auf der gezeigten Stellung einzeichnen oder nicht |
-| **Bewertungsverlauf** | Gefüllte Kurve, Balken, Punkte oder keiner; und welche Markierungen er trägt |
-| **Variantenvorschau** | Was beim Überfahren einer Engine-Variante passiert: Pfeile, Geisterfiguren, Abspielen auf dem Brett, ein kleines Brett neben der Variante oder nichts |
-| **Notation** | Wie die Figuren geschrieben werden, auf jeder Seite: deutsche Buchstaben (`Sc3`), englische Buchstaben (`Nc3`) oder Figurinen (`♞c3`) |
-| **Ton** | Ein Klick bei jedem Zug, und wie laut |
+| Seite | Einstellung | Auswahl |
+|---|---|---|
+| **Brett** | **Notation** | Wie die Figuren geschrieben werden, auf jeder Seite: deutsche Buchstaben (`Sc3`), englische Buchstaben (`Nc3`) oder Figurinen (`♞c3`) |
+| | **Pfeile** | Den Zug der Engine, den Zug von Maia und den gespielten Zug auf der gezeigten Stellung einzeichnen oder nicht |
+| | **Ton** | Ein Klick bei jedem Zug, und wie laut |
+| **Bewertungsverlauf** | **Bewertungsverlauf** | Balken oder gefüllte Kurve; und welche Markierungen er trägt |
+| **Variantenvorschau** | **Zeigen auf eine Variante** | Was beim Zeigen auf eine Engine-Variante passiert: Pfeile, Geisterfiguren, Abspielen auf dem Brett, ein kleines Brett neben der Variante oder nichts |
+| | **Darstellung** | Wie viele Züge der Variante gezeichnet werden, nach Seite gefärbt oder nicht, verblassend oder nicht, und nummerierte Marken darauf |
+| | **Ein einzelner Zug** | Ob das Zeigen auf einen Zug der Variante diese Stellung zeigt, und wie viele Züge danach gezeichnet werden |
+| | **Abspielen**, **Planüberlagerung** | Tempo und Wiederholung beim Abspielen, oder ob die Figuren auf dem Brett unter den Geisterfiguren zurücktreten – nur bei diesen beiden zu sehen |
 
 ## Die Tour wiederholen { #replay-the-tour }
 

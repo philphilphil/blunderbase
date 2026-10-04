@@ -313,6 +313,11 @@ directory are local snapshots pulled 2026-08-25.
       classes in `paneTabs.ts`): sibling `role=tab` buttons in a `tablist`, the chosen one
       a folder tab with a 2px accent top edge hung 1px below the strip's top. A tab never
       has a face, a box or the blue fill.
+    - **Side tabs**: `SideTabList` / `SideTab` (`ui/side-tabs.tsx`): the pane tab turned on
+      its side, for a dialog with pages (Board settings). A list on `panel` down the left,
+      the chosen tab the page's `surface` pushed across the rule with a 2px accent left edge
+      (`shadow-side-tab-on`); below `sm` the list lies across the top. Same structure and
+      keys as the pane tabs, Up/Down as well as Left/Right.
 
     An error message is `.bb-error`: a blunder-red frame and left bar around `body` text,
     never red text on a red tint, which falls under AA on the light panel.

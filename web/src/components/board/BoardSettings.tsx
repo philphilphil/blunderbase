@@ -8,21 +8,22 @@
  * board while you change them), so they are one dialog, opened from the transport row
  * where the reader's hand already is for Flip and the step buttons.
  *
- * Five sections, in the order the reader meets them: how a move is written, then what the
- * board says about *this* position — the standing arrows — then the click it makes as a
- * move lands, then the shape the evaluation pane draws the game in, and then what the board
- * does when a line in a panel is pointed at. The arrows and the sound are the board itself,
- * the last two the panels around it. The graph joined them for the same reason the others
- * are here: it is judged by looking at it, and the gear that opens this is the nearest
- * control to it. Notation is the odd one out — it reaches every screen that prints a move,
- * not just this one — and it is here rather than on a settings page of its own because the
- * move list beside this gear is where the choice is judged, and because one dialog of
- * per-browser reading preferences is one thing to find, where a general settings page would
- * be a second. It comes first because it is the one choice most readers make exactly once.
- * None of them has a Save: every store
- * writes straight through, so what is behind the dialog changes as the controls are used.
- * The dialog is deliberately not modal-looking on its left edge for that reason — it is
- * narrow and centred, and closing it is Escape, the X, or a click on the backdrop.
+ * Three pages down the side (`ui/side-tabs`), in the order the reader meets what they
+ * change. **Board** is the board itself: how a move is written, the standing arrows, the
+ * click as a move lands — short settings, most of them made once. **Eval graph** is the
+ * shape the evaluation pane draws the game in. **Line preview** is what the board does when
+ * a line in a panel is pointed at, the one group with enough controls to need a page of its
+ * own. It used to be one long column of six sections in no particular order, taller than a
+ * laptop screen; three pages of one fixed height fit on one and never jump as they change.
+ *
+ * The graph is here for the same reason the rest is: it is judged by looking at it, and the
+ * gear that opens this is the nearest control to it. Notation is the odd one out — it
+ * reaches every screen that prints a move, not just this one — and it is here rather than
+ * on a settings page of its own because the move list beside this gear is where the choice
+ * is judged, and because one dialog of per-browser reading preferences is one thing to
+ * find, where a general settings page would be a second. None of them has a Save: every
+ * store writes straight through, so what is behind the dialog changes as the controls are
+ * used. Closing it is Escape, the X, or a click on the backdrop.
  *
  * The words are rationed on purpose. A control whose label needs a paragraph is the wrong
  * control; a section gets one short line at most, and everything else it might have said is
@@ -35,8 +36,14 @@ import { Trans, useLingui } from '@lingui/react/macro'
 import { ChevronDown, Settings2, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 
-import { LinePreviewFields, Range, SettingsCheck } from '@/components/analysis/LinePreviewSettings'
+import {
+  LinePreviewFields,
+  Range,
+  SettingsCheck,
+  SettingsSection,
+} from '@/components/analysis/LinePreviewSettings'
 import { Button } from '@/components/ui/button'
+import { SideTab, SideTabList } from '@/components/ui/side-tabs'
 import { Label } from '@/components/ui/label'
 import { NativeSelect } from '@/components/ui/native-select'
 import { setBoardArrowPrefs, useBoardArrowPrefs } from '@/lib/board/arrowPrefs'
@@ -99,6 +106,18 @@ const GRAPH_MARKS: { value: EvalGraphMarks; label: MessageDescriptor }[] = [
   { value: 'glyphs', label: msg`Glyphs` },
 ]
 
+type SettingsPage = 'board' | 'graph' | 'preview'
+
+/**
+ * The dialog's pages, in the order the reader meets what they change: the board itself, the
+ * graph under it, then what the engine panels do to the board when a line is pointed at.
+ */
+const PAGES: { value: SettingsPage; label: MessageDescriptor }[] = [
+  { value: 'board', label: msg`Board` },
+  { value: 'graph', label: msg`Eval graph` },
+  { value: 'preview', label: msg`Line preview` },
+]
+
 /**
  * The one board-settings button on the screen, named so a key can press it.
  *
@@ -134,17 +153,8 @@ export function BoardSettingsButton({
 }) {
   const { t, i18n } = useLingui()
   const [open, setOpen] = useState(false)
-  const arrows = useBoardArrowPrefs()
-  const sound = useMoveSoundPrefs()
-  const graph = useEvalGraphPrefs()
-  const notation = useNotationPrefs()
-  // Whether the UI's language writes its pieces differently from English — which rows of
-  // `NOTATIONS` to offer, and what a stored `english` is called when it does not.
-  const localLetters = hasLocalLetters(isLocale(i18n.locale) ? i18n.locale : DEFAULT_LOCALE)
-  const notationRows = NOTATIONS.filter(
-    (row) => row.onlyLocal === undefined || row.onlyLocal === localLetters,
-  )
-  const notationValue = !localLetters && notation.style === 'english' ? 'local' : notation.style
+  // The page survives closing the dialog, so reopening it lands where the reader left off.
+  const [page, setPage] = useState<SettingsPage>('board')
 
   useEffect(() => {
     if (!open) return
@@ -152,33 +162,6 @@ export function BoardSettingsButton({
     document.addEventListener('keydown', key)
     return () => document.removeEventListener('keydown', key)
   }, [open])
-
-  /*
-   * The volume control plays what it is setting. There is no other way to know: a number
-   * between 0 and 100 says nothing about how loud a room is, and a slider you cannot hear is
-   * one you drag, close, step a move, reopen and drag again.
-   *
-   * Trailing rather than on every step. A sweep across the track fires a change every five
-   * percent, and twenty clicks in half a second is a texture, not a level — what you want to
-   * hear is the value you *landed* on. So each change cancels the pending click and books
-   * another, which makes a slow deliberate drag click per step (every pause outlasts the
-   * wait) and a fast sweep click once, at the end. 90 ms is under the threshold where a
-   * control feels laggy and well over the length of the click itself.
-   */
-  const pending = useRef<number | null>(null)
-  useEffect(
-    () => () => {
-      if (pending.current !== null) clearTimeout(pending.current)
-    },
-    [],
-  )
-  const previewSound = (volume: number) => {
-    if (pending.current !== null) clearTimeout(pending.current)
-    pending.current = window.setTimeout(() => {
-      pending.current = null
-      playMoveSound('move', volume)
-    }, 90)
-  }
 
   return (
     <>
@@ -212,7 +195,7 @@ export function BoardSettingsButton({
             <header className="flex items-start gap-3 border-b border-hairline px-4 py-3.5">
               <div className="flex flex-1 flex-col gap-1">
                 <h2 id="board-settings-title" className="text-heading font-semibold text-ink">
-                  <Trans>Board</Trans>
+                  <Trans>Board settings</Trans>
                 </h2>
                 <p className="text-label text-dim">
                   <Trans>This browser only.</Trans>
@@ -229,168 +212,215 @@ export function BoardSettingsButton({
               </Button>
             </header>
 
-            {/* The one setting here that is not about the board: it is what every screen
-                writes a move as. See the file comment for why it lives in this dialog. */}
-            <section className="flex flex-col gap-3 px-4 py-4">
-              <div className="flex flex-col gap-0.5">
-                <h3 className="text-data font-semibold text-ink">
-                  <Trans>Notation</Trans>
-                </h3>
-                <p className="text-label text-dim">
-                  <Trans>How a move is written, here and on every other screen.</Trans>
-                </p>
-              </div>
-              <div className="flex flex-col gap-1.5">
-                <Label htmlFor="notation-style">{t`Pieces`}</Label>
-                <NativeSelect
-                  id="notation-style"
-                  value={notationValue}
-                  onChange={(event) =>
-                    setNotationPrefs({ style: event.target.value as NotationStyle })
-                  }
-                  className="h-8 w-56"
-                >
-                  {notationRows.map((row) => (
-                    <option key={row.value} value={row.value}>
-                      {i18n._(row.label)}
-                    </option>
-                  ))}
-                </NativeSelect>
-              </div>
-            </section>
-
-            <section className="flex flex-col gap-3 border-t border-hairline px-4 py-4">
-              <div className="flex flex-col gap-0.5">
-                <h3 className="text-data font-semibold text-ink">
-                  <Trans>Arrows</Trans>
-                </h3>
-                <p className="text-label text-dim">
-                  <Trans>Drawn on the position the board is showing.</Trans>
-                </p>
-              </div>
-              {/* One wrapping line now that the sentences are gone: three switches, read
-                  across in a glance, rather than three stacked paragraphs. */}
-              <div className="flex flex-wrap gap-x-5 gap-y-2">
-                {ARROWS.map((arrow) => (
-                  <div key={arrow.key} className="flex items-center gap-2">
-                    <span
-                      aria-hidden
-                      className="size-2 flex-none rounded-full"
-                      style={{ background: arrow.swatch }}
-                    />
-                    <SettingsCheck
-                      id={`board-arrow-${arrow.key}`}
-                      label={i18n._(arrow.label)}
-                      checked={arrows[arrow.key]}
-                      onChange={(on) => setBoardArrowPrefs({ [arrow.key]: on })}
-                    />
-                  </div>
+            {/* The pages down the side, the chosen one beside them. A fixed height from `sm`
+                up, so stepping between pages never resizes the dialog under the pointer. */}
+            <div className="flex min-h-0 flex-col sm:h-[min(36rem,76vh)] sm:flex-row">
+              <SideTabList label={t`Board settings`} className="sm:w-40">
+                {PAGES.map((entry) => (
+                  <SideTab
+                    key={entry.value}
+                    id={`board-settings-tab-${entry.value}`}
+                    controls="board-settings-page"
+                    selected={page === entry.value}
+                    onSelect={() => setPage(entry.value)}
+                  >
+                    {i18n._(entry.label)}
+                  </SideTab>
                 ))}
+              </SideTabList>
+              <div
+                role="tabpanel"
+                id="board-settings-page"
+                aria-labelledby={`board-settings-tab-${page}`}
+                className="min-w-0 flex-1 overflow-y-auto bg-surface"
+              >
+                {page === 'board' ? <BoardPage /> : null}
+                {page === 'graph' ? <GraphPage /> : null}
+                {page === 'preview' ? <LinePreviewFields /> : null}
               </div>
-            </section>
-
-            {/* Beside the arrows rather than at the end: both are what the board itself does
-                as the reader steps through the game, where the two sections below are about
-                what the panels draw. The slider is disabled rather than hidden while the
-                sound is off — a control that vanishes is a control nobody finds twice — and
-                it plays as it is dragged (see `previewSound` above), which is the only way
-                anyone has ever set a volume. */}
-            <section className="flex flex-col gap-3 border-t border-hairline px-4 py-4">
-              <div className="flex flex-col gap-0.5">
-                <h3 className="text-data font-semibold text-ink">
-                  <Trans>Sound</Trans>
-                </h3>
-                <p className="text-label text-dim">
-                  <Trans>A click as each move lands.</Trans>
-                </p>
-              </div>
-              <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
-                <SettingsCheck
-                  id="board-sound-enabled"
-                  label={t`Move sounds`}
-                  checked={sound.enabled}
-                  onChange={(on) => {
-                    setMoveSoundPrefs({ enabled: on })
-                    // Ticking the box answers itself: you hear the thing you just turned on.
-                    if (on) previewSound(sound.volume)
-                  }}
-                />
-                <Range
-                  id="board-sound-volume"
-                  label={t`Level`}
-                  value={sound.volume}
-                  min={0}
-                  max={100}
-                  step={MOVE_SOUND_STEP}
-                  suffix="%"
-                  disabled={!sound.enabled}
-                  onChange={(volume) => {
-                    setMoveSoundPrefs({ volume })
-                    previewSound(volume)
-                  }}
-                />
-              </div>
-            </section>
-
-            <section className="flex flex-col gap-3 border-t border-hairline px-4 py-4">
-              <h3 className="text-data font-semibold text-ink">
-                <Trans>Evaluation graph</Trans>
-              </h3>
-              {/* Two fields on their own line under the heading, each named by its own
-                  label — the section title cannot label two controls, and a word over a
-                  select is shorter than a sentence beside it. */}
-              <div className="flex flex-wrap gap-4">
-                <div className="flex flex-col gap-1.5">
-                  <Label htmlFor="eval-graph-style">{t`Shape`}</Label>
-                  <NativeSelect
-                    id="eval-graph-style"
-                    value={graph.style}
-                    onChange={(event) =>
-                      setEvalGraphPrefs({ style: event.target.value as EvalGraphStyle })
-                    }
-                    className="h-8 w-48"
-                  >
-                    {GRAPH_STYLES.map((style) => (
-                      <option key={style.value} value={style.value}>
-                        {i18n._(style.label)}
-                      </option>
-                    ))}
-                  </NativeSelect>
-                </div>
-                <div className="flex flex-col gap-1.5">
-                  <Label htmlFor="eval-graph-marks">{t`Marks`}</Label>
-                  <NativeSelect
-                    id="eval-graph-marks"
-                    value={graph.marks}
-                    onChange={(event) =>
-                      setEvalGraphPrefs({ marks: event.target.value as EvalGraphMarks })
-                    }
-                    className="h-8 w-36"
-                  >
-                    {GRAPH_MARKS.map((mark) => (
-                      <option key={mark.value} value={mark.value}>
-                        {i18n._(mark.label)}
-                      </option>
-                    ))}
-                  </NativeSelect>
-                </div>
-              </div>
-            </section>
-
-            <section className="flex flex-col gap-3 border-t border-hairline px-4 py-4">
-              <div className="flex flex-col gap-0.5">
-                <h3 className="text-data font-semibold text-ink">
-                  <Trans>Line preview</Trans>
-                </h3>
-                <p className="text-label text-dim">
-                  <Trans>What pointing at an engine line does to the board.</Trans>
-                </p>
-              </div>
-              <LinePreviewFields />
-            </section>
+            </div>
           </div>
         </div>
       ) : null}
     </>
+  )
+}
+
+/**
+ * The board itself: how a move is written, the standing arrows, and the click as a move
+ * lands — the short settings a reader makes once and the ones judged on the board alone.
+ */
+function BoardPage() {
+  const { t, i18n } = useLingui()
+  const arrows = useBoardArrowPrefs()
+  const sound = useMoveSoundPrefs()
+  const notation = useNotationPrefs()
+  // Whether the UI's language writes its pieces differently from English — which rows of
+  // `NOTATIONS` to offer, and what a stored `english` is called when it does not.
+  const localLetters = hasLocalLetters(isLocale(i18n.locale) ? i18n.locale : DEFAULT_LOCALE)
+  const notationRows = NOTATIONS.filter(
+    (row) => row.onlyLocal === undefined || row.onlyLocal === localLetters,
+  )
+  const notationValue = !localLetters && notation.style === 'english' ? 'local' : notation.style
+
+  /*
+   * The volume control plays what it is setting. There is no other way to know: a number
+   * between 0 and 100 says nothing about how loud a room is, and a slider you cannot hear is
+   * one you drag, close, step a move, reopen and drag again.
+   *
+   * Trailing rather than on every step. A sweep across the track fires a change every five
+   * percent, and twenty clicks in half a second is a texture, not a level — what you want to
+   * hear is the value you *landed* on. So each change cancels the pending click and books
+   * another, which makes a slow deliberate drag click per step (every pause outlasts the
+   * wait) and a fast sweep click once, at the end. 90 ms is under the threshold where a
+   * control feels laggy and well over the length of the click itself.
+   */
+  const pending = useRef<number | null>(null)
+  useEffect(
+    () => () => {
+      if (pending.current !== null) clearTimeout(pending.current)
+    },
+    [],
+  )
+  const previewSound = (volume: number) => {
+    if (pending.current !== null) clearTimeout(pending.current)
+    pending.current = window.setTimeout(() => {
+      pending.current = null
+      playMoveSound('move', volume)
+    }, 90)
+  }
+
+  return (
+    <>
+      {/* The one setting here that is not about the board: it is what every screen writes a
+          move as. See the file comment for why it lives in this dialog. */}
+      <SettingsSection
+        title={<Trans>Notation</Trans>}
+        hint={<Trans>How a move is written, here and on every other screen.</Trans>}
+      >
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="notation-style">{t`Pieces`}</Label>
+          <NativeSelect
+            id="notation-style"
+            value={notationValue}
+            onChange={(event) => setNotationPrefs({ style: event.target.value as NotationStyle })}
+            className="h-8 w-56"
+          >
+            {notationRows.map((row) => (
+              <option key={row.value} value={row.value}>
+                {i18n._(row.label)}
+              </option>
+            ))}
+          </NativeSelect>
+        </div>
+      </SettingsSection>
+
+      <SettingsSection
+        title={<Trans>Arrows</Trans>}
+        hint={<Trans>Drawn on the position the board is showing.</Trans>}
+      >
+        {/* One wrapping line: three switches, read across in a glance, rather than three
+            stacked paragraphs. */}
+        <div className="flex flex-wrap gap-x-5 gap-y-2">
+          {ARROWS.map((arrow) => (
+            <div key={arrow.key} className="flex items-center gap-2">
+              <span
+                aria-hidden
+                className="size-2 flex-none rounded-full"
+                style={{ background: arrow.swatch }}
+              />
+              <SettingsCheck
+                id={`board-arrow-${arrow.key}`}
+                label={i18n._(arrow.label)}
+                checked={arrows[arrow.key]}
+                onChange={(on) => setBoardArrowPrefs({ [arrow.key]: on })}
+              />
+            </div>
+          ))}
+        </div>
+      </SettingsSection>
+
+      {/* The slider is disabled rather than hidden while the sound is off — a control that
+          vanishes is a control nobody finds twice — and it plays as it is dragged (see
+          `previewSound` above), which is the only way anyone has ever set a volume. */}
+      <SettingsSection
+        title={<Trans>Sound</Trans>}
+        hint={<Trans>A click as each move lands.</Trans>}
+      >
+        <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
+          <SettingsCheck
+            id="board-sound-enabled"
+            label={t`Move sounds`}
+            checked={sound.enabled}
+            onChange={(on) => {
+              setMoveSoundPrefs({ enabled: on })
+              // Ticking the box answers itself: you hear the thing you just turned on.
+              if (on) previewSound(sound.volume)
+            }}
+          />
+          <Range
+            id="board-sound-volume"
+            label={t`Level`}
+            value={sound.volume}
+            min={0}
+            max={100}
+            step={MOVE_SOUND_STEP}
+            suffix="%"
+            disabled={!sound.enabled}
+            onChange={(volume) => {
+              setMoveSoundPrefs({ volume })
+              previewSound(volume)
+            }}
+          />
+        </div>
+      </SettingsSection>
+    </>
+  )
+}
+
+/** The evaluation graph under the board: the shape it draws the game in, and its marks. */
+function GraphPage() {
+  const { t, i18n } = useLingui()
+  const graph = useEvalGraphPrefs()
+  return (
+    <SettingsSection
+      title={<Trans>Evaluation graph</Trans>}
+      hint={<Trans>The game move by move, under the board.</Trans>}
+    >
+      {/* Two fields, each named by its own label — the section title cannot label two
+          controls, and a word over a select is shorter than a sentence beside it. */}
+      <div className="flex flex-wrap gap-4">
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="eval-graph-style">{t`Shape`}</Label>
+          <NativeSelect
+            id="eval-graph-style"
+            value={graph.style}
+            onChange={(event) => setEvalGraphPrefs({ style: event.target.value as EvalGraphStyle })}
+            className="h-8 w-48"
+          >
+            {GRAPH_STYLES.map((style) => (
+              <option key={style.value} value={style.value}>
+                {i18n._(style.label)}
+              </option>
+            ))}
+          </NativeSelect>
+        </div>
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="eval-graph-marks">{t`Marks`}</Label>
+          <NativeSelect
+            id="eval-graph-marks"
+            value={graph.marks}
+            onChange={(event) => setEvalGraphPrefs({ marks: event.target.value as EvalGraphMarks })}
+            className="h-8 w-36"
+          >
+            {GRAPH_MARKS.map((mark) => (
+              <option key={mark.value} value={mark.value}>
+                {i18n._(mark.label)}
+              </option>
+            ))}
+          </NativeSelect>
+        </div>
+      </div>
+    </SettingsSection>
   )
 }

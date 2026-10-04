@@ -913,13 +913,13 @@ describe('GamePage', () => {
     await screen.findByText('Scandinavian Defense')
 
     await user.keyboard('s')
-    const panel = await screen.findByRole('dialog', { name: 'Board' })
+    const panel = await screen.findByRole('dialog', { name: 'Board settings' })
     expect(panel).toBeInTheDocument()
 
     // Escape belongs to whatever is on top: it closes the panel and does not also throw
     // the reader out of a line they were walking.
     await user.keyboard('{Escape}')
-    expect(screen.queryByRole('dialog', { name: 'Board' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('dialog', { name: 'Board settings' })).not.toBeInTheDocument()
   })
 
   it('flips the board with f', async () => {

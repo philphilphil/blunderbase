@@ -419,12 +419,14 @@
   /* The control grammar's light, as utilities so no call site spells a shadow by hand:
      `shadow-face` raises a button, `shadow-field` sinks an input, `shadow-thumb` is the
      chosen segment's edge plus its shade, `shadow-tab-on` is the folder tab's 2px accent
-     top edge hung 1px below the strip's top, and `shadow-row-bar` is the selected row's
-     inset accent bar. */
+     top edge hung 1px below the strip's top, `shadow-side-tab-on` the same tab turned on
+     its side (a 2px accent left edge, `ui/side-tabs.tsx`), and `shadow-row-bar` is the
+     selected row's inset accent bar. */
   --shadow-face: inset 0 -1px 0 var(--bb-control-shade);
   --shadow-field: inset 0 1px 0 var(--bb-field-shade);
   --shadow-thumb: 0 0 0 1px var(--bb-control-edge), inset 0 -1px 0 var(--bb-control-shade);
   --shadow-tab-on: inset 0 1px 0 var(--bb-surface), inset 0 0.1875rem 0 var(--bb-accent);
+  --shadow-side-tab-on: inset 0.125rem 0 0 var(--bb-accent);
   --shadow-row-bar: inset 0.125rem 0 0 var(--bb-accent);
 
   /* lines */

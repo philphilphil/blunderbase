@@ -361,16 +361,24 @@ msgid "Line preview"
 msgstr "Variantenvorschau"
 
 #: src/components/analysis/LinePreviewSettings.tsx
+msgid "Pointing at a line"
+msgstr "Zeigen auf eine Variante"
+
+#: src/components/analysis/LinePreviewSettings.tsx
 msgid "Row hover"
 msgstr "Zeile überfahren"
 
 #: src/components/analysis/LinePreviewSettings.tsx
-msgid "Hover a move to show its position"
-msgstr "Zug überfahren, um seine Stellung zu zeigen"
+msgid "Drawing"
+msgstr "Darstellung"
 
 #: src/components/analysis/LinePreviewSettings.tsx
-msgid "Move badges"
-msgstr "Zugmarken"
+msgid "How much of the line is drawn, and how it is marked."
+msgstr "Wie viel der Variante gezeichnet wird und wie sie beschriftet ist."
+
+#: src/components/analysis/LinePreviewSettings.tsx
+msgid "Plies drawn"
+msgstr "Gezeichnete Halbzüge"
 
 #: src/components/analysis/LinePreviewSettings.tsx
 msgid "Colour arrows by side"
@@ -381,12 +389,8 @@ msgid "Fade with depth"
 msgstr "Mit der Tiefe verblassen"
 
 #: src/components/analysis/LinePreviewSettings.tsx
-msgid "Plies drawn"
-msgstr "Gezeichnete Halbzüge"
-
-#: src/components/analysis/LinePreviewSettings.tsx
-msgid "Look-ahead"
-msgstr "Vorausschau"
+msgid "Move badges"
+msgstr "Zugmarken"
 
 #: src/components/analysis/LinePreviewSettings.tsx
 msgid "Badge label"
@@ -399,6 +403,22 @@ msgstr "Zugnummer"
 #: src/components/analysis/LinePreviewSettings.tsx
 msgid "Ply count"
 msgstr "Halbzugnummer"
+
+#: src/components/analysis/LinePreviewSettings.tsx
+msgid "One move of a line"
+msgstr "Ein einzelner Zug"
+
+#: src/components/analysis/LinePreviewSettings.tsx
+msgid "Pointing at a single move inside a line."
+msgstr "Zeigen auf einen einzelnen Zug innerhalb einer Variante."
+
+#: src/components/analysis/LinePreviewSettings.tsx
+msgid "Hover a move to show its position"
+msgstr "Zug überfahren, um seine Stellung zu zeigen"
+
+#: src/components/analysis/LinePreviewSettings.tsx
+msgid "Look-ahead"
+msgstr "Vorausschau"
 
 #: src/components/analysis/LinePreviewSettings.tsx
 msgid "Tempo"
@@ -549,18 +569,22 @@ msgid "Glyphs"
 msgstr "Symbole"
 
 #: src/components/board/BoardSettings.tsx
+#: src/routes/correspondence/CorrespondenceGamePage.tsx
+#: src/routes/live/SessionMeta.tsx
+msgid "Board"
+msgstr "Brett"
+
+#: src/components/board/BoardSettings.tsx
+msgid "Eval graph"
+msgstr "Bewertungsverlauf"
+
+#: src/components/board/BoardSettings.tsx
 msgid "Board settings"
 msgstr "Bretteinstellungen"
 
 #: src/components/board/BoardSettings.tsx
 msgid "Board settings — notation, arrows, sound, the eval graph and line preview (S)"
 msgstr "Bretteinstellungen – Notation, Pfeile, Ton, Bewertungsverlauf und Variantenvorschau (S)"
-
-#: src/components/board/BoardSettings.tsx
-#: src/routes/correspondence/CorrespondenceGamePage.tsx
-#: src/routes/live/SessionMeta.tsx
-msgid "Board"
-msgstr "Brett"
 
 #: src/components/board/BoardSettings.tsx
 msgid "This browser only."
@@ -609,6 +633,10 @@ msgid "Evaluation graph"
 msgstr "Bewertungsverlauf"
 
 #: src/components/board/BoardSettings.tsx
+msgid "The game move by move, under the board."
+msgstr "Die Partie Zug für Zug, unter dem Brett."
+
+#: src/components/board/BoardSettings.tsx
 msgid "Shape"
 msgstr "Form"
 
@@ -616,10 +644,6 @@ msgstr "Form"
 #: src/routes/live/SessionMeta.tsx
 msgid "Marks"
 msgstr "Markierungen"
-
-#: src/components/board/BoardSettings.tsx
-msgid "What pointing at an engine line does to the board."
-msgstr "Was mit dem Brett passiert, wenn du auf eine Engine-Variante zeigst."
 
 #: src/components/board/MiniBoard.tsx
 msgid "Chess position"

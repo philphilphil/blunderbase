@@ -72,6 +72,7 @@ describe('BoardSettingsButton', () => {
   it('carries the line-preview settings in the same dialog', async () => {
     render(<BoardSettingsButton />)
     await userEvent.click(screen.getByRole('button', { name: 'Board settings' }))
+    await userEvent.click(screen.getByRole('tab', { name: 'Line preview' }))
     await userEvent.selectOptions(screen.getByLabelText('Row hover'), 'peek')
 
     expect(JSON.parse(window.localStorage.getItem(LINE_PREVIEW_KEY) ?? '{}')).toMatchObject({
@@ -84,6 +85,7 @@ describe('BoardSettingsButton', () => {
   it('offers the eval graph’s two shapes, bars first', async () => {
     render(<BoardSettingsButton />)
     await userEvent.click(screen.getByRole('button', { name: 'Board settings' }))
+    await userEvent.click(screen.getByRole('tab', { name: 'Eval graph' }))
 
     const shape = screen.getByLabelText('Shape')
     expect(shape).toHaveValue('bars')
@@ -202,6 +204,7 @@ describe('BoardSettingsButton', () => {
   it('turns the graph’s marks down to discs', async () => {
     render(<BoardSettingsButton />)
     await userEvent.click(screen.getByRole('button', { name: 'Board settings' }))
+    await userEvent.click(screen.getByRole('tab', { name: 'Eval graph' }))
 
     const marks = screen.getByLabelText('Marks')
     expect(marks).toHaveValue('glyphs')
@@ -210,5 +213,47 @@ describe('BoardSettingsButton', () => {
     expect(JSON.parse(window.localStorage.getItem(EVAL_GRAPH_KEY) ?? '{}')).toMatchObject({
       marks: 'dots',
     })
+  })
+
+  // Three pages, one shown: the Board page first, and the arrows keys walk the list the way
+  // they walk every tab strip in the app.
+  it('shows one page at a time and walks the pages with the arrow keys', async () => {
+    render(<BoardSettingsButton />)
+    await userEvent.click(screen.getByRole('button', { name: 'Board settings' }))
+
+    const tabs = screen.getAllByRole('tab')
+    expect(tabs.map((tab) => tab.textContent)).toEqual(['Board', 'Eval graph', 'Line preview'])
+    expect(screen.getByRole('tab', { name: 'Board' })).toHaveAttribute('aria-selected', 'true')
+    expect(screen.getByLabelText('Pieces')).toBeInTheDocument()
+    expect(screen.queryByLabelText('Shape')).not.toBeInTheDocument()
+
+    screen.getByRole('tab', { name: 'Board' }).focus()
+    await userEvent.keyboard('{ArrowDown}')
+    expect(screen.getByRole('tab', { name: 'Eval graph' })).toHaveAttribute('aria-selected', 'true')
+    expect(screen.getByRole('tab', { name: 'Eval graph' })).toHaveFocus()
+    expect(screen.getByRole('tabpanel')).toHaveAttribute(
+      'aria-labelledby',
+      'board-settings-tab-graph',
+    )
+    expect(screen.queryByLabelText('Pieces')).not.toBeInTheDocument()
+
+    await userEvent.keyboard('{End}')
+    expect(screen.getByLabelText('Row hover')).toBeInTheDocument()
+  })
+
+  // Closing and reopening is the gesture of checking a change on the board; the reader comes
+  // back to the page they were on rather than to the top.
+  it('reopens on the page it was closed on', async () => {
+    render(<BoardSettingsButton />)
+    await userEvent.click(screen.getByRole('button', { name: 'Board settings' }))
+    await userEvent.click(screen.getByRole('tab', { name: 'Line preview' }))
+    await userEvent.keyboard('{Escape}')
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+
+    await userEvent.click(screen.getByRole('button', { name: 'Board settings' }))
+    expect(screen.getByRole('tab', { name: 'Line preview' })).toHaveAttribute(
+      'aria-selected',
+      'true',
+    )
   })
 })

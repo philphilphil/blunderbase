@@ -36,15 +36,19 @@ the engine on for it — that is a setting of the library rather than of the bro
 ## Set up the board
 
 The gear under the board, or `S`, opens **Board settings**. They apply in this browser
-only.
+only, and take effect as you change them. The dialog has three pages, listed down its left
+side (across the top on a phone); it opens again on the page you closed it on.
 
-| Setting | Choices |
-|---|---|
-| **Arrows** | Draw the engine's suggestions on the position shown, or not |
-| **Evaluation graph** | Filled curve, bars, dots or none; and which marks it carries |
-| **Line preview** | What pointing at an engine line does: arrows, ghost pieces, a replay on the board, a small board beside the line, or nothing |
-| **Notation** | How the pieces are written, on every screen: letters in the language of the app (`Nc3` in English, `Sc3` in German), English letters whatever the language, or figurines (`♞c3`) |
-| **Sound** | A click as each move lands, and how loud |
+| Page | Setting | Choices |
+|---|---|---|
+| **Board** | **Notation** | How the pieces are written, on every screen: letters in the language of the app (`Nc3` in English, `Sc3` in German), English letters whatever the language, or figurines (`♞c3`) |
+| | **Arrows** | Draw the engine's move, Maia's move and the played move on the position shown, or not |
+| | **Sound** | A click as each move lands, and how loud |
+| **Eval graph** | **Evaluation graph** | Bars or a filled curve; and which marks it carries |
+| **Line preview** | **Pointing at a line** | What pointing at an engine line does: arrows, ghost pieces, a replay on the board, a small board beside the line, or nothing |
+| | **Drawing** | How many moves of the line are drawn, coloured by side or not, fading or not, and numbered badges on them |
+| | **One move of a line** | Whether pointing at one move of a line shows that position, and how many moves after it are drawn |
+| | **Playthrough**, **Plan overlay** | The replay's speed and loop, or whether the pieces on the board step back under the ghost pieces — shown only for those two |
 
 ## Replay the tour
 

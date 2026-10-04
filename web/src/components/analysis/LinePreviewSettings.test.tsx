@@ -38,6 +38,19 @@ describe('LinePreviewFields', () => {
     expect(screen.getByLabelText('Tempo')).toBeInTheDocument()
     expect(JSON.parse(window.localStorage.getItem(LINE_PREVIEW_KEY) ?? '{}')).toMatchObject({ row: 'play' })
   })
+
+  // A control that depends on another stays where it is, disabled, rather than vanishing.
+  it('disables the look-ahead and the badge label while what they depend on is off', async () => {
+    render(<LinePreviewFields />)
+
+    expect(screen.getByRole('slider', { name: 'Look-ahead' })).toBeEnabled()
+    await userEvent.click(screen.getByRole('checkbox', { name: 'Hover a move to show its position' }))
+    expect(screen.getByRole('slider', { name: 'Look-ahead' })).toBeDisabled()
+
+    expect(screen.getByLabelText('Badge label')).toBeEnabled()
+    await userEvent.click(screen.getByRole('checkbox', { name: 'Move badges' }))
+    expect(screen.getByLabelText('Badge label')).toBeDisabled()
+  })
 })
 
 describe('LinePreviewRowChip', () => {

@@ -15,8 +15,9 @@
  */
 import type { MessageDescriptor } from '@lingui/core'
 import { msg } from '@lingui/core/macro'
-import { useLingui } from '@lingui/react/macro'
+import { Trans, useLingui } from '@lingui/react/macro'
 import { Eye, EyeOff } from 'lucide-react'
+import type { ReactNode } from 'react'
 
 import { Checkbox } from '@/components/ui/checkbox'
 import { FIELD } from '@/components/ui/input'
@@ -84,6 +85,27 @@ export function SettingsCheck({ id, label, checked, disabled, onChange }: {
       label={label}
       className="text-label text-soft enabled:hover:text-ink"
     />
+  )
+}
+
+/**
+ * One group of the board's settings dialog: a heading, a line under it at most, and its
+ * controls. Groups on a page are divided by a hairline; the first has none, since the page
+ * itself starts there.
+ */
+export function SettingsSection({ title, hint, children }: {
+  title: ReactNode
+  hint?: ReactNode
+  children: ReactNode
+}) {
+  return (
+    <section className="flex flex-col gap-3 border-t border-hairline px-5 py-4 first:border-t-0">
+      <div className="flex flex-col gap-0.5">
+        <h3 className="text-data font-semibold text-ink">{title}</h3>
+        {hint ? <p className="text-label text-dim">{hint}</p> : null}
+      </div>
+      {children}
+    </section>
   )
 }
 
@@ -165,8 +187,16 @@ export function LinePreviewRowChip({
 }
 
 /**
- * The line-preview controls, without chrome of their own — a section inside the board's
- * settings dialog (`components/board/BoardSettings`) rather than a dialog in its own right.
+ * The line-preview controls: the Line preview page of the board's settings dialog
+ * (`components/board/BoardSettings`).
+ *
+ * Grouped by the question each answers, in the order a reader asks them: what pointing at a
+ * line does at all (the mode, with its own sentence under it), how much of it is drawn and
+ * how it is marked, what pointing at one move inside a line does, and then the chosen mode's
+ * own settings, which only exist for the two modes that have any. It had been one block of
+ * eleven controls under one heading, which is how it came to read as the heaviest thing in
+ * the dialog. A control that depends on another (the badge label, the look-ahead) is
+ * disabled rather than hidden while that one is off, so it is still where it was.
  */
 export function LinePreviewFields() {
   const { t, i18n } = useLingui()
@@ -174,48 +204,61 @@ export function LinePreviewFields() {
   const set = (patch: Partial<Omit<LinePreviewPrefs, 'play' | 'overlay'>>) => setLinePreviewPrefs(patch)
 
   return (
-    <div className="flex flex-col gap-5">
-      <div className="flex flex-col gap-1.5">
-        <Label htmlFor="preview-mode">{t`Row hover`}</Label>
-        <NativeSelect id="preview-mode" value={prefs.row} onChange={(event) => set({ row: event.target.value as RowPreview })} className="h-8 w-56">
-          {MODES.map((mode) => <option key={mode.value} value={mode.value}>{i18n._(mode.label)}</option>)}
-        </NativeSelect>
-      </div>
+    <>
+      <SettingsSection title={<Trans>Pointing at a line</Trans>} hint={i18n._(ROW_SAYS[prefs.row])}>
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="preview-mode">{t`Row hover`}</Label>
+          <NativeSelect id="preview-mode" value={prefs.row} onChange={(event) => set({ row: event.target.value as RowPreview })} className="h-8 w-56">
+            {MODES.map((mode) => <option key={mode.value} value={mode.value}>{i18n._(mode.label)}</option>)}
+          </NativeSelect>
+        </div>
+      </SettingsSection>
 
-      <div className="flex flex-wrap gap-4">
+      <SettingsSection title={<Trans>Drawing</Trans>} hint={<Trans>How much of the line is drawn, and how it is marked.</Trans>}>
+        <div className="flex max-w-sm">
+          <Range id="preview-depth" label={t`Plies drawn`} value={prefs.depth} min={1} max={18} onChange={(depth) => set({ depth })} />
+        </div>
+        <div className="flex flex-wrap gap-x-5 gap-y-2">
+          <SettingsCheck id="preview-sides" label={t`Colour arrows by side`} checked={prefs.bySide} onChange={(bySide) => set({ bySide })} />
+          <SettingsCheck id="preview-fade" label={t`Fade with depth`} checked={prefs.fade} onChange={(fade) => set({ fade })} />
+        </div>
+        <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
+          <SettingsCheck id="preview-badges" label={t`Move badges`} checked={prefs.badges} onChange={(badges) => set({ badges })} />
+          <div className="flex items-center gap-2">
+            <Label htmlFor="preview-labels">{t`Badge label`}</Label>
+            <NativeSelect id="preview-labels" value={prefs.labels} disabled={!prefs.badges} onChange={(event) => set({ labels: event.target.value as LinePreviewPrefs['labels'] })} className="h-8 w-40">
+              <option value="move">{t`Move number`}</option>
+              <option value="ply">{t`Ply count`}</option>
+            </NativeSelect>
+          </div>
+        </div>
+      </SettingsSection>
+
+      <SettingsSection title={<Trans>One move of a line</Trans>} hint={<Trans>Pointing at a single move inside a line.</Trans>}>
         <SettingsCheck id="preview-scrub" label={t`Hover a move to show its position`} checked={prefs.scrub} onChange={(scrub) => set({ scrub })} />
-        <SettingsCheck id="preview-badges" label={t`Move badges`} checked={prefs.badges} onChange={(badges) => set({ badges })} />
-        <SettingsCheck id="preview-sides" label={t`Colour arrows by side`} checked={prefs.bySide} onChange={(bySide) => set({ bySide })} />
-        <SettingsCheck id="preview-fade" label={t`Fade with depth`} checked={prefs.fade} onChange={(fade) => set({ fade })} />
-      </div>
-
-      <div className="flex flex-wrap gap-5">
-        <Range id="preview-depth" label={t`Plies drawn`} value={prefs.depth} min={1} max={18} onChange={(depth) => set({ depth })} />
-        {prefs.scrub ? <Range id="preview-lookahead" label={t`Look-ahead`} value={prefs.lookahead} min={0} max={4} onChange={(lookahead) => set({ lookahead: lookahead as LinePreviewPrefs['lookahead'] })} /> : null}
-      </div>
-
-      <div className="flex flex-col gap-1.5">
-        <Label htmlFor="preview-labels">{t`Badge label`}</Label>
-        <NativeSelect id="preview-labels" value={prefs.labels} disabled={!prefs.badges} onChange={(event) => set({ labels: event.target.value as LinePreviewPrefs['labels'] })} className="h-8 w-48">
-          <option value="move">{t`Move number`}</option>
-          <option value="ply">{t`Ply count`}</option>
-        </NativeSelect>
-      </div>
+        <div className="flex max-w-sm">
+          <Range id="preview-lookahead" label={t`Look-ahead`} value={prefs.lookahead} min={0} max={4} disabled={!prefs.scrub} onChange={(lookahead) => set({ lookahead: lookahead as LinePreviewPrefs['lookahead'] })} />
+        </div>
+      </SettingsSection>
 
       {prefs.row === 'play' ? (
-        <div className="flex flex-col gap-4 border-t border-hairline pt-4">
+        <SettingsSection title={<Trans>Playthrough</Trans>}>
           <div className="flex flex-wrap gap-5">
             <Range id="preview-tempo" label={t`Tempo`} value={prefs.play.tempo} min={100} max={2000} step={50} suffix=" ms" onChange={(tempo) => setLinePreviewPrefs({ play: { tempo } })} />
             <Range id="preview-delay" label={t`Start delay`} value={prefs.play.delay} min={0} max={2000} step={50} suffix=" ms" onChange={(delay) => setLinePreviewPrefs({ play: { delay } })} />
           </div>
-          <div className="flex flex-wrap gap-4">
+          <div className="flex flex-wrap gap-x-5 gap-y-2">
             <SettingsCheck id="preview-loop" label={t`Loop`} checked={prefs.play.loop} onChange={(loop) => setLinePreviewPrefs({ play: { loop } })} />
             <SettingsCheck id="preview-ahead" label={t`Arrow one move ahead`} checked={prefs.play.ahead} onChange={(ahead) => setLinePreviewPrefs({ play: { ahead } })} />
           </div>
-        </div>
+        </SettingsSection>
       ) : null}
 
-      {prefs.row === 'overlay' ? <SettingsCheck id="preview-dim" label={t`Dim current pieces`} checked={prefs.overlay.dim} onChange={(dim) => setLinePreviewPrefs({ overlay: { dim } })} /> : null}
-    </div>
+      {prefs.row === 'overlay' ? (
+        <SettingsSection title={<Trans>Plan overlay</Trans>}>
+          <SettingsCheck id="preview-dim" label={t`Dim current pieces`} checked={prefs.overlay.dim} onChange={(dim) => setLinePreviewPrefs({ overlay: { dim } })} />
+        </SettingsSection>
+      ) : null}
+    </>
   )
 }
