@@ -288,7 +288,7 @@ dependencies = [
 
 [[package]]
 name = "blunderbase-desktop"
-version = "1.9.1"
+version = "1.9.2"
 dependencies = [
  "libc",
  "rand",
