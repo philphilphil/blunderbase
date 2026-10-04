@@ -226,9 +226,14 @@ def test_the_runner_process_drains_a_run_and_gives_its_slots_back_on_a_signal(
         )
         assert engine.runner_id is not None
         assert engine.version == "FakeFish 1", "the runner's own probe named the binary"
-        row = runner_row(settings, "gpu-box")
-        assert row.connected is True
-        assert row.version
+        # The advertisement commits before `mark_connected` does, so the engine row can be
+        # there a moment before the runner row says it is connected.
+        eventually(
+            lambda: runner_row(settings, "gpu-box").connected,
+            "the runner was marked connected",
+            runner.output,
+        )
+        assert runner_row(settings, "gpu-box").version
 
         run_id = enqueue(settings, engine.id)
         eventually(

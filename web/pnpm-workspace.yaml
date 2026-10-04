@@ -1,0 +1,7 @@
+auditConfig:
+  ignoreGhsas:
+    # braces <=3.0.3 has no fixed release. It reaches us only through @lingui/cli's
+    # micromatch, a dev tool globbing our own catalog paths, never untrusted input and
+    # never in the image. Remove once braces or micromatch ships a fix.
+    # https://github.com/advisories/GHSA-vfj7-8cjw-p6xm
+    - GHSA-vfj7-8cjw-p6xm
