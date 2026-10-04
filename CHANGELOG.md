@@ -4,6 +4,12 @@ One line per change, newest first. Written by hand when a release is cut — see
 
 ## Unreleased
 
+## v1.9.2 — 2026-10-04
+
+- Added masters and Lichess games to the game's Book tab
+- Added a mate mark to the evaluation graph's bars
+- Changed Board settings into pages with side tabs
+
 ## v1.9.1 — 2026-09-30
 
 - Added previous and next game buttons to correspondence games
