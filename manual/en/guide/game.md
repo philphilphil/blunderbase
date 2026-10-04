@@ -58,7 +58,9 @@ which puts the whole game on the clipboard as PGN; the icon turns into a tick wh
 
 The curve under the board is the evaluation move by move, on the pane's **Evaluation**
 tab; clicking it seeks. **only mine**, at the right of that pane's tabs, marks only your
-own flagged moves on the curve. Its shape and its marks are board settings.
+own flagged moves on the curve. Its shape and its marks are board settings. Drawn as bars,
+a column whose position is a forced mate carries a `#` at its tip, when the column is wide
+enough to hold one.
 
 ## See how long each move took
 
@@ -218,7 +220,7 @@ Hubert2001** — and both return to exactly the position you were on.
 
 The **Book** tab beside **Notes** shows how games went on from the position on the board;
 `B` opens it. The picker in its title row chooses which games: **My games** (the default),
-**Masters** (over-the-board games between titled players) or **Lichess** (rated games
+**Masters** (over-the-board games between players rated 2200 and up) or **Lichess** (rated games
 played on Lichess). Your choice is remembered in this browser.
 
 On **My games** the tab is headed with the name of the opening the game is in, and a move

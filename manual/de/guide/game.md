@@ -67,7 +67,8 @@ Zwischenablage, und das Symbol wird zum Haken, sobald das geklappt hat.
 Die Kurve unter dem Brett ist die Bewertung Zug für Zug, auf dem Reiter **Bewertung**
 dieses Felds; ein Klick darauf springt an die Stelle. **nur meine**, rechts neben den
 Reitern, markiert auf der Kurve nur deine eigenen Fehler. Form und Markierungen der Kurve
-sind Bretteinstellungen.
+sind Bretteinstellungen. Als Balken gezeichnet trägt eine Säule, deren Stellung ein
+erzwungenes Matt ist, ein `#` an der Spitze, sofern sie breit genug dafür ist.
 
 ## Die Bedenkzeit je Zug { #see-how-long-each-move-took }
 
@@ -242,7 +243,7 @@ der du warst.
 
 Der Reiter **Buch** neben **Notizen** zeigt, wie es von der Stellung auf dem Brett aus
 weiterging; `B` öffnet ihn. Die Auswahl in seiner Titelzeile bestimmt, aus welchen Partien:
-**Meine Partien** (die Voreinstellung), **Meister** (Turnierpartien zwischen Titelträgern)
+**Meine Partien** (die Voreinstellung), **Meister** (Turnierpartien von Spielern ab 2200)
 oder **Lichess** (gewertete Partien auf Lichess). Deine Wahl merkt sich dieser Browser.
 
 Bei **Meine Partien** steht oben der Name der Eröffnung, in der die Partie gerade ist, und
