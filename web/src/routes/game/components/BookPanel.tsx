@@ -82,11 +82,21 @@ export interface BookPanelProps {
 }
 
 /**
- * `58 34 48 52 1fr` at the mockup's scale, converted: the app runs at `html { font-size: 120% }`
- * and the mockup at 100%, so every length here is `rem` and none of them is a pixel.
+ * Move, Games, Score, Avg drop, Opening — sized to the track it is in (`@container` on the
+ * table). The notes track runs from under 15rem to well over 30, and one fixed set of widths
+ * had left the score bar a stub and the opening a few letters wide in all but the widest.
+ * So the bar takes what the fixed columns leave, up to a length that still reads; below
+ * 20rem the Opening column steps aside (the name is over the table anyway), and below 15rem
+ * Avg drop does too, leaving the three that say how often and how well.
  */
-const GRID =
-  'grid grid-cols-[3.625rem_2.125rem_3rem_3.25rem_minmax(0,1fr)] items-center gap-2'
+const GRID = cn(
+  'grid items-center gap-2',
+  'grid-cols-[3.625rem_2.25rem_minmax(3rem,7rem)_3.25rem_minmax(0,1fr)]',
+  '@max-[20rem]:grid-cols-[3.625rem_2.25rem_minmax(3rem,1fr)_3.25rem]',
+  '@max-[15rem]:grid-cols-[3.625rem_2.25rem_minmax(3rem,1fr)]',
+)
+const OPENING = '@max-[20rem]:hidden'
+const DROP = '@max-[15rem]:hidden'
 
 /** A move row's own metrics, so the two tables either side of the divider stay in step. */
 const ROW = cn(GRID, 'h-[1.625rem] rounded-md px-1.5 font-mono text-data')
@@ -112,7 +122,7 @@ export function BookPanel({ moves, ply, onPlay, onPreview, className }: BookPane
       role="table"
       aria-label={t`Your games from this position`}
       data-testid="book-panel"
-      className={cn('flex flex-none flex-col px-1.5 pb-2', className)}
+      className={cn('@container flex flex-none flex-col px-1.5 pb-2', className)}
     >
       <div
         role="row"
@@ -130,10 +140,10 @@ export function BookPanel({ moves, ply, onPlay, onPreview, className }: BookPane
         <span>
           <Trans>Score</Trans>
         </span>
-        <span className="text-right">
+        <span className={cn('text-right', DROP)}>
           <Trans>Avg drop</Trans>
         </span>
-        <span>
+        <span className={OPENING}>
           <Trans>Opening</Trans>
         </span>
       </div>
@@ -150,7 +160,7 @@ export function BookPanel({ moves, ply, onPlay, onPreview, className }: BookPane
             </span>
             <span className="text-right text-body">{move.games ?? 0}</span>
             <ScoreBar split={split} className="w-full" />
-            <span className={cn('text-right', dropTone(move.avg_win_loss))}>
+            <span className={cn('text-right', dropTone(move.avg_win_loss), DROP)}>
               {formatAvgDrop(move.avg_win_loss)}
             </span>
             {/* Last, as on the explorer, and the column that truncates: most rows past the
@@ -158,7 +168,7 @@ export function BookPanel({ moves, ply, onPlay, onPreview, className }: BookPane
             <span
               title={move.name ?? undefined}
               data-testid="book-move-opening"
-              className="truncate font-sans text-data font-semibold text-ink"
+              className={cn('truncate font-sans text-data font-semibold text-ink', OPENING)}
             >
               {move.name}
             </span>

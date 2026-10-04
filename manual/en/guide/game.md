@@ -216,9 +216,21 @@ Either way you can come straight back. The explorer offers **← Back to game**;
 offers a button in the row under its board named after the game you left — **← phib —
 Hubert2001** — and both return to exactly the position you were on.
 
-The **Book** tab beside **Notes** shows how your own games went on from here; `B` opens it.
-It is headed with the name of the opening the game is in, and a move that enters a named
-opening shows that name in its **Opening** column.
+The **Book** tab beside **Notes** shows how games went on from the position on the board;
+`B` opens it. The picker in its title row chooses which games: **My games** (the default),
+**Masters** (over-the-board games between titled players) or **Lichess** (rated games
+played on Lichess). Your choice is remembered in this browser.
+
+On **My games** the tab is headed with the name of the opening the game is in, and a move
+that enters a named opening shows that name in its **Opening** column. On **Masters** and
+**Lichess** each move shows how many games played it and how they ended for White and
+Black, and a few of those games are listed underneath; clicking one opens it in the viewer
+the [explorer](explorer.md) uses. With **Lichess** chosen, the sliders button beside the
+picker opens the filters: which speeds and which rating bands count. When the track is
+narrow, the **Opening** column and then **Avg drop** step aside.
+
+Both outside databases only answer once Lichess is connected; until then the tab offers
+**Connect Lichess** instead.
 
 ## Collections
 

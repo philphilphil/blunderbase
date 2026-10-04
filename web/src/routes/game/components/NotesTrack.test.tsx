@@ -1,8 +1,15 @@
-import { fireEvent, render, screen } from '@testing-library/react'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { fireEvent, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom'
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
+import {
+  BOOK_RATINGS_KEY,
+  BOOK_SOURCE_KEY,
+  bookSource,
+  forgetBookFilters,
+} from '../bookSource'
 import type { GameNote } from '../gameModel'
 import type { NoteRow } from '../notesModel'
 import type { BookEntry } from './BookPanel'
@@ -371,5 +378,109 @@ describe('NotesTrack', () => {
     expect(screen.getByText('0 notes')).toBeInTheDocument()
     // The Notes tab and the composer are all that is left; there is no note row to click.
     expect(screen.queryAllByRole('button')).toHaveLength(0)
+  })
+})
+
+describe('NotesTrack book source', () => {
+  const START_FEN = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1'
+
+  function memoryStorage(): Storage {
+    const values = new Map<string, string>()
+    return {
+      get length() { return values.size },
+      clear: () => values.clear(),
+      getItem: (key) => values.get(key) ?? null,
+      key: (index) => [...values.keys()][index] ?? null,
+      removeItem: (key) => void values.delete(key),
+      setItem: (key, value) => void values.set(key, String(value)),
+    }
+  }
+
+  /** Every reference request answered with one masters-shaped position. */
+  function stubReference(): string[] {
+    const seen: string[] = []
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url = String(input)
+        seen.push(url)
+        const body = {
+          source: 'masters',
+          fen: START_FEN,
+          opening: null,
+          totals: { games: 10, white: 4, draws: 4, black: 2 },
+          moves: [{ uci: 'c2c4', san: 'c4', games: 10, white: 4, draws: 4, black: 2 }],
+          top_games: [],
+        }
+        return new Response(JSON.stringify(body), { headers: { 'content-type': 'application/json' } })
+      }),
+    )
+    return seen
+  }
+
+  beforeEach(() => {
+    vi.stubGlobal('localStorage', memoryStorage())
+    bookSource.reset()
+    forgetBookFilters()
+  })
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
+    bookSource.reset()
+    forgetBookFilters()
+  })
+
+  function renderWithQueries() {
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    return render(
+      <QueryClientProvider client={client}>
+        <MemoryRouter>
+          <NotesTrack
+            book={BOOK}
+            bookPly={4}
+            fen={START_FEN}
+            notes={NOTES}
+            onSelectNote={vi.fn()}
+            composer={composer}
+            tab="book"
+          />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    )
+  }
+
+  // The owner's own games until they pick another book: no request leaves for Lichess first.
+  it('reads the owner’s own book until another is picked, and remembers the pick', async () => {
+    const seen = stubReference()
+    renderWithQueries()
+
+    const picker = screen.getByRole('combobox', { name: 'Book' })
+    expect(picker).toHaveValue('mine')
+    expect(screen.getByTestId('book-panel')).toBeInTheDocument()
+    expect(seen).toHaveLength(0)
+
+    await userEvent.selectOptions(picker, 'masters')
+    expect(await screen.findByTestId('reference-book')).toBeInTheDocument()
+    expect(screen.queryByTestId('book-panel')).not.toBeInTheDocument()
+    expect(localStorage.getItem(BOOK_SOURCE_KEY)).toBe('masters')
+  })
+
+  // Masters is one book with nothing to filter; Lichess has speeds and rating bands.
+  it('offers the filters for Lichess only, and writes what is chosen there', async () => {
+    stubReference()
+    renderWithQueries()
+    const picker = screen.getByRole('combobox', { name: 'Book' })
+
+    await userEvent.selectOptions(picker, 'masters')
+    expect(screen.queryByRole('button', { name: 'Lichess filters' })).not.toBeInTheDocument()
+
+    await userEvent.selectOptions(picker, 'lichess')
+    await userEvent.click(screen.getByRole('button', { name: 'Lichess filters' }))
+    const dialog = screen.getByRole('dialog', { name: 'Lichess games in the book' })
+    await userEvent.click(within(dialog).getByRole('button', { name: '2200' }))
+    expect(localStorage.getItem(BOOK_RATINGS_KEY)).toBe('1600,1800,2000,2200')
+
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Done' }))
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   })
 })

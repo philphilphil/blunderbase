@@ -240,10 +240,22 @@ andere Partie zeigt in der Zeile unter dem Brett einen Knopf mit dem Namen der P
 der du kamst – **← phib — Hubert2001** –, und beide führen genau in die Stellung zurück, in
 der du warst.
 
-Der Reiter **Buch** neben **Notizen** zeigt, wie es in deinen eigenen
-Partien von hier aus weiterging; `B` öffnet ihn. Oben steht der Name der Eröffnung, in der
-die Partie gerade ist, und ein Zug, der in eine benannte Eröffnung führt, zeigt ihren Namen
-in der Spalte **Eröffnung**.
+Der Reiter **Buch** neben **Notizen** zeigt, wie es von der Stellung auf dem Brett aus
+weiterging; `B` öffnet ihn. Die Auswahl in seiner Titelzeile bestimmt, aus welchen Partien:
+**Meine Partien** (die Voreinstellung), **Meister** (Turnierpartien zwischen Titelträgern)
+oder **Lichess** (gewertete Partien auf Lichess). Deine Wahl merkt sich dieser Browser.
+
+Bei **Meine Partien** steht oben der Name der Eröffnung, in der die Partie gerade ist, und
+ein Zug, der in eine benannte Eröffnung führt, zeigt ihren Namen in der Spalte
+**Eröffnung**. Bei **Meister** und **Lichess** zeigt jeder Zug, wie viele Partien ihn
+gespielt haben und wie sie für Weiß und Schwarz ausgingen; darunter stehen einige dieser
+Partien, und ein Klick öffnet sie in derselben Ansicht wie im [Explorer](explorer.md). Ist
+**Lichess** gewählt, öffnet der Regler-Knopf neben der Auswahl die Filter: welche
+Bedenkzeiten und welche Wertungsbereiche zählen. Ist die Spalte schmal, treten erst
+**Eröffnung** und dann **Ø verschenkt** zur Seite.
+
+Beide fremden Datenbanken antworten erst, wenn Lichess verbunden ist; bis dahin bietet der
+Reiter **Mit Lichess verbinden** an.
 
 ## Sammlungen { #collections }
 

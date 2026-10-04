@@ -2163,6 +2163,9 @@ export function GameStudio({ game: from }: { game: StudioGame }) {
     <NotesTrack
       book={exploring ? (exploredBook.data ?? null) : detail.book?.[String(boardIndex)]}
       bookPly={analysisPly}
+      // What the masters and Lichess books are asked about: the board's own position, on
+      // the game line or off it.
+      fen={boardPosition?.fen ?? null}
       // Off the game line the name is the last one the game reached before the branch left
       // it — an ancestor of the board, so true, if not as deep as the branch may have gone.
       opening={openingAt(detail.openings, exploring && branch ? branch.base : boardIndex)}

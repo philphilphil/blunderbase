@@ -483,6 +483,7 @@ msgstr "Läuft"
 #: src/components/badges/RunBadge.tsx
 #: src/components/tour/TourCoachmark.tsx
 #: src/routes/engines/CreateRunnerForm.tsx
+#: src/routes/game/components/BookFiltersDialog.tsx
 #: src/routes/game/components/GameCollectionsDialog.tsx
 #: src/routes/import/SyncHistory.tsx
 #: src/routes/mcp/McpKeys.tsx
@@ -919,6 +920,7 @@ msgstr "Seiten"
 #: src/routes/explorer/components/ReferenceMoveTable.tsx
 #: src/routes/game/GamePage.tsx
 #: src/routes/game/components/BookPanel.tsx
+#: src/routes/game/components/ReferenceBook.tsx
 #: src/routes/games/components/GamesTable.tsx
 #: src/routes/stats/StatsPage.tsx
 #: src/routes/stats/cards/TimeControlCard.tsx
@@ -3097,6 +3099,7 @@ msgstr "Was die Meister aus dieser Stellung spielen"
 #: src/routes/explorer/components/MoveTreeTable.tsx
 #: src/routes/explorer/components/ReferenceMoveTable.tsx
 #: src/routes/game/components/BookPanel.tsx
+#: src/routes/game/components/ReferenceBook.tsx
 msgid "Move"
 msgstr "Zug"
 
@@ -3110,6 +3113,7 @@ msgid "Which book"
 msgstr "Welches Buch"
 
 #: src/routes/correspondence/components/BookPane.tsx
+#: src/routes/game/components/NotesTrack.tsx
 msgid "Masters"
 msgstr "Meister"
 
@@ -4252,6 +4256,7 @@ msgstr "Verschenkte Gewinnchance"
 #: src/routes/explorer/components/LineSummary.tsx
 #: src/routes/explorer/components/MoveTreeTable.tsx
 #: src/routes/game/components/BookPanel.tsx
+#: src/routes/game/components/ReferenceBook.tsx
 #: src/routes/stats/StatsPage.tsx
 #: src/routes/stats/cards/ProgressCard.tsx
 #: src/routes/stats/cards/TimeControlCard.tsx
@@ -4291,6 +4296,7 @@ msgstr "Gegenüber dem {windowKey}-Zeitraum davor, sobald es einen zum Vergleich
 #: src/routes/explorer/components/MoveTreeTable.tsx
 #: src/routes/explorer/components/ReferenceMoveTable.tsx
 #: src/routes/game/components/BookPanel.tsx
+#: src/routes/game/components/ReferenceBook.tsx
 #: src/routes/games/components/columns.ts
 #: src/routes/games/filters.ts
 #: src/routes/stats/cards/BlundersByPhaseCard.tsx
@@ -5313,6 +5319,7 @@ msgid "Flip"
 msgstr "Drehen"
 
 #: src/routes/explorer/ExplorerPage.tsx
+#: src/routes/game/components/BookFiltersDialog.tsx
 #: src/routes/live/LivePage.tsx
 #: src/routes/repertoire/RepertoirePage.tsx
 msgid "Reset"
@@ -5782,6 +5789,14 @@ msgstr "Halbzug {ply} / {plyCount}"
 msgid "The engine’s evaluation of this line — it holds along the line, and empties where the board leaves it"
 msgstr "Die Bewertung dieser Variante durch die Engine – sie gilt entlang der Variante und bleibt leer, sobald das Brett sie verlässt"
 
+#: src/routes/game/components/BookFiltersDialog.tsx
+msgid "Lichess games in the book"
+msgstr "Lichess-Partien im Buch"
+
+#: src/routes/game/components/BookFiltersDialog.tsx
+msgid "Which rated games count, by speed and by rating."
+msgstr "Welche gewerteten Partien zählen, nach Bedenkzeit und nach Wertung."
+
 #: src/routes/game/components/BookPanel.tsx
 msgid "None of your games reached this position."
 msgstr "Keine deiner Partien hat diese Stellung erreicht."
@@ -6232,8 +6247,29 @@ msgid "Save note"
 msgstr "Notiz speichern"
 
 #: src/routes/game/components/NotesTrack.tsx
+msgid "My games"
+msgstr "Meine Partien"
+
+#. The site’s own name — keep it as it is.
+#: src/routes/game/components/NotesTrack.tsx
+msgid "Lichess"
+msgstr "Lichess"
+
+#: src/routes/game/components/NotesTrack.tsx
 msgid "Book and notes"
 msgstr "Buch und Notizen"
+
+#: src/routes/game/components/NotesTrack.tsx
+msgid "Which games the book is drawn from"
+msgstr "Aus welchen Partien das Buch stammt"
+
+#: src/routes/game/components/NotesTrack.tsx
+msgid "Lichess filters"
+msgstr "Lichess-Filter"
+
+#: src/routes/game/components/NotesTrack.tsx
+msgid "Lichess filters — speed and rating"
+msgstr "Lichess-Filter – Bedenkzeit und Wertung"
 
 #: src/routes/game/components/NotesTrack.tsx
 msgid "{noteCount, plural, one {# note} other {# notes}}"
@@ -6418,6 +6454,34 @@ msgstr "Wähle einen Gegner, der jetzt spielen kann"
 #: src/routes/game/components/PracticeDialog.tsx
 msgid "Play"
 msgstr "Spielen"
+
+#: src/routes/game/components/ReferenceBook.tsx
+msgid "Lichess did not answer. Try again in a moment."
+msgstr "Lichess hat nicht geantwortet. Versuch es gleich noch einmal."
+
+#: src/routes/game/components/ReferenceBook.tsx
+msgid "No masters game reached this position."
+msgstr "Keine Meisterpartie hat diese Stellung erreicht."
+
+#: src/routes/game/components/ReferenceBook.tsx
+msgid "No rated Lichess game with these filters reached this position."
+msgstr "Keine gewertete Lichess-Partie mit diesen Filtern hat diese Stellung erreicht."
+
+#: src/routes/game/components/ReferenceBook.tsx
+msgid "Masters games from this position"
+msgstr "Meisterpartien aus dieser Stellung"
+
+#: src/routes/game/components/ReferenceBook.tsx
+msgid "Lichess games from this position"
+msgstr "Lichess-Partien aus dieser Stellung"
+
+#: src/routes/game/components/ReferenceBook.tsx
+msgid "Masters games"
+msgstr "Meisterpartien"
+
+#: src/routes/game/components/ReferenceBook.tsx
+msgid "Lichess games"
+msgstr "Lichess-Partien"
 
 #: src/routes/game/components/RowMenu.tsx
 msgid "More for this game"

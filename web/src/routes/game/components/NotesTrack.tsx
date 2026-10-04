@@ -30,17 +30,31 @@
  *
  * There is deliberately no coach card and no per-move prose here. One was built and cut.
  */
+import type { MessageDescriptor } from '@lingui/core'
+import { msg } from '@lingui/core/macro'
 import { Plural, Trans, useLingui } from '@lingui/react/macro'
-import { ArrowUpRight } from 'lucide-react'
+import { ArrowUpRight, Library, SlidersHorizontal } from 'lucide-react'
 import { useState, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 
+import { PickerSelect } from '@/components/ui/native-select'
 import { cn } from '@/lib/utils'
+import { SOURCES, type ExplorerSource } from '@/routes/explorer/reference'
 
+import { bookSource, useBookFilters } from '../bookSource'
 import type { NoteRow } from '../notesModel'
+import { BookFiltersDialog } from './BookFiltersDialog'
 import { BookPanel, type BookEntry, type BookMove } from './BookPanel'
 import { PANE_TOOL, STRIP_FACTS, STRIP_RULE, TAB_ROW } from './paneTabs'
 import { PaneTab, PaneTabList } from './PaneTabList'
+import { ReferenceBook } from './ReferenceBook'
+
+/** The Book's three sources as its picker names them. */
+const SOURCE_NAMES: Record<ExplorerSource, MessageDescriptor> = {
+  mine: msg`My games`,
+  masters: msg`Masters`,
+  lichess: msg({ message: 'Lichess', comment: 'The site’s own name — keep it as it is.' }),
+}
 
 export type NotesTrackTab = 'book' | 'notes'
 
@@ -55,6 +69,11 @@ export interface NotesTrackProps {
   bookPly: number
   /** What the opening book calls the line the board is in (`gameModel.openingAt`). */
   opening?: { eco: string; name: string } | null
+  /**
+   * The position on the board, which is what the masters and Lichess books are asked about
+   * (`ReferenceBook`). The owner's own book arrives ready in `book`; theirs is fetched.
+   */
+  fen?: string | null
   onPlayBookMove?: (move: BookMove) => void
   /**
    * Open the position on the board in `/explorer`, where the same tree has the whole screen
@@ -110,6 +129,7 @@ export function NotesTrack({
   book,
   bookPly,
   opening = null,
+  fen = null,
   onPlayBookMove,
   onPreviewBookMove,
   onOpenInExplorer,
@@ -124,7 +144,7 @@ export function NotesTrack({
   onTabChange,
   className,
 }: NotesTrackProps) {
-  const { t } = useLingui()
+  const { t, i18n } = useLingui()
   // Notes until the reader picks one, and their pick from then on. Deliberately not a
   // function of the position: a default that follows the board is a pane that changes
   // behind the reader's back (see the note above). The game view holds the pick so `B`
@@ -139,6 +159,13 @@ export function NotesTrack({
   // the continuations. Falling back to that sum keeps the tab honest either way.
   const games = book?.games ?? moves.reduce((total, move) => total + (move.games ?? 0), 0)
   const noteCount = notes.length
+
+  // Which book the tab reads, and the Lichess filters (`../bookSource`): per browser, the
+  // owner's own games until they pick another. The filters dialog is the Book's alone.
+  const source = bookSource.use()
+  const filters = useBookFilters()
+  const [filtering, setFiltering] = useState(false)
+  const reference = source !== 'mine'
 
   return (
     <section
@@ -165,16 +192,50 @@ export function NotesTrack({
           </PaneTab>
         </PaneTabList>
         <span className="flex-1" />
+        {/* Which book, on the Book tab: a value picked from a list, so a strip picker — no
+            face at rest among the strip's quiet facts — and beside it, for Lichess only, the
+            way into its filters. Masters is one book with nothing to filter. */}
+        {active === 'book' ? (
+          <PickerSelect
+            label={t`Book`}
+            hideLabel
+            size="strip"
+            value={source}
+            options={SOURCES.map((value) => ({ value, label: i18n._(SOURCE_NAMES[value]) }))}
+            onChange={(value) => bookSource.set(value as ExplorerSource)}
+            title={`${i18n._(SOURCE_NAMES[source])}: ${t`Which games the book is drawn from`}`}
+            leading={<Library className="size-3.5 flex-none text-soft" aria-hidden />}
+            // In a narrow track the name gives way to the icon and ⇅ (the line preview's
+            // picker does the same), so the filters and the explorer arrow stay on the row.
+            className="flex-none self-center @max-[17rem]:[&>span.font-medium]:sr-only"
+          />
+        ) : null}
+        {active === 'book' && source === 'lichess' ? (
+          <button
+            type="button"
+            onClick={() => setFiltering(true)}
+            aria-label={t`Lichess filters`}
+            title={t`Lichess filters — speed and rating`}
+            className={cn(PANE_TOOL, 'ml-0.5 self-center')}
+          >
+            <SlidersHorizontal className="size-3.5" aria-hidden />
+          </button>
+        ) : null}
         {/* The count belongs to whichever pane is open: a fact of the strip, in the quietest
             type on the row — and it is the part that leaves when the track is too narrow for
-            it and the explorer arrow both, since the arrow is the only way out of this pane. */}
-        <span className={cn('flex items-center font-mono', STRIP_FACTS, '@max-[13rem]:hidden')}>
-          {active === 'book' ? (
-            <Plural value={games} one="# game" other="# games" />
-          ) : (
-            <Plural value={noteCount} one="# note" other="# notes" />
-          )}
-        </span>
+            it and the explorer arrow both, since the arrow is the only way out of this pane.
+            A reference book has no count here: its numbers are in the table, by the thousand. */}
+        {active === 'book' && reference ? null : (
+          <span
+            className={cn('ml-2 flex items-center font-mono', STRIP_FACTS, '@max-[13rem]:hidden')}
+          >
+            {active === 'book' ? (
+              <Plural value={games} one="# game" other="# games" />
+            ) : (
+              <Plural value={noteCount} one="# note" other="# notes" />
+            )}
+          </span>
+        )}
         {/*
           The way out to the full explorer, on the Book tab only: this pane is four columns
           of a seven-column table and has no room for the reference books, the line summary
@@ -183,7 +244,7 @@ export function NotesTrack({
           back to this game, so following it is not leaving the game behind.
         */}
         {active === 'book' && onOpenInExplorer ? (
-          <span aria-hidden className={cn(STRIP_RULE, 'ml-2 self-center')} />
+          <span aria-hidden className={cn(STRIP_RULE, 'ml-2 self-center @max-[17rem]:hidden')} />
         ) : null}
         {active === 'book' && onOpenInExplorer ? (
           <button
@@ -209,7 +270,19 @@ export function NotesTrack({
         aria-labelledby={active === 'book' ? 'notes-track-tab-book' : 'notes-track-tab-notes'}
         className="min-h-0 overflow-y-auto"
       >
-        {active === 'book' ? (
+        {active === 'book' && reference ? (
+          fen ? (
+            <ReferenceBook
+              source={source}
+              fen={fen}
+              ply={bookPly}
+              speeds={filters.speeds}
+              ratings={filters.ratings}
+              onPlay={onPlayBookMove}
+              onPreview={onPreviewBookMove}
+            />
+          ) : null
+        ) : active === 'book' ? (
           <>
             {/* The name heads the pane rather than sitting on the tab row: that row is 35
                 design pixels with two tabs, a count and the explorer arrow already on it,
@@ -264,6 +337,8 @@ export function NotesTrack({
       >
         {composer}
       </div>
+
+      {filtering ? <BookFiltersDialog onClose={() => setFiltering(false)} /> : null}
     </section>
   )
 }

@@ -483,6 +483,7 @@ msgstr "Running"
 #: src/components/badges/RunBadge.tsx
 #: src/components/tour/TourCoachmark.tsx
 #: src/routes/engines/CreateRunnerForm.tsx
+#: src/routes/game/components/BookFiltersDialog.tsx
 #: src/routes/game/components/GameCollectionsDialog.tsx
 #: src/routes/import/SyncHistory.tsx
 #: src/routes/mcp/McpKeys.tsx
@@ -919,6 +920,7 @@ msgstr "Pages"
 #: src/routes/explorer/components/ReferenceMoveTable.tsx
 #: src/routes/game/GamePage.tsx
 #: src/routes/game/components/BookPanel.tsx
+#: src/routes/game/components/ReferenceBook.tsx
 #: src/routes/games/components/GamesTable.tsx
 #: src/routes/stats/StatsPage.tsx
 #: src/routes/stats/cards/TimeControlCard.tsx
@@ -3097,6 +3099,7 @@ msgstr "What the masters play from this position"
 #: src/routes/explorer/components/MoveTreeTable.tsx
 #: src/routes/explorer/components/ReferenceMoveTable.tsx
 #: src/routes/game/components/BookPanel.tsx
+#: src/routes/game/components/ReferenceBook.tsx
 msgid "Move"
 msgstr "Move"
 
@@ -3110,6 +3113,7 @@ msgid "Which book"
 msgstr "Which book"
 
 #: src/routes/correspondence/components/BookPane.tsx
+#: src/routes/game/components/NotesTrack.tsx
 msgid "Masters"
 msgstr "Masters"
 
@@ -4252,6 +4256,7 @@ msgstr "Win % given away"
 #: src/routes/explorer/components/LineSummary.tsx
 #: src/routes/explorer/components/MoveTreeTable.tsx
 #: src/routes/game/components/BookPanel.tsx
+#: src/routes/game/components/ReferenceBook.tsx
 #: src/routes/stats/StatsPage.tsx
 #: src/routes/stats/cards/ProgressCard.tsx
 #: src/routes/stats/cards/TimeControlCard.tsx
@@ -4291,6 +4296,7 @@ msgstr "Against the {windowKey} before this one, once there is one to compare."
 #: src/routes/explorer/components/MoveTreeTable.tsx
 #: src/routes/explorer/components/ReferenceMoveTable.tsx
 #: src/routes/game/components/BookPanel.tsx
+#: src/routes/game/components/ReferenceBook.tsx
 #: src/routes/games/components/columns.ts
 #: src/routes/games/filters.ts
 #: src/routes/stats/cards/BlundersByPhaseCard.tsx
@@ -5313,6 +5319,7 @@ msgid "Flip"
 msgstr "Flip"
 
 #: src/routes/explorer/ExplorerPage.tsx
+#: src/routes/game/components/BookFiltersDialog.tsx
 #: src/routes/live/LivePage.tsx
 #: src/routes/repertoire/RepertoirePage.tsx
 msgid "Reset"
@@ -5782,6 +5789,14 @@ msgstr "ply {ply} / {plyCount}"
 msgid "The engine’s evaluation of this line — it holds along the line, and empties where the board leaves it"
 msgstr "The engine’s evaluation of this line — it holds along the line, and empties where the board leaves it"
 
+#: src/routes/game/components/BookFiltersDialog.tsx
+msgid "Lichess games in the book"
+msgstr "Lichess games in the book"
+
+#: src/routes/game/components/BookFiltersDialog.tsx
+msgid "Which rated games count, by speed and by rating."
+msgstr "Which rated games count, by speed and by rating."
+
 #: src/routes/game/components/BookPanel.tsx
 msgid "None of your games reached this position."
 msgstr "None of your games reached this position."
@@ -6232,8 +6247,29 @@ msgid "Save note"
 msgstr "Save note"
 
 #: src/routes/game/components/NotesTrack.tsx
+msgid "My games"
+msgstr "My games"
+
+#. The site’s own name — keep it as it is.
+#: src/routes/game/components/NotesTrack.tsx
+msgid "Lichess"
+msgstr "Lichess"
+
+#: src/routes/game/components/NotesTrack.tsx
 msgid "Book and notes"
 msgstr "Book and notes"
+
+#: src/routes/game/components/NotesTrack.tsx
+msgid "Which games the book is drawn from"
+msgstr "Which games the book is drawn from"
+
+#: src/routes/game/components/NotesTrack.tsx
+msgid "Lichess filters"
+msgstr "Lichess filters"
+
+#: src/routes/game/components/NotesTrack.tsx
+msgid "Lichess filters — speed and rating"
+msgstr "Lichess filters — speed and rating"
 
 #: src/routes/game/components/NotesTrack.tsx
 msgid "{noteCount, plural, one {# note} other {# notes}}"
@@ -6418,6 +6454,34 @@ msgstr "Choose an opponent that can play right now"
 #: src/routes/game/components/PracticeDialog.tsx
 msgid "Play"
 msgstr "Play"
+
+#: src/routes/game/components/ReferenceBook.tsx
+msgid "Lichess did not answer. Try again in a moment."
+msgstr "Lichess did not answer. Try again in a moment."
+
+#: src/routes/game/components/ReferenceBook.tsx
+msgid "No masters game reached this position."
+msgstr "No masters game reached this position."
+
+#: src/routes/game/components/ReferenceBook.tsx
+msgid "No rated Lichess game with these filters reached this position."
+msgstr "No rated Lichess game with these filters reached this position."
+
+#: src/routes/game/components/ReferenceBook.tsx
+msgid "Masters games from this position"
+msgstr "Masters games from this position"
+
+#: src/routes/game/components/ReferenceBook.tsx
+msgid "Lichess games from this position"
+msgstr "Lichess games from this position"
+
+#: src/routes/game/components/ReferenceBook.tsx
+msgid "Masters games"
+msgstr "Masters games"
+
+#: src/routes/game/components/ReferenceBook.tsx
+msgid "Lichess games"
+msgstr "Lichess games"
 
 #: src/routes/game/components/RowMenu.tsx
 msgid "More for this game"
