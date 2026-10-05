@@ -1,6 +1,6 @@
 import { Trans, useLingui } from '@lingui/react/macro'
 import { Loader2, Trash2, X } from 'lucide-react'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 
 import { Button } from '@/components/ui/button'
 import { FIELD } from '@/components/ui/input'
@@ -27,10 +27,19 @@ export interface NoteComposerProps {
   className?: string
 }
 
-/** How many suggestions the tag box offers at once — a list, not a catalogue. */
 /** The textarea's DOM id: the page focuses it from the Note button and the move list. */
 export const COMPOSER_TEXT_ID = 'note-composer-text'
 
+/**
+ * The box's two heights. At rest it is one field at the control height (`Input`'s `h-8`);
+ * open it is the box the fixed slot used to be — that slot was 9rem, less the slot's own
+ * padding — which fits three or four lines of a note over the row of tags and buttons.
+ * Exported so the track can reserve the resting one and the loading skeleton can draw it.
+ */
+export const COMPOSER_REST = 'h-8'
+export const COMPOSER_OPEN = 'h-[8.125rem]'
+
+/** How many suggestions the tag box offers at once — a list, not a catalogue. */
 const MAX_SUGGESTIONS = 6
 
 /** What the box was last filled from: a note of this game's, or nothing. */
@@ -84,9 +93,32 @@ function sameTags(left: readonly string[], right: readonly string[]): boolean {
  * the trimmed text alone, because trimming and an uncommitted tag both make the round trip
  * differ from what was typed.
  *
- * The composer is sized by its slot rather than by its contents (the eval curve's, on the
- * game page): the text box takes what is left under the one row that must stay reachable, so
- * the tags and the save button are on screen at every height that column can be.
+ * AT REST IT IS ONE LINE (#45). The box used to hold a fixed nine-rem slot under the Book and
+ * Notes track whether or not anybody was writing, and that slot was half of why the book got
+ * three rows. So it now has two heights and decides between them itself: a single sunk field
+ * — "Add a note…", or the first line of the note already here — and, the moment focus enters
+ * it (a click, Tab, `N`, the Note button, a Notes-tab row), the whole box, text over the one
+ * row of caption, tags and buttons. The same textarea element in both, only its classes
+ * changing, so focus never moves and a caret is never lost to a remount. Its slot — at the
+ * foot of the move table on the desktop, of the Notes tab on the phone — stays at the
+ * one-line height and the box grows *upward* out of it as an overlay (`ComposerSlot`), so
+ * opening it reflows nothing and the box does not move while anyone types.
+ *
+ * It folds back when focus leaves and nothing in it is unsaved. Leaving already saves a
+ * changed note (below), so the common case is: write, click away, it is saved and folds.
+ * What it will not do is fold away a draft it could not save — empty text with tags, a save
+ * still in flight, a save that failed (`error`, for as long as the box is still where it
+ * failed): that stays open, in sight, until it is saved or cleared. Folding it would not
+ * delete it, but a draft nobody can see is a draft somebody forgets, and "never lose typed
+ * text" includes not hiding it.
+ *
+ * A click on the open box that lands on nothing focusable — its padding, the caption, the
+ * empty end of the button row — keeps focus where it was (the `onMouseDown` below), or the
+ * focus would go to the page and the box would fold under the pointer.
+ *
+ * Open, it is sized by the height it is handed rather than by its contents: the text box
+ * takes what is left under the one row that must stay reachable, so the tags and the save
+ * button are on screen at every height the overlay can be squeezed to.
  *
  * Tags are chips: typed with Enter or a comma, offered from what has been used before, and
  * removed by clicking them. Nothing is normalised here beyond trimming and case-folding
@@ -110,15 +142,27 @@ export function NoteComposer({
   const [tags, setTags] = useState<string[]>(loaded.tags)
   const [draft, setDraft] = useState('')
   const [tagging, setTagging] = useState(false)
+  /** Whether focus is anywhere inside the box — the text, the tag field, a button. */
+  const [focused, setFocused] = useState(false)
+  const textRef = useRef<HTMLTextAreaElement>(null)
 
   // Which position, and which note on it, the box is currently filled from.
   const here = `${targetKey(target)}|${note?.id ?? ''}`
   const [filledFor, setFilledFor] = useState(here)
+  /**
+   * A failed save's error, once the box has moved on from where it failed. The page's
+   * mutation keeps its error until that same mutation runs again, which may be never — so
+   * without this one failure would hold the box open, message and all, at every position
+   * the reader visits afterwards. An error is the box's business only where it happened; a
+   * new failure is a new error object and shows again.
+   */
+  const [dismissed, setDismissed] = useState<Error | null>(null)
   if (here !== filledFor) {
     // State adjusted during the render that saw the prop move, which is what React asks
     // for here: the alternative is an effect, and an effect would paint the old note's
     // text under the new position's caption for a frame.
     setFilledFor(here)
+    if (error) setDismissed(error)
     const next = loadedFrom(note)
     // Text that matches the note now hanging here is not a draft: it is the note this box
     // just saved, come back from the server with its id. Without this the words typed into
@@ -176,6 +220,19 @@ export function NoteComposer({
   const dirty =
     text.trim() !== loaded.text.trim() || !sameTags(tags, loaded.tags) || draft.trim().length > 0
 
+  const failed = error && error !== dismissed ? error : null
+
+  // Open while somebody is in it, and while it holds anything they would lose sight of by
+  // its folding — see the note above.
+  const open = focused || dirty || !!failed
+
+  // Folded, the one-line field shows the *first* line of what it holds, which is only true
+  // if it is scrolled back to the top: a long note edited at its end would otherwise fold to
+  // whichever line the caret left in view.
+  useEffect(() => {
+    if (!open && textRef.current) textRef.current.scrollTop = 0
+  }, [open])
+
   function save() {
     if (!ready) return
     // A tag half-typed and never committed is still a tag the reader meant.
@@ -201,10 +258,33 @@ export function NoteComposer({
   return (
     <section
       data-testid="note-composer"
+      data-state={open ? 'open' : 'closed'}
       className={cn(
-        'flex min-h-0 flex-col gap-1.5 overflow-y-auto rounded-md border border-hairline bg-elevated px-3 py-1.5',
+        'flex min-h-0 flex-col rounded-md',
+        // Open: today's box — its own raised surface, and a shadow because it now lies over
+        // the pane above rather than in a slot of its own. `COMPOSER_OPEN` is the height it
+        // asks for; the pane may hand it less, and the text box is what gives.
+        // Folded: nothing but the field, at the control height, with no card around it — a
+        // card around one line is furniture.
+        open
+          ? cn(
+              COMPOSER_OPEN,
+              'gap-1.5 overflow-y-auto border border-hairline bg-elevated px-3 py-1.5 shadow-lg',
+            )
+          : COMPOSER_REST,
         className,
       )}
+      onFocus={() => setFocused(true)}
+      // A press anywhere in the box but its two fields keeps focus where it is. On the
+      // padding, the caption or the row's empty end it would otherwise go to the page and
+      // fold the box under the pointer; on a button — where a click does not focus one
+      // (Safari) — pressing Delete or a tag chip would blur the text, fold the box and
+      // unmount the button before the click landed. The fields still take their click.
+      onMouseDown={(event) => {
+        if (!(event.target instanceof Element && event.target.closest('textarea,input'))) {
+          event.preventDefault()
+        }
+      }}
       // Leaving the composer saves it: clicking a move, the board, or anywhere else. The
       // button stays for the reader who wants to see it happen, but a note should not be
       // lost to a click elsewhere. Focus moving *within* the composer (text → tags → button)
@@ -212,11 +292,13 @@ export function NoteComposer({
       onBlur={(event) => {
         const next = event.relatedTarget
         if (next instanceof Node && event.currentTarget.contains(next)) return
+        setFocused(false)
         if (dirty && ready) save()
       }}
     >
       {/* The one multi-line field (`Textarea`): sunk, so it cannot be taken for a button. */}
       <Textarea
+        ref={textRef}
         id={COMPOSER_TEXT_ID}
         value={text}
         onChange={(event) => setText(event.target.value)}
@@ -232,154 +314,187 @@ export function NoteComposer({
             save()
           }
         }}
+        // Folded, the field says what it is for in three words; open, it asks the question
+        // the note answers.
         placeholder={
-          target.kind === 'game'
-            ? t`What is worth remembering about this game?`
-            : t`What is worth remembering about this position?`
+          !open
+            ? t`Add a note…`
+            : target.kind === 'game'
+              ? t`What is worth remembering about this game?`
+              : t`What is worth remembering about this position?`
         }
         aria-label={t`Note text`}
         // The box is what gives way when the column is short: `min-h-0`, so what shrinks is
-        // the writing and never the row under it, and no resize handle — the slot decides
-        // the height now.
-        className="min-h-0 flex-1 resize-none px-2.5 text-lead text-ink"
+        // the writing and never the row under it, and no resize handle — the overlay decides
+        // the height. Folded it is one line that does not scroll: a field, not a viewer.
+        className={cn(
+          'min-h-0 flex-1 resize-none px-2.5 text-lead text-ink',
+          !open && 'overflow-hidden py-1',
+        )}
       />
 
       {/*
         Where the note hangs, its tags and both buttons on one row.
 
-        The slot this composer lives in is a hundred-odd pixels tall at the heights the page
-        is actually read at — the board above it is sized by its width and gives up nothing —
-        and a caption, a tag row and a button row stacked under the text box do not fit in
-        it: what went off the bottom of the viewport was the save button, and before that the
-        eval curve. One row fits, and the box above it is what shrinks.
+        The open box is a hundred-odd pixels tall at the heights the page is actually read at
+        — the panes around it are sized first and give up nothing — and a caption, a tag row
+        and a button row stacked under the text box do not fit in it: what went off the
+        bottom of the viewport was the save button, and before that the eval curve. One row
+        fits, and the box above it is what shrinks.
 
         It is stuck to the bottom rather than merely last, because a text box cannot shrink
         below its own padding: at some height something still has to give, and what gives is
         the writing, which scrolls under a row that stays where it is.
+
+        The row only exists while the box is open, so its buttons must not take focus on a
+        press — see the section's `onMouseDown`, which holds focus where it is for every
+        press that is not on a field.
       */}
-      <div className="sticky bottom-0 z-10 flex shrink-0 flex-nowrap items-center gap-1.5 bg-elevated">
-        {/*
-          Suggestions — and a failed save — sit *over* the box rather than in the column, for
-          the same reason: a row that only sometimes exists is a row that sometimes pushes
-          the buttons out, and the one time an error must be readable is the one time the
-          composer is at its fullest. Suggestions are offered while the tag box is being used
-          rather than whenever it is empty, because over a text box this short they would be
-          covering the note itself.
-        */}
-        {error ? (
-          <p className="absolute inset-x-0 bottom-full mb-1 truncate rounded-md border border-blunder/40 bg-raised px-1.5 py-1 text-label text-body shadow-md">
-            {error.message}
-          </p>
-        ) : null}
-        {!error && suggestions.length > 0 && (tagging || draft.trim().length > 0) ? (
-          <div
-            // `bg-selected` and a strong edge, not `bg-raised`: the strip floats over the
-            // composer's own `bg-elevated`, and two shades one step apart read as one surface
-            // with some words on it rather than a list laid on top.
-            className="absolute inset-x-0 bottom-full mb-1 flex flex-wrap gap-1 rounded-md border border-edge-strong bg-selected px-1.5 py-1 shadow-lg"
-            data-testid="tag-suggestions"
-          >
-            {suggestions.map((tag) => (
-              <button
-                key={tag}
-                type="button"
-                // The blur a click causes would take the strip away before the click had
-                // anywhere to land.
-                onMouseDown={(event) => event.preventDefault()}
-                onClick={() => addTag(tag)}
-                className="rounded-sm border border-edge bg-elevated px-1.5 py-0.5 font-mono text-label text-soft hover:border-accent-teal/50 hover:text-ink"
-              >
-                {tag}
-              </button>
-            ))}
-          </div>
-        ) : null}
-
-        <h2 className="shrink-0 font-mono text-label text-dim">
-          {/* The one place the box names what it is about: on the game entire the board
-              above it says nothing about that, and a filled-in box hides the placeholder. */}
-          {target.kind === 'game' ? (
-            <span className="text-soft">
-              <Trans>about the game</Trans>
-            </span>
+      {open ? (
+        <div className="sticky bottom-0 z-10 flex shrink-0 flex-nowrap items-center gap-1.5 bg-elevated">
+          {/*
+            Suggestions — and a failed save — sit *over* the box rather than in the column,
+            for the same reason: a row that only sometimes exists is a row that sometimes
+            pushes the buttons out, and the one time an error must be readable is the one
+            time the composer is at its fullest. Suggestions are offered while the tag box is
+            being used rather than whenever it is empty, because over a text box this short
+            they would be covering the note itself.
+          */}
+          {failed ? (
+            <p className="absolute inset-x-0 bottom-full mb-1 truncate rounded-md border border-blunder/40 bg-raised px-1.5 py-1 text-label text-body shadow-md">
+              {failed.message}
+            </p>
           ) : null}
-          {/* No "Note on 8.Bc4": the box sits under the board, so the position it is about
-              is the one on screen. Only what is not obvious is said. */}
-          {/* Only a new note pins anything: a rewrite of one already on this line is a
-              `PATCH` of its words, and the line it hangs on was pinned when it was written. */}
-          {/* No "edit" either: a box that comes up already filled in says so by itself,
-              and the delete button beside Save is only there for a note that exists. */}
-          {target.line && editing === null ? (
-            <span className="text-brilliant">
-              <Trans>pins the line</Trans>
-            </span>
+          {!failed && suggestions.length > 0 && (tagging || draft.trim().length > 0) ? (
+            <div
+              // `bg-selected` and a strong edge, not `bg-raised`: the strip floats over the
+              // composer's own `bg-elevated`, and two shades one step apart read as one
+              // surface with some words on it rather than a list laid on top.
+              className="absolute inset-x-0 bottom-full mb-1 flex flex-wrap gap-1 rounded-md border border-edge-strong bg-selected px-1.5 py-1 shadow-lg"
+              data-testid="tag-suggestions"
+            >
+              {suggestions.map((tag) => (
+                <button
+                  key={tag}
+                  type="button"
+                  // The blur a click causes would take the strip away before the click had
+                  // anywhere to land.
+                  onMouseDown={(event) => event.preventDefault()}
+                  onClick={() => addTag(tag)}
+                  className="rounded-sm border border-edge bg-elevated px-1.5 py-0.5 font-mono text-label text-soft hover:border-accent-teal/50 hover:text-ink"
+                >
+                  {tag}
+                </button>
+              ))}
+            </div>
           ) : null}
-        </h2>
 
-        {tags.map((tag) => (
-          <button
-            key={tag}
-            type="button"
-            onClick={() => setTags((current) => current.filter((entry) => entry !== tag))}
-            title={t`Remove “${tag}”`}
-            className="flex items-center gap-1 rounded-sm border border-edge bg-chip-info px-1.5 py-0.5 font-mono text-label text-soft hover:text-ink"
-          >
-            {tag}
-            <X className="size-2.5" aria-hidden />
-          </button>
-        ))}
-        <input
-          value={draft}
-          onChange={(event) => setDraft(event.target.value)}
-          onFocus={() => setTagging(true)}
-          onBlur={() => setTagging(false)}
-          onKeyDown={(event) => {
-            if (event.key === 'Enter' || event.key === ',') {
-              event.preventDefault()
-              addTag(draft)
-              return
-            }
-            // Backspace on an empty box takes the last chip back, as a chip list should.
-            if (event.key === 'Backspace' && draft === '') setTags((current) => current.slice(0, -1))
-          }}
-          placeholder={t`tag…`}
-          aria-label={t`Tags`}
-          // A field like the text box above it (FIELD: sunk, its own fill), at the row's h-6.
-          className={cn(FIELD, 'h-6 w-24 min-w-[4rem] flex-1 px-2 font-mono text-label text-ink')}
-        />
+          <h2 className="shrink-0 font-mono text-label text-dim">
+            {/* The one place the box names what it is about: on the game entire the board
+                above it says nothing about that, and a filled-in box hides the placeholder. */}
+            {target.kind === 'game' ? (
+              <span className="text-soft">
+                <Trans>about the game</Trans>
+              </span>
+            ) : null}
+            {/* No "Note on 8.Bc4": the box sits under the board, so the position it is
+                about is the one on screen. Only what is not obvious is said. */}
+            {/* Only a new note pins anything: a rewrite of one already on this line is a
+                `PATCH` of its words, and the line it hangs on was pinned when it was
+                written. */}
+            {/* No "edit" either: a box that comes up already filled in says so by itself,
+                and the delete button beside Save is only there for a note that exists. */}
+            {target.line && editing === null ? (
+              <span className="text-brilliant">
+                <Trans>pins the line</Trans>
+              </span>
+            ) : null}
+          </h2>
 
-        {/* The standard buttons at the control row's size: Save is the region's one
-            primary action, so the filled accent (the one disabled look — no face — until
-            there is something to save, with a title saying so); Delete is the tool button's
-            square beside it, red only under the pointer. */}
-        <Button
-          type="button"
-          size="sm"
-          disabled={!ready}
-          title={
-            pending ? t`Saving the note…` : ready ? t`Save this note (Enter)` : t`Write something to save`
-          }
-          onClick={save}
-        >
-          {pending ? <Loader2 className="animate-spin" aria-hidden /> : null}
-          <Trans>Save note</Trans>
-        </Button>
-        {/* ⌘↵ saves and Escape leaves the box; the box itself is always there, so there is
-            no Cancel to press. */}
-        {editing !== null && onDelete ? (
+          {tags.map((tag) => (
+            <button
+              key={tag}
+              type="button"
+              onClick={() => {
+                // The chip goes, so the keyboard goes back to the text first: a focused
+                // element that is unmounted takes focus to the page without a blur in every
+                // browser, and the box would think it still had somebody in it.
+                textRef.current?.focus()
+                setTags((current) => current.filter((entry) => entry !== tag))
+              }}
+              title={t`Remove “${tag}”`}
+              className="flex items-center gap-1 rounded-sm border border-edge bg-chip-info px-1.5 py-0.5 font-mono text-label text-soft hover:text-ink"
+            >
+              {tag}
+              <X className="size-2.5" aria-hidden />
+            </button>
+          ))}
+          <input
+            value={draft}
+            onChange={(event) => setDraft(event.target.value)}
+            onFocus={() => setTagging(true)}
+            onBlur={() => setTagging(false)}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter' || event.key === ',') {
+                event.preventDefault()
+                addTag(draft)
+                return
+              }
+              // Backspace on an empty box takes the last chip back, as a chip list should.
+              if (event.key === 'Backspace' && draft === '')
+                setTags((current) => current.slice(0, -1))
+            }}
+            placeholder={t`tag…`}
+            aria-label={t`Tags`}
+            // A field like the text box above it (FIELD: sunk, its own fill), at the row's
+            // h-6.
+            className={cn(
+              FIELD,
+              'h-6 w-24 min-w-[4rem] flex-1 px-2 font-mono text-label text-ink',
+            )}
+          />
+
+          {/* The standard buttons at the control row's size: Save is the region's one
+              primary action, so the filled accent (the one disabled look — no face — until
+              there is something to save, with a title saying so); Delete is the tool
+              button's square beside it, red only under the pointer. */}
           <Button
             type="button"
-            variant="secondary"
-            size="icon-sm"
-            onClick={() => onDelete(editing)}
-            aria-label={t`Delete this note`}
-            title={t`Delete this note`}
-            className="text-soft hover:not-disabled:border-blunder/40 hover:not-disabled:text-blunder"
+            size="sm"
+            disabled={!ready}
+            title={
+              pending
+                ? t`Saving the note…`
+                : ready
+                  ? t`Save this note (Enter)`
+                  : t`Write something to save`
+            }
+            onClick={save}
           >
-            <Trash2 className="size-3.5" aria-hidden />
+            {pending ? <Loader2 className="animate-spin" aria-hidden /> : null}
+            <Trans>Save note</Trans>
           </Button>
-        ) : null}
-      </div>
+          {/* ⌘↵ saves and Escape leaves the box; the box itself is always there, so there
+              is no Cancel to press. */}
+          {editing !== null && onDelete ? (
+            <Button
+              type="button"
+              variant="secondary"
+              size="icon-sm"
+              onClick={() => {
+                // As for a chip: the button leaves with the note, so the text keeps focus.
+                textRef.current?.focus()
+                onDelete(editing)
+              }}
+              aria-label={t`Delete this note`}
+              title={t`Delete this note`}
+              className="text-soft hover:not-disabled:border-blunder/40 hover:not-disabled:text-blunder"
+            >
+              <Trash2 className="size-3.5" aria-hidden />
+            </Button>
+          ) : null}
+        </div>
+      ) : null}
     </section>
   )
 }

@@ -199,6 +199,17 @@ Read the game, then press it — that game speaks from then on, and the others a
 `N` writes a note about the position on the board; **Enter** saves it, **Shift+Enter** is a
 new line. Notes come back in every game that reaches that position — see [Notes](notes.md).
 
+The note box sits at the foot of the move list, so **Book** and **Notes** beside it have
+their whole height. At rest it is one line — **Add a note…**, or the first line of the note
+already on this position. Click into it, or press `N` or the **Note** button, and it opens
+upward over the move list, with the tags and **Save note** under the text; nothing else on
+the screen moves. Click anywhere else, or press Escape, and what you wrote is saved and the
+box folds back to one line. A note it could not save — an earlier save still on its way, or
+one that failed — keeps the box open until it is saved or cleared; a failed save's message
+goes once you step to another move. On a game that is not in your library the box is a
+line saying so instead, and the **Notes** tab says why. On a phone the box is at the foot
+of the **Notes** tab.
+
 Not every thought is about a square. "Played this on no sleep", "the plan was wrong from
 the opening" — that is about the game, and written on move one it would come back under
 every game that opened the same way. So the first row of the **Notes** tab is always this

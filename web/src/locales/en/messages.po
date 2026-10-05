@@ -5694,6 +5694,10 @@ msgid "Notes hang off a game in your library. Add this one and it can be annotat
 msgstr "Notes hang off a game in your library. Add this one and it can be annotated like any other — counted in no statistic, since you did not play it."
 
 #: src/routes/game/GamePage.tsx
+msgid "Add this game to your library to write notes on it."
+msgstr "Add this game to your library to write notes on it."
+
+#: src/routes/game/GamePage.tsx
 msgid "Moves column width"
 msgstr "Moves column width"
 
@@ -6191,6 +6195,10 @@ msgstr "Time left at the end"
 #: src/routes/game/components/MoveTimeGraph.tsx
 msgid "left"
 msgstr "left"
+
+#: src/routes/game/components/NoteComposer.tsx
+msgid "Add a note…"
+msgstr "Add a note…"
 
 #: src/routes/game/components/NoteComposer.tsx
 msgid "What is worth remembering about this game?"

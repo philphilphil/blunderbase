@@ -88,9 +88,10 @@ export interface MobileGameViewProps {
   /** `MaiaPanel` — the human column and the engine pane, the live search a tab of the latter. */
   maiaPanel: ReactNode
   /**
-   * `NotesTrack` — Book and Notes behind one tab row, with the note composer pinned under
-   * both. It is the whole of the Notes tab: the desktop's second track, unchanged, which is
-   * what keeps the book the phone sees and the book the desktop sees the same panel.
+   * `NotesTrack` — Book and Notes behind one tab row, with the note composer docked under
+   * both. It is the whole of the Notes tab: the desktop's second track, plus the composer
+   * the desktop docks under its move table, which keeps the book the phone sees and the
+   * book the desktop sees the same panel.
    */
   notesTrack: ReactNode
 }
@@ -208,10 +209,12 @@ export function MobileGameView({
         ) : shown === 'notes' ? (
           /*
             The desktop's notes track, whole: Book when the position has one, the game's
-            notes otherwise, and the composer pinned underneath like a message box. Reading
-            what is already written is the common visit and belongs where the eye lands; the
+            notes otherwise, and the composer docked underneath like a message box — one
+            line until it is tapped, then the whole box laid over the list. Reading what is
+            already written is the common visit and belongs where the eye lands; the
             composer is where a phone keyboard will push it anyway, and the Note button in
-            the transport row switches to this tab and focuses it (`GamePage`).
+            the transport row switches to this tab and focuses it, which opens it
+            (`GamePage`).
           */
           notesTrack
         ) : (

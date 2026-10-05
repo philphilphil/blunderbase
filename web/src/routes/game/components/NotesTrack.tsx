@@ -1,12 +1,12 @@
 /**
- * The right column's second track: Notes and Book behind a tab, with the note composer
- * pinned underneath both of them.
+ * The right column's second track: Notes and Book behind a tab.
  *
- * THE COMPOSER IS NOT IN THE TAB PANE, and that is the whole point of this component. It
- * belongs to the position on the board, not to what the reader is looking up, so it stays
- * put under either tab and switching tabs never moves the box somebody is typing in. It is
- * rendered after an explicit spacer rather than merely last, so it is at the bottom of the
- * track at every height the track can be.
+ * THE NOTE COMPOSER IS NOT IN THE TAB PANE. It belongs to the position on the board, not to
+ * what the reader is looking up, so switching tabs never moves the box somebody is typing
+ * in. On the desktop it is not in this track at all: it sits at the foot of the move table
+ * (#45), so the book and the notes have the track's whole height. On the phone, where the
+ * moves are a tab of their own, this is the Notes tab and the composer is passed in and
+ * docked at its floor (`./composerDock`), one line until it is used.
  *
  * Book and Notes share one pane because they answer the same question at two scopes — what
  * happened here before, and what you wrote about it — and because they are never both
@@ -45,6 +45,8 @@ import { bookSource, useBookFilters } from '../bookSource'
 import type { NoteRow } from '../notesModel'
 import { BookFiltersDialog } from './BookFiltersDialog'
 import { BookPanel, type BookEntry, type BookMove } from './BookPanel'
+import { DOCK, DOCK_CLEARANCE } from './composerDock'
+import { ComposerSlot } from './ComposerSlot'
 import { PANE_TOOL, STRIP_FACTS, STRIP_RULE, TAB_ROW } from './paneTabs'
 import { PaneTab, PaneTabList } from './PaneTabList'
 import { ReferenceBook } from './ReferenceBook'
@@ -105,25 +107,23 @@ export interface NotesTrackProps {
    */
   originState?: { from: string; label?: string }
 
-  /** The `<NoteComposer/>` for the position on the board. Rendered, never wrapped in a tab. */
-  composer: ReactNode
+  /**
+   * What the Notes tab says when it has no rows, in place of "No notes in this game yet." —
+   * a game nobody can write on says *why*, which the one-line composer slot only has room
+   * to hint at.
+   */
+  emptyNotes?: string
+  /**
+   * The `<NoteComposer/>` for the position on the board, docked at the track's floor and
+   * never wrapped in a tab — the phone's. The desktop docks it under the move table instead
+   * and passes none.
+   */
+  composer?: ReactNode
   /** The open tab, when the page holds it. */
   tab?: NotesTrackTab
   onTabChange?: (tab: NotesTrackTab) => void
   className?: string
 }
-
-/**
- * The composer's slot, as a definite height.
- *
- * `NoteComposer` is written to be sized by its slot — its text box takes what is left under
- * the one row that must stay reachable — so it needs a container with a height rather than
- * one derived from its own contents, or the textarea's `flex-1` has nothing to resolve
- * against. A fixed slot is also what guarantees the promise this component makes: the box
- * cannot move when the tab above it changes, because nothing above it can change its size.
- */
-const COMPOSER_SLOT = 'h-[9rem]'
-
 
 export function NotesTrack({
   book,
@@ -139,6 +139,7 @@ export function NotesTrack({
   onWriteGameNote,
   gameNoteActive = false,
   originState,
+  emptyNotes,
   composer,
   tab,
   onTabChange,
@@ -170,7 +171,7 @@ export function NotesTrack({
   return (
     <section
       data-testid="notes-track"
-      className={cn('flex min-h-0 min-w-0 flex-col', className)}
+      className={cn('flex min-h-0 min-w-0 flex-col', composer !== undefined && DOCK, className)}
     >
       <div className={cn(TAB_ROW, '@container')}>
         <PaneTabList label={t`Book and notes`}>
@@ -261,14 +262,14 @@ export function NotesTrack({
 
       {/*
         The pane shrinks and scrolls; it never grows. What takes the room the panes do not
-        want is the spacer below, which is what keeps the composer on the floor of the track
-        rather than floating up under a short list.
+        want is the spacer below, which is what keeps a docked composer on the floor of the
+        track rather than floating up under a short list.
       */}
       <div
         role="tabpanel"
         id="notes-track-pane"
         aria-labelledby={active === 'book' ? 'notes-track-tab-book' : 'notes-track-tab-notes'}
-        className="min-h-0 overflow-y-auto"
+        className={cn('min-h-0 overflow-y-auto', composer !== undefined && DOCK_CLEARANCE)}
       >
         {active === 'book' && reference ? (
           fen ? (
@@ -313,6 +314,7 @@ export function NotesTrack({
             onSelect={onSelectNote}
             onWriteGameNote={onWriteGameNote}
             gameNoteActive={gameNoteActive}
+            empty={emptyNotes}
             originState={originState}
           />
         )}
@@ -320,23 +322,7 @@ export function NotesTrack({
 
       <div className="min-h-0 flex-1" />
 
-      {/*
-        No rule above the composer: the mockup draws one because its composer is a bare
-        stack of fields, and `NoteComposer` brings its own bordered surface. Two lines a few
-        pixels apart would read as a mistake.
-
-        `[&>*]` hands the slot's height to whatever composer is passed in, which is the
-        contract `NoteComposer` is written to — see `COMPOSER_SLOT`.
-      */}
-      <div
-        data-testid="composer-slot"
-        className={cn(
-          'flex flex-none flex-col px-1.5 pt-1.5 pb-2 [&>*]:min-h-0 [&>*]:flex-1',
-          COMPOSER_SLOT,
-        )}
-      >
-        {composer}
-      </div>
+      {composer !== undefined ? <ComposerSlot composer={composer} /> : null}
 
       {filtering ? <BookFiltersDialog onClose={() => setFiltering(false)} /> : null}
     </section>
@@ -381,6 +367,7 @@ function NoteList({
   onSelect,
   onWriteGameNote,
   gameNoteActive,
+  empty,
   originState,
 }: {
   notes: readonly NoteRow[]
@@ -388,6 +375,7 @@ function NoteList({
   onSelect: (row: NoteRow) => void
   onWriteGameNote?: () => void
   gameNoteActive: boolean
+  empty?: string
   originState?: { from: string; label?: string }
 }) {
   const { t } = useLingui()
@@ -401,7 +389,7 @@ function NoteList({
   if (notes.length === 0 && !stub) {
     return (
       <p className="px-3 py-4 text-data text-dim">
-        <Trans>No notes in this game yet.</Trans>
+        {empty ?? <Trans>No notes in this game yet.</Trans>}
       </p>
     )
   }

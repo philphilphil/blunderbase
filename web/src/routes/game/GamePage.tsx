@@ -58,7 +58,9 @@ import {
   type MoveAnnotation,
   type MoveListVariation,
 } from './components/MoveList'
-import { COMPOSER_TEXT_ID, NoteComposer } from './components/NoteComposer'
+import { DOCK, DOCK_CLEARANCE } from './components/composerDock'
+import { ComposerSlot } from './components/ComposerSlot'
+import { COMPOSER_REST, COMPOSER_TEXT_ID, NoteComposer } from './components/NoteComposer'
 import { NotesTrack, type NotesTrackTab } from './components/NotesTrack'
 import { PracticeBar } from './components/PracticeBar'
 import { PracticeDialog } from './components/PracticeDialog'
@@ -2109,18 +2111,28 @@ export function GameStudio({ game: from }: { game: StudioGame }) {
   /*
    * The composer's slot, for a game that is not in the library.
    *
-   * `NotesTrack` reserves a fixed height for whatever it is handed, so leaving the slot
-   * empty would open a hole in the column rather than close it. What goes there is the one
-   * sentence that explains the state — and it is deliberately not a second "Add to library"
-   * button: that decision has one place, the control row under the board, and two of them
-   * would be two places to look for the same thing.
+   * The slot reserves the one-line height for whatever it is handed (`ComposerSlot`), so
+   * leaving it empty would open a hole rather than close it. What goes there is the one
+   * sentence that explains the state, at the composer's own resting height so the slot is
+   * the same on every game — and it is deliberately not a second "Add to library" button:
+   * that decision has one place, the control row under the board, and two of them would be
+   * two places to look for the same thing. One line holds the short form. The reason (no
+   * statistic counts a game you did not play) is the title, and — because a title never
+   * shows on a phone — it is also the Notes tab's empty state (`readOnlyNotes`), where the
+   * pane has room for the whole sentence on either layout.
    */
+  const readOnlyNotes = t`Notes hang off a game in your library. Add this one and it can be annotated like any other — counted in no statistic, since you did not play it.`
   const referenceComposer = (
-    <div className="flex min-w-0 flex-col justify-center rounded-md border border-dashed border-edge-strong px-3 text-data leading-relaxed text-dim">
-      <Trans>
-        Notes hang off a game in your library. Add this one and it can be annotated like any other
-        — counted in no statistic, since you did not play it.
-      </Trans>
+    <div
+      title={readOnlyNotes}
+      className={cn(
+        COMPOSER_REST,
+        'flex min-w-0 items-center rounded-md border border-dashed border-edge-strong px-3 text-data text-dim',
+      )}
+    >
+      <span className="truncate">
+        <Trans>Add this game to your library to write notes on it.</Trans>
+      </span>
     </div>
   )
 
@@ -2134,16 +2146,17 @@ export function GameStudio({ game: from }: { game: StudioGame }) {
       onSave={writeNote}
       onDelete={forgetNote}
       onClose={blurComposer}
-      // No height of its own on either layout: it is handed one by the slot at the foot of
-      // `NotesTrack`, which is what guarantees the box cannot move when the tab above it
-      // changes — see that component's `COMPOSER_SLOT`.
+      // It sizes itself — one line at rest, the open box on focus — and its slot pins it to
+      // the floor of the pane it is docked to and lets it grow upward over that pane rather
+      // than into the column (`ComposerSlot`), so nothing moves when it opens.
       className="min-w-0"
     />
   )
 
   /*
-    The right column's second track: Book and Notes behind one tab row, with the composer
-    pinned *below* the pane rather than inside it.
+    The right column's second track: Book and Notes behind one tab row. On the phone the
+    composer is docked at its floor; on the desktop it is under the move table instead
+    (`movesCell`), so this track has its whole height for the book and the notes.
 
     `book` is keyed by the half-move count on the board, which is `cursor + 1` — the same
     number the payload was built with — and it is only asked for while the board is on the
@@ -2170,7 +2183,8 @@ export function GameStudio({ game: from }: { game: StudioGame }) {
       onWriteGameNote={readOnly ? undefined : writeGameNote}
       originState={leaving}
       gameNoteActive={target.kind === 'game'}
-      composer={readOnly ? referenceComposer : composer}
+      emptyNotes={readOnly ? readOnlyNotes : undefined}
+      composer={mobile ? (readOnly ? referenceComposer : composer) : undefined}
       tab={notesTab}
       onTabChange={setNotesTab}
       className={mobile ? 'flex-1' : undefined}
@@ -2201,11 +2215,32 @@ export function GameStudio({ game: from }: { game: StudioGame }) {
       // there — that strip is also where the PGN affordance lives, which is why the phone
       // header carries one.
       showTitleStrip={!mobile}
-      // The moves/notes rule, in the same weight as every other boundary between panes: the
-      // workspace is a matrix of panes divided by rules, and a boundary that is quieter than
-      // its neighbours reads as an accident rather than as a division.
-      className={mobile ? 'min-h-0 flex-1' : 'min-h-0 border-r border-edge-strong'}
+      // Desktop: the table scrolls clear of the note composer when it opens over it.
+      scrollerClassName={mobile ? undefined : DOCK_CLEARANCE}
+      className="min-h-0 flex-1"
     />
+  )
+
+  /*
+    The desktop's move cell: the table, and the note composer docked at its foot (#45) — one
+    line at rest, growing up over the table when it is used. It used to be a fixed 9rem slot
+    under the Book and Notes beside it, which left the book about three rows on a laptop;
+    here it costs the table one line, and the book and the notes get their track's whole
+    height. It belongs under the moves anyway: a note is about the position the board is on,
+    and the table is what the board is stepping through.
+
+    The moves/notes rule, in the same weight as every other boundary between panes: the
+    workspace is a matrix of panes divided by rules, and a boundary that is quieter than its
+    neighbours reads as an accident rather than as a division.
+  */
+  const movesCell = (
+    <div
+      data-testid="moves-cell"
+      className={cn(DOCK, 'flex min-h-0 min-w-0 flex-col border-r border-edge-strong')}
+    >
+      {moveList}
+      <ComposerSlot composer={readOnly ? referenceComposer : composer} />
+    </div>
   )
 
   // The trail is the list this game was opened from, named as the rail names it, its last
@@ -2462,12 +2497,7 @@ export function GameStudio({ game: from }: { game: StudioGame }) {
         >
           {practiceBar}
           {maiaPanel}
-          {moveList}
-          {/*
-            Book and Notes behind one tab row, with the composer pinned below the pane: a
-            note is about the position on the board, so the box it is written in must not
-            move when the pane above it changes what it is showing.
-          */}
+          {movesCell}
           {notesTrack}
           {evalGraph}
         </div>

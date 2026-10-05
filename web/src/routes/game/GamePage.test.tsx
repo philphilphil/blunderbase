@@ -1004,6 +1004,28 @@ describe('GamePage', () => {
     expect(document.activeElement).toBe(document.getElementById(COMPOSER_TEXT_ID))
   })
 
+  it('docks the one-line composer under the move table, not under the book and notes', async () => {
+    const user = userEvent.setup()
+    renderPage()
+    await screen.findByText('Scandinavian Defense')
+
+    // #45: the Book and Notes get their track's whole height; the box a note is written in
+    // sits under the moves the board is stepping through.
+    const cell = screen.getByTestId('moves-cell')
+    const composer = screen.getByTestId('note-composer')
+    expect(cell).toContainElement(screen.getByTestId('move-list'))
+    expect(within(cell).getByTestId('composer-slot')).toContainElement(composer)
+    expect(screen.getByTestId('notes-track')).not.toContainElement(composer)
+    expect(within(screen.getByTestId('notes-track')).queryByTestId('composer-slot')).toBeNull()
+
+    // One line at rest; the whole box once N puts the keyboard in it, and back on Escape.
+    expect(composer).toHaveAttribute('data-state', 'closed')
+    await user.keyboard('n')
+    expect(composer).toHaveAttribute('data-state', 'open')
+    await user.keyboard('{Escape}')
+    expect(composer).toHaveAttribute('data-state', 'closed')
+  })
+
   it('opens and closes the live search with e', async () => {
     const user = userEvent.setup()
     renderPage()

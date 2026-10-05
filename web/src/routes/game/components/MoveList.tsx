@@ -110,6 +110,11 @@ export interface MoveListProps {
    * and since the PGN affordance lives in this one, it has to place `PgnButton` itself.
    */
   showTitleStrip?: boolean
+  /**
+   * Added to the box the table scrolls in: the desktop passes the clearance that keeps the
+   * rows reachable under the note composer when it opens over the table (`./composerDock`).
+   */
+  scrollerClassName?: string
   className?: string
 }
 
@@ -153,6 +158,7 @@ export function MoveList({
   onSelectPly,
   notedMoves,
   showTitleStrip = true,
+  scrollerClassName,
   className,
 }: MoveListProps) {
   const [expanded, setExpanded] = useState(false)
@@ -225,14 +231,18 @@ export function MoveList({
   // scrolling every scrollable ancestor as well — on this page that means the studio's own
   // columns and the window, so stepping through a game dragged the whole screen about.
   // The scroller is the row's offset parent (it is `relative`), so the arithmetic is local.
+  // Its bottom padding is room the open note composer lies over (`scrollerClassName`), so
+  // the row is kept above that rather than merely inside the box.
   useEffect(() => {
     const box = scroller.current
     const row = activeRow.current
     if (!box || !row) return
+    const covered = parseFloat(getComputedStyle(box).paddingBottom) || 0
+    const visible = box.clientHeight - covered
     const top = row.offsetTop
     const bottom = top + row.offsetHeight
     if (top < box.scrollTop) box.scrollTop = top
-    else if (bottom > box.scrollTop + box.clientHeight) box.scrollTop = bottom - box.clientHeight
+    else if (bottom > box.scrollTop + visible) box.scrollTop = bottom - visible
     // Walking a variation moves nothing in the table, but the row it hangs off — which is
     // the row it is drawn under — is what has to stay in view while it does.
   }, [cursor, walked?.cursor, walked?.sans.length])
@@ -272,7 +282,10 @@ export function MoveList({
       </div>
       ) : null}
 
-      <div ref={scroller} className="relative min-h-0 flex-1 overflow-y-auto py-0.5">
+      <div
+        ref={scroller}
+        className={cn('relative min-h-0 flex-1 overflow-y-auto py-0.5', scrollerClassName)}
+      >
         {folded ? (
           <button
             type="button"

@@ -6,6 +6,8 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { ApiError } from '@/lib/api/client'
 import { cn } from '@/lib/utils'
 
+import { COMPOSER_REST } from './NoteComposer'
+
 /** A pane's title strip, as every pane on the screen draws it (`paneTabs.TAB_ROW`'s box). */
 const STRIP = 'h-[2.1875rem] flex-none border-b border-line bg-panel'
 
@@ -19,8 +21,9 @@ const STRIP = 'h-[2.1875rem] flex-none border-b border-line bg-panel'
  * the whole workspace; the board flush left in a column sized to its board (the same
  * `100dvh` width and floors) with the moves column taking the rest; the splitter's rule; and
  * in the moves column one grid of panes bounded by rules rather than cards with gaps — the
- * engine band's two ruled cells, the move table beside the notes track, the eval graph —
- * each under the 35-design-pixel title strip it will have. Nothing here is rounded past a
+ * engine band's two ruled cells, the move table with the composer's one-line field at its
+ * foot beside the notes track, the eval graph — each under the 35-design-pixel title strip
+ * it will have. Nothing here is rounded past a
  * control's radius, because nothing on the real screen is.
  *
  * The moves column's floor has to come *off* on a phone — 26.875rem is 516 physical pixels,
@@ -87,10 +90,15 @@ export function GameViewSkeleton() {
 
           <div className="flex min-h-0 flex-col border-r border-edge-strong">
             <div className={STRIP} />
-            <div className="flex flex-1 flex-col gap-1 px-1.5 py-1.5">
+            <div className="flex min-h-0 flex-1 flex-col gap-1 overflow-hidden px-1.5 py-1.5">
               {Array.from({ length: 10 }, (_, index) => (
-                <Skeleton key={index} className="h-[1.625rem] rounded-sm" />
+                <Skeleton key={index} className="h-[1.625rem] flex-none rounded-sm" />
               ))}
+            </div>
+            {/* the composer's slot at the table's foot (`ComposerSlot`), with the one-line
+                field it holds at rest */}
+            <div className="h-[2.875rem] flex-none px-1.5 pt-1.5 pb-2">
+              <Skeleton className={cn(COMPOSER_REST, 'rounded-md')} />
             </div>
           </div>
 
@@ -100,11 +108,6 @@ export function GameViewSkeleton() {
               {Array.from({ length: 4 }, (_, index) => (
                 <Skeleton key={index} className="h-[1.625rem] rounded-sm" />
               ))}
-            </div>
-            {/* the composer's slot, `NotesTrack`'s own 9rem — it keeps that height
-                whatever the pane above it is showing, which is the whole point of it */}
-            <div className="h-[9rem] flex-none px-1.5 pt-1.5 pb-2">
-              <Skeleton className="h-full rounded-md" />
             </div>
           </div>
 

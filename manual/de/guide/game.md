@@ -219,6 +219,19 @@ von da an spricht diese Partie, und die anderen bleiben unberührt.
 ist eine neue Zeile. Notizen erscheinen in jeder Partie, die diese Stellung erreicht – siehe
 [Notizen](notes.md).
 
+Das Notizfeld steht am Fuß der Zugliste, damit **Buch** und **Notizen** daneben ihre ganze
+Höhe behalten. Solange du nicht schreibst, ist es eine einzige Zeile – **Notiz schreiben …**
+oder die erste Zeile der Notiz, die schon an dieser Stellung hängt. Klickst du hinein oder
+drückst `N` oder die Schaltfläche **Notiz**, klappt es nach oben über die Zugliste auf, mit
+den Schlagwörtern und **Notiz speichern** unter dem Text; sonst bewegt sich auf dem
+Bildschirm nichts. Ein Klick irgendwo anders oder Escape speichert, was du geschrieben hast,
+und das Feld schrumpft wieder auf eine Zeile. Eine Notiz, die es nicht speichern konnte –
+weil ein früheres Speichern noch unterwegs ist oder eines fehlgeschlagen ist –, hält das Feld
+offen, bis sie gespeichert oder gelöscht ist; die Fehlermeldung verschwindet, sobald du zu
+einem anderen Zug gehst. Bei einer Partie, die nicht in deiner Bibliothek ist, steht dort
+stattdessen eine Zeile, die das sagt, und der Reiter **Notizen** erklärt, warum. Auf dem
+Handy steht das Feld am Fuß des Reiters **Notizen**.
+
 Nicht jeder Gedanke gehört zu einem Feld. „Unausgeschlafen gespielt“, „der Plan war von der
 Eröffnung an falsch“ – das ist über die Partie, und im ersten Zug geschrieben käme es in
 jeder Partie wieder, die genauso begonnen hat. Deshalb gehört die erste Zeile im Reiter

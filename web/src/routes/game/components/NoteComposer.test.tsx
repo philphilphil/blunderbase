@@ -221,8 +221,10 @@ describe('NoteComposer', () => {
     expect(onSave).toHaveBeenCalledWith('this idea belongs two moves later', [], null)
   })
 
-  it('has no Position / Game switch, and names the game only when it is on it', () => {
+  it('has no Position / Game switch, and names the game only when it is on it', async () => {
+    const user = userEvent.setup()
     const { view } = draw()
+    await user.click(screen.getByLabelText('Note text'))
     expect(screen.queryByRole('radio')).not.toBeInTheDocument()
     expect(screen.queryByText('about the game')).not.toBeInTheDocument()
 
@@ -246,5 +248,154 @@ describe('NoteComposer', () => {
     await user.click(screen.getByLabelText('Note text'))
     await user.click(elsewhere())
     expect(onSave).toHaveBeenCalledWith('played this half asleep', [], null)
+  })
+})
+
+/**
+ * The box at rest is one line, and opens when focus enters it (#45). What matters is that
+ * the opening is a change of *classes* on the same textarea — so focus and the caret never
+ * move — and that it never folds away something nobody has saved.
+ */
+describe('NoteComposer folding', () => {
+  const box = () => screen.getByTestId('note-composer')
+
+  it('rests as one field, with no tags or buttons under it', () => {
+    draw()
+    expect(box()).toHaveAttribute('data-state', 'closed')
+    expect(screen.getByPlaceholderText('Add a note…')).toBeInTheDocument()
+    expect(screen.queryByLabelText('Tags')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Save note/ })).not.toBeInTheDocument()
+  })
+
+  it('opens when focus enters it, on the same textarea, and folds when it leaves', async () => {
+    const user = userEvent.setup()
+    draw()
+    const text = screen.getByLabelText('Note text')
+
+    await user.click(text)
+    expect(box()).toHaveAttribute('data-state', 'open')
+    // The very node that was clicked, still focused: opening is not a remount.
+    expect(screen.getByLabelText('Note text')).toBe(text)
+    expect(text).toHaveFocus()
+    expect(screen.getByLabelText('Tags')).toBeInTheDocument()
+    expect(
+      screen.getByPlaceholderText('What is worth remembering about this position?'),
+    ).toBeInTheDocument()
+
+    // Moving within it (text → tags) is not leaving it.
+    await user.click(screen.getByLabelText('Tags'))
+    expect(box()).toHaveAttribute('data-state', 'open')
+
+    await user.click(elsewhere())
+    expect(box()).toHaveAttribute('data-state', 'closed')
+  })
+
+  it('folds once leaving has saved the note', async () => {
+    const user = userEvent.setup()
+    const { onSave } = draw()
+
+    await user.type(screen.getByLabelText('Note text'), 'the knight is offside')
+    await user.click(elsewhere())
+
+    expect(onSave).toHaveBeenCalledTimes(1)
+    expect(box()).toHaveAttribute('data-state', 'closed')
+    // Folded, not emptied: the note is still what the field holds.
+    expect(screen.getByLabelText('Note text')).toHaveValue('the knight is offside')
+  })
+
+  it('stays open over a draft it could not save', async () => {
+    const user = userEvent.setup()
+    const { onSave } = draw({ pending: true })
+
+    // A save already in flight: leaving cannot write this, so the box stays in sight.
+    await user.type(screen.getByLabelText('Note text'), 'and the rook too')
+    await user.click(elsewhere())
+
+    expect(onSave).not.toHaveBeenCalled()
+    expect(box()).toHaveAttribute('data-state', 'open')
+    expect(screen.getByLabelText('Note text')).toHaveValue('and the rook too')
+  })
+
+  it('stays open while a save has failed, so the error can be read', () => {
+    draw({ error: new Error('The server said no.') })
+    expect(box()).toHaveAttribute('data-state', 'open')
+    expect(screen.getByText('The server said no.')).toBeInTheDocument()
+  })
+
+  it('lets a failed save go once the board has moved on from where it failed', () => {
+    const error = new Error('The server said no.')
+    const { view } = draw({ error })
+    expect(box()).toHaveAttribute('data-state', 'open')
+
+    // The page's mutation still carries the same error; the box is somewhere else now.
+    view.rerender(
+      <NoteComposer
+        target={{ ...TARGET, ply: 9, label: '5.O-O' }}
+        error={error}
+        onSave={vi.fn()}
+        onClose={vi.fn()}
+      />,
+    )
+    expect(box()).toHaveAttribute('data-state', 'closed')
+    expect(screen.queryByText('The server said no.')).not.toBeInTheDocument()
+
+    // A new failure is a new error, and shows where it happened.
+    view.rerender(
+      <NoteComposer
+        target={{ ...TARGET, ply: 9, label: '5.O-O' }}
+        error={new Error('Still no.')}
+        onSave={vi.fn()}
+        onClose={vi.fn()}
+      />,
+    )
+    expect(box()).toHaveAttribute('data-state', 'open')
+    expect(screen.getByText('Still no.')).toBeInTheDocument()
+  })
+
+  it('stays open under a press on its caption or padding', async () => {
+    const user = userEvent.setup()
+    draw({ target: { ...TARGET, kind: 'game', ply: null, fen: null, label: 'the game' } })
+    const text = screen.getByLabelText('Note text')
+
+    await user.click(text)
+    expect(box()).toHaveAttribute('data-state', 'open')
+    // Neither the caption nor the box's own padding takes focus, so a press on them must
+    // not hand it to the page.
+    await user.click(screen.getByText('about the game'))
+    expect(box()).toHaveAttribute('data-state', 'open')
+    expect(text).toHaveFocus()
+    await user.click(box())
+    expect(box()).toHaveAttribute('data-state', 'open')
+    expect(text).toHaveFocus()
+  })
+
+  it('opens an existing note whole, and its delete button is not lost to the fold', async () => {
+    const user = userEvent.setup()
+    const onDelete = vi.fn()
+    draw({ note: stored('the bishop is loose here'), onDelete })
+
+    // At rest it is the note's first line in the field.
+    expect(box()).toHaveAttribute('data-state', 'closed')
+    expect(screen.getByLabelText('Note text')).toHaveValue('the bishop is loose here')
+
+    await user.click(screen.getByLabelText('Note text'))
+    expect(box()).toHaveAttribute('data-state', 'open')
+    // Pressing a button in the row keeps focus where it is, so the box cannot fold away
+    // from under the pointer between the press and the click.
+    await user.click(screen.getByRole('button', { name: 'Delete this note' }))
+    expect(onDelete).toHaveBeenCalledWith(77)
+    expect(screen.getByLabelText('Note text')).toHaveFocus()
+  })
+
+  it('closes on Escape the way it always has, through the page', async () => {
+    const user = userEvent.setup()
+    const onClose = vi.fn(() => (document.activeElement as HTMLElement | null)?.blur())
+    render(<NoteComposer target={TARGET} onSave={vi.fn()} onClose={onClose} />)
+
+    await user.click(screen.getByLabelText('Note text'))
+    await user.keyboard('{Escape}')
+
+    expect(onClose).toHaveBeenCalledTimes(1)
+    expect(box()).toHaveAttribute('data-state', 'closed')
   })
 })

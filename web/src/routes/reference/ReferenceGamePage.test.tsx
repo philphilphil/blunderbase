@@ -166,7 +166,14 @@ describe('ReferenceGamePage', () => {
     await userEvent.keyboard('a')
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /Note/ })).not.toBeInTheDocument()
+    // The composer's one-line slot says what to do instead, and the Notes tab's empty state
+    // says why in full — visible text, since a title never shows on a phone.
+    expect(
+      screen.getByText('Add this game to your library to write notes on it.'),
+    ).toBeInTheDocument()
+    expect(screen.getByTitle(/Notes hang off a game in your library/)).toBeInTheDocument()
     expect(screen.getByText(/Notes hang off a game in your library/)).toBeInTheDocument()
+    expect(screen.queryByText('No notes in this game yet.')).not.toBeInTheDocument()
 
     // What is left is the board itself, which is the point of opening it here.
     expect(screen.getByRole('button', { name: 'Hints' })).toBeInTheDocument()

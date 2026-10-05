@@ -172,6 +172,38 @@ describe('NotesTrack', () => {
     expect(screen.getByRole('tabpanel')).not.toContainElement(before)
   })
 
+  it('reserves only the one-line height, and lets the composer grow over the pane', () => {
+    renderTrack()
+
+    // jsdom lays nothing out, so what is checked is the arrangement that makes the overlay:
+    // a slot in the flow at the resting height, and inside it a layer pinned to the floor
+    // and positioned against the *track* — the section is the positioned ancestor, the slot
+    // is not — with the pane carrying the scroll room the open box needs.
+    const slot = screen.getByTestId('composer-slot')
+    const layer = screen.getByTestId('composer-layer')
+    expect(slot).toHaveClass('flex-none', 'h-[2.875rem]')
+    expect(slot).not.toHaveClass('relative')
+    expect(screen.getByTestId('notes-track')).toHaveClass('relative', 'group/dock')
+    expect(layer).toHaveClass('absolute', 'bottom-2', 'max-h-[calc(100%-3rem)]')
+    expect(layer).toHaveAttribute('data-composer-layer')
+    expect(layer).toContainElement(screen.getByTestId('composer-stub'))
+    expect(screen.getByRole('tabpanel').className).toMatch(/dock:pb-\[5\.75rem\]/)
+  })
+
+  it('has no composer slot where the page docks the composer elsewhere', () => {
+    // The desktop: the composer is under the move table, and this track keeps its height.
+    renderTrack({ composer: undefined })
+    expect(screen.queryByTestId('composer-slot')).not.toBeInTheDocument()
+    expect(screen.getByTestId('notes-track')).not.toHaveClass('relative')
+    expect(screen.getByRole('tabpanel').className).not.toMatch(/dock:pb-/)
+  })
+
+  it('says why there are no notes where the page says why', () => {
+    renderTrack({ notes: [], emptyNotes: 'Notes hang off a game in your library.' })
+    expect(screen.getByText('Notes hang off a game in your library.')).toBeInTheDocument()
+    expect(screen.queryByText('No notes in this game yet.')).not.toBeInTheDocument()
+  })
+
   it('leaves a reader who chose Book on Book as the board steps out of book and back in', () => {
     const { rerender } = renderTrack()
     fireEvent.click(screen.getByRole('tab', { name: 'Book' }))
