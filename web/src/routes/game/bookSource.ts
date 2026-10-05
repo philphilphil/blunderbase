@@ -13,6 +13,8 @@
  */
 import { useSyncExternalStore } from 'react'
 
+import { useReferenceExplorer } from '@/lib/api/queries'
+import type { ReferenceSource } from '@/lib/api/types'
 import { viewPreference } from '@/lib/ui/viewPreference'
 import {
   DEFAULT_RATINGS,
@@ -108,3 +110,35 @@ export function forgetBookFilters(): void {
 export function useBookFilters(): BookFilters {
   return useSyncExternalStore(subscribe, snapshot, () => DEFAULT_FILTERS)
 }
+
+/** Enough rows to cover what anybody plays from a position; the long tail is the explorer's. */
+const MOVE_LIMIT = 12
+/** A handful, to show what happens after the moves; the explorer lists more. */
+const GAME_LIMIT = 5
+
+/**
+ * The masters or Lichess book from a position, as the Book tab asks for it — one query, so
+ * the tab's own table (`ReferenceBook`) and the count on the tab name (`NotesTrack`) read
+ * the same cached answer. That is also why the count costs nothing extra once the tab is
+ * open: whichever asks first fetches, and the other is handed the cache. `fen` null asks
+ * nothing.
+ */
+export function useReferenceBook(
+  source: ReferenceSource | null,
+  fen: string | null,
+  speeds: readonly string[] = [],
+  ratings: readonly number[] = [],
+) {
+  return useReferenceExplorer(
+    {
+      source: source ?? 'masters',
+      fen: fen ?? '',
+      moves: MOVE_LIMIT,
+      top_games: GAME_LIMIT,
+      ...(source === 'lichess' ? { speeds: speeds.join(','), ratings: ratings.join(',') } : {}),
+    },
+    { enabled: source !== null && fen !== null },
+  )
+}
+
+export { GAME_LIMIT as REFERENCE_GAME_LIMIT }

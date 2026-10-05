@@ -256,6 +256,11 @@ andere Partie zeigt in der Zeile unter dem Brett einen Knopf mit dem Namen der P
 der du kamst – **← phib — Hubert2001** –, und beide führen genau in die Stellung zurück, in
 der du warst.
 
+Beide Reiter tragen eine Zahl, damit du siehst, was hinter dem geschlossenen steckt:
+**Notizen** zählt die Notizen zu dieser Partie, **Buch** die Züge, die das gewählte Buch von
+der Stellung auf dem Brett kennt – **Buch 0** heißt, keine dieser Partien kam hierher. Bei
+**Meister** und **Lichess** erscheint die Zahl, sobald das Buch geantwortet hat.
+
 Der Reiter **Buch** neben **Notizen** zeigt, wie es von der Stellung auf dem Brett aus
 weiterging; `B` öffnet ihn. Die Auswahl in seiner Titelzeile bestimmt, aus welchen Partien:
 **Meine Partien** (die Voreinstellung), **Meister** (Turnierpartien von Spielern ab 2200)

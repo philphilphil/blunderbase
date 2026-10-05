@@ -603,7 +603,7 @@ describe('GamePage', () => {
 
     // The board is at the start, where the fixture's book has two continuations. The track
     // opens on Notes, so the book is one tab away.
-    await user.click(screen.getByRole('tab', { name: 'Book' }))
+    await user.click(screen.getByRole('tab', { name: /^Book/ }))
     const row = await screen.findByRole('row', { name: /d4/ })
     await user.click(row)
 
@@ -959,9 +959,9 @@ describe('GamePage', () => {
     await user.keyboard('v')
     expect(screen.getByRole('tab', { name: 'Evaluation' })).toHaveAttribute('aria-selected', 'true')
 
-    expect(screen.getByRole('tab', { name: 'Notes' })).toHaveAttribute('aria-selected', 'true')
+    expect(screen.getByRole('tab', { name: /^Notes/ })).toHaveAttribute('aria-selected', 'true')
     await user.keyboard('b')
-    expect(screen.getByRole('tab', { name: 'Book' })).toHaveAttribute('aria-selected', 'true')
+    expect(screen.getByRole('tab', { name: /^Book/ })).toHaveAttribute('aria-selected', 'true')
   })
 
   it('switches Maia between one level and every level with l', async () => {
@@ -1049,7 +1049,7 @@ describe('GamePage', () => {
     renderPage()
     await screen.findByText('Scandinavian Defense')
 
-    await user.click(screen.getByRole('tab', { name: 'Book' }))
+    await user.click(screen.getByRole('tab', { name: /^Book/ }))
     await user.click(await screen.findByRole('row', { name: /d4/ }))
     expect(await screen.findByText('Back to game')).toBeInTheDocument()
 
@@ -1443,7 +1443,7 @@ describe('GamePage', () => {
 
     // Into a book line: the run never looked here, the search is the only claim about the
     // position, so the pane goes to it without being asked.
-    await user.click(screen.getByRole('tab', { name: 'Book' }))
+    await user.click(screen.getByRole('tab', { name: /^Book/ }))
     await user.click(await screen.findByRole('row', { name: /d4/ }))
     expect(await screen.findByText('Back to game')).toBeInTheDocument()
     expect(tab('Live')).toHaveAttribute('aria-selected', 'true')
@@ -1625,7 +1625,7 @@ describe('GamePage', () => {
     // The arrow rides on the Book tab, whether or not the owner's own games reached here:
     // the explorer also holds the reference books, which have plenty to say about a
     // position none of your games ever visited.
-    await user.click(screen.getByRole('tab', { name: 'Book' }))
+    await user.click(screen.getByRole('tab', { name: /^Book/ }))
     await user.click(screen.getByRole('button', { name: 'Open this position in the explorer' }))
 
     const stub = await screen.findByTestId('explorer-stub')
@@ -1656,7 +1656,7 @@ describe('GamePage', () => {
     // worse than none.
     await user.click(screen.getByRole('button', { name: /Back to game/ }))
     await user.click(screen.getByRole('button', { name: 'First' }))
-    await user.click(screen.getByRole('tab', { name: 'Book' }))
+    await user.click(screen.getByRole('tab', { name: /^Book/ }))
     await user.click(await screen.findByRole('row', { name: /d4/ }))
     expect(screen.getByText('analysis +1')).toBeInTheDocument()
     expect(bar()).toHaveAttribute('title', 'not analysed')
@@ -2677,7 +2677,7 @@ describe('GamePage notes', () => {
    */
   function notesTab() {
     return within(screen.getByRole('tablist', { name: 'Book and notes' })).getByRole('tab', {
-      name: 'Notes',
+      name: /^Notes/,
     })
   }
 
@@ -2692,13 +2692,10 @@ describe('GamePage notes', () => {
     renderPage()
     await screen.findByText('Scandinavian Defense')
 
-    // The payload's one note sits at count 1 — the position after 1.e4 — and the track's
-    // tab row states how many there are beside the two tabs: a fact of the strip, after the
-    // tablist rather than inside it (nothing but tabs sits in the tab group).
+    // The payload's one note sits at count 1 — the position after 1.e4 — and the Notes tab
+    // carries how many there are on its name, readable before the tab is opened.
+    expect(notesTab()).toHaveTextContent('Notes1')
     await user.click(notesTab())
-    const tablist = screen.getByRole('tablist', { name: 'Book and notes' })
-    expect(within(tablist.parentElement!).getByText('1 note')).toBeInTheDocument()
-    expect(within(tablist).queryByText('1 note')).not.toBeInTheDocument()
 
     // A row is where the note hangs and the note itself, clamped. Its tags are not repeated
     // here: clicking the row loads it into the composer below, which is where they are read

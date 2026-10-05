@@ -22,7 +22,6 @@ import { useLocation, useNavigate } from 'react-router-dom'
 import { LichessConnectCard } from '@/components/lichess/ConnectLichess'
 import { COLUMN_HEAD, ROW } from '@/components/ui/row'
 import { Skeleton } from '@/components/ui/skeleton'
-import { useReferenceExplorer } from '@/lib/api/queries'
 import type { ReferenceMove, ReferenceSource } from '@/lib/api/types'
 import { useNotation } from '@/lib/chess/notationPrefs'
 import { cn } from '@/lib/utils'
@@ -30,12 +29,9 @@ import { SidesBar } from '@/routes/explorer/components/ScoreBar'
 import { formatCount, resultOf, tokenTrouble } from '@/routes/explorer/reference'
 import { formatResult } from '@/routes/games/format'
 
+import { REFERENCE_GAME_LIMIT, useReferenceBook } from '../bookSource'
 import { usePlyLabel } from '../plyNumbering'
 
-/** Enough rows to cover what anybody plays from a position; the long tail is the explorer's. */
-const MOVE_LIMIT = 12
-/** A handful, to show what happens after the moves; the explorer lists more. */
-const GAME_LIMIT = 5
 
 /** Move, Games, the split, then the opening — which steps aside in a narrow track. */
 const GRID =
@@ -72,13 +68,8 @@ export function ReferenceBook({
   // Where the reader came from, so the game it opens offers the way back to this position.
   const from = `${location.pathname}${location.search}`
 
-  const book = useReferenceExplorer({
-    source,
-    fen,
-    moves: MOVE_LIMIT,
-    top_games: GAME_LIMIT,
-    ...(source === 'lichess' ? { speeds: speeds.join(','), ratings: ratings.join(',') } : {}),
-  })
+  // The same query the tab's count reads (`../bookSource`), so the two never disagree.
+  const book = useReferenceBook(source, fen, speeds, ratings)
 
   const token = tokenTrouble(book.error)
   if (token) {
@@ -106,7 +97,7 @@ export function ReferenceBook({
   }
 
   const moves = book.data.moves
-  const games = book.data.top_games.slice(0, GAME_LIMIT)
+  const games = book.data.top_games.slice(0, REFERENCE_GAME_LIMIT)
   if (moves.length === 0 && games.length === 0) {
     return (
       <p data-testid="reference-book-empty" className="px-3 py-6 text-center text-data text-dim">

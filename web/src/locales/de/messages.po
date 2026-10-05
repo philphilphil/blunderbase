@@ -6270,10 +6270,6 @@ msgid "Lichess filters — speed and rating"
 msgstr "Lichess-Filter – Bedenkzeit und Wertung"
 
 #: src/routes/game/components/NotesTrack.tsx
-msgid "{noteCount, plural, one {# note} other {# notes}}"
-msgstr "{noteCount, plural, one {# Notiz} other {# Notizen}}"
-
-#: src/routes/game/components/NotesTrack.tsx
 msgid "Open this position in the explorer"
 msgstr "Diese Stellung im Explorer öffnen"
 

@@ -231,6 +231,11 @@ Either way you can come straight back. The explorer offers **← Back to game**;
 offers a button in the row under its board named after the game you left — **← phib —
 Hubert2001** — and both return to exactly the position you were on.
 
+Each of the two tabs carries a number, so you can see what is behind the closed one: **Notes**
+counts the notes on this game, **Book** the moves the chosen book has from the position on
+the board — **Book 0** means none of those games got here. On **Masters** and **Lichess** the
+number appears once the book has answered.
+
 The **Book** tab beside **Notes** shows how games went on from the position on the board;
 `B` opens it. The picker in its title row chooses which games: **My games** (the default),
 **Masters** (over-the-board games between players rated 2200 and up) or **Lichess** (rated games

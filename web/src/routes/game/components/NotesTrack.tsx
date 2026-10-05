@@ -41,7 +41,7 @@ import { PickerSelect } from '@/components/ui/native-select'
 import { cn } from '@/lib/utils'
 import { SOURCES, type ExplorerSource } from '@/routes/explorer/reference'
 
-import { bookSource, useBookFilters } from '../bookSource'
+import { bookSource, useBookFilters, useReferenceBook } from '../bookSource'
 import type { NoteRow } from '../notesModel'
 import { BookFiltersDialog } from './BookFiltersDialog'
 import { BookPanel, type BookEntry, type BookMove } from './BookPanel'
@@ -168,6 +168,24 @@ export function NotesTrack({
   const [filtering, setFiltering] = useState(false)
   const reference = source !== 'mine'
 
+  // How many rows each tab holds, on the tab's name, so the reader can see without opening
+  // it whether there is anything there — the book's continuations from this position, this
+  // game's notes. A masters or Lichess book has to be asked for that even while Notes is
+  // open; it is the very query the Book tab reads (`useReferenceBook`), cached for good, so
+  // opening the tab afterwards costs nothing.
+  //
+  // A zero is printed too (owner's call, 2026-10-05): "Book 0" is the answer to "have I been
+  // here before?" without a click, and it is the answer for most positions of most games.
+  // Only a book that has not answered yet — still loading, or not reachable — shows no
+  // number, because a zero there would be a claim nobody made.
+  const referenceBook = useReferenceBook(
+    reference ? source : null,
+    reference ? fen : null,
+    filters.speeds,
+    filters.ratings,
+  )
+  const bookRows = reference ? referenceBook.data?.moves.length : moves.length
+
   return (
     <section
       data-testid="notes-track"
@@ -180,6 +198,7 @@ export function NotesTrack({
             controls="notes-track-pane"
             selected={active === 'notes'}
             onSelect={() => setActive('notes')}
+            count={noteCount}
           >
             <Trans>Notes</Trans>
           </PaneTab>
@@ -188,6 +207,7 @@ export function NotesTrack({
             controls="notes-track-pane"
             selected={active === 'book'}
             onSelect={() => setActive('book')}
+            count={bookRows}
           >
             <Trans>Book</Trans>
           </PaneTab>
@@ -226,17 +246,15 @@ export function NotesTrack({
             type on the row — and it is the part that leaves when the track is too narrow for
             it and the explorer arrow both, since the arrow is the only way out of this pane.
             A reference book has no count here: its numbers are in the table, by the thousand. */}
-        {active === 'book' && reference ? null : (
+        {/* How many of the owner's games reached this position, which the tab's count of
+            continuations does not say. Notes have no fact here: their count is on the tab. */}
+        {active === 'book' && !reference ? (
           <span
             className={cn('ml-2 flex items-center font-mono', STRIP_FACTS, '@max-[13rem]:hidden')}
           >
-            {active === 'book' ? (
-              <Plural value={games} one="# game" other="# games" />
-            ) : (
-              <Plural value={noteCount} one="# note" other="# notes" />
-            )}
+            <Plural value={games} one="# game" other="# games" />
           </span>
-        )}
+        ) : null}
         {/*
           The way out to the full explorer, on the Book tab only: this pane is four columns
           of a seven-column table and has no room for the reference books, the line summary

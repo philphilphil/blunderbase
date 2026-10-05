@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { fireEvent, render, screen, within } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -68,6 +68,9 @@ const NOTES: NoteRow[] = [
 const composer = <div data-testid="composer-stub">composer</div>
 
 function renderTrack(props: Partial<Parameters<typeof NotesTrack>[0]> = {}) {
+  // A client even for the owner's own book: the tab's count asks the masters or Lichess
+  // book through the same query the Book tab reads, and that hook needs one to exist.
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   return render(
     <NotesTrack
       book={BOOK}
@@ -78,7 +81,13 @@ function renderTrack(props: Partial<Parameters<typeof NotesTrack>[0]> = {}) {
       {...props}
     />,
     // A note from another game links to it.
-    { wrapper: MemoryRouter },
+    {
+      wrapper: ({ children }) => (
+        <QueryClientProvider client={client}>
+          <MemoryRouter>{children}</MemoryRouter>
+        </QueryClientProvider>
+      ),
+    },
   )
 }
 
@@ -88,21 +97,28 @@ describe('NotesTrack', () => {
 
     // Notes lead: they matter at every ply and the composer writes into them, so the game
     // opens on what you wrote rather than on a pane that changes from game to game.
+    // Each tab carries how many rows it holds, so what is behind the closed one is visible:
+    // two notes, and the book's two continuations from this position.
     const tabs = screen.getAllByRole('tab')
-    expect(tabs.map((tab) => tab.textContent)).toEqual(['Notes', 'Book'])
-    expect(screen.getByRole('tab', { name: 'Notes' })).toHaveAttribute('aria-selected', 'true')
-    expect(screen.getByRole('tab', { name: 'Book' })).toHaveAttribute('aria-selected', 'false')
+    expect(tabs.map((tab) => tab.textContent)).toEqual(['Notes2', 'Book2'])
+    expect(screen.getByRole('tab', { name: /^Notes/ })).toHaveAttribute('aria-selected', 'true')
+    expect(screen.getByRole('tab', { name: /^Book/ })).toHaveAttribute('aria-selected', 'false')
     expect(screen.queryByTestId('book-panel')).not.toBeInTheDocument()
-    expect(screen.getByText('2 notes')).toBeInTheDocument()
+  })
+
+  it('counts an empty book and an empty notes list as 0, so the tab says so unopened', () => {
+    renderTrack({ book: NO_BOOK, notes: [] })
+    expect(screen.getByRole('tab', { name: /^Book/ })).toHaveTextContent('Book0')
+    expect(screen.getByRole('tab', { name: /^Notes/ })).toHaveTextContent('Notes0')
   })
 
   it('shows the book, with its own game count, when the reader asks for it', async () => {
     const user = userEvent.setup()
     renderTrack()
 
-    await user.click(screen.getByRole('tab', { name: 'Book' }))
+    await user.click(screen.getByRole('tab', { name: /^Book/ }))
 
-    expect(screen.getByRole('tab', { name: 'Book' })).toHaveAttribute('aria-selected', 'true')
+    expect(screen.getByRole('tab', { name: /^Book/ })).toHaveAttribute('aria-selected', 'true')
     expect(screen.getByTestId('book-panel')).toBeInTheDocument()
     // The entry's own count, not the sum of the continuations: one of the nine games ended
     // at this position and still reached it.
@@ -113,7 +129,7 @@ describe('NotesTrack', () => {
     const user = userEvent.setup()
     renderTrack({ book: null, opening: { eco: 'B90', name: 'Sicilian Defense: Najdorf Variation' } })
 
-    await user.click(screen.getByRole('tab', { name: 'Book' }))
+    await user.click(screen.getByRole('tab', { name: /^Book/ }))
 
     expect(screen.getByTestId('book-opening')).toHaveTextContent(
       'Sicilian Defense: Najdorf VariationB90',
@@ -131,7 +147,7 @@ describe('NotesTrack', () => {
       screen.queryByRole('button', { name: 'Open this position in the explorer' }),
     ).not.toBeInTheDocument()
 
-    await user.click(screen.getByRole('tab', { name: 'Book' }))
+    await user.click(screen.getByRole('tab', { name: /^Book/ }))
     await user.click(screen.getByRole('button', { name: 'Open this position in the explorer' }))
     expect(onOpenInExplorer).toHaveBeenCalledTimes(1)
   })
@@ -142,8 +158,8 @@ describe('NotesTrack', () => {
     // The strip never changes shape — a tab that came and went moved the Notes tab under
     // the pointer every time the game left book.
     expect(screen.getAllByRole('tab')).toHaveLength(2)
-    expect(screen.getByRole('tab', { name: 'Book' })).toHaveAttribute('aria-selected', 'false')
-    expect(screen.getByRole('tab', { name: 'Notes' })).toHaveAttribute('aria-selected', 'true')
+    expect(screen.getByRole('tab', { name: /^Book/ })).toHaveAttribute('aria-selected', 'false')
+    expect(screen.getByRole('tab', { name: /^Notes/ })).toHaveAttribute('aria-selected', 'true')
     expect(screen.queryByTestId('book-panel')).not.toBeInTheDocument()
   })
 
@@ -151,10 +167,10 @@ describe('NotesTrack', () => {
     const user = userEvent.setup()
     renderTrack({ book: NO_BOOK })
 
-    await user.click(screen.getByRole('tab', { name: 'Book' }))
+    await user.click(screen.getByRole('tab', { name: /^Book/ }))
 
     expect(screen.getByTestId('book-panel-empty')).toBeInTheDocument()
-    expect(screen.getByRole('tab', { name: 'Book' })).toHaveAttribute('aria-selected', 'true')
+    expect(screen.getByRole('tab', { name: /^Book/ })).toHaveAttribute('aria-selected', 'true')
   })
 
   it('keeps the composer outside the tabs, and does not move it when they switch', () => {
@@ -164,7 +180,7 @@ describe('NotesTrack', () => {
     expect(screen.getByRole('tabpanel')).not.toContainElement(before)
     expect(screen.getByTestId('composer-slot')).toContainElement(before)
 
-    fireEvent.click(screen.getByRole('tab', { name: 'Book' }))
+    fireEvent.click(screen.getByRole('tab', { name: /^Book/ }))
 
     // The very same DOM node, still in the same slot: a box being typed into cannot be
     // remounted or reflowed by a tab above it.
@@ -206,7 +222,7 @@ describe('NotesTrack', () => {
 
   it('leaves a reader who chose Book on Book as the board steps out of book and back in', () => {
     const { rerender } = renderTrack()
-    fireEvent.click(screen.getByRole('tab', { name: 'Book' }))
+    fireEvent.click(screen.getByRole('tab', { name: /^Book/ }))
     const track = (book: BookEntry | null) => (
       <NotesTrack
         book={book}
@@ -220,11 +236,11 @@ describe('NotesTrack', () => {
     // The open tab is the reader's, not the position's: it does not flip to Notes when the
     // game leaves book, and the empty book is itself an answer.
     rerender(track(null))
-    expect(screen.getByRole('tab', { name: 'Book' })).toHaveAttribute('aria-selected', 'true')
+    expect(screen.getByRole('tab', { name: /^Book/ })).toHaveAttribute('aria-selected', 'true')
     expect(screen.getByTestId('book-panel-empty')).toBeInTheDocument()
 
     rerender(track(BOOK))
-    expect(screen.getByRole('tab', { name: 'Book' })).toHaveAttribute('aria-selected', 'true')
+    expect(screen.getByRole('tab', { name: /^Book/ })).toHaveAttribute('aria-selected', 'true')
     expect(screen.getByTestId('book-panel')).toBeInTheDocument()
   })
 
@@ -232,7 +248,7 @@ describe('NotesTrack', () => {
     const onSelectNote = vi.fn()
     renderTrack({ onSelectNote })
 
-    expect(screen.getByText('2 notes')).toBeInTheDocument()
+    expect(screen.getByRole('tab', { name: /^Notes/ })).toHaveTextContent('Notes2')
     // The tabs carry `role="tab"` and the book rows `role="row"`, so the only plain
     // buttons in the track are the note rows themselves.
     const rows = screen.getAllByRole('button')
@@ -281,7 +297,7 @@ describe('NotesTrack', () => {
         }),
       ],
     })
-    fireEvent.click(screen.getByRole('tab', { name: 'Notes' }))
+    fireEvent.click(screen.getByRole('tab', { name: /^Notes/ }))
 
     // A model game says it is one, as the explorer's notes do.
     expect(screen.getByRole('link', { name: /from the model game Carlsen vs Caruana/ })).toHaveAttribute(
@@ -313,7 +329,7 @@ describe('NotesTrack', () => {
 
   it('lights the note the composer is standing on', () => {
     renderTrack({ activeNoteId: 2 })
-    fireEvent.click(screen.getByRole('tab', { name: 'Notes' }))
+    fireEvent.click(screen.getByRole('tab', { name: /^Notes/ }))
 
     // The tabs carry `role="tab"` and the book rows `role="row"`, so the only plain
     // buttons in the track are the note rows themselves.
@@ -386,12 +402,14 @@ describe('NotesTrack', () => {
       />
     )
     render(
-      <MemoryRouter initialEntries={['/games/14']}>
-        <Routes>
-          <Route path="/games/14" element={track} />
-          <Route path="/games/77" element={<Arrived />} />
-        </Routes>
-      </MemoryRouter>,
+      <QueryClientProvider client={new QueryClient()}>
+        <MemoryRouter initialEntries={['/games/14']}>
+          <Routes>
+            <Route path="/games/14" element={track} />
+            <Route path="/games/77" element={<Arrived />} />
+          </Routes>
+        </MemoryRouter>
+      </QueryClientProvider>,
     )
 
     await user.click(screen.getByRole('link', { name: /from Kasparov vs Karpov/ }))
@@ -407,7 +425,7 @@ describe('NotesTrack', () => {
     renderTrack({ book: null, notes: [] })
 
     expect(screen.getByText('No notes in this game yet.')).toBeInTheDocument()
-    expect(screen.getByText('0 notes')).toBeInTheDocument()
+    expect(screen.getByRole('tab', { name: /^Notes/ })).toHaveTextContent('Notes0')
     // The Notes tab and the composer are all that is left; there is no note row to click.
     expect(screen.queryAllByRole('button')).toHaveLength(0)
   })
@@ -480,6 +498,17 @@ describe('NotesTrack book source', () => {
       </QueryClientProvider>,
     )
   }
+
+  it('counts a masters book on its tab, with Notes open, once it has answered', async () => {
+    stubReference()
+    bookSource.set('masters')
+    renderWithQueries()
+
+    // No number at all until it answers: a 0 there would be a claim nobody made.
+    const book = screen.getByRole('tab', { name: /^Book/ })
+    expect(book).toHaveTextContent(/^Book$/)
+    await waitFor(() => expect(book).toHaveTextContent('Book1'))
+  })
 
   // The owner's own games until they pick another book: no request leaves for Lichess first.
   it('reads the owner’s own book until another is picked, and remembers the pick', async () => {
