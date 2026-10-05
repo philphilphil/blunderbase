@@ -29,7 +29,6 @@ function renderList(moves: MoveRow[], props: Partial<Parameters<typeof MoveList>
       cursor={-1}
       collapsedThrough={null}
       annotation={null}
-      flaggedCount={0}
       plyCount={moves.length}
       onSelectPly={onSelectPly}
       onSelectVariationMove={onSelectVariationMove}
@@ -152,26 +151,12 @@ describe('MoveList', () => {
     expect(screen.getByText(/1… Nxe4\?\?/)).toBeInTheDocument()
   })
 
-  it('filters to the flagged moves on the second tab', async () => {
-    const user = userEvent.setup()
-    renderList(
-      [move(0, 'e4'), move(1, 'd5'), move(2, 'Nc3', { classification: 'mistake' })],
-      { flaggedCount: 1 },
-    )
-    await user.click(screen.getByRole('tab', { name: /Flagged/ }))
-    expect(screen.getByRole('tab', { name: /Flagged/ })).toHaveAttribute('aria-selected', 'true')
-    expect(screen.getByText('Nc3')).toBeInTheDocument()
-    expect(screen.queryByText('e4')).not.toBeInTheDocument()
+  it('says so when a game has no moves', () => {
+    renderList([])
+    expect(screen.getByText('No moves — this game has an empty move list.')).toBeInTheDocument()
   })
 
-  it('says so when a game has nothing flagged', async () => {
-    const user = userEvent.setup()
-    renderList([move(0, 'e4'), move(1, 'd5')])
-    await user.click(screen.getByRole('tab', { name: /Flagged/ }))
-    expect(screen.getByText('Nothing flagged in this game.')).toBeInTheDocument()
-  })
-
-  it('copies the game from the tab row’s PGN affordance', async () => {
+  it('copies the game from the title strip’s PGN affordance', async () => {
     const writeText = vi.fn(async () => {})
     const user = userEvent.setup()
     // `userEvent.setup()` installs its own clipboard stub, so this replaces it after.
@@ -249,7 +234,6 @@ describe('MoveList', () => {
         cursor={0}
         collapsedThrough={null}
         annotation={null}
-        flaggedCount={0}
         plyCount={2}
         variations={[{ id: null, base: 1, sans: ['c6', 'd4'], cursor: 2 }]}
         onSelectPly={vi.fn()}
@@ -264,7 +248,6 @@ describe('MoveList', () => {
         cursor={0}
         collapsedThrough={null}
         annotation={null}
-        flaggedCount={0}
         plyCount={2}
         variations={[{ id: null, base: 1, sans: ['c6', 'd4'], cursor: 0 }]}
         onSelectPly={vi.fn()}
@@ -370,7 +353,6 @@ describe('MoveList', () => {
         cursor={0}
         collapsedThrough={null}
         annotation={null}
-        flaggedCount={0}
         plyCount={2}
         variations={lines.map((entry) => ({
           ...entry,
@@ -472,47 +454,23 @@ describe('MoveList', () => {
     expect(screen.queryByRole('button', { name: 'Copy PGN' })).not.toBeInTheDocument()
   })
 
-  it('draws the tab a caller names, and hides the row when the caller owns the tabs', () => {
-    // What the phone layout does: the tabs are promoted into a strip of its own
-    // (`MobileGameView`), so the table is told which one to draw and its row goes.
-    // The filter keeps whole move *pairs*, so the blunder goes in the second pair — with
-    // it in the first, "e4" would still be on screen as the white half of a kept row.
-    const moves = [
-      move(0, 'e4'),
-      move(1, 'e5'),
-      move(2, 'Nf3'),
-      move(3, 'Qh4', { classification: 'blunder' }),
-    ]
-    const list = (props: Partial<Parameters<typeof MoveList>[0]>) => (
-      <MoveList
-        pairs={pairMoves(moves)}
-        cursor={-1}
-        collapsedThrough={null}
-        annotation={null}
-        flaggedCount={1}
-        plyCount={moves.length}
-        onSelectPly={vi.fn()}
-        {...props}
-      />
-    )
-    const { rerender } = render(list({ tab: 'flagged', showTabRow: false }))
-    expect(screen.queryByRole('tab', { name: /^Moves/ })).not.toBeInTheDocument()
-    // Filtered to the flagged move without anyone having clicked a tab in here.
-    expect(screen.getByText('Qh4')).toBeInTheDocument()
-    expect(screen.queryByText('e4')).not.toBeInTheDocument()
-
-    rerender(list({ tab: 'moves', showTabRow: false }))
+  it('hides its title strip when the caller draws its own', () => {
+    // What the phone layout does: its own strip names the pane (`MobileGameView`), so the
+    // list's strip goes, and every move is still drawn.
+    renderList([move(0, 'e4'), move(1, 'e5')], { showTitleStrip: false, pgn: '1. e4 e5 *' })
+    expect(screen.queryByRole('heading', { name: 'Moves' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Copy PGN' })).not.toBeInTheDocument()
     expect(screen.getByText('e4')).toBeInTheDocument()
+    expect(screen.getByText('e5')).toBeInTheDocument()
   })
 
-  it('offers only Moves and Flagged — notes have a track of their own now', () => {
-    renderList([move(0, 'e4'), move(1, 'd5')])
-    // Real tabs in a tablist, the chosen one `aria-selected` (they had been pressed buttons).
-    expect(screen.getByRole('tablist', { name: 'Moves and flagged moves' })).toBeInTheDocument()
-    expect(screen.getByRole('tab', { name: /^Moves/ })).toHaveAttribute('aria-selected', 'true')
-    expect(screen.getByRole('tab', { name: /^Flagged/ })).toHaveAttribute('aria-selected', 'false')
-    expect(screen.queryByRole('tab', { name: /Notes/ })).not.toBeInTheDocument()
-    // The plies count and the PGN affordance stay put beside them.
+  it('wears a plain title, not tabs — there is one view, and no Flagged filter', () => {
+    renderList([move(0, 'e4'), move(1, 'd5', { classification: 'blunder' })])
+    // A tablist of one would announce a choice there is none of.
+    expect(screen.getByRole('heading', { name: 'Moves' })).toBeInTheDocument()
+    expect(screen.queryByRole('tablist')).not.toBeInTheDocument()
+    expect(screen.queryByRole('tab')).not.toBeInTheDocument()
+    // The plies count stays beside it.
     expect(screen.getByText('2 plies')).toBeInTheDocument()
   })
 

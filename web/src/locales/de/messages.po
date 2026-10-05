@@ -5888,7 +5888,6 @@ msgid "ACPL"
 msgstr "ACPL"
 
 #: src/routes/game/components/FlaggedMoments.tsx
-#: src/routes/game/components/MoveList.tsx
 msgid "Nothing flagged in this game."
 msgstr "In dieser Partie ist nichts markiert."
 
@@ -6047,11 +6046,6 @@ msgid "likely continuation"
 msgstr "wahrscheinliche Fortsetzung"
 
 #: src/routes/game/components/MobileGameView.tsx
-#: src/routes/game/components/MoveList.tsx
-msgid "Flagged"
-msgstr "Markiert"
-
-#: src/routes/game/components/MobileGameView.tsx
 msgid "Eval"
 msgstr "Bewertung"
 
@@ -6086,10 +6080,6 @@ msgstr "Sf3, exd5, O-O…"
 #: src/routes/game/components/MoveInput.tsx
 msgid "Type a move in notation; it is played as soon as it is unambiguous."
 msgstr "Tipp einen Zug in Notation; er wird gespielt, sobald er eindeutig ist."
-
-#: src/routes/game/components/MoveList.tsx
-msgid "Moves and flagged moves"
-msgstr "Züge und markierte Züge"
 
 #: src/routes/game/components/MoveList.tsx
 msgid "{plyCount} plies"

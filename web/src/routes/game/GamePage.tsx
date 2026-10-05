@@ -57,7 +57,6 @@ import {
   PGN_BUTTON_ID,
   type MoveAnnotation,
   type MoveListVariation,
-  type MoveTab,
 } from './components/MoveList'
 import { COMPOSER_TEXT_ID, NoteComposer } from './components/NoteComposer'
 import { NotesTrack, type NotesTrackTab } from './components/NotesTrack'
@@ -326,13 +325,6 @@ export function GameStudio({ game: from }: { game: StudioGame }) {
    */
   const [mobileTab, setMobileTab] = useState<MobileTab>('moves')
 
-  /**
-   * The desktop move column's tab, held here rather than inside `MoveList` so `t` can move
-   * it. The table still owns its own where nobody passes one — the explorer's board does —
-   * and the phone's tab is `mobileTab` above, since there the strip carries four panes and
-   * not two.
-   */
-  const [columnTab, setColumnTab] = useState<MoveTab>('moves')
   /**
    * The graph pane's reading and the Book/Notes pick, held here rather than in the panes so
    * `V`, `T` and `B` can open them. Neither follows the position — see the panes' own notes.
@@ -1363,7 +1355,7 @@ export function GameStudio({ game: from }: { game: StudioGame }) {
   const best = useMemo(() => bestRun(finishedRuns), [finishedRuns])
   const engineRun = useMemo(() => runFor(finishedRuns, upcoming), [finishedRuns, upcoming])
 
-  // Design 1a's `PGN` affordance in the move-list tab row. No endpoint exports one, so it
+  // Design 1a's `PGN` affordance in the move list's title strip. No endpoint exports one, so it
   // is assembled from this payload (`./pgn`).
   const pgn = useMemo(
     () => (detail ? buildPgn(detail.game, moves) : undefined),
@@ -2111,7 +2103,7 @@ export function GameStudio({ game: from }: { game: StudioGame }) {
   )
 
   // The curve's own marks, as rows. Only the phone builds it: the desktop reads them off
-  // the plot with a mouse, and off the move table's Flagged tab beside it.
+  // the plot with a mouse, and off the glyph badges in the move list beside it.
   const flaggedMoments = <FlaggedMoments moves={moves} cursor={cursor} onSelect={seek} />
 
   /*
@@ -2185,19 +2177,12 @@ export function GameStudio({ game: from }: { game: StudioGame }) {
     />
   )
 
-  // The phone's strip is Moves · Eval · Engine · Notes now: Flagged has gone from it — the
-  // Eval tab already lists the curve's marks, under the curve that explains them — and Book
-  // joined Notes. Only `moves` mounts the table, so the tab it is told to draw is Moves
-  // unless something puts the strip back on a Flagged it can no longer reach itself.
-  const movesTab: MoveTab = mobileTab === 'flagged' ? 'flagged' : 'moves'
-
   const moveList = (
     <MoveList
       pairs={pairs}
       cursor={cursor}
       collapsedThrough={collapsedThrough}
       annotation={annotation}
-      flaggedCount={flaggedCount}
       plyCount={plyCount}
       pgn={pgn}
       // Every line this session has walked, each under the move it hangs off and in
@@ -2212,12 +2197,10 @@ export function GameStudio({ game: from }: { game: StudioGame }) {
       onUnpinVariation={readOnly ? undefined : unpinVariation}
       onSelectPly={selectPly}
       notedMoves={notedMoves}
-      // The phone promotes the table's tabs into `MobileGameView`'s strip, so the table is
-      // told which one to draw and its own row is switched off — that row is also where the
-      // PGN affordance lives, which is why the phone header carries one.
-      tab={mobile ? movesTab : columnTab}
-      onTabChange={mobile ? undefined : setColumnTab}
-      showTabRow={!mobile}
+      // The phone's own strip names this pane, so the list's title strip is switched off
+      // there — that strip is also where the PGN affordance lives, which is why the phone
+      // header carries one.
+      showTitleStrip={!mobile}
       // The moves/notes rule, in the same weight as every other boundary between panes: the
       // workspace is a matrix of panes divided by rules, and a boundary that is quieter than
       // its neighbours reads as an accident rather than as a division.

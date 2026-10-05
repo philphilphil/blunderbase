@@ -481,8 +481,9 @@ none of them is a layout problem, so none is fixable in `web/`.
 - **The `Variations` and `Book` move-list tabs** (design 1a) — `/games/{id}`
   sends a flat move list with no variation tree and takes none, and `Book` is the
   per-position question `/explorer` already answers on a screen with a board to
-  walk it. The slot carries `Flagged`; the design's `PGN` affordance is
-  implemented. Rationale in `MoveList.tsx`'s docblock.
+  walk it. The slot is a plain `Moves` title now (the `Flagged` tab that held it
+  was removed in #45); the design's `PGN` affordance is implemented. Rationale in
+  `MoveList.tsx`'s docblock.
 - **The sidebar footer's `2.4 GB / 3.8 GB`** (every design frame) — no endpoint
   reports disk usage. The same three-line treatment once carried analysis
   coverage of the library, which is the "how full is this database" question the

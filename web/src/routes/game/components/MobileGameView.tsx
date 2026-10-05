@@ -12,25 +12,24 @@ import { formatScore, type Score } from '@/lib/chess/evaluation'
 import { cn } from '@/lib/utils'
 
 import { formatResult } from '../gameModel'
-import { PgnButton, type MoveTab } from './MoveList'
+import { PgnButton } from './MoveList'
 import { PaneTab, PaneTabList } from './PaneTabList'
 
 /**
- * The phone's tabs. `moves` is the move table's own tab, promoted out of it (see
- * `MoveList`'s `showTabRow`); the rest are the panels that have nowhere else to live once
- * the second column is gone. `flagged` is still in the union because the table can still be
- * *told* to draw that tab — it is simply no longer one of the strip's own (below).
+ * The phone's tabs. `moves` is the move list, whose own title strip is switched off here
+ * (see `MoveList`'s `showTitleStrip`); the rest are the panels that have nowhere else to live
+ * once the second column is gone.
  */
-export type MobileTab = MoveTab | 'eval' | 'engine' | 'notes'
+export type MobileTab = 'moves' | 'eval' | 'engine' | 'notes'
 
 /**
  * Reading order, not grouping order: Moves, then the two panels that describe the position
  * the board is on, then the one that is about what you wrote. Notes is last because it is a
  * place you go on purpose.
  *
- * There is no Flagged tab any more. The Eval tab already carries `FlaggedMoments` — the same
- * list of the curve's marks — directly under the curve that explains them, and two doors to
- * one room is one door too many on a strip this narrow.
+ * There is no Flagged tab, here or on the desktop. The Eval tab carries `FlaggedMoments` —
+ * the list of the curve's marks — directly under the curve that explains them, and two
+ * doors to one room is one door too many on a strip this narrow.
  */
 const MOBILE_TABS: readonly MobileTab[] = ['moves', 'eval', 'engine', 'notes']
 
@@ -43,7 +42,6 @@ const UNAIDED_TABS: readonly MobileTab[] = ['moves', 'notes']
 
 const TAB_LABEL: Record<MobileTab, MessageDescriptor> = {
   moves: msg`Moves`,
-  flagged: msg`Flagged`,
   notes: msg`Notes`,
   eval: msg`Eval`,
   engine: msg`Engine`,
@@ -424,7 +422,7 @@ function TabStrip({
               className="flex-1 justify-center whitespace-nowrap px-1"
             >
               {i18n._(TAB_LABEL[name])}
-              {/* Flagged keeps the blunder hue (a verdict); a note count is plain data. */}
+              {/* The flagged count keeps the blunder hue (a verdict); a note count is plain data. */}
               {count > 0 ? (
                 <span
                   className={cn(

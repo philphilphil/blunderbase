@@ -56,10 +56,12 @@ ein anderes Programm die Partie genauso wieder einliest.
 ## Was die Markierungen bedeuten { #what-the-badges-mean }
 
 Die Zugspalte kennzeichnet Züge mit `??`, `?`, `?!` oder `!` und färbt die betroffenen
-Zeilen ein. Sie hat zwei Reiter, **Züge** und **Markiert**; **Markiert** zeigt nur diese
-Züge, ihre Zahl steht auf dem Reiter. Wann ein Zug welche Markierung bekommt, steht unter
-[Analyse](analysis.md). Dieselbe Leiste nennt die Zahl der Halbzüge und trägt ganz rechts
-**PGN kopieren** (das Kopiersymbol, oder `C`): Es legt die ganze Partie als PGN in die
+Züge ein. Von einem zum nächsten kommst du mit ↑ und ↓ oder den Schaltflächen unter dem
+Brett, oder mit einem Klick auf eine Markierung im Bewertungsverlauf; auf dem Handy listet
+sie außerdem der Reiter **Bewertung**, ihre Zahl steht auf dem Reiter. Wann ein Zug welche
+Markierung bekommt, steht unter [Analyse](analysis.md). Die Titelleiste der Spalte,
+**Züge**, nennt die Zahl der Halbzüge und trägt ganz rechts **PGN kopieren** (das
+Kopiersymbol, oder `C`): Es legt die ganze Partie als PGN in die
 Zwischenablage, und das Symbol wird zum Haken, sobald das geklappt hat.
 
 ## Der Bewertungsverlauf { #read-the-evaluation-graph }

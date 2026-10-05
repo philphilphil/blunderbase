@@ -48,11 +48,13 @@ position, and its moves are numbered from it: a game that begins with Black to m
 
 ## What the badges mean
 
-The move column marks a move `??`, `?`, `?!` or `!` and tints the flagged rows. It has two
-tabs, **Moves** and **Flagged**; **Flagged** shows only those moves, with their count on
-the tab. What earns each badge is in [Analysis](analysis.md). The same strip says how many
-plies the game has and, at its right end, carries **Copy PGN** (the copy icon, or `C`),
-which puts the whole game on the clipboard as PGN; the icon turns into a tick when it has.
+The move column marks a move `??`, `?`, `?!` or `!` and tints the flagged moves. To get from
+one to the next, use ↑ and ↓ or the transport buttons under the board, or click a mark on the
+evaluation graph; on a phone the **Eval** tab also lists them, with their count on the tab.
+What earns each badge is in [Analysis](analysis.md). The column's title strip, **Moves**,
+says how many plies the game has and, at its right end, carries **Copy PGN** (the copy
+icon, or `C`), which puts the whole game on the clipboard as PGN; the icon turns into a
+tick when it has.
 
 ## Read the evaluation graph
 

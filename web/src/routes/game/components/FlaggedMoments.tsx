@@ -19,10 +19,10 @@ import { usePlyLabel } from '../plyNumbering'
  * a phone can hit a row where it cannot hit a 3-pixel dot on a plot. The two are one panel
  * — the curve is the shape of the game, this is its index.
  *
- * Not the same thing as the move table's Flagged tab, which is that same table with the
- * quiet pairs filtered out: this is one row per mistake rather than per move pair, with the
- * cost on it, and it does not carry variations or notes. The table is for reading the game;
- * this is for choosing which mistake to look at next.
+ * Not a filtered move list: this is one row per mistake, with the cost on it, and it does
+ * not carry variations or notes. The move list is for reading the game; this is for
+ * choosing which mistake to look at next. The desktop has no copy of it — the glyph badges
+ * in the move list and the marks on the plot beside it already point at the same moves.
  */
 export function FlaggedMoments({
   moves,

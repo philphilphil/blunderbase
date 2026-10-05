@@ -1,6 +1,7 @@
 /**
- * The structure of a pane's tabs, so every strip is a real tablist: Moves / Flagged,
- * Notes / Book, Evaluation / Move time, Run / Live, the phone's game tabs.
+ * The structure of a pane's tabs, so every strip is a real tablist: Notes / Book,
+ * Evaluation / Move time, Run / Live, the phone's game tabs. A pane with one view (Moves)
+ * wears a plain title instead — a tablist of one announces a choice there is none of.
  *
  * The strips had been built three ways (a tablist, a group of `aria-pressed` buttons, and
  * pills wrapped in spans), so a screen reader heard three kinds of thing and the arrow keys
@@ -73,7 +74,7 @@ export function PaneTab({
   'data-testid'?: string
   selected: boolean
   onSelect: () => void
-  /** A count beside the name ("Flagged 10"), in `PANE_COUNT`. */
+  /** A count beside the name ("Notes 3"), in `PANE_COUNT`. */
   count?: ReactNode
   disabled?: boolean
   /** The id of the panel this tab shows (`aria-controls`). */

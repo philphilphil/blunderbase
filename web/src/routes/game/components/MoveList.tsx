@@ -13,7 +13,6 @@ import { cn } from '@/lib/utils'
 import { formatRemaining, moveNumberOf, type MovePair } from '../gameModel'
 import { usePlyLabel, usePlyNumbering, usePlyOffset } from '../plyNumbering'
 import { PANE_TOOL, STRIP_FACTS, STRIP_RULE, TAB_ROW } from './paneTabs'
-import { PaneTab, PaneTabList } from './PaneTabList'
 
 /**
  * The inline note design 1a puts under a flagged move: what it cost and what was better.
@@ -33,13 +32,6 @@ export interface MoveAnnotation {
   winLoss: number | null
   bestSan: string | null
 }
-
-/**
- * Two tabs, not three. `Notes` used to live here because the desktop column was the only
- * place a note could be read; it now has a standing track of its own beside this one at
- * every width down to the phone, so a tab would be a second door into an open room.
- */
-export type MoveTab = 'moves' | 'flagged'
 
 /**
  * One line in the table, drawn inline under the move it hangs off.
@@ -92,9 +84,8 @@ export interface MoveListProps {
   /** Move number through which the opening is folded away, or null. */
   collapsedThrough: number | null
   annotation: MoveAnnotation | null
-  flaggedCount: number
   plyCount: number
-  /** The game as PGN, for the tab row's export affordance. Built by `../pgn`. */
+  /** The game as PGN, for the title strip's export affordance. Built by `../pgn`. */
   pgn?: string
   /**
    * The session's lines, drawn inline under the moves they hang off, oldest first — the one
@@ -115,20 +106,10 @@ export interface MoveListProps {
   /** Mainline move indices that carry a note (`notesModel.notedMoveIndices`). */
   notedMoves?: ReadonlySet<number>
   /**
-   * The open tab, where the caller owns it. Undefined leaves the table in charge of its
-   * own, which is what the desktop column does and has always done. The phone layout
-   * promotes these tabs into a strip of its own that also holds Eval, Engine and Notes,
-   * so there the tab is page state and this table is told which one to draw.
+   * Draw the title strip. False where the caller draws a strip of its own — the phone does,
+   * and since the PGN affordance lives in this one, it has to place `PgnButton` itself.
    */
-  tab?: MoveTab
-  /** Fires on a click in the tab row — meaningless while `showTabRow` is false. */
-  onTabChange?: (tab: MoveTab) => void
-  /**
-   * Draw the tab row. False where the caller draws the tabs itself; the PGN affordance
-   * lives in that row, so a caller that switches it off has to place `PgnButton` somewhere
-   * of its own.
-   */
-  showTabRow?: boolean
+  showTitleStrip?: boolean
   className?: string
 }
 
@@ -150,20 +131,17 @@ export interface MoveListProps {
  * what explains the late blunders, and putting the two in the same row lets that
  * correlation be read straight off the table instead of captioned under it.
  *
- * The design's tab row is `Moves / Variations / Book`, with `PGN` pinned right. `PGN` is
- * here; the other two are not, and are not a matter of layout. A game carries one line —
- * `/games/{id}` sends a flat move list with no variation tree, and nothing in the API
- * accepts one — so a `Variations` tab would be an empty room. `Book` is a per-position
- * question, and it now has a pane of its own in the track beside this one. The slot they
- * leave carries `Flagged`: the game's mistakes, which is what the whole screen is for and
- * what the design's own eval graph and glyph badges point at.
+ * The pane wears a title strip, not tabs. The design's row was `Moves / Variations / Book`;
+ * variations are drawn inline here and Book has a pane of its own. A `Flagged` tab filled
+ * the slot for a while and was removed (#45): it said nothing the glyph badges, the eval
+ * graph's marks and ↑/↓ do not already say, and a filtered copy of the list is a second
+ * place to look for the same moves.
  */
 export function MoveList({
   pairs,
   cursor,
   collapsedThrough,
   annotation,
-  flaggedCount,
   plyCount,
   pgn,
   variations,
@@ -174,21 +152,9 @@ export function MoveList({
   onUnpinVariation,
   onSelectPly,
   notedMoves,
-  tab: openTab,
-  onTabChange,
-  showTabRow = true,
+  showTitleStrip = true,
   className,
 }: MoveListProps) {
-  const { t } = useLingui()
-  // Uncontrolled by default — the desktop column has never had anywhere else to put these
-  // tabs. `openTab` takes over where a caller draws the strip itself; the internal state is
-  // still kept in step, so handing control back would not jump the table to another tab.
-  const [ownTab, setOwnTab] = useState<MoveTab>('moves')
-  const tab = openTab ?? ownTab
-  const setTab = (next: MoveTab) => {
-    setOwnTab(next)
-    onTabChange?.(next)
-  }
   const [expanded, setExpanded] = useState(false)
   const scroller = useRef<HTMLDivElement>(null)
   const activeRow = useRef<HTMLDivElement>(null)
@@ -198,17 +164,11 @@ export function MoveList({
   // Stepping into the folded part of the game opens it rather than stranding the cursor.
   const cursorInFold =
     collapsedThrough !== null && cursor >= 0 && cursorMove <= collapsedThrough
-  const folded = tab === 'moves' && collapsedThrough !== null && !expanded && !cursorInFold
-  const rows = pairs.filter((pair) => {
-    if (tab === 'flagged') {
-      return isFlagged(pair.white?.classification) || isFlagged(pair.black?.classification)
-    }
-    return !folded || pair.moveNumber > collapsedThrough!
-  })
+  const folded = collapsedThrough !== null && !expanded && !cursorInFold
+  const rows = pairs.filter((pair) => !folded || pair.moveNumber > collapsedThrough!)
 
-  // Built off every pair, not the filtered ones: a reading belongs to the move two plies
-  // after the one that produced it, and the fold or the `Flagged` tab may well have taken
-  // that earlier move off screen.
+  // Built off every pair, not the shown ones: a reading belongs to the move two plies after
+  // the one that produced it, and the fold may well have taken that earlier move off screen.
   const clocks = useMemo(() => clocksAtMove(pairs), [pairs])
 
   // Every line on screen, in the order it was handed over — which is the order they were
@@ -242,9 +202,9 @@ export function MoveList({
     })
   }
 
-  // A line whose anchor is filtered away by the fold or the `Flagged` tab has no move on
-  // screen to hang under, and one off the starting position never had one; either way it
-  // goes to the top of the list rather than disappearing with its anchor.
+  // A line whose anchor is folded away has no move on screen to hang under, and one off the
+  // starting position never had one; either way it goes to the top of the list rather than
+  // disappearing with its anchor.
   const shown = new Set(rows.map((pair) => pair.moveNumber))
   const orphans: React.ReactNode[] = []
   const anchored = new Map<number, React.ReactNode[]>()
@@ -275,41 +235,34 @@ export function MoveList({
     else if (bottom > box.scrollTop + box.clientHeight) box.scrollTop = bottom - box.clientHeight
     // Walking a variation moves nothing in the table, but the row it hangs off — which is
     // the row it is drawn under — is what has to stay in view while it does.
-  }, [cursor, tab, walked?.cursor, walked?.sans.length])
+  }, [cursor, walked?.cursor, walked?.sans.length])
 
   return (
     <div data-testid="move-list" className={cn('flex min-h-0 flex-col', className)}>
-      {showTabRow ? (
+      {showTitleStrip ? (
       // `@container` on top of the shared strip: the ply count below hides by this row's own
       // width, which only a container query can read.
       <div className={cn(TAB_ROW, '@container')}>
-        <PaneTabList label={t`Moves and flagged moves`}>
-          <PaneTab selected={tab === 'moves'} onSelect={() => setTab('moves')}>
-            <Trans>Moves</Trans>
-          </PaneTab>
-          <PaneTab selected={tab === 'flagged'} onSelect={() => setTab('flagged')}>
-            <Trans>Flagged</Trans>
-            {/* The count keeps the blunder hue: it is the game's mistakes, a verdict. */}
-            {flaggedCount > 0 ? (
-              <span className="font-mono text-meta text-blunder">{flaggedCount}</span>
-            ) : null}
-          </PaneTab>
-        </PaneTabList>
+        {/* A plain title where a tab would stand, in a tab's own type and inset so the strip
+            lines up with the tabbed strips around it — not a tablist of one, which would
+            announce a choice there is none of. */}
+        <h2 className="flex items-center px-3 text-data font-medium text-ink">
+          <Trans>Moves</Trans>
+        </h2>
         <div className="flex-1" />
         {/*
-          The strip's order is tabs │ facts │ tools. `flex-none`, so whatever else this row
+          The strip's order is title │ facts │ tools. `flex-none`, so whatever else this row
           has to give up, the PGN tool is never the thing that gets clipped off the right edge.
 
-          The ply total goes below `md`: the tabs, a count and this pair do not fit across a
-          375px screen, and of everything here it is the one thing said elsewhere — the
-          phone's own header carries `ply 34/91`. The phone layout switches this whole row
-          off (`showTabRow`) and draws its own strip, so this only bites a narrow desktop
-          window; it is kept because that window is real and a clipped PGN button is not
-          worth the two words.
+          The ply total goes below `md`: of everything here it is the one thing said
+          elsewhere — the phone's own header carries `ply 34/91`. The phone layout switches
+          this whole strip off (`showTitleStrip`) and draws its own strip, so this only bites a
+          narrow desktop window; it is kept because that window is real and a clipped PGN
+          button is not worth the two words.
         */}
         <div className="flex flex-none items-center gap-2 whitespace-nowrap">
           {/* And on a desktop whose track is at its 15.625rem floor, by the row's own width:
-              German's "Markiert" and "Halbzüge" are longer than the words this was fitted to. */}
+              German's "Halbzüge" is longer than the word this was fitted to. */}
           <span className={cn(STRIP_FACTS, 'font-mono max-md:hidden @max-[16.5rem]:hidden')}>
             <Trans>{plyCount} plies</Trans>
           </span>
@@ -336,11 +289,7 @@ export function MoveList({
 
         {rows.length === 0 ? (
           <p className="px-3 py-6 text-center text-data text-dim">
-            {tab === 'flagged' ? (
-              <Trans>Nothing flagged in this game.</Trans>
-            ) : (
-              <Trans>No moves — this game has an empty move list.</Trans>
-            )}
+            <Trans>No moves — this game has an empty move list.</Trans>
           </p>
         ) : null}
 
@@ -451,7 +400,7 @@ function ClockCell({ seconds }: { seconds: number | undefined }) {
 }
 
 /**
- * Design 1a's `PGN`, pinned to the right of the tab row. It copies rather than downloads:
+ * Design 1a's `PGN`, pinned to the right of the title strip. It copies rather than downloads:
  * the thing anyone wants a game's PGN for — pasting it into an analysis board, handing it
  * to your assistant over MCP — starts with it on the clipboard.
  *
@@ -460,14 +409,14 @@ function ClockCell({ seconds }: { seconds: number | undefined }) {
  * `c` copies the game, and it does it by pressing this rather than by copying the text a
  * second time somewhere else: the button owns the clipboard call *and* the copied/failed
  * flash that says it worked, and a second path would be a second answer to "did that
- * work". Exactly one of these is mounted at any width — the tab row's, or the phone
+ * work". Exactly one of these is mounted at any width — the title strip's, or the phone
  * header's.
  */
 export const PGN_BUTTON_ID = 'game-pgn-copy'
 
 /**
- * Copy the whole game as PGN. Exported because the tab row it normally sits in is switched
- * off below `md` (`showTabRow`), and the phone layout has to put it somewhere of its own.
+ * Copy the whole game as PGN. Exported because the title strip it normally sits in is switched
+ * off below `md` (`showTitleStrip`), and the phone layout has to put it somewhere of its own.
  */
 export function PgnButton({ pgn }: { pgn?: string }) {
   const { t } = useLingui()
@@ -508,8 +457,8 @@ export function PgnButton({ pgn }: { pgn?: string }) {
         title={said ?? t`Copy PGN (C)`}
         // An icon tool in the strip's tools slot (`PANE_TOOL`), like the focus and compare
         // tools beside it. It had been the ghost word "PGN", a text button without a face,
-        // which the grammar does not allow; a labelled face squeezed the ply count into the
-        // Flagged tab. The copy glyph turns into a check (or a cross) for the flash.
+        // which the grammar does not allow; a labelled face squeezed the ply count off a
+        // narrow strip. The copy glyph turns into a check (or a cross) for the flash.
         className={cn(
           PANE_TOOL,
           state === 'copied' && 'text-good',
