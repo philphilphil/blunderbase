@@ -22,6 +22,7 @@ export type SortKey =
   | 'ply_count'
   | 'worst'
   | 'source'
+  | 'notes'
 // No `tier`: it ranked games by which pass they had, and with one pass there is nothing left
 // to rank. The backend still reads an old `order=tier` as the default order.
 
@@ -56,6 +57,8 @@ const NATURAL_DIRECTION: Record<SortKey, 'asc' | 'desc'> = {
   ply_count: 'desc',
   worst: 'desc',
   source: 'asc',
+  // The most-annotated games first: sorting by notes is looking for the ones you wrote on.
+  notes: 'desc',
 }
 
 const SORT_KEYS = Object.keys(NATURAL_DIRECTION) as SortKey[]

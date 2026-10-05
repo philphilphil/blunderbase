@@ -289,6 +289,11 @@ export interface GameSummary extends Extra {
    * payload from before collections still type-checks — read it as `game.collections ?? []`.
    */
   collections?: number[]
+  /**
+   * How many notes were written on this game — its own, not the ones from other games at a
+   * shared position. Sent on `/games` rows; absent where nobody counted.
+   */
+  note_count?: number | null
 }
 
 /** One point of a game's eval curve: `win` is the win percentage, 0..100. */

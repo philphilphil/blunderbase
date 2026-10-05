@@ -226,6 +226,11 @@ GAME_ORDERS: dict[str, Callable[[], ColumnElement[Any]]] = {
     "ply_count": lambda: Game.ply_count,
     "worst": lambda: Game.card["worst_moments"][0]["win_loss"].as_float(),
     "source": lambda: Game.source,
+    # How many notes were written on this game (`note_counts`), as a correlated count so a
+    # game with none sorts as 0 rather than sinking with the NULLs.
+    "notes": lambda: (
+        select(func.count(Note.id)).where(Note.game_id == Game.id).scalar_subquery()
+    ),
 }
 
 
@@ -501,6 +506,28 @@ def _unique_ids(game_ids: Iterable[int]) -> list[int]:
 def _id_chunks(ids: list[int]) -> list[list[int]]:
     """The ids as IN-sized batches: SQLite has a ceiling on bound parameters."""
     return [ids[start : start + DELETE_CHUNK] for start in range(0, len(ids), DELETE_CHUNK)]
+
+
+def note_counts(session: Session, game_ids: Iterable[int]) -> dict[int, int]:
+    """How many notes each of these games carries, in one query per chunk of ids.
+
+    A game's own notes only — the ones written on it (`Note.game_id`): about the game, on a
+    move of it, on a line pinned to it. A note written in another game, or in the explorer,
+    on a position this game also reached turns up on the game screen, but it is not this
+    game's, and a count that included it would grow every game of a popular opening each
+    time one of them was annotated. Every id asked about is a key, 0 for none.
+    """
+    ids = _unique_ids(game_ids)
+    found = dict.fromkeys(ids, 0)
+    for chunk in _id_chunks(ids):
+        statement = (
+            select(Note.game_id, func.count(Note.id))
+            .where(Note.game_id.in_(chunk))
+            .group_by(Note.game_id)
+        )
+        for game_id, count in session.execute(statement):
+            found[int(game_id)] = int(count)
+    return found
 
 
 def delete_all_games(session: Session) -> Wiped:
@@ -1329,6 +1356,7 @@ def game_card(
     *,
     worst: int = 3,
     collections: Sequence[int] | None = None,
+    notes: int | None = None,
     queued: bool | None = None,
 ) -> dict[str, Any]:
     """A game as a compact card: the summary, the eval curve and its worst moments.
@@ -1347,7 +1375,7 @@ def game_card(
     stored = _stored_card(game, worst)
     card = stored if stored is not None else build_card(session, game, worst=max(worst, 0))
     return {
-        **game_summary(game, collections=collections),
+        **game_summary(game, collections=collections, notes=notes),
         "analyzed": card["analyzed"],
         # A card folded before there was one pass says `deep` instead; a deep run then was
         # exactly what a requested run is now, and refolding every card to rename the key
@@ -1362,14 +1390,15 @@ def game_card(
 def game_cards(session: Session, games: Iterable[Game], *, worst: int = 3) -> list[dict[str, Any]]:
     """`game_card` over a list, which is what `get_last_games` is usually followed by.
 
-    Each card carries the collections its game is in and whether a run over it is queued,
-    each looked up once for the whole list.
+    Each card carries the collections its game is in, how many notes were written on it and
+    whether a run over it is queued, each looked up once for the whole list.
     """
     from backend.services import collections as collections_service
 
     rows = list(games)
     ids = [game.id for game in rows]
     memberships = collections_service.collections_of(session, ids)
+    notes = note_counts(session, ids)
     waiting = queued_games(session, ids)
     return [
         game_card(
@@ -1377,6 +1406,7 @@ def game_cards(session: Session, games: Iterable[Game], *, worst: int = 3) -> li
             game,
             worst=worst,
             collections=memberships.get(game.id, []),
+            notes=notes.get(game.id, 0),
             queued=game.id in waiting,
         )
         for game in rows
@@ -1534,24 +1564,35 @@ def game_url(game: Game) -> str | None:
 
 
 def game_summaries(session: Session, games: Iterable[Game]) -> list[dict[str, Any]]:
-    """`game_summary` over a page of games, each with the collections it is in.
+    """`game_summary` over a page of games, each with its collections and its note count.
 
-    The memberships are one query for the whole page rather than one per row, which is the
-    difference between a list of fifty games and fifty-one queries.
+    Both are one query for the whole page rather than one per row, which is the difference
+    between a list of fifty games and a hundred and one queries.
     """
     from backend.services import collections as collections_service
 
     rows = list(games)
-    memberships = collections_service.collections_of(session, [game.id for game in rows])
-    return [game_summary(game, collections=memberships.get(game.id, [])) for game in rows]
+    ids = [game.id for game in rows]
+    memberships = collections_service.collections_of(session, ids)
+    notes = note_counts(session, ids)
+    return [
+        game_summary(game, collections=memberships.get(game.id, []), notes=notes.get(game.id, 0))
+        for game in rows
+    ]
 
 
-def game_summary(game: Game, *, collections: Sequence[int] | None = None) -> dict[str, Any]:
+def game_summary(
+    game: Game,
+    *,
+    collections: Sequence[int] | None = None,
+    notes: int | None = None,
+) -> dict[str, Any]:
     """The compact form of a game every payload in the service layer embeds.
 
-    `collections` is the ids of the collections the game is in, for the callers that have
-    looked them up (`game_summaries`, `game_cards`, `get_game_detail`); left out, the key
-    is absent rather than a list that would claim the game is in none.
+    `collections` is the ids of the collections the game is in, and `notes` how many notes
+    were written on it (`note_counts`), for the callers that have looked them up
+    (`game_summaries`, `game_cards`; `get_game_detail` for the collections); left out, the
+    key is absent rather than a value that would claim the game is in none, or has none.
     """
     summary = _compact(
         {
@@ -1588,6 +1629,8 @@ def game_summary(game: Game, *, collections: Sequence[int] | None = None) -> dic
     )
     if collections is not None:
         summary["collections"] = list(collections)
+    if notes is not None:
+        summary["note_count"] = notes
     return summary
 
 

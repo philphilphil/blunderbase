@@ -942,6 +942,7 @@ msgstr "Openings"
 #: src/routes/correspondence/CorrespondenceGamePage.tsx
 #: src/routes/game/components/MobileGameView.tsx
 #: src/routes/game/components/NotesTrack.tsx
+#: src/routes/games/components/columns.ts
 #: src/routes/notes/NotesPage.tsx
 msgid "Notes"
 msgstr "Notes"

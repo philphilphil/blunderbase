@@ -352,6 +352,22 @@ export const GameRow = memo(function GameRow({
         </span>
       ) : null}
 
+      {has('notes') ? (
+        // How many notes were written on this game — its own, not the ones it meets from
+        // other games at a shared position (`note_count`). A 0 is printed, quieter than a
+        // count: a blank would read as "not known" in a column that always knows.
+        <span
+          data-testid="game-note-count"
+          {...cell(
+            'notes',
+            cn('text-right font-mono tabular', (game.note_count ?? 0) > 0 ? 'text-soft' : meta),
+          )}
+        >
+          {game.note_count ?? null}
+          {last === 'notes' ? remove : null}
+        </span>
+      ) : null}
+
       {has('collections') ? (
         // Contained inline: the table's body is as wide as its widest row's content (it
         // scrolls sideways past that, `GamesTable`), and without this a game in five

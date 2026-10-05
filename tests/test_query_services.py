@@ -911,6 +911,33 @@ def test_game_detail_gathers_notes_on_the_game_and_on_its_positions(library: Lib
     assert position_note["ply"] == 0
 
 
+def test_the_games_list_counts_each_games_own_notes_and_sorts_by_them(library: Library) -> None:
+    """The games list's Notes column: what was written *on* a game, not the notes it only
+    meets because another game, or the explorer, reached one of its positions."""
+    session = library.session
+    noted, other = library["qg000001"], library["qg000002"]
+    notes.save_note(session, "stop playing Ba4 on autopilot", game_id=noted.id)
+    notes.save_note(session, "the plan was wrong from move one", game_id=noted.id)
+    # On the starting position every game in the library reaches, from no game at all.
+    notes.save_note(session, "the Berlin again", fen=START_EPD)
+
+    found = games_service.search_games(session, GameFilters())
+    by_id = {row["id"]: row["note_count"] for row in games_service.game_summaries(session, found)}
+    assert by_id[noted.id] == 2
+    assert by_id[other.id] == 0
+    cards = games_service.game_cards(session, found)
+    assert {card["id"]: card["note_count"] for card in cards} == by_id
+
+    # A summary nobody counted for says nothing rather than claiming none.
+    assert "note_count" not in games_service.game_summary(noted)
+
+    # Sorted by it, a game with none sorts as 0 rather than sinking with the NULLs.
+    most = games_service.search_games(session, GameFilters(), order="notes", direction="desc")
+    assert most[0].id == noted.id
+    fewest = games_service.search_games(session, GameFilters(), order="notes", direction="asc")
+    assert fewest[-1].id == noted.id
+
+
 def test_get_game_detail_of_an_unknown_game_is_none(library: Library) -> None:
     assert games_service.get_game_detail(library.session, 9999) is None
 

@@ -1,6 +1,6 @@
 /**
- * The 15 columns of the library table, at the widths design 2b draws them (emitted as
- * `rem`), with two departures from the design and one addition (`Collections`).
+ * The 16 columns of the library table, at the widths design 2b draws them (emitted as
+ * `rem`), with two departures from the design and two additions (`Notes`, `Collections`).
  *
  * Two of the design's columns — per-game accuracy and ACPL — have no backend behind them:
  * `/games?cards=true` carries the eval curve and the three worst moments, not a per-game
@@ -37,7 +37,7 @@ export interface Column {
 }
 
 /**
- * Fifteen columns do not fit on a 375px screen, so below `md` a row stops being a line of
+ * Sixteen columns do not fit on a 375px screen, so below `md` a row stops being a line of
  * a table and becomes a two-line card laid out on this grid:
  *
  * ```
@@ -48,9 +48,9 @@ export interface Column {
  *   └───┴───────────────────────────────┴─────┴───────┘
  * ```
  *
- * The opening, the clock, the move count, the source and the analysis are the five that go:
- * they are the ones a phone can look up by opening the game, and dropping them is what
- * buys the two names a readable width. The header drops their sort with them, so what a
+ * The opening, the clock, the move count, the source, the analysis and the notes are the
+ * six that go: they are the ones a phone can look up by opening the game, and dropping them
+ * is what buys the two names a readable width. The header drops their sort with them, so what a
  * phone can sort by is exactly what it can see.
  */
 export const PHONE_CARD =
@@ -108,6 +108,10 @@ export const COLUMNS: Column[] = [
   { id: 'tier', label: msg`Analysis`, width: 84, phone: null },
   // Three badges at most (a card carries three worst moments), or the Analyse button.
   { id: 'flags', label: msg`Flags`, width: 120, phone: CARD.flags },
+  // How many notes were written on the game (#45), beside the collections: both are the
+  // owner's own work on it rather than the engine's. Only that game's notes — one written
+  // in another game on a shared position is not counted. The phone drops it.
+  { id: 'notes', label: msg`Notes`, width: 52, align: 'right', sort: 'notes', mono: true, phone: null },
   // A game's collections, apart from its flags: flags are the engine's verdict, a
   // collection is the owner's filing, and one cell holding both read as one kind of thing.
   // Last and flexible, as plain names, since it is the one column whose width is whatever

@@ -29,10 +29,15 @@ describe('cell geometry', () => {
     expect(cellClass(column('collections'))).not.toMatch(/(^|\s)min-w-28/)
   })
 
-  it('makes Flags the flexible last column when there are no collections', () => {
+  it('makes Notes the flexible last column when there are no collections', () => {
     const columns = columnsFor(false, false)
-    expect(columns.at(-1)).toMatchObject({ id: 'flags', width: 'flex' })
-    expect(columnsFor(false, true).find((each) => each.id === 'flags')?.width).toBe(120)
+    expect(columns.at(-1)).toMatchObject({ id: 'notes', width: 'flex' })
+    expect(columnsFor(false, true).find((each) => each.id === 'notes')?.width).toBe(52)
+    expect(columns.find((each) => each.id === 'flags')?.width).toBe(120)
+  })
+
+  it('keeps Notes with the engine hidden: they are the owner’s, not the engine’s', () => {
+    expect(columnsFor(true, true).map((each) => each.id)).toContain('notes')
   })
 
   it('drops Worst and Flags with the engine hidden, and hands the phone slot to Analysis', () => {
@@ -40,7 +45,7 @@ describe('cell geometry', () => {
     expect(hidden.map((each) => each.id)).not.toContain('worst')
     expect(hidden.map((each) => each.id)).not.toContain('flags')
     expect(hidden.find((each) => each.id === 'tier')?.phone).toBe(column('flags').phone)
-    // With no collections either, Analysis is last and takes the rest of the width.
-    expect(columnsFor(true, false).at(-1)).toMatchObject({ id: 'tier', width: 'flex' })
+    // With no collections either, Notes is last and takes the rest of the width.
+    expect(columnsFor(true, false).at(-1)).toMatchObject({ id: 'notes', width: 'flex' })
   })
 })

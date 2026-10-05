@@ -333,11 +333,26 @@ describe('GamesTable collection chips', () => {
     expect(screen.queryByRole('link', { name: /League/ })).not.toBeInTheDocument()
   })
 
-  it('gives collections a column of their own, last, after the flags', () => {
+  it('gives collections a column of their own, last, after the flags and the notes', () => {
     withCollections([{ ...GAME, collections: [3] } as GameCard])
     const header = screen.getAllByRole('row')[0]!
     const heads = [...header.children].map((cell) => cell.textContent)
-    expect(heads.slice(-2)).toEqual(['Flags', 'Collections'])
+    expect(heads.slice(-3)).toEqual(['Flags', 'Notes', 'Collections'])
+  })
+
+  it('counts each game’s notes, a 0 included, and sorts by them', async () => {
+    const onSortChange = vi.fn()
+    setup({
+      games: [
+        { ...GAME, note_count: 3 } as GameCard,
+        { ...GAME, id: 13, note_count: 0 } as GameCard,
+      ],
+      onSortChange,
+    })
+    const cells = screen.getAllByTestId('game-note-count')
+    expect(cells.map((cell) => cell.textContent)).toEqual(['3', '0'])
+    await userEvent.click(screen.getAllByRole('button', { name: /^Notes/ })[0]!)
+    expect(onSortChange).toHaveBeenCalledWith({ key: 'notes', direction: 'desc' })
   })
 
   it('drops the Collections column while there are no collections', () => {

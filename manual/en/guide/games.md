@@ -76,6 +76,9 @@ is among them. For a game nothing has analysed it holds **Analyse**, which queue
 once the game is waiting in the queue or being analysed, it reads **In queue** instead. The
 only badges in the table are the `??`, `?` and `?!` flags. The **Worst** column is coloured
 only when the drop is an inaccuracy or worse.
+**Notes** counts the notes written on a game — on the game itself, its moves and its pinned
+lines; a note from another game that reached the same position is not counted. Sort by it
+to find the games you annotated.
 The last column, **Collections**, names the collections a game is in, separated by commas;
 it is there only once you have made a collection.
 

@@ -306,6 +306,10 @@ class GameSummary(Payload):
     # Looked up for the games list and the game detail; an embedding that did not look
     # them up reads [] too, so a client never has to ask whether the key is there.
     collections: list[int] = Field(default_factory=list)
+    # How many notes were written on this game (`services.games.note_counts`) — its own, not
+    # the ones from other games that reached its positions. Looked up for the games list;
+    # absent where nobody counted, rather than a 0 that would claim it has none.
+    note_count: int | None = None
 
 
 class GameEngineUpdate(Input):

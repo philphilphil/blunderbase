@@ -83,6 +83,10 @@ Analyse dabei ist. Bei einer Partie, die noch nichts analysiert hat, steht dort
 analysiert, steht dort stattdessen **In der Warteschlange**. Symbole gibt es in der Tabelle
 nur für `??`, `?` und `?!`. Die Spalte **Verlust** ist erst ab einer Ungenauigkeit
 eingefärbt.
+**Notizen** zählt die Notizen, die zu einer Partie geschrieben wurden – zur Partie selbst, zu
+ihren Zügen und zu ihren angehefteten Varianten; eine Notiz aus einer anderen Partie, die
+dieselbe Stellung erreicht hat, zählt nicht mit. Nach dieser Spalte sortiert, findest du die
+Partien, die du kommentiert hast.
 Die letzte Spalte, **Sammlungen**, nennt die Sammlungen, in denen eine Partie liegt, durch
 Kommas getrennt; sie erscheint erst, wenn du eine Sammlung angelegt hast.
 
