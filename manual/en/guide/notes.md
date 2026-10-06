@@ -19,7 +19,8 @@ line. A box that saves when you click away still does.
 
 Under the board of any game that reaches the position, in **Your notes on this position**
 in the explorer, and on the live board. The move column marks a move whose position has
-been written about, so a game you have thought about before says so.
+been written about, so a game you have thought about before says so; point at a marked move
+to read the note. A move without a note shows no tooltip.
 
 ## The notes page
 

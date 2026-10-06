@@ -2720,9 +2720,15 @@ describe('GamePage notes', () => {
     renderPage()
     await screen.findByText('Scandinavian Defense')
 
-    // 1.e4 produced the noted position, so it is e4 that is marked, not d5.
-    expect(screen.getByTitle('1.e4 — noted')).toBeInTheDocument()
-    expect(screen.getByTitle('1…d5')).toBeInTheDocument()
+    // 1.e4 produced the noted position, so it is e4 that is marked, not d5 — and pointing
+    // at it reads the note itself, while d5 has no tooltip at all.
+    const cell = (san: string) =>
+      within(screen.getByTestId('move-list')).getByRole('button', { name: new RegExp(`^${san}`) })
+    expect(cell('e4')).toHaveAttribute(
+      'title',
+      expect.stringContaining('The Scandinavian invites the queen out early'),
+    )
+    expect(cell('d5')).not.toHaveAttribute('title')
   })
 
   it('writes a note about the position on the board', async () => {
@@ -2889,8 +2895,8 @@ describe('GamePage notes', () => {
     const row = await screen.findByTestId('kept-variation')
 
     // Count 2 is one move into a line off ply 1, so it is 1…c6 that carries the mark.
-    expect(within(row).getByRole('button', { name: 'c6' }).title).toContain('noted')
-    expect(within(row).getByRole('button', { name: 'd4' }).title).not.toContain('noted')
+    expect(within(row).getByRole('button', { name: 'c6' }).title).toBe('This is the whole point of the Caro.')
+    expect(within(row).getByRole('button', { name: 'd4' })).not.toHaveAttribute('title')
 
     await user.click(notesTab())
     const list = within(screen.getByTestId('game-notes'))

@@ -73,6 +73,8 @@ export interface MoveListVariation {
   pinnedThrough?: number
   /** Indices into `sans` that carry a note, drawn as a mark on that move. */
   noted?: readonly number[]
+  /** What those notes say, by the same index — the mark's tooltip. A pinned line's only. */
+  noteTexts?: ReadonlyMap<number, readonly string[]>
 }
 
 export interface MoveListProps {
@@ -101,8 +103,11 @@ export interface MoveListProps {
   /** Unpin a variation the server holds. */
   onUnpinVariation?: (lineId: number) => void
   onSelectPly: (ply: number) => void
-  /** Mainline move indices that carry a note (`notesModel.notedMoveIndices`). */
-  notedMoves?: ReadonlySet<number>
+  /**
+   * Mainline move indices that carry a note, each with its text (`notesModel.notedMoveIndices`):
+   * the move is marked, and pointing at it reads the note.
+   */
+  notedMoves?: ReadonlyMap<number, readonly string[]>
   /**
    * Draw the title strip. False where the caller draws a strip of its own — the phone does,
    * and since the PGN affordance lives in this one, it has to place `PgnButton` itself.
@@ -341,14 +346,14 @@ export function MoveList({
                     move={pair.white}
                     cursor={cursor}
                     clock={clocks ? (clocks.get(pair.white?.ply ?? -1) ?? null) : undefined}
-                    noted={pair.white ? notedMoves?.has(pair.white.ply) : false}
+                    note={pair.white ? notedMoves?.get(pair.white.ply) : undefined}
                     onSelectPly={onSelectPly}
                   />
                   <MoveCell
                     move={pair.black}
                     cursor={cursor}
                     clock={clocks ? (clocks.get(pair.black?.ply ?? -1) ?? null) : undefined}
-                    noted={pair.black ? notedMoves?.has(pair.black.ply) : false}
+                    note={pair.black ? notedMoves?.get(pair.black.ply) : undefined}
                     onSelectPly={onSelectPly}
                     black
                   />
@@ -506,41 +511,42 @@ export function PgnButton({ pgn }: { pgn?: string }) {
  * The glyph is coloured text after the move rather than a boxed badge: a box on half the
  * moves of a game was most of what made the table look busy. `clock` is undefined for a
  * game played without one (no clock at all) and null for a move that has no reading.
+ *
+ * Pointing at a move shows a tooltip only where there is a note, and then the note itself
+ * (owner's call, 2026-10-06). It used to repeat the move — "12.Nxd4" over a cell that
+ * already says 12 and Nxd4 — which told nobody anything; what the mark cannot show is what
+ * was written, and that is now one hover away.
  */
 function MoveCell({
   move,
   cursor,
   clock,
-  noted,
+  note,
   onSelectPly,
   black = false,
 }: {
   move: MoveRow | undefined
   cursor: number
   clock?: number | null
-  /** A note hangs on the position this move produced — marked, not spelled out. */
-  noted?: boolean
+  /** What is written on the position this move produced, if anything: marked, and read on hover. */
+  note?: readonly string[]
   onSelectPly: (ply: number) => void
   black?: boolean
 }) {
-  const { t } = useLingui()
   const notate = useNotation()
-  const plyLabel = usePlyLabel()
   const edge = black ? 'border-l border-hairline' : undefined
   if (!move?.san) return <span className={cn('h-full', edge)} />
   const san = notate(move.san)
   const glyph = glyphFor(move.classification)
   const flagged = isFlagged(move.classification)
   const active = move.ply === cursor
-  // The number and the move are one unit — `1…d5` — so the title is one message with that
-  // unit in it rather than a translated tail glued onto an untranslated head.
-  const moveLabel = `${plyLabel(move.ply)}${san}`
+  const noted = note !== undefined && note.length > 0
 
   return (
     <button
       type="button"
       onClick={() => onSelectPly(move.ply)}
-      title={noted ? t`${moveLabel} — noted` : moveLabel}
+      title={noted ? note.join('\n\n') : undefined}
       className={cn(
         // `min-w-0` so the row can never push past the track: at the 250px band the cells
         // are what has to give, and the san truncates rather than the glyph or the clock
@@ -562,7 +568,6 @@ function MoveCell({
       {glyph ? (
         <span
           className={cn('flex-none font-bold', GLYPHS[glyph].textClass)}
-          title={GLYPHS[glyph].label}
           aria-label={GLYPHS[glyph].label}
           data-classification={glyph}
         >
@@ -635,9 +640,7 @@ function Variation({
   onPin?: (variation: MoveListVariation) => void
   onUnpin?: (lineId: number) => void
 }) {
-  const { t } = useLingui()
   const notate = useNotation()
-  const plyLabel = usePlyLabel()
   const numbering = usePlyNumbering()
   const cursor = variation.cursor ?? 0
   const lineId = variation.lineId ?? null
@@ -669,16 +672,9 @@ function Variation({
         {variation.sans.map((san, index) => {
           const ply = variation.base + index
           const active = !quiet && cursor === index + 1
-          // Four whole sentences rather than a stem with two tails bolted on: what a line is
-          // and whether it carries a note are one statement, and a translator needs it whole.
-          const moveLabel = `${plyLabel(ply)}${notate(san)}`
-          const title = quiet
-            ? noted.has(index)
-              ? t`${moveLabel} — kept line, noted`
-              : t`${moveLabel} — kept line`
-            : noted.has(index)
-              ? t`${moveLabel} — analysis, noted`
-              : t`${moveLabel} — analysis`
+          // As on the game's own moves (`MoveCell`): a tooltip only where a note is, and
+          // then what it says.
+          const title = noted.has(index) ? variation.noteTexts?.get(index)?.join('\n\n') : undefined
           return (
             <span key={`${index}-${san}`} className="inline-flex items-baseline gap-1">
               {numbering.side(ply) === 'white' || index === 0 ? (

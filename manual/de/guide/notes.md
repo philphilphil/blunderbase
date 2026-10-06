@@ -22,7 +22,8 @@ neue Zeile. Ein Feld, das beim Wegklicken speichert, tut das weiterhin.
 Unter dem Brett jeder Partie, die die Stellung erreicht, im Explorer unter **Deine Notizen
 zu dieser Stellung** und auf dem Live-Brett. Die Zugspalte markiert Züge, zu deren Stellung
 eine Notiz existiert. Eine Partie, über die du schon einmal nachgedacht hast, sagt es dir
-also.
+also. Zeigst du auf einen markierten Zug, liest du die Notiz; ein Zug ohne Notiz zeigt
+keinen Tooltip.
 
 ## Die Notizseite { #the-notes-page }
 

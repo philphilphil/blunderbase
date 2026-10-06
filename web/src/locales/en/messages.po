@@ -6115,26 +6115,6 @@ msgid "Copy PGN (C)"
 msgstr "Copy PGN (C)"
 
 #: src/routes/game/components/MoveList.tsx
-msgid "{moveLabel} — noted"
-msgstr "{moveLabel} — noted"
-
-#: src/routes/game/components/MoveList.tsx
-msgid "{moveLabel} — kept line, noted"
-msgstr "{moveLabel} — kept line, noted"
-
-#: src/routes/game/components/MoveList.tsx
-msgid "{moveLabel} — kept line"
-msgstr "{moveLabel} — kept line"
-
-#: src/routes/game/components/MoveList.tsx
-msgid "{moveLabel} — analysis, noted"
-msgstr "{moveLabel} — analysis, noted"
-
-#: src/routes/game/components/MoveList.tsx
-msgid "{moveLabel} — analysis"
-msgstr "{moveLabel} — analysis"
-
-#: src/routes/game/components/MoveList.tsx
 msgid "Unpin this line"
 msgstr "Unpin this line"
 

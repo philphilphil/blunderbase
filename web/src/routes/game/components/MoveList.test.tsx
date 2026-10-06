@@ -542,11 +542,35 @@ describe('MoveList', () => {
     })
   })
 
-  it('marks a noted move with the note icon rather than the old dot', () => {
-    renderList([move(0, 'e4'), move(1, 'd5')], { notedMoves: new Set([1]) })
+  it('marks a noted move with the note icon, and its tooltip is the note and nothing else', () => {
+    renderList([move(0, 'e4'), move(1, 'd5')], {
+      notedMoves: new Map([[1, ['Too slow here.', 'Again.']]]),
+    })
     const cellOf = (san: string) => screen.getByText(san).closest('button')!
-    expect(cellOf('d5')).toHaveAttribute('title', '1…d5 — noted')
+    expect(cellOf('d5')).toHaveAttribute('title', 'Too slow here.\n\nAgain.')
     expect(cellOf('d5').querySelector('svg')).not.toBeNull()
+    // A move with no note has no tooltip at all: repeating "1.e4" over e4 said nothing.
+    expect(cellOf('e4')).not.toHaveAttribute('title')
     expect(cellOf('e4').querySelector('svg')).toBeNull()
+  })
+
+  it('shows a pinned line’s note on hover, and nothing over its other moves', () => {
+    renderList([move(0, 'e4'), move(1, 'd5')], {
+      variations: [
+        {
+          id: null,
+          lineId: 7,
+          base: 1,
+          sans: ['c6', 'd4'],
+          cursor: null,
+          pinnedThrough: 2,
+          noted: [1],
+          noteTexts: new Map([[1, ['The Caro-Kann plan.']]]),
+        },
+      ],
+    })
+    const line = within(screen.getByTestId('kept-variation'))
+    expect(line.getByRole('button', { name: /d4/ })).toHaveAttribute('title', 'The Caro-Kann plan.')
+    expect(line.getByRole('button', { name: 'c6' })).not.toHaveAttribute('title')
   })
 })

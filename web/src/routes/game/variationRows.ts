@@ -65,8 +65,8 @@ export interface VariationRowsInput {
   kept: readonly KeptVariation[]
   /** The line the board is standing in, or null while it is on the game. */
   walked: WalkedLine | null
-  /** Which indices of each pinned line carry a note (`notedLineIndices`). */
-  notedByLine?: Map<number, Set<number>>
+  /** Which indices of each pinned line carry a note, and what (`notedLineIndices`). */
+  notedByLine?: ReadonlyMap<number, ReadonlyMap<number, readonly string[]>>
 }
 
 export function variationRows({
@@ -94,7 +94,7 @@ export function variationRows({
       overlap && overlap.moves.length > pinned.moves.length ? overlap.moves : pinned.moves
     const sans = sanVariation(line, pinned.base_ply, longest, longest.length)
     if (sans.length === 0) continue
-    const noted = [...(notedByLine?.get(pinned.id) ?? [])]
+    const noted = [...(notedByLine?.get(pinned.id)?.keys() ?? [])]
       .filter((index) => index < sans.length)
       .sort((left, right) => left - right)
     rows.push({

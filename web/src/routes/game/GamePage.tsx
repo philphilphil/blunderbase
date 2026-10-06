@@ -938,8 +938,11 @@ export function GameStudio({ game: from }: { game: StudioGame }) {
         cursor: row.cursor,
         pinnedThrough: row.pinnedThrough,
         noted: row.noted,
+        // What the marked moves' notes say, for their tooltips. Only a pinned line has any:
+        // a note on a line is what pins it.
+        noteTexts: row.lineId !== null ? notedByLine.get(row.lineId) : undefined,
       })),
-    [rows],
+    [notedByLine, rows],
   )
   /** The row the board is standing in, which is the one a pin or a note would act on. */
   const walkedRow = useMemo(() => rows.find((row) => row.cursor !== null) ?? null, [rows])

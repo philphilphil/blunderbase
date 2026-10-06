@@ -6115,26 +6115,6 @@ msgid "Copy PGN (C)"
 msgstr "PGN kopieren (C)"
 
 #: src/routes/game/components/MoveList.tsx
-msgid "{moveLabel} — noted"
-msgstr "{moveLabel} – mit Notiz"
-
-#: src/routes/game/components/MoveList.tsx
-msgid "{moveLabel} — kept line, noted"
-msgstr "{moveLabel} – behaltene Variante, mit Notiz"
-
-#: src/routes/game/components/MoveList.tsx
-msgid "{moveLabel} — kept line"
-msgstr "{moveLabel} – behaltene Variante"
-
-#: src/routes/game/components/MoveList.tsx
-msgid "{moveLabel} — analysis, noted"
-msgstr "{moveLabel} – Analyse, mit Notiz"
-
-#: src/routes/game/components/MoveList.tsx
-msgid "{moveLabel} — analysis"
-msgstr "{moveLabel} – Analyse"
-
-#: src/routes/game/components/MoveList.tsx
 msgid "Unpin this line"
 msgstr "Diese Variante nicht mehr anheften"
 

@@ -177,9 +177,13 @@ describe('noteRows', () => {
 })
 
 describe('notedMoveIndices', () => {
-  it('marks the move that produced each noted position', () => {
-    const marks = notedMoveIndices([note({ id: 1, ply: 2 }), note({ id: 2, ply: 4 })], [])
-    expect([...marks].sort()).toEqual([1, 3])
+  it('marks the move that produced each noted position, with what is written there', () => {
+    const marks = notedMoveIndices(
+      [note({ id: 1, ply: 2, text: 'one' }), note({ id: 2, ply: 4, text: 'two' }), note({ id: 3, ply: 4, text: 'three' })],
+      [],
+    )
+    expect([...marks.keys()].sort()).toEqual([1, 3])
+    expect(marks.get(3)).toEqual(['two', 'three'])
   })
 
   it('marks nothing for the starting position, for a loose note, or for a line note', () => {
@@ -194,9 +198,9 @@ describe('notedMoveIndices', () => {
 describe('notedLineIndices', () => {
   it('marks the line move that produced each noted position', () => {
     const marks = notedLineIndices([
-      { ...LINE, notes: [note({ id: 1, ply: 3, line_id: 7 })] },
+      { ...LINE, notes: [note({ id: 1, ply: 3, line_id: 7, text: 'the plan' })] },
     ])
-    expect([...(marks.get(7) ?? [])]).toEqual([1])
+    expect([...(marks.get(7)?.entries() ?? [])]).toEqual([[1, ['the plan']]])
   })
 
   it('marks nothing on the branch position, which no line move produced', () => {

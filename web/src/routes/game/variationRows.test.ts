@@ -165,7 +165,7 @@ describe('variationRows', () => {
       kept: [],
       walked: null,
       // A note after one move of the line marks that move, which is index 0.
-      notedByLine: new Map([[7, new Set([0])]]),
+      notedByLine: new Map([[7, new Map([[0, ['a note']]])]]),
     })
     expect(rows[0]?.noted).toEqual([0])
     expect(rows[0]?.sans).toEqual(['c6', 'd4'])
@@ -177,7 +177,7 @@ describe('variationRows', () => {
       persisted: [pinned()],
       kept: [],
       walked: null,
-      notedByLine: new Map([[7, new Set([0, 4])]]),
+      notedByLine: new Map([[7, new Map([[0, ['a note']], [4, ['another']]])]]),
     })
     expect(rows[0]?.noted).toEqual([0])
   })

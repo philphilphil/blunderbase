@@ -221,7 +221,8 @@ function anchorAt(anchor: NoteAnchor): [number, number] {
 }
 
 /**
- * The mainline move indices that carry a note — what the move list marks.
+ * The mainline move indices that carry a note, each with what is written there — what the
+ * move list marks, and what pointing at the mark reads (the texts in the notes' order).
  *
  * Only the game's own notes: a note on a variation is marked on the variation's move, not
  * on the mainline move the variation happens to branch from. A note on the starting
@@ -230,28 +231,36 @@ function anchorAt(anchor: NoteAnchor): [number, number] {
 export function notedMoveIndices(
   notes: readonly GameNote[],
   lines: readonly LineResponse[],
-): Set<number> {
-  const marks = new Set<number>()
+): Map<number, string[]> {
+  const marks = new Map<number, string[]>()
   for (const note of notes) {
     const anchor = noteAnchor(note, lines)
     if (anchor.kind !== 'mainline' || anchor.count <= 0) continue
-    marks.add(anchor.count - 1)
+    const texts = marks.get(anchor.count - 1)
+    if (texts) texts.push(note.text)
+    else marks.set(anchor.count - 1, [note.text])
   }
   return marks
 }
 
-/** The indices into one line's moves that carry a note, keyed by line id. */
+/**
+ * The indices into one line's moves that carry a note, each with what is written there,
+ * keyed by line id.
+ */
 export function notedLineIndices(
   lines: readonly LineResponse[],
-): Map<number, Set<number>> {
-  const byLine = new Map<number, Set<number>>()
+): Map<number, Map<number, string[]>> {
+  const byLine = new Map<number, Map<number, string[]>>()
   for (const line of lines) {
-    const marks = new Set<number>()
+    const marks = new Map<number, string[]>()
     for (const note of line.notes ?? []) {
       const count = typeof note.ply === 'number' ? note.ply : null
       if (count === null) continue
       const index = count - line.base_ply
-      if (index >= 1) marks.add(index - 1)
+      if (index < 1) continue
+      const texts = marks.get(index - 1)
+      if (texts) texts.push(note.text)
+      else marks.set(index - 1, [note.text])
     }
     if (marks.size > 0) byLine.set(line.id, marks)
   }
