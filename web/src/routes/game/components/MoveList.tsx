@@ -2,8 +2,6 @@ import { Trans, useLingui } from '@lingui/react/macro'
 import { Check, Copy, Pin, PinOff, X } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 
-import { ClassificationBadge } from '@/components/badges/ClassificationBadge'
-import { ROW_CURSOR } from '@/components/ui/row'
 import type { Classification, MoveRow } from '@/lib/api/types'
 import { GLYPHS, glyphFor, isFlagged } from '@/lib/chess/classification'
 import { formatScore, formatWinLoss, type Score } from '@/lib/chess/evaluation'
@@ -119,9 +117,18 @@ export interface MoveListProps {
 }
 
 /**
- * The paired move table from design 1a: a number column and two move cells, glyph badges
- * on anything the engine flagged, the opening folded behind a "moves 1–18 collapsed" rule,
- * and the moves after the cursor dimmed so the eye stops where the board is.
+ * The paired move table: a shaded number gutter and two cells per row, each holding a move,
+ * its glyph and the clock it was played on (`MoveCell` says why the clock moved into the
+ * cell), and the opening folded behind a "moves 1–18 collapsed" rule.
+ *
+ * The layout is #45's: five spacings were set side by side on a real game in
+ * `docs/design/prototypes/move-list-layouts.html` and the owner chose this one (B, the
+ * ledger, 2026-10-06). It is Lichess's shape on purpose — the gutter numbers the rows the way
+ * every analysis board does, the cells are the targets — and capped at 22rem so a wide pane
+ * leaves its spare width after the row instead of inside it. The pair under the cursor is
+ * marked by its number in accent rather than by a tinted row (`ROW_CURSOR` was made for
+ * this list and went with that row): the current move's selected cell is already in that
+ * row, and the tint was a second highlight for the same fact.
  *
  * A clicked engine line or Maia rollout is drawn inline as an indented variation under the
  * move it branches from, walkable move by move, and stays listed there for the rest of the
@@ -306,7 +313,7 @@ export function MoveList({
           </p>
         ) : null}
 
-        <div className="flex flex-col px-1.5 font-mono text-lead">
+        <div className="flex flex-col font-mono text-lead">
           {orphans}
           {rows.map((pair) => {
             const isActivePair =
@@ -316,35 +323,35 @@ export function MoveList({
               : false
             return (
               <div key={pair.moveNumber} ref={isActivePair ? activeRow : undefined}>
-                {/* The pair under the cursor is `row-active` plus the inset accent bar
-                    (`ROW_CURSOR`): the tint alone sat 1.1:1 off the pane, and the bar makes
-                    the row findable at a glance without competing with the current move's
-                    own blue. */}
-                <div
-                  className={cn(
-                    'flex h-7 items-center rounded-md px-1.5',
-                    isActivePair ? ROW_CURSOR : 'hover:bg-raised',
-                  )}
-                >
+                {/* A number gutter and two cells, capped at 22rem so a wide pane leaves its
+                    spare width after the row rather than between a move and its clock. */}
+                <div className="grid h-6 max-w-[22rem] grid-cols-[2rem_minmax(0,1fr)_minmax(0,1fr)]">
+                  {/* The pair under the cursor says so in its number, accent and bold: the
+                      cell already carries the one selected fill, and a tinted row under it
+                      was a second highlight for the same fact. */}
                   <span
-                    className={cn('w-[2rem] flex-none tabular', isActivePair ? 'text-dim' : 'text-dim-2')}
+                    className={cn(
+                      'flex h-full items-center justify-end bg-panel pr-1.5 text-data tabular',
+                      isActivePair ? 'font-semibold text-accent-teal' : 'text-dim-2',
+                    )}
                   >
-                    {pair.moveNumber}.
+                    {pair.moveNumber}
                   </span>
                   <MoveCell
                     move={pair.white}
                     cursor={cursor}
+                    clock={clocks ? (clocks.get(pair.white?.ply ?? -1) ?? null) : undefined}
                     noted={pair.white ? notedMoves?.has(pair.white.ply) : false}
                     onSelectPly={onSelectPly}
                   />
-                  {clocks ? <ClockCell seconds={clocks.get(pair.white?.ply ?? -1)} /> : null}
                   <MoveCell
                     move={pair.black}
                     cursor={cursor}
+                    clock={clocks ? (clocks.get(pair.black?.ply ?? -1) ?? null) : undefined}
                     noted={pair.black ? notedMoves?.has(pair.black.ply) : false}
                     onSelectPly={onSelectPly}
+                    black
                   />
-                  {clocks ? <ClockCell seconds={clocks.get(pair.black?.ply ?? -1)} /> : null}
                 </div>
                 {annotated && annotation ? <Annotation annotation={annotation} /> : null}
                 {anchored.get(pair.moveNumber)}
@@ -388,14 +395,13 @@ function clocksAtMove(pairs: MovePair[]): Map<number, number> | null {
 const TIME_TROUBLE = 20
 
 /**
- * One clock reading, right-aligned against the move it belongs to and a size smaller than
+ * One clock reading, at the right edge of the move's own cell and two sizes smaller than
  * the move, because it is context and not the thing being read. Context, but still data:
  * `dim-2`, the quietest step that clears AA, rather than `faint`, which is kept for marks
  * nobody has to read.
  *
  * `--bb-mistake` under twenty seconds, so a run of orange down the last ten rows sits
- * beside the run of `??` badges that shares a cause. The cell keeps its width when there
- * is nothing to show, so the column stays a column and the move cells do not jump.
+ * beside the run of `??` glyphs that shares a cause.
  */
 function ClockCell({ seconds }: { seconds: number | undefined }) {
   const low = seconds !== undefined && seconds >= 0 && seconds < TIME_TROUBLE
@@ -403,7 +409,7 @@ function ClockCell({ seconds }: { seconds: number | undefined }) {
     <span
       data-testid="move-clock"
       className={cn(
-        'w-[2.25rem] flex-none pr-1.5 text-right text-label tabular',
+        'ml-auto flex-none pl-1.5 text-meta tabular',
         low ? 'text-mistake' : 'text-dim-2',
       )}
     >
@@ -487,22 +493,41 @@ export function PgnButton({ pgn }: { pgn?: string }) {
   )
 }
 
+/**
+ * One half of a row: the move, its glyph, its note mark and the clock it was played on, as
+ * one cell and one button (#45, layout B of `docs/design/prototypes/move-list-layouts.html`).
+ *
+ * The clock is *inside* the cell, at its right edge, and Black's cell opens with a hairline.
+ * The table used to give each clock a column of its own after a stretching move cell, which
+ * put White's clock right beside Black's move — about 11px from Nf6 and 77px from d4 — so
+ * it read as Black's. A cell is a region the eye groups by, and the hairline is its edge.
+ *
+ * The whole cell is the target, and the current move fills it with the one selected blue.
+ * The glyph is coloured text after the move rather than a boxed badge: a box on half the
+ * moves of a game was most of what made the table look busy. `clock` is undefined for a
+ * game played without one (no clock at all) and null for a move that has no reading.
+ */
 function MoveCell({
   move,
   cursor,
+  clock,
   noted,
   onSelectPly,
+  black = false,
 }: {
   move: MoveRow | undefined
   cursor: number
+  clock?: number | null
   /** A note hangs on the position this move produced — marked, not spelled out. */
   noted?: boolean
   onSelectPly: (ply: number) => void
+  black?: boolean
 }) {
   const { t } = useLingui()
   const notate = useNotation()
   const plyLabel = usePlyLabel()
-  if (!move?.san) return <span className="min-w-0 flex-1 px-1" />
+  const edge = black ? 'border-l border-hairline' : undefined
+  if (!move?.san) return <span className={cn('h-full', edge)} />
   const san = notate(move.san)
   const glyph = glyphFor(move.classification)
   const flagged = isFlagged(move.classification)
@@ -517,23 +542,35 @@ function MoveCell({
       onClick={() => onSelectPly(move.ply)}
       title={noted ? t`${moveLabel} — noted` : moveLabel}
       className={cn(
-        // `min-w-0` so the row can never push past the track: at the 250px band the two
-        // move cells are what has to give, and the san truncates rather than the number,
-        // the clock or the glyph badge being shoved off the right edge.
-        // The current move is the app's one selected state (`--bb-selected` with the accent
-        // ringed inside it), the same blue a selected row or segment wears, on the
-        // blue-grey `row-active` of its pair. SAN is primary data, so `ink` at rest.
-        'flex h-5 min-w-0 flex-1 items-center gap-[0.3125rem] rounded-md px-1 text-left',
-        active
-          ? 'bg-selected text-bright ring-1 ring-inset ring-accent-teal/55'
-          : flagged
-            ? cn(GLYPHS[glyph!].textClass, 'font-medium hover:text-bright')
-            : 'text-ink hover:text-bright',
+        // `min-w-0` so the row can never push past the track: at the 250px band the cells
+        // are what has to give, and the san truncates rather than the glyph or the clock
+        // being shoved off the edge. The current move is the app's one selected fill and
+        // keeps it under the pointer. SAN is primary data, so `ink` at rest.
+        'flex h-full min-w-0 items-center gap-[0.1875rem] pr-1.5 pl-2 text-left',
+        edge,
+        active ? 'bg-selected text-bright' : 'text-ink hover:bg-raised hover:text-bright',
       )}
     >
-      <span className="truncate">{san}</span>
-      <ClassificationBadge classification={move.classification} size="md" />
+      <span
+        className={cn(
+          'truncate',
+          flagged && !active && cn(GLYPHS[glyph!].textClass, 'font-medium'),
+        )}
+      >
+        {san}
+      </span>
+      {glyph ? (
+        <span
+          className={cn('flex-none font-bold', GLYPHS[glyph].textClass)}
+          title={GLYPHS[glyph].label}
+          aria-label={GLYPHS[glyph].label}
+          data-classification={glyph}
+        >
+          {GLYPHS[glyph].glyph}
+        </span>
+      ) : null}
       {noted ? <NoteMark /> : null}
+      {clock !== undefined ? <ClockCell seconds={clock ?? undefined} /> : null}
     </button>
   )
 }
@@ -611,7 +648,9 @@ function Variation({
     <div
       data-testid={quiet ? 'kept-variation' : 'move-variation'}
       data-pinned={lineId !== null ? 'true' : undefined}
-      className="group/line flex gap-2 py-1 pl-[2.625rem] pr-2 font-mono text-data leading-[1.5]"
+      // `pl-[2.5rem]`: the 2rem number gutter plus the cell's own `pl-2`, so the line starts
+      // under the moves it continues.
+      className="group/line flex gap-2 py-1 pl-[2.5rem] pr-2 font-mono text-data leading-[1.5]"
     >
       {/*
         The rail is what says at a glance whether a line is only today's reading or something
@@ -753,7 +792,7 @@ function Annotation({ annotation }: { annotation: MoveAnnotation }) {
   const color = glyph ? GLYPHS[glyph].color : 'var(--bb-blunder)'
   const winLoss = formatWinLoss(annotation.winLoss)
   return (
-    <div className="flex gap-2 py-1.5 pl-[2.625rem] pr-2 font-sans text-data italic leading-[1.5] text-soft">
+    <div className="flex gap-2 py-1.5 pl-[2.5rem] pr-2 font-sans text-data italic leading-[1.5] text-soft">
       <div className="w-0.5 flex-none rounded-sm opacity-50" style={{ background: color }} />
       <div>
         {/* Whose move this is about, first and in the move list's own mono, so the note is

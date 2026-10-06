@@ -1,0 +1,727 @@
+<meta charset="utf-8">
+<title>Move list layouts</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500;700&display=swap">
+<style>
+/*
+  Layout: one page of specimens. A sticky control strip sets the move column's width for
+  every specimen at once; the specimens wrap in rows; a short verdict closes the page.
+  The colours, type scale and row metrics are Blunderbase's own (web/src/index.css), at the
+  app's 120 % root, so a specimen here is the size it would be in the app.
+*/
+:root {
+  color-scheme: dark;
+  --void: #1d1e1f;
+  --panel: #2c2d2e;
+  --surface: #232424;
+  --raised: #363738;
+  --selected: #2b4760;
+  --row-active: #2b3139;
+  --control: #3c3d3e;
+  --control-edge: #5d5f5e;
+  --hairline: #3a3c3b;
+  --line: #3e4040;
+  --edge: #474949;
+  --edge-strong: #555756;
+  --bright: #f8f8f4;
+  --ink: #eeeeea;
+  --body: #d8d8d3;
+  --soft: #b6b5b0;
+  --dim: #a3a29c;
+  --dim-2: #9a998f;
+  --faint: #8b8a82;
+  --faint-2: #7c7b73;
+  --accent: #83b7e3;
+  --blunder: #ee766e;
+  --blunder-ink: #2a0f0d;
+  --mistake: #dda05a;
+  --inaccuracy: #cbb96a;
+  --info: #8fb6c9;
+  --brilliant: #b098d7;
+
+  --font-sans: 'Geist', ui-sans-serif, 'Helvetica Neue', Helvetica, sans-serif;
+  --font-mono: 'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  /* the app's named scale (index.css) */
+  --t-meta: 0.625rem;
+  --t-label: 0.6875rem;
+  --t-data: 0.75rem;
+  --t-lead: 0.8125rem;
+  --t-heading: 0.875rem;
+  --t-value: 0.9375rem;
+
+  --pane-w: 18.75rem; /* set by the width slider */
+}
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) {
+    color-scheme: light;
+    --void: #e4e4e1; --panel: #efefec; --surface: #fbfbfa; --raised: #e5e5e1;
+    --selected: #d3e1f0; --row-active: #e8eef4; --control: #ffffff; --control-edge: #aeaea9;
+    --hairline: #dcdcd8; --line: #d1d1cd; --edge: #c5c5c0; --edge-strong: #b6b6b1;
+    --bright: #101010; --ink: #202020; --body: #3b3b39; --soft: #5c5c59; --dim: #696966;
+    --dim-2: #6d6d69; --faint: #767672; --faint-2: #8c8c87; --accent: #245f9e;
+    --blunder: #bb3e35; --blunder-ink: #ffffff; --mistake: #9b6819; --inaccuracy: #7d6a12;
+    --info: #3a6274; --brilliant: #7054a5;
+  }
+}
+:root[data-theme="light"] {
+  color-scheme: light;
+  --void: #e4e4e1; --panel: #efefec; --surface: #fbfbfa; --raised: #e5e5e1;
+  --selected: #d3e1f0; --row-active: #e8eef4; --control: #ffffff; --control-edge: #aeaea9;
+  --hairline: #dcdcd8; --line: #d1d1cd; --edge: #c5c5c0; --edge-strong: #b6b6b1;
+  --bright: #101010; --ink: #202020; --body: #3b3b39; --soft: #5c5c59; --dim: #696966;
+  --dim-2: #6d6d69; --faint: #767672; --faint-2: #8c8c87; --accent: #245f9e;
+  --blunder: #bb3e35; --blunder-ink: #ffffff; --mistake: #9b6819; --inaccuracy: #7d6a12;
+  --info: #3a6274; --brilliant: #7054a5;
+}
+:root[data-theme="dark"] { color-scheme: dark; }
+
+html { font-size: 120%; }
+body {
+  margin: 0;
+  background: var(--void);
+  color: var(--body);
+  font-family: var(--font-sans);
+  font-size: var(--t-data);
+  line-height: 1.5;
+}
+* { box-sizing: border-box; }
+button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; text-align: left; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; border-radius: 0.25rem; }
+.mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+
+.wrap { max-width: 92rem; margin: 0 auto; padding-inline: 1rem; }
+
+/* --- head ------------------------------------------------------------- */
+.head { padding-block: 1.75rem 1rem; display: grid; gap: 0.5rem; }
+.eyebrow { font-size: var(--t-meta); letter-spacing: 0.08em; text-transform: uppercase; color: var(--dim-2); }
+h1 { margin: 0; font-size: 1.375rem; line-height: 1.2; font-weight: 600; color: var(--ink); text-wrap: balance; }
+.lead { margin: 0; max-width: 42rem; font-size: var(--t-lead); color: var(--soft); }
+.lead b { color: var(--ink); font-weight: 500; }
+
+/* --- what is odd today ----------------------------------------------- */
+.findings {
+  display: grid; gap: 0.75rem 1.5rem; padding-block: 0.5rem 1.25rem;
+  grid-template-columns: repeat(auto-fit, minmax(17rem, 1fr));
+}
+.finding { display: grid; gap: 0.375rem; align-content: start; min-width: 0; }
+.finding h2 { margin: 0; font-size: var(--t-heading); font-weight: 600; color: var(--ink); }
+.finding p { margin: 0; color: var(--soft); max-width: 34rem; }
+.measure {
+  display: flex; align-items: flex-start; gap: 0; margin-top: 0.25rem;
+  font-family: var(--font-mono); font-size: var(--t-lead); color: var(--ink);
+}
+.measure .tok { padding-top: 0.0625rem; white-space: nowrap; }
+.measure .tok.clk { font-size: var(--t-label); color: var(--dim-2); padding-top: 0.1875rem; }
+.measure .gap { display: grid; justify-items: center; gap: 0.125rem; padding-top: 0.6875rem; }
+.measure .gap i {
+  display: block; height: 0.375rem; width: 100%;
+  border-inline: 1px solid var(--faint-2); border-top: 0; position: relative;
+}
+.measure .gap i::after { content: ''; position: absolute; inset-inline: 0; top: 50%; border-top: 1px dashed var(--faint-2); }
+.measure .gap em { font-style: normal; font-size: var(--t-meta); color: var(--dim-2); white-space: nowrap; }
+.measure .gap.wide { width: 4.5rem; }
+.measure .gap.narrow { width: 1.75rem; }
+.measure .gap.narrow em { color: var(--mistake); }
+
+/* --- controls ---------------------------------------------------------- */
+.controls {
+  position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5;
+  background: color-mix(in srgb, var(--void) 94%, transparent);
+  backdrop-filter: blur(6px);
+  border-block: 1px solid var(--hairline);
+}
+.controls .wrap { display: flex; flex-wrap: wrap; align-items: center; gap: 0.625rem 1.5rem; padding-block: 0.625rem; }
+.ctl { display: flex; align-items: center; gap: 0.5rem; min-width: 0; }
+.ctl > .lbl { font-size: var(--t-label); color: var(--dim); white-space: nowrap; }
+.slider { display: grid; gap: 0.125rem; }
+.slider input { width: 13rem; max-width: 50vw; accent-color: var(--accent); margin: 0; }
+.ticks { position: relative; height: 0.875rem; width: 13rem; max-width: 50vw; font-size: var(--t-meta); color: var(--faint); }
+.ticks span { position: absolute; transform: translateX(-50%); white-space: nowrap; }
+.readout { font-size: var(--t-label); color: var(--ink); white-space: nowrap; }
+.readout small { color: var(--dim-2); font-size: var(--t-meta); }
+.seg {
+  display: inline-flex; padding: 0.125rem; gap: 0.125rem; border-radius: 0.3125rem;
+  background: var(--panel); border: 1px solid var(--line);
+}
+.seg button {
+  padding: 0.125rem 0.5rem; border-radius: 0.25rem; font-size: var(--t-label); color: var(--soft);
+  white-space: nowrap;
+}
+.seg button:hover { color: var(--ink); }
+.seg button[aria-pressed="true"] {
+  background: var(--control); color: var(--ink);
+  box-shadow: inset 0 0 0 1px var(--control-edge);
+}
+.check { display: inline-flex; align-items: center; gap: 0.375rem; font-size: var(--t-label); color: var(--soft); cursor: pointer; }
+.check input { accent-color: var(--accent); margin: 0; }
+.keys { font-size: var(--t-meta); color: var(--dim-2); margin-left: auto; }
+.keys kbd {
+  font-family: var(--font-mono); font-size: var(--t-meta); padding: 0 0.25rem; border-radius: 0.1875rem;
+  border: 1px solid var(--edge); color: var(--soft); background: var(--panel);
+}
+
+/* --- specimens ------------------------------------------------------------ */
+.specimens { display: flex; flex-wrap: wrap; gap: 1.25rem 1rem; align-items: flex-start; padding-block: 1.25rem 1.5rem; }
+.card {
+  width: min(100%, calc(var(--pane-w) + 1.5rem));
+  display: grid; gap: 0.625rem; padding: 0.75rem;
+  background: var(--panel); border: 1px solid var(--line); border-radius: 0.375rem;
+  min-width: 0;
+}
+.card.pick { border-color: color-mix(in srgb, var(--accent) 55%, var(--line)); }
+.card-head { display: flex; align-items: center; gap: 0.5rem; min-width: 0; }
+.tag {
+  flex: none; display: inline-grid; place-items: center; min-width: 1.25rem; height: 1.25rem; padding: 0 0.25rem;
+  border-radius: 0.25rem; background: var(--control); box-shadow: inset 0 0 0 1px var(--control-edge);
+  font-family: var(--font-mono); font-size: var(--t-label); font-weight: 600; color: var(--ink);
+}
+.card h3 { margin: 0; font-size: var(--t-heading); font-weight: 600; color: var(--ink); min-width: 0; }
+.cost { margin-left: auto; flex: none; font-size: var(--t-meta); color: var(--dim-2); white-space: nowrap; }
+.card.pick .cost { color: var(--accent); }
+.idea { margin: 0; color: var(--soft); }
+.changes { margin: 0; padding: 0; list-style: none; display: grid; gap: 0.25rem; color: var(--soft); }
+.changes li, .verdict li { position: relative; padding-left: 0.875rem; }
+.changes li::before, .verdict li::before { content: '–'; color: var(--faint); position: absolute; left: 0; }
+.changes code, .verdict code, .finding code, .idea code {
+  font-family: var(--font-mono); font-size: 0.6875rem; color: var(--ink); overflow-wrap: anywhere;
+  background: var(--surface); border: 1px solid var(--hairline); border-radius: 0.1875rem; padding: 0 0.1875rem;
+}
+.scroll-x { overflow-x: auto; max-width: 100%; }
+
+/* --- the pane, as the game page draws it ----------------------------------- */
+.pane {
+  width: var(--pane-w); max-width: 100%;
+  background: var(--surface); border: 1px solid var(--line); border-radius: 0.25rem; overflow: hidden;
+}
+.strip {
+  height: 2.1875rem; display: flex; align-items: center; gap: 0.5rem; padding: 0 0.5rem 0 0.75rem;
+  background: var(--panel); border-bottom: 1px solid var(--line);
+}
+.strip .title { font-size: var(--t-data); font-weight: 500; color: var(--ink); flex: none; }
+.strip .fill { flex: 1; }
+.strip .facts {
+  font-family: var(--font-mono); font-size: var(--t-meta); color: var(--dim-2);
+  min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.strip .rule { width: 1px; height: 1rem; background: var(--hairline); flex: none; }
+.strip .tool { flex: none; display: grid; place-items: center; width: 1.25rem; height: 1.25rem; color: var(--soft); }
+.strip svg { width: 0.875rem; height: 0.875rem; }
+
+.list { font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: var(--t-lead); line-height: 1.25rem; padding: 0.125rem 0.375rem 0.375rem; }
+
+/* glyphs: the app's badge, and the plain text the newer specimens use */
+.badge {
+  display: inline-flex; align-items: center; justify-content: center; height: 1rem; padding: 0 0.1875rem;
+  border-radius: 0.125rem; font-size: var(--t-meta); font-weight: 700; flex: none;
+}
+.badge.best { background: color-mix(in srgb, var(--accent) 14%, transparent); color: var(--accent); }
+.badge.inaccuracy { background: color-mix(in srgb, var(--inaccuracy) 14%, transparent); color: var(--inaccuracy); }
+.badge.mistake { background: color-mix(in srgb, var(--mistake) 16%, transparent); color: var(--mistake); }
+.badge.blunder { background: var(--blunder); color: var(--blunder-ink); }
+.tg { font-weight: 700; flex: none; }
+.tg.best { color: var(--accent); }
+.tg.inaccuracy { color: var(--inaccuracy); }
+.tg.mistake { color: var(--mistake); }
+.tg.blunder { color: var(--blunder); }
+.note { width: 0.5625rem; height: 0.5625rem; flex: none; color: var(--accent); opacity: 0.85; }
+
+.san { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.mv { color: var(--ink); }
+.mv:hover { color: var(--bright); }
+.mv.f-inaccuracy .san { color: var(--inaccuracy); font-weight: 500; }
+.mv.f-mistake .san { color: var(--mistake); font-weight: 500; }
+.mv.f-blunder .san { color: var(--blunder); font-weight: 500; }
+.mv.cur, .mv.cur .san { color: var(--bright); }
+.low { color: var(--mistake) !important; }
+
+/* the "Best was …" aside and a kept line, shared; each specimen sets --indent */
+.ann {
+  display: flex; gap: 0.5rem; padding: 0.375rem 0.5rem 0.375rem var(--indent, 2.625rem);
+  font-family: var(--font-sans); font-size: var(--t-data); font-style: italic; line-height: 1.5; color: var(--soft);
+}
+.ann .rail, .line .rail { width: 0.125rem; flex: none; border-radius: 0.125rem; }
+.ann .rail { background: var(--c); opacity: 0.5; }
+.ann .m { font-family: var(--font-mono); font-style: normal; }
+.ann .up { font-style: normal; }
+.line {
+  display: flex; gap: 0.5rem; padding: 0.25rem 0.5rem 0.25rem var(--indent, 2.625rem);
+  font-size: var(--t-data); line-height: 1.5;
+}
+.line .rail { background: var(--brilliant); opacity: 0.2; }
+.line .body { display: flex; flex-wrap: wrap; gap: 0.125rem 0.25rem; align-items: baseline; }
+.line .paren { color: var(--faint-2); }
+.line .n { color: var(--faint); }
+.line .lm { color: var(--dim); }
+
+/* ── Today: the table as MoveList.tsx draws it ──────────────────────────── */
+.v-now { --indent: 2.625rem; }
+.v-now .row { display: flex; align-items: center; height: 1.75rem; border-radius: 0.25rem; padding: 0 0.375rem; }
+.v-now .row:hover { background: var(--raised); }
+.v-now .row.active { background: var(--row-active); box-shadow: inset 0.125rem 0 0 var(--accent); }
+.v-now .num { width: 2rem; flex: none; color: var(--dim-2); }
+.v-now .row.active .num { color: var(--dim); }
+.v-now .mv {
+  flex: 1 1 0; min-width: 0; display: flex; align-items: center; gap: 0.3125rem;
+  height: 1.25rem; padding: 0 0.25rem; border-radius: 0.25rem;
+}
+.v-now .mv.cur { background: var(--selected); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 55%, transparent); }
+.v-now .clk { width: 2.25rem; flex: none; padding-right: 0.375rem; text-align: right; font-size: var(--t-label); color: var(--dim-2); }
+
+/* ── A: fixed columns, the clock beside its own move ─────────────────────── */
+.v-a, .v-c, .v-d { --indent: 2rem; }
+.v-a .row, .v-c .row, .v-d .row {
+  display: grid; align-items: center; border-radius: 0.25rem; padding-right: 0.375rem;
+  grid-template-columns: 1.75rem minmax(0, 6rem) 2.25rem 1rem minmax(0, 6rem) 2.25rem;
+  max-width: 20rem;
+}
+.v-a .row { height: 1.75rem; }
+.v-a .row:hover, .v-c .row:hover, .v-d .row:hover { background: var(--raised); }
+.v-a .row.active, .v-c .row.active, .v-d .row.active { background: var(--row-active); box-shadow: inset 0.125rem 0 0 var(--accent); }
+.v-a .num, .v-c .num, .v-d .num { text-align: right; padding-right: 0.375rem; color: var(--dim-2); font-size: var(--t-data); }
+.v-a .row.active .num, .v-c .row.active .num, .v-d .row.active .num { color: var(--dim); }
+.v-a .mv, .v-c .mv, .v-d .mv {
+  justify-self: start; max-width: 100%; min-width: 0; display: inline-flex; align-items: center; gap: 0.3125rem;
+  height: 1.25rem; padding: 0 0.25rem; border-radius: 0.25rem;
+}
+.v-a .mv.cur, .v-c .mv.cur, .v-d .mv.cur { background: var(--selected); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 55%, transparent); }
+.v-a .clk, .v-d .clk { text-align: right; font-size: var(--t-label); color: var(--dim-2); }
+
+/* ── B: ledger, a number gutter and cells ────────────────────────────────── */
+.v-b { --indent: 2.5rem; }
+.v-b .list { padding: 0 0 0.375rem; }
+.v-b .row { display: grid; grid-template-columns: 2rem minmax(0, 1fr) minmax(0, 1fr); height: 1.5rem; max-width: 22rem; }
+.v-b .num {
+  background: var(--panel); color: var(--dim-2); font-size: var(--t-data); height: 100%;
+  display: flex; align-items: center; justify-content: flex-end; padding-right: 0.375rem;
+}
+.v-b .row.active .num { color: var(--accent); font-weight: 600; }
+.v-b .mv { display: flex; align-items: center; gap: 0.1875rem; height: 100%; min-width: 0; padding: 0 0.375rem 0 0.5rem; }
+.v-b .mv.black { border-left: 1px solid var(--hairline); }
+.v-b .mv:hover { background: var(--raised); }
+.v-b .mv.cur { background: var(--selected); }
+.v-b .clk { margin-left: auto; padding-left: 0.375rem; font-size: var(--t-meta); color: var(--dim-2); flex: none; }
+.v-b .empty { height: 100%; }
+.v-b .mv.black.blank { border-left: 1px solid var(--hairline); }
+
+/* ── C: think time instead of the clock ──────────────────────────────────── */
+.v-c .row { height: 1.75rem; grid-template-columns: 1.75rem minmax(0, 6rem) 3rem 0.75rem minmax(0, 6rem) 3rem; max-width: 21rem; }
+.v-c .think { display: flex; align-items: center; justify-content: flex-end; gap: 0.25rem; font-size: var(--t-meta); color: var(--dim-2); }
+.v-c .bar { height: 0.25rem; border-radius: 1px; background: var(--faint-2); opacity: 0.7; }
+.v-c .bar.long { background: var(--info); opacity: 1; }
+.v-c .think.long { color: var(--ink); }
+
+/* ── D: A's columns, B's calm ────────────────────────────────────────────── */
+.v-d .row { height: 1.5rem; }
+.v-d .mv { gap: 0.125rem; }
+
+/* --- verdict ---------------------------------------------------------------- */
+.verdict {
+  display: grid; gap: 1rem 2.5rem; padding-block: 0.5rem 2.5rem;
+  grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr));
+  border-top: 1px solid var(--hairline); padding-top: 1.25rem;
+}
+.verdict h2 { margin: 0 0 0.375rem; font-size: var(--t-value); font-weight: 600; color: var(--ink); }
+.verdict h3 { margin: 0 0 0.375rem; font-size: var(--t-heading); font-weight: 600; color: var(--ink); }
+.verdict p { margin: 0 0 0.5rem; color: var(--soft); max-width: 38rem; }
+.verdict ul { margin: 0; padding: 0; list-style: none; display: grid; gap: 0.375rem; color: var(--soft); }
+.verdict b { color: var(--ink); font-weight: 500; }
+.foot { padding-block: 0 2rem; font-size: var(--t-meta); color: var(--dim-2); }
+
+@media (max-width: 40rem) {
+  .keys { display: none; }
+  .slider input, .ticks { width: 10rem; }
+}
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+
+<header class="wrap head">
+  <span class="eyebrow">Blunderbase · game page · #45 follow-up</span>
+  <h1>Move list layouts</h1>
+  <p class="lead">Five ways to space the move table, side by side on <b>your game from the #45 screenshot</b>
+    (10+0, 18 moves). They share one cursor: click a move in any of them, or use the arrow keys, and every
+    list follows. The slider sets the column width for all of them.</p>
+</header>
+
+<section class="wrap findings" aria-label="What is odd today">
+  <div class="finding">
+    <h2>White's clock sits next to Black's move</h2>
+    <p>The clock is right-aligned at the end of White's half, which puts it beside the next move. In the
+      screenshot, 9:58 is about 11 px from Nf6 and about 77 px from d4, so it reads as Black's.</p>
+    <div class="measure" aria-hidden="true">
+      <span class="tok">d4 <span class="tg best">!</span></span>
+      <span class="gap wide"><i></i><em>≈77 px</em></span>
+      <span class="tok clk">9:58</span>
+      <span class="gap narrow"><i></i><em>≈11</em></span>
+      <span class="tok">Nf6</span>
+    </div>
+  </div>
+  <div class="finding">
+    <h2>The cells stretch with the column</h2>
+    <p>Both move cells are <code class="mono">flex-1</code>, so a wider track pushes a move, its badge and
+      its clock further apart rather than leaving the room at the end. Drag the slider on “Today” to
+      watch it happen.</p>
+  </div>
+  <div class="finding">
+    <h2>Three highlights at once</h2>
+    <p>Boxed badges on half the moves, a tinted row for the pair, and a boxed current move whose box runs
+      the whole width of its cell. Each is right on its own; together the row is busy.</p>
+  </div>
+</section>
+
+<div class="controls">
+  <div class="wrap">
+    <div class="ctl">
+      <span class="lbl" id="width-label">Column</span>
+      <div class="slider">
+        <input id="width" type="range" min="250" max="480" step="10" value="300" aria-labelledby="width-label" aria-describedby="width-out">
+        <div class="ticks" aria-hidden="true">
+          <span style="left: 0%">250</span>
+          <span style="left: 21.7%">300</span>
+          <span style="left: 39.1%">340</span>
+        </div>
+      </div>
+      <span class="readout" id="width-out"></span>
+    </div>
+    <div class="ctl">
+      <span class="lbl">Clocks</span>
+      <div class="seg" role="group" aria-label="Clocks">
+        <button type="button" id="clk-real" aria-pressed="true">10+0, as played</button>
+        <button type="button" id="clk-blitz" aria-pressed="false">3+0 scramble</button>
+      </div>
+    </div>
+    <label class="check"><input type="checkbox" id="best" checked> Show <span class="tg best mono">!</span> on best moves</label>
+    <div class="ctl">
+      <span class="lbl">Theme</span>
+      <div class="seg" role="group" aria-label="Theme">
+        <button type="button" data-theme-pick="auto" aria-pressed="true">Auto</button>
+        <button type="button" data-theme-pick="dark" aria-pressed="false">Dark</button>
+        <button type="button" data-theme-pick="light" aria-pressed="false">Light</button>
+      </div>
+    </div>
+    <span class="keys"><kbd>←</kbd> <kbd>→</kbd> step · <kbd>↑</kbd> <kbd>↓</kbd> flagged · <kbd>Home</kbd> <kbd>End</kbd></span>
+  </div>
+</div>
+
+<main class="wrap specimens" id="specimens">
+  <article class="card">
+    <div class="card-head"><span class="tag">Now</span><h3>Today</h3><span class="cost">as shipped</span></div>
+    <p class="idea">The table as <code class="mono">MoveList.tsx</code> draws it, for comparison.</p>
+    <div class="scroll-x"><div class="pane v-now" data-variant="now"></div></div>
+    <ul class="changes">
+      <li>Two flexible cells, each followed by a fixed clock.</li>
+      <li>Number left-aligned in a 2rem column.</li>
+    </ul>
+  </article>
+
+  <article class="card">
+    <div class="card-head"><span class="tag">A</span><h3>Fixed columns</h3><span class="cost">CSS only</span></div>
+    <p class="idea">The same table on a fixed grid. Each clock sits after its own move, and spare width stays at the end of the row.</p>
+    <div class="scroll-x"><div class="pane v-a" data-variant="a"></div></div>
+    <ul class="changes">
+      <li>Row becomes <code>grid</code> with columns 1.75 · 6 · 2.25 · 1 · 6 · 2.25 rem, capped at 20rem.</li>
+      <li>The move button hugs its text, so the current-move box is the size of the move.</li>
+      <li>Numbers right-aligned, so 9. and 10. line up on the dot.</li>
+    </ul>
+  </article>
+
+  <article class="card">
+    <div class="card-head"><span class="tag">B</span><h3>Ledger</h3><span class="cost">CSS + highlight rules</span></div>
+    <p class="idea">Lichess's shape: a shaded number gutter and two cells per row, each cell holding its move and its clock.</p>
+    <div class="scroll-x"><div class="pane v-b" data-variant="b"></div></div>
+    <ul class="changes">
+      <li>A hairline between the halves groups each clock with its move.</li>
+      <li>The whole cell is the button and lights up; the pair shows as an accent number instead of a tinted row.</li>
+      <li>Glyphs as coloured text, rows 1.5rem: about 15 % shorter.</li>
+    </ul>
+  </article>
+
+  <article class="card">
+    <div class="card-head"><span class="tag">C</span><h3>Think time</h3><span class="cost">CSS + derived data</span></div>
+    <p class="idea">A's grid, but the clock column shows how long each move took, as a number and a small bar. The clock as it stood is in the tooltip.</p>
+    <div class="scroll-x"><div class="pane v-c" data-variant="c"></div></div>
+    <ul class="changes">
+      <li>Long thinks (top tenth of the game) are blue, so the hard moments show at a glance.</li>
+      <li>Under 20 s left, the remaining clock replaces the think time, in orange.</li>
+      <li>Changes what the column means; the Move time graph already says some of this.</li>
+    </ul>
+  </article>
+
+  <article class="card pick">
+    <div class="card-head"><span class="tag">D</span><h3>Fixed and calm</h3><span class="cost">my pick · CSS + glyph text</span></div>
+    <p class="idea">A's columns with B's quieter details: glyphs as coloured text and 1.5rem rows. Row tint and selected move stay as the app's grammar has them.</p>
+    <div class="scroll-x"><div class="pane v-d" data-variant="d"></div></div>
+    <ul class="changes">
+      <li>Everything in A.</li>
+      <li><code>ClassificationBadge</code> becomes a coloured suffix (<span class="tg blunder mono">??</span>, <span class="tg inaccuracy mono">?!</span>) in the move list only.</li>
+      <li>Rows <code>h-6</code> instead of <code>h-7</code>.</li>
+    </ul>
+  </article>
+</main>
+
+<section class="wrap verdict" aria-label="Recommendation">
+  <div>
+    <h2>My pick: D</h2>
+    <p>It fixes the clock that reads as the opponent's, stops the row from stretching on wide columns,
+      and calms the row down, without changing what the table is. It keeps the clock, the row tint and
+      the selected-move box exactly as the app's design grammar defines them.</p>
+    <p>A is the smallest step if you want to change only the spacing. B looks best on a wide column but
+      bends the highlight rules. C is a different feature: I'd offer it as a setting, not as the default.</p>
+    <p>Separate from layout: try the <b>!</b> switch above. Without it, the flagged moves are the only
+      glyphs left, and they stand out much more.</p>
+  </div>
+  <div>
+    <h3>What D takes in MoveList.tsx</h3>
+    <ul>
+      <li>Row: <code>grid h-6 max-w-[20rem] grid-cols-[1.75rem_minmax(0,6rem)_2.25rem_1rem_minmax(0,6rem)_2.25rem]</code> instead of <code>flex h-7</code>; a 1rem spacer cell before Black.</li>
+      <li>Move button: <code>justify-self-start</code> instead of <code>flex-1</code>.</li>
+      <li>Number: <code>text-right pr-1.5</code>.</li>
+      <li>Glyph: a coloured suffix span from <code>GLYPHS[glyph].textClass</code> instead of <code>ClassificationBadge</code>.</li>
+      <li>Variation and “Best was …” indent: <code>pl-[2rem]</code>, so they start under the moves.</li>
+      <li>Tests: the clock cells keep their <code>data-testid</code>; no behaviour changes.</li>
+    </ul>
+  </div>
+</section>
+
+<p class="wrap foot">Clocks, glyphs and note marks are from the game in the #45 screenshot. “Best was …” lines come from
+  Stockfish on this machine, at 1.5M nodes per position. The 3+0 clocks are made up, to show time trouble.</p>
+
+<script>
+(function () {
+  const G = { best: '!', inaccuracy: '?!', mistake: '?', blunder: '??' };
+  const FLAGGED = new Set(['inaccuracy', 'mistake', 'blunder']);
+
+  // [san, classification, clock after the move (s)] — White, then Black, move by move.
+  const W = [
+    ['d4','best',598],['Nc3',null,596],['Nf3','inaccuracy',594],['a3','inaccuracy',592],['Bg5',null,591],
+    ['Bxf6','inaccuracy',587],['e3',null,587],['h3',null,580],['Bd3','best',578],['e4','blunder',563],
+    ['Bxe4',null,556],['Nxd4','best',551],['Bxb7','inaccuracy',533],['Bf3',null,530],['Ne2','best',524],
+    ['Qxd8','inaccuracy',514],['O-O','best',513],['Ng3','inaccuracy',508],
+  ];
+  const B = [
+    ['Nf6',null,597],['g6','inaccuracy',595],['Bg7',null,594],['O-O',null,593],['Nc6','inaccuracy',585],
+    ['Bxf6',null,582],['d5','best',574],['Bf5',null,570],['Be6',null,558],['dxe4',null,535],
+    ['Nxd4','best',530],['Bxd4',null,525],['Rb8','best',522],['Rxb2','best',519],['Bg7',null,481],
+    ['Rxd8','best',481],['Rxc2','best',477],['Bxa1','best',473],
+  ];
+  const NOTED = new Set([13, 22, 31]);
+  // Stockfish, per ply: [best, cp before, cp after, win change for the mover (%)]
+  const EVAL = [
+    ['e4',43,33,-0.9],['Nf6',33,36,-0.3],['c4',36,-1,-3.4],['d5',-1,71,-6.6],['e4',71,7,-5.9],
+    ['d5',7,39,-2.9],['e4',39,-41,-7.4],['d5',-41,-8,-3.0],['e4',-8,-20,-1.1],['d5',-20,67,-8.0],
+    ['d5',67,-37,-9.5],['exf6',-37,-28,-0.8],['e3',-28,-32,-0.4],['d5',-32,-36,0.4],['Be2',-36,-49,-1.2],
+    ['a6',-49,-22,-2.5],['Bd3',-22,-20,0.2],['Bc8',-20,12,-2.9],['Qd2',12,-212,-19.7],['Nxd4',-212,-168,-3.6],
+    ['Nxe4',-168,-176,-0.7],['Nxd4',-176,-172,-0.3],['Nxd4',-172,-190,-1.5],['Qxd4',-190,-157,-2.7],
+    ['Qf3',-157,-229,-5.9],['Rb8',-229,-223,-0.5],['Qf3',-223,-302,-5.8],['Rxb2',-302,-316,0.9],
+    ['Ne2',-316,-335,-1.2],['Bf6',-335,-289,-3.1],['O-O',-289,-419,-8.0],['Rxd8',-419,-419,0],
+    ['O-O',-419,-431,-0.6],['Rxc2',-431,-424,-0.4],['Rad1',-424,-542,-5.4],['Bxa1',-542,-523,-0.8],
+  ];
+  // The kept line under move 9: what the engine had instead of 10.e4.
+  const LINE = { base: 18, sans: ['Qd2','Bg7','O-O','a6','Rfe1'] };
+
+  // Made-up 3+0 thinking times, so the scramble shows what time trouble looks like.
+  const BLITZ_W = [2,3,4,5,8,6,12,9,15,28,10,7,20,11,9,13,4,6];
+  const BLITZ_B = [1,2,3,4,5,9,6,10,8,18,6,5,7,9,12,6,8,4];
+
+  const plies = [];
+  for (let i = 0; i < W.length; i++) {
+    plies.push({ san: W[i][0], cls: W[i][1], clk: W[i][2], ply: 2 * i });
+    if (B[i]) plies.push({ san: B[i][0], cls: B[i][1], clk: B[i][2], ply: 2 * i + 1 });
+  }
+  const blitz = [];
+  { let w = 180, b = 180;
+    for (let i = 0; i < W.length; i++) { w -= BLITZ_W[i]; blitz.push(w); b -= BLITZ_B[i]; blitz.push(b); } }
+
+  const state = { cursor: 18, clocks: 'real', best: true, width: 300 };
+
+  const clockOf = (ply) => (state.clocks === 'real' ? plies[ply].clk : blitz[ply]);
+  const startOf = () => (state.clocks === 'real' ? 600 : 180);
+  const spentOf = (ply) => (ply < 2 ? startOf() : clockOf(ply - 2)) - clockOf(ply);
+  const fmtClock = (s) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+  const fmtSpent = (s) => (s < 60 ? `${s}s` : fmtClock(s));
+  const fmtScore = (cp) => (cp >= 0 ? '+' : '−') + (Math.abs(cp) / 100).toFixed(2);
+  const fmtPct = (v) => (v > 0 ? '+' : v < 0 ? '−' : '') + Math.abs(v).toFixed(1) + '%';
+  const label = (ply) => `${Math.floor(ply / 2) + 1}${ply % 2 ? '…' : '.'}`;
+  const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+  const NOTE = '<svg class="note" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.6 1.6h4.6L9.4 3.8v6.6H2.6z"/><path d="M4.3 5.6h3.4M4.3 7.6h2.2"/></svg>';
+  const COPY = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>';
+
+  function shows(cls) { return cls && (cls !== 'best' || state.best); }
+  function badge(cls) { return shows(cls) ? `<span class="badge ${cls}" title="${cls}">${G[cls]}</span>` : ''; }
+  function textGlyph(cls) { return shows(cls) ? `<span class="tg ${cls}">${G[cls]}</span>` : ''; }
+
+  function moveTitle(p) {
+    const left = clockOf(p.ply);
+    return `${label(p.ply)}${p.san} · ${fmtSpent(spentOf(p.ply))} spent · ${fmtClock(left)} left${NOTED.has(p.ply) ? ' · noted' : ''}`;
+  }
+
+  /** One move as a button, in the look a specimen asks for. */
+  function move(p, look, extra = '') {
+    if (!p) return look === 'cell' ? '<span class="mv black blank empty"></span>' : '<span></span>';
+    const cur = p.ply === state.cursor;
+    const cls = ['mv', p.cls && FLAGGED.has(p.cls) ? `f-${p.cls}` : '', cur ? 'cur' : '', extra].join(' ');
+    const glyph = look === 'badge' ? badge(p.cls) : textGlyph(p.cls);
+    const note = NOTED.has(p.ply) ? NOTE : '';
+    const clock = look === 'cell' ? clockCell(p) : '';
+    return `<button type="button" class="${cls}" data-ply="${p.ply}" title="${esc(moveTitle(p))}"${cur ? ' aria-current="step"' : ''}><span class="san">${esc(p.san)}</span>${glyph}${note}${clock}</button>`;
+  }
+
+  function clockCell(p) {
+    if (!p) return '<span class="clk"></span>';
+    const left = clockOf(p.ply);
+    return `<span class="clk${left < 20 ? ' low' : ''}">${fmtClock(left)}</span>`;
+  }
+
+  function thinkCell(p, longest) {
+    if (!p) return '<span></span>';
+    const left = clockOf(p.ply);
+    const spent = Math.max(0, spentOf(p.ply));
+    if (left < 20) {
+      return `<span class="think low" title="${fmtClock(left)} left">${fmtClock(left)}</span>`;
+    }
+    const long = spent >= longest;
+    const max = Math.max(...plies.map((q) => Math.max(0, spentOf(q.ply))));
+    const width = Math.max(0.125, (Math.sqrt(spent) / Math.sqrt(max)) * 1.25);
+    return `<span class="think${long ? ' long' : ''}" title="${fmtSpent(spent)} spent · ${fmtClock(left)} left"><i class="bar${long ? ' long' : ''}" style="width:${width}rem"></i>${fmtSpent(spent)}</span>`;
+  }
+
+  function annotation() {
+    const p = plies[state.cursor];
+    if (!p || !FLAGGED.has(p.cls)) return '';
+    const [best, before, after, wl] = EVAL[p.ply];
+    const color = `var(--${p.cls})`;
+    return `<div class="ann" style="--c:${color}"><i class="rail"></i><div>`
+      + `<span class="m" style="color:${color}">${label(p.ply)} ${esc(p.san)}${G[p.cls]} </span>`
+      + `<span class="up">Best was </span><span class="m" style="color:var(--ink)">${esc(best)}</span><span class="up">. </span>`
+      + `<span class="m" style="color:var(--dim)">${fmtScore(before)} → <span style="color:${color}">${fmtScore(after)}</span></span>`
+      + `<span class="m" style="color:var(--dim)"> (<span style="color:${color}">${fmtPct(wl)}</span> win)</span>`
+      + `</div></div>`;
+  }
+
+  function keptLine() {
+    let html = '<div class="line"><i class="rail"></i><div class="body mono"><span class="paren">(</span>';
+    LINE.sans.forEach((san, i) => {
+      const ply = LINE.base + i;
+      if (ply % 2 === 0 || i === 0) html += `<span class="n">${label(ply)}</span>`;
+      html += `<span class="lm">${esc(san)}</span>`;
+    });
+    return html + '<span class="paren">)</span></div></div>';
+  }
+
+  function pairs() {
+    const out = [];
+    for (let i = 0; i < plies.length; i += 2) out.push({ n: i / 2 + 1, w: plies[i], b: plies[i + 1] });
+    return out;
+  }
+
+  function rowsFor(variant) {
+    const anchor = Math.floor((LINE.base - 1) / 2) + 1; // the move the line hangs under
+    const spents = plies.map((p) => Math.max(0, spentOf(p.ply))).sort((a, b) => b - a);
+    const longest = spents[Math.max(0, Math.floor(spents.length / 10) - 1)];
+    return pairs().map(({ n, w, b }) => {
+      const active = state.cursor === w.ply || (b && state.cursor === b.ply);
+      let row;
+      if (variant === 'now') {
+        row = `<span class="num">${n}.</span>${move(w, 'badge')}${clockCell(w)}${move(b, 'badge')}${clockCell(b)}`;
+      } else if (variant === 'a') {
+        row = `<span class="num">${n}.</span>${move(w, 'badge')}${clockCell(w)}<span></span>${move(b, 'badge')}${clockCell(b)}`;
+      } else if (variant === 'b') {
+        row = `<span class="num">${n}</span>${move(w, 'cell')}${move(b, 'cell', 'black')}`;
+      } else if (variant === 'c') {
+        row = `<span class="num">${n}.</span>${move(w, 'badge')}${thinkCell(w, longest)}<span></span>${move(b, 'badge')}${thinkCell(b, longest)}`;
+      } else {
+        row = `<span class="num">${n}.</span>${move(w, 'text')}${clockCell(w)}<span></span>${move(b, 'text')}${clockCell(b)}`;
+      }
+      const inPair = state.cursor === w.ply || (b && state.cursor === b.ply);
+      return `<div><div class="row${active ? ' active' : ''}">${row}</div>${inPair ? annotation() : ''}${n === anchor ? keptLine() : ''}</div>`;
+    }).join('');
+  }
+
+  function stripFor(variant) {
+    let facts = `${plies.length} plies`;
+    if (variant === 'c') {
+      let top = plies[0];
+      for (const p of plies) if (spentOf(p.ply) > spentOf(top.ply)) top = p;
+      facts = `longest ${fmtSpent(spentOf(top.ply))} · ${label(top.ply)}${top.san}`;
+    }
+    return `<div class="strip"><span class="title">Moves</span><span class="fill"></span><span class="facts">${esc(facts)}</span><span class="rule"></span><span class="tool" title="Copy PGN">${COPY}</span></div>`;
+  }
+
+  function render() {
+    document.querySelectorAll('.pane[data-variant]').forEach((pane) => {
+      const variant = pane.dataset.variant;
+      pane.innerHTML = stripFor(variant) + `<div class="list">${rowsFor(variant)}</div>`;
+    });
+  }
+
+  // --- controls ------------------------------------------------------------
+  const root = document.documentElement;
+  const width = document.getElementById('width');
+  const widthOut = document.getElementById('width-out');
+  function setWidth(v) {
+    state.width = v;
+    root.style.setProperty('--pane-w', `${v / 16}rem`);
+    const band = v === 250 ? 'today under 1440' : v === 300 ? 'today from 1440' : v === 340 ? 'today from 1600' : '';
+    widthOut.innerHTML = `${v} design px <small>· ${Math.round(v * 1.2)} on screen${band ? ' · ' + band : ''}</small>`;
+  }
+  width.addEventListener('input', () => setWidth(Number(width.value)));
+
+  const real = document.getElementById('clk-real');
+  const fast = document.getElementById('clk-blitz');
+  function setClocks(mode) {
+    state.clocks = mode;
+    real.setAttribute('aria-pressed', String(mode === 'real'));
+    fast.setAttribute('aria-pressed', String(mode === 'blitz'));
+    render();
+  }
+  real.addEventListener('click', () => setClocks('real'));
+  fast.addEventListener('click', () => setClocks('blitz'));
+
+  document.getElementById('best').addEventListener('change', (e) => { state.best = e.target.checked; render(); });
+
+  document.querySelectorAll('[data-theme-pick]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const pick = btn.dataset.themePick;
+      if (pick === 'auto') root.removeAttribute('data-theme'); else root.setAttribute('data-theme', pick);
+      document.querySelectorAll('[data-theme-pick]').forEach((b) => b.setAttribute('aria-pressed', String(b === btn)));
+    });
+  });
+
+  // --- the shared cursor ------------------------------------------------------
+  document.getElementById('specimens').addEventListener('click', (e) => {
+    const target = e.target.closest('[data-ply]');
+    if (!target) return;
+    state.cursor = Number(target.dataset.ply);
+    render();
+    const again = document.querySelector(`.pane[data-variant="${target.closest('.pane').dataset.variant}"] [data-ply="${state.cursor}"]`);
+    if (again) again.focus({ preventScroll: true });
+  });
+
+  function seekFlagged(step) {
+    for (let i = state.cursor + step; i >= 0 && i < plies.length; i += step) {
+      if (FLAGGED.has(plies[i].cls)) return i;
+    }
+    return state.cursor;
+  }
+  document.addEventListener('keydown', (e) => {
+    if (e.target.closest && e.target.closest('input, select, textarea')) return;
+    if (e.metaKey || e.ctrlKey || e.altKey) return;
+    let next = null;
+    if (e.key === 'ArrowRight') next = Math.min(plies.length - 1, state.cursor + 1);
+    else if (e.key === 'ArrowLeft') next = Math.max(-1, state.cursor - 1);
+    else if (e.key === 'ArrowDown') next = seekFlagged(1);
+    else if (e.key === 'ArrowUp') next = seekFlagged(-1);
+    else if (e.key === 'Home') next = -1;
+    else if (e.key === 'End') next = plies.length - 1;
+    if (next === null) return;
+    e.preventDefault();
+    state.cursor = next;
+    render();
+  });
+
+  setWidth(state.width);
+  render();
+})();
+</script>

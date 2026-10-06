@@ -48,6 +48,11 @@ position, and its moves are numbered from it: a game that begins with Black to m
 
 ## What the badges mean
 
+Each row of the move column has its move number in a shaded margin, then White's and
+Black's move in a cell each. Where the game was played with a clock, the clock as it stood
+after the move sits at the right edge of that move's cell, in orange under 20 seconds. The
+move the board is on fills its cell in blue, and its row's number turns blue too.
+
 The move column marks a move `??`, `?`, `?!` or `!` and tints the flagged moves. To get from
 one to the next, use ↑ and ↓ or the transport buttons under the board, or click a mark on the
 evaluation graph; on a phone the **Eval** tab also lists them, with their count on the tab.

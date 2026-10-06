@@ -211,8 +211,26 @@ describe('MoveList', () => {
     // The gaps are flex, not text: the row reads `(1…c6 2.d4 Nf6)` on screen.
     expect(line).toHaveTextContent('(1…c62.d4Nf6)')
     // It is drawn inside the row of the move it left from, not appended to the table.
-    const row = screen.getByText('1.').closest('div')!.parentElement!
+    // The gutter numbers the row without a dot, the way an analysis board does.
+    const row = screen.getByText('1').closest('div')!.parentElement!
     expect(row.contains(line)).toBe(true)
+  })
+
+  it('holds each clock in its own move’s cell, and marks the pair in the gutter', () => {
+    renderList(
+      [move(0, 'e4', { clock: 598 }), move(1, 'd5', { clock: 597, classification: 'blunder' })],
+      { cursor: 1 },
+    )
+    // #45: White's clock used to sit beside Black's move. Now each is inside its button.
+    const white = screen.getByRole('button', { name: /e4/ })
+    const black = screen.getByRole('button', { name: /d5/ })
+    expect(within(white).getByTestId('move-clock')).toHaveTextContent('9:58')
+    expect(within(black).getByTestId('move-clock')).toHaveTextContent('9:57')
+    // The glyph is text after the move, still named for a screen reader.
+    expect(within(black).getByLabelText('blunder')).toHaveTextContent('??')
+    // The current move fills its cell; the pair says so in its number, not a tinted row.
+    expect(black).toHaveClass('bg-selected')
+    expect(screen.getByText('1')).toHaveClass('text-accent-teal')
   })
 
   it('lights the move the board is standing on, and only that one', () => {

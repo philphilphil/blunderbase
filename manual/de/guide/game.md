@@ -55,6 +55,12 @@ ein anderes Programm die Partie genauso wieder einliest.
 
 ## Was die Markierungen bedeuten { #what-the-badges-mean }
 
+Jede Zeile der Zugspalte trägt die Zugnummer in einem schattierten Rand, daneben den Zug
+von Weiß und den von Schwarz in je einer Zelle. Wurde mit Uhr gespielt, steht am rechten
+Rand jeder Zelle die Uhr, wie sie nach diesem Zug stand – unter 20 Sekunden in Orange. Der
+Zug, auf dem das Brett steht, füllt seine Zelle blau, und die Nummer seiner Zeile wird
+ebenfalls blau.
+
 Die Zugspalte kennzeichnet Züge mit `??`, `?`, `?!` oder `!` und färbt die betroffenen
 Züge ein. Von einem zum nächsten kommst du mit ↑ und ↓ oder den Schaltflächen unter dem
 Brett, oder mit einem Klick auf eine Markierung im Bewertungsverlauf; auf dem Handy listet

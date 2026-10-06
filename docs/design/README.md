@@ -330,8 +330,9 @@ directory are local snapshots pulled 2026-08-25.
       face's shade dropped (pushed in). A `Button` gets it from `aria-pressed` (never the
       filled `default`); a set `PickerButton`, a `FilterChip` in a narrowed set, a
       selected row (plus `shadow-row-bar`, the 2px inset accent bar, unchanged on hover)
-      take it too. The move list's current move is `bg-selected text-bright` with an inset
-      accent ring; the pair under the cursor is `--bb-row-active` plus the bar.
+      take it too. The move list's current move fills its whole cell, `bg-selected
+      text-bright`; the pair under the cursor says so in its gutter number, accent and bold,
+      rather than with a tinted row (#45, layout B of `prototypes/move-list-layouts.html`).
     - **Hover** is `raised` on rows, ghosts and idle tabs, `control-hover` on a face,
       text only on rail rows and idle segments. Never `hover:bg-selected`.
     - **Focus** is one solid 2px accent ring, 2px out (`:focus-visible` in `index.css`),

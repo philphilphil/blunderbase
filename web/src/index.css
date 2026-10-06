@@ -175,8 +175,8 @@
   --bb-track: #3a3c3b; /* progress / meter troughs */
   --bb-meter: #6b6f6d; /* filled meter, quiet */
   --bb-meter-2: #5a5e5c; /* filled meter, quieter still */
-  /* The move-list pair under the cursor: a blue-grey, so "where you are" never reads as
-     the neutral hover (`--bb-raised`) passing over it. */
+  /* A list's cursor row (the Notes tab's active note): a blue-grey, so "where you are"
+     never reads as the neutral hover (`--bb-raised`) passing over it. */
   --bb-row-active: #2b3139;
   --bb-cell: #2b2c2c; /* engine-panel cell */
   --bb-cell-strong: #313232; /* engine-panel cell, top line */
