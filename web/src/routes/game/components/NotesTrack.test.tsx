@@ -13,7 +13,7 @@ import {
 import type { GameNote } from '../gameModel'
 import type { NoteRow } from '../notesModel'
 import type { BookEntry } from './BookPanel'
-import { NotesTrack } from './NotesTrack'
+import { NotesTrack, type NotesTrackTab } from './NotesTrack'
 
 const BOOK: BookEntry = {
   games: 9,
@@ -480,7 +480,8 @@ describe('NotesTrack book source', () => {
     forgetBookFilters()
   })
 
-  function renderWithQueries() {
+  /** `null` leaves the track its own tab, which opens on Notes and follows clicks. */
+  function renderWithQueries(tab: NotesTrackTab | null = 'book') {
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
     return render(
       <QueryClientProvider client={client}>
@@ -492,14 +493,14 @@ describe('NotesTrack book source', () => {
             notes={NOTES}
             onSelectNote={vi.fn()}
             composer={composer}
-            tab="book"
+            tab={tab ?? undefined}
           />
         </MemoryRouter>
       </QueryClientProvider>,
     )
   }
 
-  it('counts a masters book on its tab, with Notes open, once it has answered', async () => {
+  it('counts a masters book on its tab once it has answered', async () => {
     stubReference()
     bookSource.set('masters')
     renderWithQueries()
@@ -508,6 +509,26 @@ describe('NotesTrack book source', () => {
     const book = screen.getByRole('tab', { name: /^Book/ })
     expect(book).toHaveTextContent(/^Book$/)
     await waitFor(() => expect(book).toHaveTextContent('Book1'))
+  })
+
+  // Asking Lichess for every move stepped through behind a closed tab runs into its rate
+  // limit, so with Notes open nothing is asked; an answer already in hand is still counted.
+  it('asks a masters book nothing while Notes is open, and keeps the count it has', async () => {
+    const seen = stubReference()
+    bookSource.set('masters')
+    renderWithQueries(null)
+
+    const book = screen.getByRole('tab', { name: /^Book/ })
+    expect(book).toHaveTextContent(/^Book$/)
+    expect(seen).toHaveLength(0)
+
+    await userEvent.click(book)
+    await waitFor(() => expect(book).toHaveTextContent('Book1'))
+    expect(seen).toHaveLength(1)
+
+    await userEvent.click(screen.getByRole('tab', { name: /^Notes/ }))
+    expect(book).toHaveTextContent('Book1')
+    expect(seen).toHaveLength(1)
   })
 
   // The owner's own games until they pick another book: no request leaves for Lichess first.

@@ -121,13 +121,14 @@ const GAME_LIMIT = 5
  * the tab's own table (`ReferenceBook`) and the count on the tab name (`NotesTrack`) read
  * the same cached answer. That is also why the count costs nothing extra once the tab is
  * open: whichever asks first fetches, and the other is handed the cache. `fen` null asks
- * nothing.
+ * nothing; `ask` false fetches nothing either, but still hands back an answer already cached.
  */
 export function useReferenceBook(
   source: ReferenceSource | null,
   fen: string | null,
   speeds: readonly string[] = [],
   ratings: readonly number[] = [],
+  ask = true,
 ) {
   return useReferenceExplorer(
     {
@@ -137,7 +138,7 @@ export function useReferenceBook(
       top_games: GAME_LIMIT,
       ...(source === 'lichess' ? { speeds: speeds.join(','), ratings: ratings.join(',') } : {}),
     },
-    { enabled: source !== null && fen !== null },
+    { enabled: ask && source !== null && fen !== null },
   )
 }
 

@@ -264,8 +264,9 @@ der du warst.
 
 Beide Reiter tragen eine Zahl, damit du siehst, was hinter dem geschlossenen steckt:
 **Notizen** zählt die Notizen zu dieser Partie, **Buch** die Züge, die das gewählte Buch von
-der Stellung auf dem Brett kennt – **Buch 0** heißt, keine dieser Partien kam hierher. Bei
-**Meister** und **Lichess** erscheint die Zahl, sobald das Buch geantwortet hat.
+der Stellung auf dem Brett kennt – **Buch 0** heißt, keine dieser Partien kam hierher.
+**Meister** und **Lichess** werden nur gefragt, solange der Reiter **Buch** offen ist; ihre Zahl
+erscheint also erst, wenn Sie dort nachgesehen haben.
 
 Der Reiter **Buch** neben **Notizen** zeigt, wie es von der Stellung auf dem Brett aus
 weiterging; `B` öffnet ihn. Die Auswahl in seiner Titelzeile bestimmt, aus welchen Partien:
