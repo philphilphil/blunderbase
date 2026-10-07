@@ -480,30 +480,31 @@ describe('NotesTrack book source', () => {
     forgetBookFilters()
   })
 
-  /** `null` leaves the track its own tab, which opens on Notes and follows clicks. */
-  function renderWithQueries(tab: NotesTrackTab | null = 'book') {
+  function renderWithQueries(tab: NotesTrackTab = 'book') {
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
-    return render(
+    const track = (fen: string) => (
       <QueryClientProvider client={client}>
         <MemoryRouter>
           <NotesTrack
             book={BOOK}
             bookPly={4}
-            fen={START_FEN}
+            fen={fen}
             notes={NOTES}
             onSelectNote={vi.fn()}
             composer={composer}
-            tab={tab ?? undefined}
+            tab={tab}
           />
         </MemoryRouter>
-      </QueryClientProvider>,
+      </QueryClientProvider>
     )
+    const view = render(track(START_FEN))
+    return { ...view, moveTo: (fen: string) => view.rerender(track(fen)) }
   }
 
-  it('counts a masters book on its tab once it has answered', async () => {
+  it('counts a masters book on its tab, with Notes open, once it has answered', async () => {
     stubReference()
     bookSource.set('masters')
-    renderWithQueries()
+    renderWithQueries('notes')
 
     // No number at all until it answers: a 0 there would be a claim nobody made.
     const book = screen.getByRole('tab', { name: /^Book/ })
@@ -511,24 +512,22 @@ describe('NotesTrack book source', () => {
     await waitFor(() => expect(book).toHaveTextContent('Book1'))
   })
 
-  // Asking Lichess for every move stepped through behind a closed tab runs into its rate
-  // limit, so with Notes open nothing is asked; an answer already in hand is still counted.
-  it('asks a masters book nothing while Notes is open, and keeps the count it has', async () => {
+  // An arrow key held through a game would send Lichess a request per move flicked past,
+  // and a burst like that is what its rate limit answers: only where the board stops is asked.
+  it('asks a masters book only about the position the board settles on', async () => {
     const seen = stubReference()
     bookSource.set('masters')
-    renderWithQueries(null)
+    const { moveTo } = renderWithQueries('notes')
+    await waitFor(() => expect(seen).toHaveLength(1))
 
-    const book = screen.getByRole('tab', { name: /^Book/ })
-    expect(book).toHaveTextContent(/^Book$/)
-    expect(seen).toHaveLength(0)
+    const passed = 'rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1'
+    const landed = 'rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 0 2'
+    moveTo(passed)
+    moveTo(landed)
 
-    await userEvent.click(book)
-    await waitFor(() => expect(book).toHaveTextContent('Book1'))
-    expect(seen).toHaveLength(1)
-
-    await userEvent.click(screen.getByRole('tab', { name: /^Notes/ }))
-    expect(book).toHaveTextContent('Book1')
-    expect(seen).toHaveLength(1)
+    await waitFor(() => expect(seen).toHaveLength(2))
+    const asked = seen.map((url) => new URL(url, 'http://test').searchParams.get('fen'))
+    expect(asked).toEqual([START_FEN, landed])
   })
 
   // The owner's own games until they pick another book: no request leaves for Lichess first.

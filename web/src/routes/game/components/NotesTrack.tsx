@@ -43,6 +43,7 @@ import { SOURCES, type ExplorerSource } from '@/routes/explorer/reference'
 
 import { bookSource, useBookFilters, useReferenceBook } from '../bookSource'
 import type { NoteRow } from '../notesModel'
+import { useDebounced } from '../useLiveMaia'
 import { BookFiltersDialog } from './BookFiltersDialog'
 import { BookPanel, type BookEntry, type BookMove } from './BookPanel'
 import { DOCK, DOCK_CLEARANCE } from './composerDock'
@@ -57,6 +58,9 @@ const SOURCE_NAMES: Record<ExplorerSource, MessageDescriptor> = {
   masters: msg`Masters`,
   lichess: msg({ message: 'Lichess', comment: 'The site’s own name — keep it as it is.' }),
 }
+
+/** How long the board sits on a position before the Book's count asks Masters or Lichess. */
+const BOOK_COUNT_SETTLE_MS = 300
 
 export type NotesTrackTab = 'book' | 'notes'
 
@@ -170,22 +174,24 @@ export function NotesTrack({
 
   // How many rows each tab holds, on the tab's name, so the reader can see without opening
   // it whether there is anything there — the book's continuations from this position, this
-  // game's notes. A masters or Lichess book is asked only while the Book tab is open: asking
-  // it for the count behind a closed tab would send a request to Lichess for every move
-  // stepped through, which nobody asked for and which runs into its rate limit. With Notes
-  // open the tab still counts a position the book has already answered, from the cache of
-  // the very query the Book tab reads (`useReferenceBook`).
+  // game's notes. A masters or Lichess book is asked for that even while Notes is open,
+  // through the very query the Book tab reads (`useReferenceBook`), cached for good, so
+  // opening the tab afterwards costs nothing. It is asked only once the board has settled
+  // on a position, though: an arrow key held through a game would otherwise send Lichess a
+  // request per move flicked past, and a burst like that is what its rate limit answers. A
+  // position already answered is counted at once, from the cache, settled or not.
   //
   // A zero is printed too (owner's call, 2026-10-05): "Book 0" is the answer to "have I been
   // here before?" without a click, and it is the answer for most positions of most games.
   // Only a book that has not answered — not asked yet, still loading, or not reachable —
   // shows no number, because a zero there would be a claim nobody made.
+  const settledFen = useDebounced(fen, BOOK_COUNT_SETTLE_MS)
   const referenceBook = useReferenceBook(
     reference ? source : null,
     reference ? fen : null,
     filters.speeds,
     filters.ratings,
-    active === 'book',
+    settledFen === fen,
   )
   const bookRows = reference ? referenceBook.data?.moves.length : moves.length
 
