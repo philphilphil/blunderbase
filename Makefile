@@ -1,4 +1,4 @@
-.PHONY: run run-demo backend web desktop desktop-macos desktop-windows ios ios-test ios-run ios-shot install test migrate engines mcp mcp-http mcp-key release publish site docs docs-serve
+.PHONY: run run-demo backend web desktop desktop-macos desktop-windows ios ios-test ios-run ios-shot install test migrate engines mcp mcp-http mcp-key release publish site screenshots docs docs-serve
 
 # The recipes are POSIX sh (mkdir -p, trap, &, wait). On a Windows checkout make would
 # otherwise hand them to cmd.exe, where `mkdir -p data` creates a folder called `-p`.
@@ -177,6 +177,14 @@ v%: ; @:
 # blunderbase.org (site/README.md, "Hosting").
 site:
 	@sh scripts/site.sh
+
+# The README's and the landing page's screenshots, both themes, from the demo library and
+# the built web app (docs/contributing.md, "Screenshots"). Playwright is pulled in for the
+# run rather than kept in uv.lock: nothing else wants it, and the version is pinned here so
+# the Chromium it downloads once stays the one it drives. `only=notes` shoots one scene.
+screenshots: $(DEMO_DB)
+	uv run --with playwright==1.63.0 python -m playwright install chromium
+	uv run --with playwright==1.63.0 python scripts/screenshots.py $(if $(only),--only $(only))
 
 # The manual (mkdocs.yml at the root): markdown under manual/en and manual/de, a static
 # site in manual-site/. `--strict` is the point of the target — it fails on a cross-link
