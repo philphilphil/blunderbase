@@ -370,6 +370,123 @@ def test_the_tour_flag_is_not_one_of_the_settings_a_save_rewrites(session: Sessi
     assert app_settings.get_tour_seen(session) is True
 
 
+# --- the games list's columns ----------------------------------------------
+
+DEFAULT_COLUMNS: dict[str, list[str]] = {"order": [], "hidden": []}
+
+
+def test_an_install_nobody_has_arranged_reads_as_the_default(session: Session) -> None:
+    """Empty lists: the ids and their default order are the web app's, not the row's."""
+    assert app_settings.get_game_columns(session) == DEFAULT_COLUMNS
+
+
+def test_an_arrangement_comes_back_as_it_was_stored_unknown_ids_included(
+    session: Session,
+) -> None:
+    """An id this build does not know may be a newer build's, so it keeps its place."""
+    value = {"order": ["white", "from_the_future", "date"], "hidden": ["from_the_future"]}
+
+    assert app_settings.set_game_columns(session, value) == value
+    assert app_settings.get_game_columns(session) == value
+
+
+def test_a_second_arrangement_updates_the_one_row(session: Session) -> None:
+    app_settings.get_game_columns(session)
+    app_settings.set_game_columns(session, {"order": ["date", "white"], "hidden": []})
+
+    after = app_settings.set_game_columns(session, {"order": ["white", "date"], "hidden": ["date"]})
+
+    assert after == {"order": ["white", "date"], "hidden": ["date"]}
+    assert app_settings.get_game_columns(session) == after
+    rows = session.scalars(select(AppSetting).where(AppSetting.key == app_settings.GAME_COLUMNS))
+    assert len(rows.all()) == 1
+
+
+def test_putting_the_default_back_removes_the_row(session: Session) -> None:
+    app_settings.set_game_columns(session, {"order": ["date"], "hidden": []})
+
+    assert app_settings.set_game_columns(session, None) == DEFAULT_COLUMNS
+
+    assert session.get(AppSetting, app_settings.GAME_COLUMNS) is None
+
+
+def test_an_arrangement_with_nothing_usable_in_it_is_the_default_rather_than_a_row(
+    session: Session,
+) -> None:
+    app_settings.set_game_columns(session, {"order": ["date"], "hidden": []})
+
+    assert app_settings.set_game_columns(session, {"order": [], "hidden": []}) == DEFAULT_COLUMNS
+
+    assert session.get(AppSetting, app_settings.GAME_COLUMNS) is None
+
+
+@pytest.mark.parametrize(
+    ("given", "kept"),
+    [
+        # Not strings, and strings no build could have named, are dropped.
+        (
+            {"order": ["date", 3, None, "White", "a b", "9lives", "", "x" * 33], "hidden": []},
+            {"order": ["date"], "hidden": []},
+        ),
+        # The first of a repeat keeps its place.
+        (
+            {"order": ["date", "white", "date", "black", "white"], "hidden": []},
+            {"order": ["date", "white", "black"], "hidden": []},
+        ),
+        # Hidden ids must be listed, and are kept once.
+        (
+            {"order": ["date", "white"], "hidden": ["white", "nowhere", "white", 7, ["x"]]},
+            {"order": ["date", "white"], "hidden": ["white"]},
+        ),
+        # A `hidden` that is not a list hides nothing.
+        ({"order": ["date"], "hidden": "date"}, {"order": ["date"], "hidden": []}),
+        ({"order": ["date"]}, {"order": ["date"], "hidden": []}),
+    ],
+)
+def test_an_arrangement_is_cleaned_on_the_way_in(
+    session: Session, given: dict[str, Any], kept: dict[str, list[str]]
+) -> None:
+    assert app_settings.set_game_columns(session, given) == kept
+    assert app_settings.get_game_columns(session) == kept
+
+
+def test_an_arrangement_keeps_at_most_the_cap(session: Session) -> None:
+    ids = [f"c{n}" for n in range(app_settings.MAX_GAME_COLUMNS + 6)]
+
+    kept = app_settings.set_game_columns(session, {"order": ids, "hidden": ids[-3:]})
+
+    assert kept["order"] == ids[: app_settings.MAX_GAME_COLUMNS]
+    assert kept["hidden"] == []
+
+
+@pytest.mark.parametrize(
+    "value",
+    ["date,white", ["date", "white"], {"order": "date"}, {"hidden": ["date"]}, 3, None],
+)
+def test_a_columns_row_edited_by_hand_reads_as_the_default(session: Session, value: Any) -> None:
+    """The row is JSON a person can open; a value that says nothing is the default."""
+    session.add(AppSetting(key=app_settings.GAME_COLUMNS, value=value))
+    session.commit()
+
+    assert app_settings.get_game_columns(session) == DEFAULT_COLUMNS
+
+
+def test_the_columns_are_not_one_of_the_settings_a_save_rewrites(session: Session) -> None:
+    """The analysis form replaces every key it knows; this must not be one of them."""
+    value = {"order": ["date", "white"], "hidden": ["white"]}
+    app_settings.set_game_columns(session, value)
+
+    app_settings.replace(session, dict.fromkeys(app_settings.KEYS))
+
+    assert app_settings.get_game_columns(session) == value
+
+
+def test_the_payload_caps_the_ids_where_the_service_does() -> None:
+    from backend.api.schemas import MAX_GAME_COLUMN_IDS
+
+    assert MAX_GAME_COLUMN_IDS == app_settings.MAX_GAME_COLUMNS
+
+
 # --- the endpoint ----------------------------------------------------------
 
 
@@ -487,6 +604,58 @@ def test_the_bootstrap_payload_moves_with_the_setting(api: TestClient) -> None:
     api.put("/api/settings", json={"maia_target_elo": 1700})
 
     assert api.get("/api/auth/status").json()["maia_target_elo"] == 1700
+
+
+def test_the_games_columns_answer_the_default_until_arranged(api: TestClient) -> None:
+    assert api.get("/api/settings/game-columns").json() == DEFAULT_COLUMNS
+
+
+def test_a_put_of_the_columns_answers_with_what_was_kept(api: TestClient) -> None:
+    body = {"order": ["date", "Bad Id", "white", "date", "later_column"], "hidden": ["white", "x"]}
+    kept = {"order": ["date", "white", "later_column"], "hidden": ["white"]}
+
+    response = api.put("/api/settings/game-columns", json=body)
+
+    assert response.status_code == 200
+    assert response.json() == kept
+    assert api.get("/api/settings/game-columns").json() == kept
+
+
+def test_a_null_order_puts_the_default_columns_back(api: TestClient) -> None:
+    api.put("/api/settings/game-columns", json={"order": ["date"], "hidden": []})
+
+    response = api.put("/api/settings/game-columns", json={"order": None, "hidden": []})
+
+    assert response.json() == DEFAULT_COLUMNS
+    assert api.get("/api/settings/game-columns").json() == DEFAULT_COLUMNS
+
+
+@pytest.mark.parametrize(
+    "body",
+    [
+        {"order": ["date"], "hidden": [], "widths": {}},
+        {"hidden": ["date"]},
+        {},
+        {"order": [f"c{n}" for n in range(65)], "hidden": []},
+    ],
+)
+def test_a_columns_body_that_is_not_an_arrangement_is_a_422(
+    api: TestClient, body: dict[str, Any]
+) -> None:
+    """An extra field is a mistake, and a missing `order` must not read as a reset."""
+    api.put("/api/settings/game-columns", json={"order": ["date"], "hidden": []})
+
+    assert api.put("/api/settings/game-columns", json=body).status_code == 422
+    assert api.get("/api/settings/game-columns").json() == {"order": ["date"], "hidden": []}
+
+
+def test_a_save_of_the_settings_leaves_the_columns_alone(api: TestClient) -> None:
+    arranged = {"order": ["white", "date"], "hidden": ["date"]}
+    api.put("/api/settings/game-columns", json=arranged)
+
+    api.put("/api/settings", json={"analysis_nodes": 50_000})
+
+    assert api.get("/api/settings/game-columns").json() == arranged
 
 
 def _seed(session: Session) -> Game:

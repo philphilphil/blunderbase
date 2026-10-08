@@ -5,8 +5,8 @@ boot (`backend/config.py`). These are not: they are the ones a person changes wh
 app is running and expects to take effect on the next thing they click, so they live in
 the database and are read where they are used rather than cached in the process.
 
-There are twenty-one of them, in eight groups, plus two rows that are not settings at all
-(`queue_paused` and `tour_seen`, at the bottom).
+There are twenty-one of them, in eight groups, plus three rows that are not settings at all
+(`queue_paused`, `tour_seen` and `game_columns`, at the bottom).
 
 **The Maia levels.** The ratings every Maia question is asked at — the ratings the owner
 is playing towards and the ones they want to contrast with, not the one they have. Batch
@@ -113,6 +113,14 @@ reason `queue_paused` is. It lives here rather than in the browser because it is
 about the owner and not about a browser: a tour that came back on a second machine, or
 after clearing site data, would be a tour that had not run once.
 
+**Which columns the games list shows, and in what order** — `game_columns`, the Columns
+menu on the games screen. Outside `SETTINGS` and outside `replace` for the reason the other
+two are. Stored with the library rather than in the browser for the reason `tour_seen` is:
+the owner arranged *their* list, and a second machine that showed it the old way would be a
+choice that had not been made. Only the shape is checked here — which ids exist is the web
+app's column list, and an id this build does not know is kept in its place, so a tab left
+open across an upgrade cannot lose a newer column's position by saving.
+
 A value outside what a setting can mean is clamped, never refused: an owner aiming at 2200
 gets Maia's top level rather than a form that will not save. The one exception is the
 ordering of the three thresholds, because there is no clamp that rescues an inaccuracy
@@ -126,11 +134,13 @@ effect on the next restart would not be a setting anyone could use.
 
 from __future__ import annotations
 
+import re
 from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Literal
 
 from sqlalchemy import delete, select
+from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.orm import Session
 
 from backend.config import (
@@ -143,6 +153,7 @@ from backend.config import (
 )
 from backend.db.enums import EngineRole, Speed, speed_rank
 from backend.db.models import AppSetting
+from backend.db.types import utcnow
 
 # --- the keys -------------------------------------------------------------
 
@@ -211,6 +222,10 @@ AUTO_SYNC_MINUTES = "auto_sync_minutes"
 # range, and a member of the set `replace` rewrites would be un-seen by the next save of
 # the Analysis pass page.
 TOUR_SEEN = "tour_seen"
+# The games list's columns: `{"order": [...], "hidden": [...]}`. Outside `SETTINGS` because
+# `replace` rewrites every key it knows, so a member would be wiped by the next save of the
+# Analysis pass page; and it is a list of names, not a number with a clamp.
+GAME_COLUMNS = "game_columns"
 
 ROLE_KEYS: dict[EngineRole, str] = {
     EngineRole.ANALYSIS: ANALYSIS_ENGINE_ID,
@@ -676,6 +691,85 @@ def set_tour_seen(session: Session, seen: bool) -> bool:
         row.value = FLAG_ON
     session.commit()
     return True
+
+
+# What a column id may look like. The web app's list is the authority on which ids exist; this
+# only keeps a row from holding something no build could ever have named, such as a paragraph.
+GAME_COLUMN_ID = re.compile(r"[a-z][a-z0-9_]{0,31}")
+# Four times the columns the list has today: room for ids a newer build adds, and a ceiling
+# on what a stray client can make every page load read back.
+MAX_GAME_COLUMNS = 64
+
+
+def clean_game_columns(value: object) -> dict[str, list[str]] | None:
+    """Whatever was given as the games list's columns, as an arrangement, or None.
+
+    `order` keeps the strings shaped like an id, the first of any repeat, at most
+    `MAX_GAME_COLUMNS` of them; `hidden` keeps the ids that are in `order`. Unknown but
+    well-formed ids stay where they are, because a newer build may know them. None is "this
+    says nothing" — not a dict, no list under `order`, or nothing left in it — and the caller
+    reads that as the default rather than as a list with no columns, which is not a state.
+    """
+    if not isinstance(value, Mapping):
+        return None
+    raw_order = value.get("order")
+    if not isinstance(raw_order, list):
+        return None
+    order: list[str] = []
+    for item in raw_order:
+        if isinstance(item, str) and GAME_COLUMN_ID.fullmatch(item) and item not in order:
+            order.append(item)
+            if len(order) == MAX_GAME_COLUMNS:
+                break
+    if not order:
+        return None
+    raw_hidden = value.get("hidden")
+    listed = set(order)
+    hidden: list[str] = []
+    for item in raw_hidden if isinstance(raw_hidden, list) else []:
+        if isinstance(item, str) and item in listed and item not in hidden:
+            hidden.append(item)
+    return {"order": order, "hidden": hidden}
+
+
+def get_game_columns(session: Session) -> dict[str, list[str]]:
+    """The games list's columns as the owner arranged them, or empty lists for the default.
+
+    Empty rather than a list of ids, because the ids and their default order are the web
+    app's: an install that never opened the menu shows whatever the running build ships.
+    Cleaned on the way out as well, because the row is JSON a person can edit by hand.
+    Read past the identity map: `set_game_columns` writes with a Core upsert, which leaves a
+    row this session loaded earlier holding the old value (sessions here do not expire on
+    commit).
+    """
+    row = session.get(AppSetting, GAME_COLUMNS, populate_existing=True)
+    cleaned = None if row is None else clean_game_columns(row.value)
+    return cleaned if cleaned is not None else {"order": [], "hidden": []}
+
+
+def set_game_columns(session: Session, value: Mapping[str, object] | None) -> dict[str, list[str]]:
+    """Store the arrangement, or put the default back. Returns what is in force afterwards.
+
+    None, or a value with nothing usable in it, deletes the row: the default is the absence
+    of a row here as everywhere else, and an empty arrangement is not one. The write is a
+    single upsert rather than a read and an add, because two first saves in quick succession
+    reach the threadpool together, and the second add would collide on the key.
+    """
+    cleaned = None if value is None else clean_game_columns(value)
+    if cleaned is None:
+        session.execute(delete(AppSetting).where(AppSetting.key == GAME_COLUMNS))
+    else:
+        # An ON CONFLICT update runs no Python-side `onupdate`, so the stamp is set here.
+        session.execute(
+            sqlite_insert(AppSetting)
+            .values(key=GAME_COLUMNS, value=cleaned, updated_at=utcnow())
+            .on_conflict_do_update(
+                index_elements=[AppSetting.key],
+                set_={"value": cleaned, "updated_at": utcnow()},
+            )
+        )
+    session.commit()
+    return get_game_columns(session)
 
 
 def _flag(session: Session, key: str) -> bool:

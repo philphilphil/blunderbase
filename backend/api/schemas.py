@@ -250,6 +250,33 @@ class TourUpdate(Input):
     seen: bool
 
 
+# The most column ids one save may carry; `services.app_settings.MAX_GAME_COLUMNS` again,
+# refused here so an oversized body never reaches the cleaner.
+MAX_GAME_COLUMN_IDS = 64
+
+
+class GameColumns(BaseModel):
+    """The games list's columns as the owner arranged them; empty lists are the default.
+
+    Its own payload for the reason `TourState` is: a PUT of `AppSettings` replaces every key
+    it names, and a layout choice has no business being reset by a save of a node budget.
+    The ids are the web app's; an id the running build does not know is kept in its place.
+    """
+
+    order: list[str] = Field(description="every column id, left to right, hidden ones included")
+    hidden: list[str] = Field(description="the ids in `order` that are not shown")
+
+
+class GameColumnsUpdate(Input):
+    """The whole arrangement, or `order: null` to put the default back.
+
+    `order` is required so that a body which forgot it is a 422 rather than a silent reset.
+    """
+
+    order: list[str] | None = Field(max_length=MAX_GAME_COLUMN_IDS)
+    hidden: list[str] = Field(default_factory=list, max_length=MAX_GAME_COLUMN_IDS)
+
+
 # --- games ----------------------------------------------------------------
 
 # How many games one request may name — a batch to analyse, or a selection to delete. A
