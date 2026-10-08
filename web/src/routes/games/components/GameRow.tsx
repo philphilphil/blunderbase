@@ -22,6 +22,13 @@
  * per breakpoint: every cell is in the DOM at both sizes and the breakpoint only decides
  * where it sits, so the row stays one thing to reason about — and to test. (`Worst` and
  * `Collections` come and go with their columns, `columnsFor`, at every size alike.)
+ *
+ * The cells are drawn from the table's column list rather than written out in order: each
+ * column id has a renderer (`CELLS`), and the row walks `columns`, so the header, the rows
+ * and the skeleton agree on which cells there are and in what order by construction — the
+ * list can drop, add or reorder a column without the row knowing. Every cell says which
+ * column it is (`data-col`) and is a `role="cell"`, so a row reads as one to assistive
+ * technology too. The row's delete is the tail of whichever cell is last (`Cell`).
  */
 import { useLingui } from '@lingui/react/macro'
 import { EyeOff, Trash2 } from 'lucide-react'
@@ -51,17 +58,303 @@ import {
   outcomeTone,
   worstDrop,
 } from '../format'
-import { cellClass, cellStyle, PHONE_CARD, ROW_HEIGHT, type Column } from './columns'
+import {
+  cellClass,
+  PHONE_CARD,
+  ROW_HEIGHT,
+  ROW_SUBGRID,
+  type ColumnId,
+  type LaidColumn,
+} from './columns'
+
+/** The column ids a row has a cell for: every column in `COLUMNS`, the checkbox included. */
+type CellId = ColumnId | 'select'
 
 /**
- * The `style` and `className` one cell carries: its width, its place, and its own look.
- * Read off the row's own column list, since Flags is fixed or flexible depending on whether
- * the table has a Collections column after it (`columnsFor`).
+ * What one cell is made of, apart from where it sits (`cellClass`): its own layout and type,
+ * its hover title and its content. Where it sits belongs to the column, and changes with
+ * whether it is last; what it says belongs to the game.
  */
-function cellOf(columns: readonly Column[], id: string, className?: string) {
-  const found = columns.find((entry) => entry.id === id)
-  if (!found) throw new Error(`unknown column ${id}`)
-  return { style: cellStyle(found), className: cn(cellClass(found), className) }
+interface CellParts {
+  className?: string
+  title?: string
+  testId?: string
+  body: React.ReactNode
+}
+
+/**
+ * Everything about the row that the cells read, worked out once per render. The words are
+ * translated by the row and handed in, because the `t` macro is only rewritten where
+ * `useLingui` was called — a renderer out here calling it would ship untranslated and
+ * never reach the catalog.
+ */
+interface CellContext {
+  game: GameCard
+  selected: boolean
+  /** The tone of dim metadata: `dim` on a plain row, `soft` on a selected one. */
+  meta: string
+  /** This row's verdict is held back (⇧E, or this one game imported with it held back). */
+  quiet: boolean
+  analysis: ReturnType<typeof analysisOf>
+  inCollections: boolean
+  ownerSide: GameCard['color'] | null
+  /** "In queue", or the Analyse button, for a game no pass has looked at. */
+  queueState: React.ReactNode
+  collectionNames: ReadonlyMap<number, string>
+  onToggle: (id: number, event: React.MouseEvent) => void
+  words: { select: string; unknownOpening: string; heldBack: string; sourceLink: string }
+}
+
+/**
+ * A player's name. The owner's side is set bold under its column, which is how the row says
+ * which side was theirs — the same fact the old `Col` disc carried, now told by the name it
+ * belongs to.
+ */
+function nameClass({ ownerSide, selected }: CellContext, side: 'white' | 'black') {
+  return cn(
+    'truncate text-lead',
+    ownerSide === side ? 'font-semibold text-ink' : selected ? 'text-bright' : 'text-ink-2',
+  )
+}
+
+/** One renderer per column id; the row draws whichever of them its column list names. */
+const CELLS: Record<CellId, (ctx: CellContext) => CellParts> = {
+  select: ({ game, selected, onToggle, words }) => ({
+    className: 'flex items-center',
+    body: (
+      <Checkbox
+        checked={selected}
+        aria-label={words.select}
+        onCheckedChange={(_next, event) => {
+          event.stopPropagation()
+          onToggle(game.id, event)
+        }}
+        // The row's Enter and Space open the game; on the box they tick it instead.
+        onKeyDown={(event) => {
+          if (event.key === 'Enter' || event.key === ' ') event.stopPropagation()
+        }}
+      />
+    ),
+  }),
+
+  date: ({ game, selected, inCollections }) => ({
+    className: cn(
+      'font-mono tabular text-body max-md:flex max-md:min-w-0 max-md:items-center max-md:gap-2',
+      selected ? 'max-md:text-soft' : 'max-md:text-dim',
+    ),
+    body: (
+      <>
+        {formatGameDate(game.played_at)}
+        {/* The phone card's copy of the chips (see the Collections cell for why there are two). */}
+        {inCollections ? <CollectionChips ids={game.collections} className="md:hidden" /> : null}
+      </>
+    ),
+  }),
+
+  white: (ctx) => ({
+    className: nameClass(ctx, 'white'),
+    title: ctx.game.white ?? undefined,
+    body: ctx.game.white ?? '—',
+  }),
+
+  white_rating: ({ game }) => ({
+    className: 'text-right font-mono tabular text-body',
+    body: game.white_rating ?? '—',
+  }),
+
+  black: (ctx) => ({
+    className: nameClass(ctx, 'black'),
+    title: ctx.game.black ?? undefined,
+    body: ctx.game.black ?? '—',
+  }),
+
+  black_rating: ({ game }) => ({
+    className: 'text-right font-mono tabular text-body',
+    body: game.black_rating ?? '—',
+  }),
+
+  opening: ({ game, meta, words }) => ({
+    className: 'truncate text-body',
+    title: [game.opening, game.eco].filter(Boolean).join(' · ') || undefined,
+    body: (
+      <>
+        {game.opening ?? words.unknownOpening}{' '}
+        {game.eco ? <span className={cn('font-mono', meta)}>{game.eco}</span> : null}
+      </>
+    ),
+  }),
+
+  result: ({ game }) => ({
+    className: cn('text-center font-mono font-semibold tabular', outcomeTone(game.outcome)),
+    body: formatResult(game.result),
+  }),
+
+  // Capped (`columns.ts`), so a long correspondence clock ends in "…" and is whole here.
+  time: ({ game }) => ({
+    className: 'truncate font-mono tabular text-soft',
+    title: formatTimeControl(game),
+    body: formatTimeControl(game),
+  }),
+
+  moves: ({ game }) => ({
+    className: 'text-right font-mono tabular text-soft',
+    body: moveCount(game.ply_count),
+  }),
+
+  // Under ⇧E the table has no Worst column at all (`columnsFor`), so a quiet row here is
+  // one game imported with its engine held back: the cell marks it rather than going blank.
+  worst: ({ game, meta, quiet, words }) => {
+    if (quiet) {
+      return {
+        className: cn('flex items-center justify-end', meta),
+        body: <EyeOff className="size-3" role="img" aria-label={words.heldBack} />,
+      }
+    }
+    const drop = worstDrop(game)
+    return {
+      className: cn('text-right font-mono tabular', dropTone(drop)),
+      body: formatDrop(drop),
+    }
+  },
+
+  source: ({ game, words }) => ({
+    className: 'flex items-center',
+    // A dot and the site's name, a link to the game there where it has one; the click stops
+    // in the link rather than also opening the row (`SourceBadge`).
+    body: (
+      <SourceBadge
+        source={game.source}
+        variant="plain"
+        size="sm"
+        href={game.url}
+        title={game.url ? words.sourceLink : undefined}
+      />
+    ),
+  }),
+
+  // Whether a pass has run, and where none has, the way to get one: the button (or "In
+  // queue") stands in the column that answers "analysed?", rather than in Flags, which is
+  // about what a pass found. The phone card drops this column, so it keeps a copy in its
+  // Flags slot — or, while ⇧E takes Flags away, takes that slot itself.
+  tier: ({ analysis, selected, queueState }) => ({
+    className: 'flex items-center gap-2',
+    body: analysis ? (
+      <RunBadge
+        run={analysis}
+        plain
+        className={selected && !analysis.requested ? 'text-soft' : undefined}
+      />
+    ) : (
+      queueState
+    ),
+  }),
+
+  flags: ({ game, analysis, quiet, meta, queueState, words }) => ({
+    className: 'flex items-center gap-1 overflow-hidden',
+    body:
+      analysis && quiet ? (
+        // One game held back while the rest of the table shows its flags: an empty cell
+        // here would read as a game without a mistake in it. (Under ⇧E the column is gone
+        // altogether, so the eye only ever marks a game hidden on its own.)
+        <span
+          role="img"
+          aria-label={words.heldBack}
+          title={words.heldBack}
+          className={cn('flex items-center', meta)}
+        >
+          <EyeOff className="size-3.5" aria-hidden />
+        </span>
+      ) : analysis ? (
+        flagCounts(game).map((flag) => (
+          <ClassificationBadge
+            key={flag.glyph}
+            glyph={flag.glyph}
+            count={flag.count}
+            size="sm"
+            className="shrink-0 px-[0.3125rem]"
+          />
+        ))
+      ) : (
+        // The phone card's copy: it has no Analysis column, and this is its one slot on the
+        // second line (see the Analysis cell).
+        <span className="flex min-w-0 items-center md:hidden">{queueState}</span>
+      ),
+  }),
+
+  // How many notes were written on this game — its own, not the ones it meets from other
+  // games at a shared position (`note_count`). A 0 is printed, quieter than a count: a
+  // blank would read as "not known" in a column that always knows.
+  notes: ({ game, meta }) => ({
+    className: cn('text-right font-mono tabular', (game.note_count ?? 0) > 0 ? 'text-soft' : meta),
+    testId: 'game-note-count',
+    body: game.note_count ?? null,
+  }),
+
+  // The desktop copy of the game's collections, as names. The phone card has no column for
+  // it, so there the chips ride on the date's line, which spans most of the card.
+  collections: ({ game, inCollections, collectionNames }) => ({
+    className: 'flex items-center gap-2 text-soft',
+    body: inCollections ? (
+      <CollectionNames ids={game.collections ?? []} names={collectionNames} />
+    ) : null,
+  }),
+}
+
+/**
+ * One cell: the column's place (`cellClass`) around the renderer's parts.
+ *
+ * The last cell carries the row's delete as its tail, and splits in two to do it: the outer
+ * span is the cell — its place, and from `md` up a flex line holding the content and the
+ * bin — and the inner span carries the content's own layout, exactly as it would if the
+ * column were not last. So a cell's look never depends on where it falls: Flags keeps its
+ * badges in its own flex box, the date keeps its chips, and on a phone (where the bin is
+ * hidden and the outer span is a plain box) the card renders as it always does. The inner
+ * span takes the phone slot's classes too: their placement half is inert on a span that is
+ * not a grid item, and their alignment half (Flags' `justify-end`) is only something the
+ * inner span, being the flex box, can act on.
+ *
+ * The inner span is a block at every size unless its renderer makes it a flex box (`block`
+ * comes before the renderer's classes, so their `flex` wins). Not being a grid or flex item
+ * on a phone, it would otherwise stay inline, and an inline box can neither truncate nor
+ * align its text: a long name made last would run over the Elo beside it in the card, and a
+ * last Worst would stop lining up under Black's Elo.
+ *
+ * `contain:inline-size` keeps the last cell's content out of its own minimum width. The
+ * last track is the space the others leave, down to a floor (`tracksFor`), and a grid item's
+ * automatic minimum is its content: without it a game in five long-named collections would
+ * push its cell past the track and the pane's edge instead of truncating the list.
+ */
+function Cell({ column, parts, tail }: { column: LaidColumn; parts: CellParts; tail?: React.ReactNode }) {
+  if (tail === undefined) {
+    return (
+      <span
+        role="cell"
+        data-col={column.id}
+        data-testid={parts.testId}
+        title={parts.title}
+        className={cn(cellClass(column), parts.className)}
+      >
+        {parts.body}
+      </span>
+    )
+  }
+  return (
+    <span
+      role="cell"
+      data-col={column.id}
+      data-testid={parts.testId}
+      className={cn(cellClass(column), 'md:flex md:items-center md:gap-2 md:[contain:inline-size]')}
+    >
+      <span title={parts.title} className={cn(column.phone, 'block', parts.className, 'md:min-w-0 md:flex-1')}>
+        {parts.body}
+      </span>
+      {tail}
+    </span>
+  )
+}
+
+function hasCell(id: string): id is CellId {
+  return Object.hasOwn(CELLS, id)
 }
 
 /**
@@ -112,7 +405,7 @@ export interface GameRowProps {
    */
   engineHidden?: boolean
   /** The table's columns (`columnsFor`), worked out once by the table for every row. */
-  columns: readonly Column[]
+  columns: readonly LaidColumn[]
   /** Every collection's name by id, in the collections list's order, for the Collections cell. */
   collectionNames: ReadonlyMap<number, string>
 }
@@ -131,34 +424,10 @@ export const GameRow = memo(function GameRow({
   collectionNames,
 }: GameRowProps) {
   const { t } = useLingui()
-  const cell = (id: string, className?: string) => cellOf(columns, id, className)
-  const has = (id: string) => columns.some((column) => column.id === id)
-  // The row's delete sits at its end, in whichever cell that is (`columnsFor`).
-  const last = columns.at(-1)?.id
-  const analysis = analysisOf(game)
-  const drop = worstDrop(game)
-  const flags = flagCounts(game)
-  // This row's verdict is held back either because the engine is hidden everywhere (⇧E,
-  // which also takes the Worst column out of the table) or because this one game was
-  // imported with it held back (`engine_hidden`, cleared on the game itself). The second
-  // keeps the column and marks the cell instead, so the row says *why* it is quiet.
-  const quiet = engineHidden || game.engine_hidden === true
-  // Most rows are in no collection; those never render the phone's chips at all.
-  const inCollections = (game.collections?.length ?? 0) > 0
-  // The owner's side, or null: a game added from the reference books has none, and a
-  // game of theirs whose side is not yet known has none either. Their name is set bold
-  // under its column, which is how the row says which side was theirs — the same fact
-  // the old `Col` disc carried, now told by the name it belongs to.
   const id = game.id
-  const ownerSide = game.is_owner_game === false ? null : (game.color ?? null)
-  const nameClass = (side: 'white' | 'black') =>
-    cn(
-      'truncate text-lead',
-      ownerSide === side ? 'font-semibold text-ink' : selected ? 'text-bright' : 'text-ink-2',
-    )
+  const analysis = analysisOf(game)
   // What reads `dim` on a plain row reads `soft` on a selected one (see the doc above).
   const meta = selected ? 'text-soft' : 'text-dim'
-  const remove = <DeleteGameButton id={id} onDelete={onDelete} />
   // A game no pass has looked at: "In queue" once one is asked for, here or by the import
   // (the button would only queue it a second time), else the command that asks — a small
   // tool button, since accent text is a link.
@@ -184,6 +453,31 @@ export const GameRow = memo(function GameRow({
       {analysing ? t`Queueing…` : t`Analyse`}
     </Button>
   )
+  const ctx: CellContext = {
+    game,
+    selected,
+    meta,
+    // This row's verdict is held back either because the engine is hidden everywhere (⇧E,
+    // which also takes the Worst column out of the table) or because this one game was
+    // imported with it held back (`engine_hidden`, cleared on the game itself). The second
+    // keeps the column and marks the cell instead, so the row says *why* it is quiet.
+    quiet: engineHidden || game.engine_hidden === true,
+    analysis,
+    // Most rows are in no collection; those never render the phone's chips at all.
+    inCollections: (game.collections?.length ?? 0) > 0,
+    // The owner's side, or null: a game added from the reference books has none, and a
+    // game of theirs whose side is not yet known has none either.
+    ownerSide: game.is_owner_game === false ? null : (game.color ?? null),
+    queueState,
+    collectionNames,
+    onToggle,
+    words: {
+      select: t`Select game ${id}`,
+      unknownOpening: t`Unknown opening`,
+      heldBack: t`Engine hidden on this game until you show it`,
+      sourceLink: t`Open this game on the site it came from`,
+    },
+  }
 
   return (
     <div
@@ -203,7 +497,8 @@ export const GameRow = memo(function GameRow({
       className={cn(
         // `select-none`: a shift-click extends the selection of rows, and must not also
         // paint a run of text blue from the last row clicked to this one.
-        'group flex cursor-pointer items-center gap-2.5 border-t border-hairline px-5 font-sans text-data select-none',
+        'group cursor-pointer items-center border-t border-hairline px-5 font-sans text-data select-none',
+        ROW_SUBGRID,
         ROW_HEIGHT,
         PHONE_CARD,
         'max-md:gap-x-2 max-md:gap-y-1 max-md:px-3 max-md:py-2',
@@ -211,177 +506,19 @@ export const GameRow = memo(function GameRow({
         selected && ROW_SELECTED,
       )}
     >
-      <span {...cell('select', 'flex items-center')}>
-        <Checkbox
-          checked={selected}
-          aria-label={t`Select game ${id}`}
-          onCheckedChange={(_next, event) => {
-            event.stopPropagation()
-            onToggle(game.id, event)
-          }}
-          // The row's Enter and Space open the game; on the box they tick it instead.
-          onKeyDown={(event) => {
-            if (event.key === 'Enter' || event.key === ' ') event.stopPropagation()
-          }}
-        />
-      </span>
-
-      <span
-        {...cell(
-          'date',
-          cn(
-            'font-mono tabular text-body max-md:flex max-md:min-w-0 max-md:items-center max-md:gap-2',
-            selected ? 'max-md:text-soft' : 'max-md:text-dim',
-          ),
-        )}
-      >
-        {formatGameDate(game.played_at)}
-        {/* The phone card's copy of the chips (see the Collections cell for why there are two). */}
-        {inCollections ? <CollectionChips ids={game.collections} className="md:hidden" /> : null}
-      </span>
-
-      <span {...cell('white', nameClass('white'))} title={game.white ?? undefined}>
-        {game.white ?? '—'}
-      </span>
-
-      <span {...cell('white_rating', 'text-right font-mono tabular text-body')}>
-        {game.white_rating ?? '—'}
-      </span>
-
-      <span {...cell('black', nameClass('black'))} title={game.black ?? undefined}>
-        {game.black ?? '—'}
-      </span>
-
-      <span {...cell('black_rating', 'text-right font-mono tabular text-body')}>
-        {game.black_rating ?? '—'}
-      </span>
-
-      <span
-        {...cell('opening', 'truncate text-body')}
-        title={[game.opening, game.eco].filter(Boolean).join(' · ') || undefined}
-      >
-        {game.opening ?? t`Unknown opening`}{' '}
-        {game.eco ? <span className={cn('font-mono', meta)}>{game.eco}</span> : null}
-      </span>
-
-      <span
-        {...cell('result', cn('text-center font-mono font-semibold tabular', outcomeTone(game.outcome)))}
-      >
-        {formatResult(game.result)}
-      </span>
-
-      <span {...cell('time', 'truncate font-mono tabular text-soft')}>{formatTimeControl(game)}</span>
-
-      <span {...cell('moves', 'text-right font-mono tabular text-soft')}>
-        {moveCount(game.ply_count)}
-      </span>
-
-      {engineHidden ? null : quiet ? (
-        <span {...cell('worst', cn('flex items-center justify-end', meta))}>
-          <EyeOff
-            className="size-3"
-            role="img"
-            aria-label={t`Engine hidden on this game until you show it`}
+      {columns.map((column) =>
+        // A column this build has no cell for draws nothing rather than throwing the page
+        // of rows away; `COLUMNS` and `CELLS` are kept to the same ids.
+        hasCell(column.id) ? (
+          <Cell
+            key={column.id}
+            column={column}
+            parts={CELLS[column.id](ctx)}
+            // The row's delete sits at its end, in whichever cell that is (`columnsFor`).
+            tail={column.last ? <DeleteGameButton id={id} onDelete={onDelete} /> : undefined}
           />
-        </span>
-      ) : (
-        <span {...cell('worst', cn('text-right font-mono tabular', dropTone(drop)))}>
-          {formatDrop(drop)}
-        </span>
+        ) : null,
       )}
-
-      <span {...cell('source', 'flex items-center')}>
-        {/* A dot and the site's name, a link to the game there where it has one; the click
-            stops in the link rather than also opening the row (`SourceBadge`). */}
-        <SourceBadge
-          source={game.source}
-          variant="plain"
-          size="sm"
-          href={game.url}
-          title={game.url ? t`Open this game on the site it came from` : undefined}
-        />
-      </span>
-
-      {/* Whether a pass has run, and where none has, the way to get one: the button (or
-          "In queue") stands in the column that answers "analysed?", rather than in Flags,
-          which is about what a pass found. The phone card drops this column, so it keeps
-          a copy in its Flags slot — or, while ⇧E takes Flags away, takes that slot itself. */}
-      <span {...cell('tier', 'flex items-center gap-2')}>
-        {analysis ? (
-          <RunBadge
-            run={analysis}
-            plain
-            className={selected && !analysis.requested ? 'text-soft' : undefined}
-          />
-        ) : (
-          queueState
-        )}
-        {last === 'tier' ? remove : null}
-      </span>
-
-      {has('flags') ? (
-        <span {...cell('flags', 'flex items-center gap-1 overflow-hidden')}>
-          {analysis && quiet ? (
-            // One game held back while the rest of the table shows its flags: an empty cell
-            // here would read as a game without a mistake in it. (Under ⇧E the column is
-            // gone altogether, so the eye only ever marks a game hidden on its own.)
-            <span
-              role="img"
-              aria-label={t`Engine hidden on this game until you show it`}
-              title={t`Engine hidden on this game until you show it`}
-              className={cn('flex items-center', meta)}
-            >
-              <EyeOff className="size-3.5" aria-hidden />
-            </span>
-          ) : analysis ? (
-            flags.map((flag) => (
-              <ClassificationBadge
-                key={flag.glyph}
-                glyph={flag.glyph}
-                count={flag.count}
-                size="sm"
-                className="shrink-0 px-[0.3125rem]"
-              />
-            ))
-          ) : (
-            // The phone card's copy: it has no Analysis column, and this is its one slot on
-            // the second line (see the Analysis cell).
-            <span className="flex min-w-0 items-center md:hidden">{queueState}</span>
-          )}
-          {last === 'flags' ? remove : null}
-        </span>
-      ) : null}
-
-      {has('notes') ? (
-        // How many notes were written on this game — its own, not the ones it meets from
-        // other games at a shared position (`note_count`). A 0 is printed, quieter than a
-        // count: a blank would read as "not known" in a column that always knows.
-        <span
-          data-testid="game-note-count"
-          {...cell(
-            'notes',
-            cn('text-right font-mono tabular', (game.note_count ?? 0) > 0 ? 'text-soft' : meta),
-          )}
-        >
-          {game.note_count ?? null}
-          {last === 'notes' ? remove : null}
-        </span>
-      ) : null}
-
-      {has('collections') ? (
-        // Contained inline: the table's body is as wide as its widest row's content (it
-        // scrolls sideways past that, `GamesTable`), and without this a game in five
-        // long-named collections would widen every row by the full list instead of
-        // truncating it. The cell's floor (`cellClass`) is what it adds to that width.
-        <span {...cell('collections', 'flex items-center gap-2 text-soft md:[contain:inline-size]')}>
-          {/* The desktop copy. The phone card has no column for it, so there the chips ride
-              on the date's line, which spans most of the card. */}
-          {inCollections ? (
-            <CollectionNames ids={game.collections ?? []} names={collectionNames} />
-          ) : null}
-          {last === 'collections' ? remove : null}
-        </span>
-      ) : null}
     </div>
   )
 })
@@ -393,7 +530,8 @@ export const GameRow = memo(function GameRow({
  * beside a click target that opens the game and a permanently visible bin on forty rows
  * reads as a page about deleting games. It confirms first, like every other delete here —
  * and it is desktop-only: the phone card has no room for a hover affordance, and a
- * selection plus the footer's Delete… is the same act with a bigger target.
+ * selection plus the footer's Delete… is the same act with a bigger target. It needs no
+ * margin to reach the end: the last cell's content takes the spare width (`Cell`).
  */
 function DeleteGameButton({ id, onDelete }: { id: number; onDelete: (id: number) => void }) {
   const { t } = useLingui()
@@ -411,7 +549,7 @@ function DeleteGameButton({ id, onDelete }: { id: number; onDelete: (id: number)
       onKeyDown={(event) => {
         if (event.key === 'Enter' || event.key === ' ') event.stopPropagation()
       }}
-      className="ml-auto flex-none opacity-0 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100 hover:not-disabled:text-blunder focus-visible:opacity-100 max-md:hidden"
+      className="flex-none opacity-0 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100 hover:not-disabled:text-blunder focus-visible:opacity-100 max-md:hidden"
     >
       <Trash2 className="size-3.5" aria-hidden />
     </Button>

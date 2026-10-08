@@ -9,6 +9,8 @@
  * every filter is a `PickerButton` (a value from a list, ⇅); and the right-hand cluster
  * holds the commands (Clear, Make a collection…, Save filter…) beside the text field they
  * save along with the pickers, so Save filter never wraps alone to the far left of row two.
+ * Columns closes the row: it arranges the table below rather than cutting the library
+ * (`ColumnsMenu`).
  *
  * Collection is one more picker rather than a control of its own: the library under
  * `?collection=` is the same list, narrowed, so picking one here and opening a card on the
@@ -49,6 +51,7 @@ import { formatCount, OUTCOME_LABELS, SOURCE_LABELS } from '../format'
 import { MAX_LABEL_LENGTH, saveFilter, suggestLabel } from '../savedFilters'
 import { useCollectionNames } from '../useCollectionNames'
 import { CollectionDialog } from './CollectionDialog'
+import { ColumnsMenu } from './ColumnsMenu'
 import { DATE_PANEL_WIDTH, DateRangePanel } from './DateRangePanel'
 import { FilterPopover, OptionRow, PopoverLabel, TriState } from './FilterPopover'
 
@@ -122,6 +125,9 @@ export function FilterBar({ filters, onChange, trailing, clear }: FilterBarProps
         <MakeCollection filters={filters} />
         <SaveFilter filters={filters} collectionName={collectionName} />
         {trailing}
+        {/* Last, after the search box: it arranges the table under the bar rather than
+            narrowing what is in it, so it is not among the commands that act on the cut. */}
+        <ColumnsMenu />
       </div>
     </div>
   )

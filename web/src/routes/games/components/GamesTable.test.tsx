@@ -1,14 +1,17 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { render, screen } from '@testing-library/react'
+import { cleanup, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { queryKeys } from '@/lib/api/keys'
-import type { GameCard } from '@/lib/api/types'
+import type { GameCard, GameColumns } from '@/lib/api/types'
+import { GAME_COLUMNS_KEY } from '@/lib/games/demoColumns'
 import { setEngineHidden } from '@/lib/ui/engineVisibility'
 
 import { DEFAULT_SORT } from '../sorting'
+import { columnsFor, defaultArrangement, type LaidColumn } from './columns'
+import { GameRow } from './GameRow'
 import { GamesTable, type GamesTableProps } from './GamesTable'
 
 const GAME = {
@@ -35,7 +38,7 @@ const GAME = {
   worst_moments: [{ ply: 69, win_loss: 80.28, classification: 'blunder' }],
 } as unknown as GameCard
 
-function setup(over: Partial<GamesTableProps> = {}) {
+function setup(over: Partial<GamesTableProps> = {}, columns?: GameColumns) {
   const props: GamesTableProps = {
     games: [GAME],
     sort: DEFAULT_SORT,
@@ -56,6 +59,8 @@ function setup(over: Partial<GamesTableProps> = {}) {
   // The table asks for the collections list (it drops its Collections column without any);
   // an empty client answers "none" by never answering.
   const client = new QueryClient({ defaultOptions: { queries: { retry: false, enabled: false } } })
+  // The owner's column choice, as the server would have answered it.
+  if (columns) client.setQueryData(queryKeys.gameColumns(), columns)
   render(
     <QueryClientProvider client={client}>
       <GamesTable {...props} />
@@ -65,9 +70,10 @@ function setup(over: Partial<GamesTableProps> = {}) {
 }
 
 // ⇧E is a mode that outlives a route, and it is written down — so it outlives a test, and
-// a whole test file, unless it is put back.
+// a whole test file, unless it is put back. So is this browser's copy of the column choice.
 afterEach(() => {
   setEngineHidden(false)
+  localStorage.removeItem(GAME_COLUMNS_KEY)
 })
 
 describe('GamesTable states', () => {
@@ -146,8 +152,9 @@ describe('GamesTable rows', () => {
     // slot (that card has no Analysis column); jsdom has no media queries, so both are here.
     const buttons = screen.getAllByRole('button', { name: 'Analyse' })
     expect(buttons).toHaveLength(2)
-    expect(buttons[0]!.parentElement).toHaveClass('md:w-[var(--cell-width)]')
+    expect(buttons[0]!.closest('[data-col]')).toHaveAttribute('data-col', 'tier')
     expect(buttons[1]!.parentElement).toHaveClass('md:hidden')
+    expect(buttons[1]!.closest('[data-col]')).toHaveAttribute('data-col', 'flags')
     await userEvent.click(buttons[0]!)
     expect(props.onAnalyse).toHaveBeenCalledWith(12)
     expect(screen.queryByText('Unanalysed')).not.toBeInTheDocument()
@@ -222,6 +229,209 @@ describe('GamesTable rows', () => {
     expect(props.onDelete).toHaveBeenCalledWith(12)
     // The row's own delete must not also open the game.
     expect(props.onOpen).not.toHaveBeenCalled()
+  })
+})
+
+describe('GameRow cells', () => {
+  /** The table's columns cut after `id`, which becomes the flexible last one, as `columnsFor` makes it. */
+  function lastIs(id: string): LaidColumn[] {
+    const all = columnsFor(defaultArrangement(), false, false)
+    const cut = all.slice(0, all.findIndex((column) => column.id === id) + 1)
+    return cut.map((column, index) => ({ ...column, last: index === cut.length - 1 }))
+  }
+
+  function row(columns: readonly LaidColumn[]) {
+    render(
+      <GameRow
+        game={GAME}
+        selected={false}
+        onToggle={vi.fn()}
+        onOpen={vi.fn()}
+        onAnalyse={vi.fn()}
+        onDelete={vi.fn()}
+        analysing={false}
+        columns={columns}
+        collectionNames={new Map()}
+      />,
+    )
+    return screen.getByRole('row')
+  }
+
+  it('draws one cell per column, in the column list’s order', () => {
+    const columns = columnsFor(defaultArrangement(), false, false)
+    row(columns)
+    expect(screen.getAllByRole('cell').map((cell) => cell.getAttribute('data-col'))).toEqual(
+      columns.map((column) => column.id),
+    )
+  })
+
+  it('puts the delete at the end of the table’s last cell', () => {
+    setup()
+    // Without collections, Notes is last.
+    const remove = screen.getByRole('button', { name: 'Delete game 12' })
+    expect(remove.closest('[data-col]')).toHaveAttribute('data-col', 'notes')
+    expect(screen.getByTestId('game-note-count')).toContainElement(remove)
+  })
+
+  it('moves the delete to whichever column is last', () => {
+    row(lastIs('opening'))
+    const remove = screen.getByRole('button', { name: 'Delete game 12' })
+    expect(remove.closest('[data-col]')).toHaveAttribute('data-col', 'opening')
+    // The title stays on the span holding the words, not on the cell around the bin.
+    expect(screen.getByText('Alekhine Defense')).toHaveAttribute('title', 'Alekhine Defense · B02')
+  })
+
+  it('keeps the phone card’s Flags slot intact when Flags is last', () => {
+    const cell = row(lastIs('flags')).querySelector<HTMLElement>('[data-col="flags"]')!
+    expect(cell).toHaveAttribute('role', 'cell')
+    // The bin's line is a desktop layout only: on a phone the cell is a plain box in the
+    // card's grid, and its inner span carries the cell's own layout as when it is not last.
+    expect(cell).toHaveClass('md:flex', 'max-md:col-start-6', 'max-md:row-start-2')
+    expect(cell).not.toHaveClass('flex')
+    const inner = cell.firstElementChild!
+    expect(inner).toHaveClass('flex', 'items-center', 'gap-1', 'overflow-hidden', 'max-md:justify-end')
+    // The badges are the inner span's own flex items, and the bin sits after it.
+    expect(screen.getByLabelText('1 blunder').parentElement).toBe(inner)
+    expect(cell.lastElementChild).toBe(screen.getByRole('button', { name: 'Delete game 12' }))
+    expect(cell.lastElementChild).toHaveClass('max-md:hidden')
+  })
+
+  it('keeps a last name cut short and aligned in the phone card', () => {
+    // On a phone the inner span is neither a grid nor a flex item, so it has to be a block
+    // of its own: an inline span can neither truncate a long name nor align a figure.
+    const white = row(lastIs('white')).querySelector<HTMLElement>('[data-col="white"]')!
+    const name = white.firstElementChild!
+    expect(name).toHaveClass('block', 'truncate')
+    expect(name).not.toHaveClass('inline')
+    cleanup()
+    const worst = row(lastIs('worst')).querySelector<HTMLElement>('[data-col="worst"]')!
+    expect(worst.firstElementChild).toHaveClass('block', 'text-right')
+    cleanup()
+    // A renderer's own flex box still wins over the block.
+    const flags = row(lastIs('flags')).querySelector<HTMLElement>('[data-col="flags"]')!
+    expect(flags.firstElementChild).toHaveClass('flex')
+    expect(flags.firstElementChild).not.toHaveClass('block')
+  })
+})
+
+describe('GamesTable layout', () => {
+  /** The grid between the scroller and the rows, which carries the track list. */
+  function grid() {
+    return screen.getByRole('table', { name: 'Games' }).firstElementChild as HTMLElement
+  }
+
+  it('lays the columns on one grid of content-sized tracks, the last taking the rest', () => {
+    setup()
+    // Without collections Notes is last: 7rem plus the row's 1.25rem padding.
+    expect(grid().getAttribute('style')).toMatch(/grid-template-columns:[^;]*auto minmax\(8\.25rem, 1fr\)/)
+    // No cell is handed a width any more; each sizes its track.
+    for (const cell of screen.getAllByRole('cell')) expect(cell.getAttribute('style')).toBeNull()
+  })
+
+  it('makes the header, the body, the rows and the skeleton subgrids of it', () => {
+    setup()
+    const [header, row] = screen.getAllByRole('row')
+    for (const node of [header!, screen.getByRole('rowgroup'), row!]) {
+      expect(node).toHaveClass('md:grid-cols-subgrid', 'md:col-span-full')
+    }
+    // The header stays put in the one scroller while the rows go under it — for the whole
+    // scroll only if its parent, the grid, is never shrunk to the scroller's height.
+    expect(header).toHaveClass('sticky', 'top-0')
+    expect(grid()).toHaveClass('flex-none')
+  })
+
+  it('keeps the skeleton’s wrapper a subgrid level, so its rows are not squeezed into one track', () => {
+    setup({ status: 'pending', games: [] })
+    const wrapper = screen.getByTestId('games-loading')
+    expect(wrapper).toHaveAttribute('aria-busy')
+    expect(wrapper).toHaveClass('md:grid-cols-subgrid', 'md:col-span-full')
+    expect(wrapper.firstElementChild).toHaveClass('md:grid-cols-subgrid')
+  })
+
+  it('scrolls in one place only: nothing between the scroller and the cells has overflow', () => {
+    // A subgrid that is also a scroll container falls out of line in WebKit.
+    setup()
+    const table = screen.getByRole('table', { name: 'Games' })
+    expect(table).toHaveClass('overflow-auto')
+    const levels = [grid(), ...screen.getAllByRole('row'), screen.getByRole('rowgroup')]
+    for (const node of levels) expect(node.className).not.toMatch(/overflow-/)
+  })
+
+  it('keeps a blank the size of the delete after the last head, over the row’s bin', () => {
+    setup()
+    const heads = screen.getAllByRole('columnheader')
+    const last = heads.at(-1)!
+    expect(last).toHaveTextContent('Notes')
+    expect(last.lastElementChild).toHaveAttribute('aria-hidden')
+    expect(last.lastElementChild).toHaveClass('size-6', 'max-md:hidden')
+  })
+
+  it('puts the whole clock in the Time cell’s title, since a long one is cut short', () => {
+    setup({ games: [{ ...GAME, time_control: '1/259200' } as GameCard] })
+    const cell = screen.getAllByRole('cell').find((node) => node.dataset.col === 'time')!
+    expect(cell).toHaveAttribute('title', cell.textContent!)
+  })
+})
+
+describe('GamesTable with the owner’s column choice', () => {
+  const cellOf = (id: string) => screen.queryAllByRole('cell').find((node) => node.dataset.col === id)
+  const heads = () => screen.getAllByRole('columnheader').map((head) => head.textContent)
+
+  it('lays the columns out in the chosen order', () => {
+    setup({}, { order: ['opening', 'white', 'date'], hidden: [] })
+    // The ones the choice leaves out are new to it and slot in after their predecessors;
+    // the three it names keep their order.
+    const order = screen.getAllByRole('cell').map((cell) => cell.dataset.col)
+    expect(order.indexOf('opening')).toBeLessThan(order.indexOf('white'))
+    expect(order.indexOf('white')).toBeLessThan(order.indexOf('date'))
+    expect(heads()[0]).toBe('Opening')
+  })
+
+  it('draws every column, hiding none, when nothing is stored', () => {
+    setup({}, { order: [], hidden: [] })
+    expect(heads()).toContain('Opening')
+    expect(screen.getAllByRole('cell').filter((cell) => cell.classList.contains('md:hidden'))).toEqual([])
+  })
+
+  it('drops a hidden phone-less column everywhere, and keeps a card field as md:hidden', () => {
+    setup({}, { order: ['date', 'white', 'opening', 'notes'], hidden: ['opening', 'white'] })
+    expect(heads()).not.toContain('Opening')
+    expect(heads()).not.toContain('White')
+    // Opening has no place in the phone card, so it is gone; White is a card field, so its
+    // cell stays for the card and is hidden from md up.
+    expect(cellOf('opening')).toBeUndefined()
+    expect(cellOf('white')).toHaveClass('md:hidden', 'max-md:col-start-2')
+    expect(screen.getByText('chillzone')).toBeInTheDocument()
+    // One track per shown column: the hidden ones take none.
+    const shownColumns = screen.getAllByRole('columnheader').length + 1 // and the checkbox
+    const tracks = screen.getByRole('table', { name: 'Games' }).firstElementChild!.getAttribute('style')!
+    expect(tracks.match(/auto|minmax\([^)]*\)/g)).toHaveLength(shownColumns)
+  })
+
+  it('hides the same cells in the skeleton', () => {
+    setup({ status: 'pending', games: [] }, { order: ['date', 'white', 'opening'], hidden: ['opening', 'white'] })
+    const first = screen.getByTestId('games-loading').firstElementChild!
+    const spans = Array.from(first.children)
+    // The checkbox, date, white (md:hidden) and the columns new to the choice — no opening.
+    const hiddenFromMd = spans.filter((span) => span.classList.contains('md:hidden'))
+    expect(hiddenFromMd).toHaveLength(1)
+    expect(hiddenFromMd[0]).toHaveClass('max-md:col-start-2')
+    expect(spans.some((span) => span.classList.contains('md:min-w-47'))).toBe(false)
+  })
+
+  it('moves the delete to whichever shown column is last', () => {
+    setup({}, { order: ['date', 'white', 'opening', 'notes'], hidden: ['notes'] })
+    // Notes hidden and no collections: the columns new to the choice slot in after their
+    // predecessors, so Flags is the last one shown, and it takes the bin.
+    const remove = screen.getByRole('button', { name: 'Delete game 12' })
+    const cell = remove.closest<HTMLElement>('[data-col]')!
+    expect(cell).toHaveAttribute('data-col', 'flags')
+    const shownFromMd = within(cell.closest<HTMLElement>('[role="row"]')!)
+      .getAllByRole('cell')
+      .filter((each) => !each.classList.contains('md:hidden'))
+    expect(shownFromMd.at(-1)).toBe(cell)
+    expect(cellOf('notes')).toBeUndefined()
+    expect(screen.getAllByRole('columnheader').at(-1)!.lastElementChild).toHaveClass('size-6')
   })
 })
 

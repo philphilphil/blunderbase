@@ -33,9 +33,11 @@ export interface LibraryQuery {
   /** 1-based, the way the footer says it. */
   page: number
   pageSize: number
+  /** False to hold the request: the page does not know yet which sort it reads the list in. */
+  enabled?: boolean
 }
 
-export function useGameLibrary({ filters, sort, page, pageSize }: LibraryQuery) {
+export function useGameLibrary({ filters, sort, page, pageSize, enabled = true }: LibraryQuery) {
   const limit = Math.min(Math.max(pageSize, 1), MAX_PAGE_SIZE)
   const query = useMemo(
     () => ({
@@ -52,6 +54,8 @@ export function useGameLibrary({ filters, sort, page, pageSize }: LibraryQuery) 
     queryKey: queryKeys.gameCards(query),
     queryFn: () => api.listGameCards(query),
     placeholderData: keepPreviousData,
+    // Set only to hold, so a caller's (or a test client's) default stands otherwise.
+    ...(enabled ? {} : { enabled: false }),
   })
 
   const games: GameCard[] = result.data?.games ?? []

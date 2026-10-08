@@ -49,7 +49,8 @@ further filter makes it **Games (filtered)** again.
 
 ## Search the table
 
-The **Filter games: opponent, ECO, PGN…** field at the right end of the filter bar matches
+The **Filter games: opponent, ECO, PGN…** field near the right end of the filter bar, before
+**Columns**, matches
 an opponent, an ECO code and the text of the PGN. `/` puts the cursor in it from anywhere
 on the screen; **Esc** takes the cursor back out and leaves the search as it is.
 
@@ -62,14 +63,42 @@ since there is nothing to save yet. Two come with the app: **Losses as black** a
 you saved shows the × that forgets it. Picking one, there or from `⌘K`, keeps the order
 you had the table in, and it stays highlighted however you sort or page it.
 
+## Choose and arrange the columns
+
+**Columns**, at the right end of the filter bar after the search field, opens a list of
+the table's columns. Tick a column to show it and untick it to hide it. To move one, drag
+it by the grip at the start of its row to where it should go, or step it with the arrows
+at the end of the row; the top of the list is the left of the table. From the keyboard,
+Space on the grip picks the column up, the up and down arrow keys carry it, Space puts it
+down and Escape puts it back where it was. Each change shows at once and is kept, and
+**Reset to default** puts every column back, in its first order.
+One column has to stay, so the last box you could untick is greyed out. **Worst**,
+**Flags** and **Collections** do not count for that, since `⇧E` and deleting your last
+collection take them away anyway.
+
+Whichever column ends up last takes the spare width, and the row's bin moves to its end. A
+list sorted by a column you hide is read newest first instead, on every screen size, until
+you show the column again; the address keeps the sort you chose. With **Date** hidden it is
+still newest first, with no header marked.
+
+On a phone, where a row is a card, the button is not there. The card keeps its fields
+whatever you chose; only the sort buttons above the cards leave out a hidden column's.
+
+The choice is stored with your library, so it is the same on every device you open
+Blunderbase on. The public demo is the exception: there it stays in your browser.
+**Columns** stays greyed out until your choice has arrived from the server, so a change is
+never made on top of a stand-in. If it cannot be read, the table keeps the columns this
+browser showed last, and pointing at the button says so.
+
 ## Sort and page
 
 Click a column header to sort by it, and again to turn it round; the sorted one carries an
 arrow. The sort applies to the whole filtered library, not to the page in front of you.
 **Rows** in the footer sets the rows per page — **Fit** is as many as the window has room
-for — and the ‹ › beside it page through, around the page you are on. Where the window is
-too narrow for every column, the table scrolls sideways, and a fade on its right edge says
-there is more.
+for — and the ‹ › beside it page through, around the page you are on. Each column is as
+wide as what it holds on the page; names, openings and long clocks stop at a width and end
+in "…", and pointing at one shows it whole. Where the window is too narrow for every
+column, the table scrolls sideways, and a fade on its right edge says there is more.
 
 The **Analysis** column says **Analysed** in plain words, in purple when a run you asked for
 is among them. For a game nothing has analysed it holds **Analyse**, which queues its pass;
@@ -79,13 +108,15 @@ only when the drop is an inaccuracy or worse.
 **Notes** counts the notes written on a game — on the game itself, its moves and its pinned
 lines; a note from another game that reached the same position is not counted. Sort by it
 to find the games you annotated.
-The last column, **Collections**, names the collections a game is in, separated by commas;
-it is there only once you have made a collection.
+**Collections** names the collections a game is in, separated by commas; it is there only
+once you have made a collection.
 
 ## Read the list without the engine
 
 `⇧E`, or the **Hide engine** switch in the title bar, drops the **Worst** and **Flags**
-columns from the table, so it says what you played and not how well. A list left sorted by
+columns from the table, whatever you chose under **Columns**, so it says what you played
+and not how well; the **Columns** list marks both as off while the engine is hidden. A
+list left sorted by
 **Worst** falls back to newest first while it is on. The **Analysis** filter still
 works — a question you asked is not an answer you were handed — and **Analyse**, which
 queues a game nothing has looked at, is still there on its row. The whole of the mode is under
@@ -125,4 +156,5 @@ The filters live in the address, so any cut of the library is a link you can sen
 bookmark. The sort and the page you are on go into it too, which is why going back from a
 game — with Back or with the crumb in its title bar — lands on the same page in the
 same order. How many rows you asked for does not: that
-stays a setting of your own browser.
+stays a setting of your own browser. Nor do the columns, which are stored with the library
+rather than in the link ([Choose and arrange the columns](#choose-and-arrange-the-columns)).

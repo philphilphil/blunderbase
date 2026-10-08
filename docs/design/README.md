@@ -64,7 +64,8 @@ directory are local snapshots pulled 2026-08-25.
     for a picker at the right of its region: the Dashboard's Speed, the explorer's
     filters), so it never covers the next column or runs off the window.
   - **A sideways-scrolling table fades its right edge** while more is off to that side
-    (`lib/ui/useMoreRight.ts`): the Games table and the explorer's move tables.
+    (`lib/ui/useMoreRight.ts`, the shared `FADE_RIGHT`, or `FADE_RIGHT_MD` for a table that
+    folds into cards on a phone): the Games table and the explorer's move tables.
   - **Speeds are names**, capitalised and in one order, bullet to correspondence, on every
     picker and chip; the Dashboard's list carries each speed's game count.
   - **German writes an ellipsis after a word with a space** ("Analysieren …"), in the
@@ -90,6 +91,29 @@ directory are local snapshots pulled 2026-08-25.
   everywhere instead — the library, Stats and the explorer can each be narrowed to one. The
   switch may come back together with a rework of the reference-games (`whose`) feature,
   which is the library's existing answer to "games that should not count".
+- **Games table: columns sized to their content** (issue #42). The fixed widths of design
+  2b are gone; each column is as wide as its widest cell on the page, header included.
+  The table is one CSS grid (`routes/games/components/GamesTable.tsx`) and every row is a
+  subgrid of it, so the header and the rows line up by being laid out together. The rules
+  that keep it working:
+  - **One scroller, both axes**, with the header `sticky` inside it. A header in its own
+    scroller would need its sideways scroll kept in step by hand.
+  - **A subgrid is never a scroll container.** In WebKit one that is falls out of line with
+    its parent after a relayout, so nothing between the scroller and the cells sets
+    `overflow`.
+  - **Every wrapper between the body and its rows is a subgrid level** (the loading
+    skeleton's included). A plain wrapper is one grid item in the first track, with every
+    row squeezed inside it.
+  - **Floors on the cells, never narrower than the old widths.** A cell that clips has an
+    automatic minimum of zero in a grid, so each one carries an explicit `md:min-w-*`; the
+    names, the opening and the other text columns keep at least design 2b's widths, and
+    the figure columns floor at a few `ch` of their mono face. Names, openings, clocks and
+    collections are capped and end in "…" (`columns.ts`).
+  - **No head clips.** A truncating header cell would cut `SortButton`'s pill and the focus
+    ring.
+  - **The last track is `minmax(7rem + the row's padding, 1fr)`** (wider when the column's
+    own floor is): it takes the spare width and holds the row's delete; a subgrid adds the
+    row's padding to its edge tracks, hence the 1.25rem on top.
 - **Compute: Engines and Machines as two pages**
   (`prototypes/compute-pages.html`, built 2026-09-12; plan and what differs from the
   prototype in `docs/compute.md`). The Engines page's inventory and its capacity grid become two rail
@@ -306,7 +330,7 @@ directory are local snapshots pulled 2026-08-25.
       top shade (`shadow-field`), the inverse of a face; focus is the accent border and
       the ring.
     - **Tables and rows**: `SortableHead` (`table.tsx`) is a column head whose whole cell
-      sorts, and `SortButton` is its button alone for a div grid (the Games table), `end`
+      sorts, and `SortButton` is its button alone for the Games table's subgrid, `end`
       for a right-aligned figure column; `ui/row.ts` gives non-table lists `TableRow`'s
       states.
     - **Pane tabs**: `PaneTabList` / `PaneTab` (`routes/game/components/PaneTabList.tsx`,

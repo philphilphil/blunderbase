@@ -38,6 +38,13 @@ export const queryKeys = {
    */
   tour: (): QueryKey => ['tour'],
 
+  /**
+   * The games list's columns, as the owner arranged them. A root of its own for the tour's
+   * reason, and not under `games()` either: every import and delete invalidates that root,
+   * and none of them says anything about which columns the list shows.
+   */
+  gameColumns: (): QueryKey => ['gameColumns'],
+
   games: (): QueryKey => ['games'],
   gameList: (query: GameQuery = {}): QueryKey => ['games', 'list', query],
   gameCards: (query: GameQuery = {}): QueryKey => ['games', 'cards', query],

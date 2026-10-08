@@ -129,6 +129,7 @@ msgstr "Der Analysedurchlauf endet nach {budget} Knoten."
 #: src/components/analysis/AnalyseDialog.tsx
 #: src/routes/game/components/MobileGameView.tsx
 #: src/routes/game/components/MoveList.tsx
+#: src/routes/games/components/columns.ts
 msgid "Moves"
 msgstr "Züge"
 
@@ -1591,6 +1592,10 @@ msgstr "{hours} Std."
 #: src/lib/analysis/useStreamSession.ts
 msgid "Another analysis board took this position over."
 msgstr "Ein anderes Analysebrett hat diese Stellung übernommen."
+
+#: src/lib/api/queries.ts
+msgid "Could not save the columns"
+msgstr "Die Spalten konnten nicht gespeichert werden"
 
 #: src/lib/board/linePreview.ts
 msgid "after {at}"
@@ -3447,6 +3452,7 @@ msgid "It becomes a library game: its analysis pass is queued, it counts in the 
 msgstr "Sie wird eine Partie der Bibliothek: Ihr Analysedurchlauf wird eingereiht, sie zählt in der Statistik, und der Baum bleibt an ihr hängen – von hier an nur noch lesbar."
 
 #: src/routes/correspondence/components/GameHeader.tsx
+#: src/routes/games/components/columns.ts
 #: src/routes/games/filters.ts
 #: src/routes/notes/filters.ts
 msgid "Result"
@@ -6764,6 +6770,70 @@ msgstr "Eröffnung (ECO)"
 msgid "B22, or just C6"
 msgstr "B22, oder auch nur C6"
 
+#: src/routes/games/components/ColumnsMenu.tsx
+msgid "Picked up {column}."
+msgstr "{column} aufgenommen."
+
+#: src/routes/games/components/ColumnsMenu.tsx
+msgid "{column} is at place {place} of {count}."
+msgstr "{column} steht an Stelle {place} von {count}."
+
+#: src/routes/games/components/ColumnsMenu.tsx
+msgid "{column} dropped where it was."
+msgstr "{column} an der alten Stelle abgelegt."
+
+#: src/routes/games/components/ColumnsMenu.tsx
+msgid "{column} dropped at place {place} of {count}."
+msgstr "{column} an Stelle {place} von {count} abgelegt."
+
+#: src/routes/games/components/ColumnsMenu.tsx
+msgid "Moving {column} cancelled; it is back in its place."
+msgstr "Verschieben von {column} abgebrochen; die Spalte steht wieder an ihrer Stelle."
+
+#: src/routes/games/components/ColumnsMenu.tsx
+msgid "To move a column, press Space or Enter on its grip, then the up and down arrow keys, and Space or Enter again to drop it. Escape cancels."
+msgstr "Um eine Spalte zu verschieben, auf ihrem Griff Leertaste oder Eingabe drücken, sie mit den Pfeiltasten nach oben oder unten bewegen und mit Leertaste oder Eingabe ablegen. Escape bricht ab."
+
+#: src/routes/games/components/ColumnsMenu.tsx
+msgid "Could not read the column choice"
+msgstr "Die Spaltenauswahl konnte nicht gelesen werden"
+
+#: src/routes/games/components/ColumnsMenu.tsx
+msgid "Choose and order the columns"
+msgstr "Spalten auswählen und anordnen"
+
+#: src/routes/games/components/ColumnsMenu.tsx
+msgid "Columns"
+msgstr "Spalten"
+
+#: src/routes/games/components/ColumnsMenu.tsx
+msgid "One column has to stay"
+msgstr "Eine Spalte muss bleiben"
+
+#: src/routes/games/components/ColumnsMenu.tsx
+msgid "Off while the engine is hidden"
+msgstr "Aus, solange die Engine ausgeblendet ist"
+
+#: src/routes/games/components/ColumnsMenu.tsx
+msgid "Move {label} up"
+msgstr "{label} nach oben"
+
+#: src/routes/games/components/ColumnsMenu.tsx
+msgid "Move {label} down"
+msgstr "{label} nach unten"
+
+#: src/routes/games/components/ColumnsMenu.tsx
+msgid "Reset to default"
+msgstr "Auf Standard zurücksetzen"
+
+#: src/routes/games/components/ColumnsMenu.tsx
+msgid "Drag {label} to another place"
+msgstr "{label} an eine andere Stelle ziehen"
+
+#: src/routes/games/components/ColumnsMenu.tsx
+msgid "Drag to move"
+msgstr "Zum Verschieben ziehen"
+
 #: src/routes/games/components/DeleteGamesDialog.tsx
 msgid "{count, plural, one {Delete 1 game} other {Delete # games}}"
 msgstr "{count, plural, one {1 Partie löschen} other {# Partien löschen}}"
@@ -6988,16 +7058,24 @@ msgstr "Zu einer Sammlung hinzufügen"
 msgid "Elo"
 msgstr "Elo"
 
-#. Column header, short for "Result", in a 40px column
+#. Column header, short for "Result" — kept short so the figure column stays narrow
 #: src/routes/games/components/columns.ts
 #: src/routes/notes/components/NoteRow.tsx
 msgid "Res"
 msgstr "Erg."
 
-#. Column header, short for "Moves", in a 40px column
+#. Column header, short for "Moves" — kept short so the figure column stays narrow
 #: src/routes/games/components/columns.ts
 msgid "Mv"
 msgstr "Zg."
+
+#: src/routes/games/components/columns.ts
+msgid "White's rating"
+msgstr "Wertung von Weiß"
+
+#: src/routes/games/components/columns.ts
+msgid "Black's rating"
+msgstr "Wertung von Schwarz"
 
 #: src/routes/games/components/columns.ts
 msgid "Time"

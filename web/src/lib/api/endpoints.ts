@@ -57,6 +57,8 @@ import type {
   EngineUpdate,
   ExplorerResponse,
   GameCardList,
+  GameColumns,
+  GameColumnsUpdate,
   GameDetail,
   GameFilters,
   GameList,
@@ -183,6 +185,16 @@ export const getTourState = () => http.get<TourState>('/settings/tour')
 /** `seen: false` is "Show the tour again"; the answer is the flag in force afterwards. */
 export const setTourSeen = (seen: boolean) =>
   http.put<TourState>('/settings/tour', { body: { seen } })
+
+export const getGameColumns = (signal?: AbortSignal) =>
+  http.get<GameColumns>('/settings/game-columns', { signal })
+
+/**
+ * The whole arrangement, never a patch of it; `order: null` puts the default back. The
+ * answer is what was kept: badly formed and repeated ids are dropped on the way in.
+ */
+export const saveGameColumns = (body: GameColumnsUpdate) =>
+  http.put<GameColumns>('/settings/game-columns', { body })
 
 // --- games ----------------------------------------------------------------
 
