@@ -4,14 +4,14 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Blunderbase - kostenlose Open-Source-Schachdatenbank für deine Partien</title>
-<meta name="description" content="Blunderbase ist eine kostenlose Open-Source-Schachdatenbank für deine eigenen Partien. Sie importiert deine Partien von Lichess, Chess.com, FICS und aus PGN-Dateien, analysiert jede einzelne mit Stockfish und Maia und gibt deinem eigenen KI-Assistenten per MCP Zugriff auf die Bibliothek. Desktop-App für macOS und Windows, Docker-Image, iOS-Begleit-App.">
+<meta name="description" content="Blunderbase ist eine kostenlose Open-Source-Schachdatenbank für deine eigenen Partien. Notizen hängen an der Stellung und kommen in jeder Partie wieder, die sie erreicht, und Stockfish und Maia analysieren jede Partie von Lichess, Chess.com, FICS oder aus PGN-Dateien, ausgeblendet, bis du fragst. Desktop-App für macOS und Windows, Docker-Image, iOS-Begleit-App.">
 <link rel="canonical" href="https://blunderbase.org/de/">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="Blunderbase">
 <meta property="og:locale" content="de_DE">
 <meta property="og:locale:alternate" content="en_US">
 <meta property="og:title" content="Blunderbase - kostenlose Open-Source-Schachdatenbank für deine Partien">
-<meta property="og:description" content="Deine eigene Schachdatenbank, die jede Partie, die du spielst, mit Stockfish und Maia analysiert. Kostenlos, Open Source, läuft auf deinem eigenen Rechner.">
+<meta property="og:description" content="Deine eigene Schachdatenbank: Notizen hängen an der Stellung, und Stockfish und Maia warten, bis du selbst hingeschaut hast. Kostenlos, Open Source, läuft auf deinem eigenen Rechner.">
 <meta property="og:image" content="https://blunderbase.org/assets/game-dark.png">
 <meta property="og:image:width" content="3840">
 <meta property="og:image:height" content="2160">
@@ -45,7 +45,8 @@
     "Import von Partien aus Lichess, Chess.com, FICS und PGN-Dateien",
     "Stockfish-Analyse jeder Partie, grobe Patzer markiert",
     "Maia in mehreren Wertungsstufen: was Menschen gespielt hätten",
-    "Notizen zu Stellungen und Varianten",
+    "Notizen zu Stellungen, die in jeder Partie wiederkommen, die die Stellung erreicht",
+    "Die Engine ausblenden, um eine Partie selbst zu lesen, je Browser oder je Bedenkzeit neuer Partien",
     "Eröffnungsexplorer mit Siegquoten über deine eigenen Partien",
     "Statistiken nach Eröffnung, Farbe, Bedenkzeit und Partiephase",
     "MCP-Server für deinen eigenen KI-Assistenten",
@@ -254,6 +255,25 @@
   .pillar .note { margin-top: 0.625rem; font-size: 0.8125rem; color: var(--dim); }
   section > .fine { margin: 1.25rem 0 0; font-size: 0.8125rem; color: var(--dim); max-width: 72ch; }
 
+  /*
+   * The two things Blunderbase does that a chess database usually does not — notes that
+   * belong to a position, and an engine that waits — each get the words beside a screenshot
+   * rather than a line in the feature list. The words come first on a narrow screen.
+   */
+  .feature { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 3fr); gap: 2.5rem; align-items: start; }
+  .feature.flip { grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); }
+  .feature.flip figure { order: -1; }
+  .feature h3 { margin: 0 0 0.75rem; font-size: 1.5rem; line-height: 1.2; letter-spacing: -0.015em; font-weight: 600; color: var(--text); }
+  .feature p { margin: 0 0 0.875rem; color: var(--muted); font-size: 0.9375rem; }
+  .feature kbd { font-family: "Geist Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 0.8125rem; padding: 0.05rem 0.35rem; border: 1px solid var(--edge-strong); border-radius: 0.25rem; background: var(--elevated); color: var(--text); }
+  .feature ul { margin: 1.125rem 0 0; padding: 0; list-style: none; }
+  .feature li { display: flex; gap: 0.625rem; padding: 0.5rem 0; border-top: 1px solid var(--hairline); color: var(--body); font-size: 0.875rem; }
+  .feature li svg { width: 1rem; height: 1rem; color: var(--good); margin-top: 0.2rem; }
+  @media (max-width: 52rem) {
+    .feature, .feature.flip { grid-template-columns: 1fr; }
+    .feature.flip figure { order: 0; }
+  }
+
   /* the phone row: the companion beside the words about it */
   .phone-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2.5rem; align-items: center; }
   .phones { display: flex; gap: 1rem; justify-content: center; }
@@ -345,9 +365,44 @@
   </div>
 
   <figure class="hero-shot">
-    <button type="button" class="shot"><img class="themed" data-dark="/assets/game-dark.png" data-light="/assets/game-light.png" alt="Der Partiebildschirm: das Brett mit der eingezeichneten Engine-Variante, Maias Zugwahrscheinlichkeiten, Stockfishs Varianten, die Zugliste mit Markierungen für grobe Patzer und der Bewertungsverlauf." width="3840" height="2160"></button>
-    <figcaption>Der Partiebildschirm. Stockfishs Varianten aufs Brett gezeichnet, Maias Vermutungen daneben, darunter der Bewertungsverlauf.</figcaption>
+    <button type="button" class="shot"><img class="themed" data-dark="/assets/game-dark.png" data-light="/assets/game-light.png" alt="Der Partiebildschirm: das Brett mit der eingezeichneten Engine-Variante, Maias Zugwahrscheinlichkeiten, Stockfishs Varianten, die Zugliste mit Markierungen für grobe Patzer, deine Notiz zur Stellung und der Bewertungsverlauf." width="3840" height="2160"></button>
+    <figcaption>Der Partiebildschirm. Stockfishs Variante auf dem Brett, Maias Vermutungen, deine Notiz neben den Zügen.</figcaption>
   </figure>
+
+  <section id="notes">
+    <h2>Notizen</h2>
+    <div class="feature">
+      <div>
+        <h3>Eine Notiz gehört zur Stellung</h3>
+        <p>Drück <kbd>N</kbd> und schreib los. Die Notiz hängt an der Stellung und erscheint in jeder Partie, die sie erreicht, gleich über welche Zugfolge.</p>
+        <ul>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5L20 7"/></svg>Schlagwörter, Filter und drei Ansichten auf der Notizenseite</li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5L20 7"/></svg>Notizen zu einer ganzen Partie oder einer gespeicherten Variante</li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5L20 7"/></svg>Von dir geschrieben oder von deinem KI-Assistenten</li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5L20 7"/></svg>Export als Markdown oder PGN</li>
+        </ul>
+      </div>
+      <figure>
+        <button type="button" class="shot"><img class="themed" data-dark="/assets/notes-dark.png" data-light="/assets/notes-light.png" alt="Die Notizenseite: jede Notiz neben einem Diagramm ihrer Stellung, mit Schlagwörtern, der Partie, in der sie entstand, und der Zahl deiner Partien, die diese Stellung erreichen." loading="lazy" width="3840" height="2160"></button>
+        <figcaption>Die Notizenseite. Jede Notiz mit ihrer Stellung und den Partien, die dorthin führen.</figcaption>
+      </figure>
+    </div>
+  </section>
+
+  <section id="unaided">
+    <h2>Erst selbst hinsehen</h2>
+    <div class="feature flip">
+      <div>
+        <h3>Die Engine wartet, bis du fragst</h3>
+        <p><kbd>⇧E</kbd> blendet jedes Urteil der Engine aus: Bewertung, <code>??</code>-Markierungen, Verlauf, Varianten. Züge, Uhren und Notizen bleiben. Erst selbst urteilen, dann vergleichen.</p>
+        <p>Oder lass neue Partien gleich so ankommen. Wähle die Bedenkzeiten, etwa nur klassisch, und jede Partie bleibt still, bis du <b>Engine zeigen</b> drückst. Bulletpartien zeigen sie weiter sofort.</p>
+      </div>
+      <figure>
+        <button type="button" class="shot"><img class="themed" data-dark="/assets/game-quiet-dark.png" data-light="/assets/game-quiet-light.png" alt="Derselbe Partiebildschirm mit ausgeblendeter Engine: das Brett, die Züge mit ihren Uhrzeiten und die Notiz, ohne Bewertung, Markierungen, Verlauf oder Engine-Varianten." loading="lazy" width="3840" height="2160"></button>
+        <figcaption>Dieselbe Partie, Engine ausgeblendet.</figcaption>
+      </figure>
+    </div>
+  </section>
 
   <section id="what">
     <h2>Was es macht</h2>
@@ -360,7 +415,7 @@
       <div class="pillar">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v14c0 1.7 3.6 3 8 3s8-1.3 8-3V5"/><path d="M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3"/></svg>
         <h3>Deine Datenbank</h3>
-        <p>Deine Partien von Lichess, Chess.com, FICS und aus PGN-Dateien in einer Bibliothek, nach Zeitplan synchronisiert. Notizen zu Stellungen und Varianten, ein Explorer mit Siegquoten über deine eigenen Partien und Referenzpartien, die du zum Studieren hinzufügst.</p>
+        <p>Deine Partien von Lichess, Chess.com, FICS und aus PGN-Dateien in einer Bibliothek, nach Zeitplan synchronisiert. Sammlungen, um sie zu gruppieren, ein Explorer mit Siegquoten über deine eigenen Partien und Referenzpartien, die du zum Studieren hinzufügst.</p>
       </div>
       <div class="pillar">
         <svg class="m" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a8 8 0 0 1-8 8H8l-5 3V12a8 8 0 0 1 8-8h2a8 8 0 0 1 8 8z"/><path d="M9 12h.01M12 12h.01M15 12h.01"/></svg>
@@ -397,7 +452,8 @@
       <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5L20 7"/></svg>Partien von Lichess, Chess.com, FICS und aus PGN-Dateien importieren</li>
       <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5L20 7"/></svg>Deine Partien mit mehreren Engines analysieren</li>
       <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5L20 7"/></svg>Maia auf mehreren ELO-Stufen, um zu sehen, was Menschen gespielt hätten</li>
-      <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5L20 7"/></svg>Notizen zu Stellungen und Varianten</li>
+      <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5L20 7"/></svg>Notizen zu Stellungen, die in jeder Partie wiederkommen, die sie erreicht</li>
+      <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5L20 7"/></svg>Die Engine ausblenden, eine Partie selbst lesen und danach vergleichen</li>
       <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5L20 7"/></svg>Engine-Varianten aufs Brett gezeichnet, nicht nur aufgelistet</li>
       <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5L20 7"/></svg>Volle MCP-Unterstützung: Partien mit einem KI-Agenten auf einem gemeinsamen Live-Brett besprechen</li>
       <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5L20 7"/></svg>Lokale Engines und Stockfish als WebAssembly im Browser</li>
