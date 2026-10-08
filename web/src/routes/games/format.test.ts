@@ -17,19 +17,33 @@ import {
 } from './format'
 
 describe('formatGameDate', () => {
-  const now = new Date('2016-12-20T00:00:00Z')
+  // Midday UTC, so the reader's calendar day is the 3rd in every test zone.
+  const played = '2014-01-03T12:00:00Z'
 
-  it('leaves the year off a game from the current year', () => {
-    expect(formatGameDate('2016-08-22T10:00:00Z', now)).toBe('22 Aug')
+  it('writes the whole date in figures in the chosen order', () => {
+    expect(formatGameDate(played, 'dmy-dot')).toBe('03.01.2014')
+    expect(formatGameDate(played, 'mdy-slash')).toBe('01/03/2014')
+    expect(formatGameDate(played, 'dmy-slash')).toBe('03/01/2014')
+    expect(formatGameDate(played, 'iso')).toBe('2014-01-03')
   })
 
-  it('adds a two-digit year to an older game', () => {
-    expect(formatGameDate('2014-01-03T10:00:00Z', now)).toBe('3 Jan 14')
+  it('writes the month as a word in the page’s language when words are chosen', () => {
+    // The tests run in English, which is British: day, month, year.
+    expect(formatGameDate(played, 'words')).toBe('3 Jan 2014')
+  })
+
+  it('asks the browser when the format is automatic', () => {
+    const browser = new Intl.DateTimeFormat(navigator.languages, {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+    })
+    expect(formatGameDate(played, 'auto')).toBe(browser.format(new Date(played)))
   })
 
   it('is an em dash for a game with no date, and for nonsense', () => {
-    expect(formatGameDate(null, now)).toBe('—')
-    expect(formatGameDate('not a date', now)).toBe('—')
+    expect(formatGameDate(null, 'iso')).toBe('—')
+    expect(formatGameDate('not a date', 'iso')).toBe('—')
   })
 })
 

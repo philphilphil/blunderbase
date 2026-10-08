@@ -24,6 +24,7 @@ import { SourceBadge } from '@/components/badges/SourceBadge'
 import { Button } from '@/components/ui/button'
 import { useDeletedGames, useForgetDeletions } from '@/lib/api/queries'
 import type { DeletedGame } from '@/lib/api/types'
+import { useDateFormat } from '@/lib/i18n/dateFormat'
 import { cn } from '@/lib/utils'
 
 import { stamp } from './format'
@@ -135,9 +136,10 @@ function Row({
   onForget: () => void
 }) {
   const { t } = useLingui()
+  const dateFormat = useDateFormat()
   const white = row.white_name
   const black = row.black_name
-  const when = stamp(row.deleted_at)
+  const when = stamp(row.deleted_at, dateFormat)
   return (
     <li className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-hairline px-4 py-2 last:border-b-0">
       <SourceBadge source={row.source} variant="plain" />
@@ -156,7 +158,7 @@ function Row({
         </Trans>
       </span>
       <span className="font-mono text-label text-dim tabular">
-        {row.played_at ? stamp(row.played_at) : '—'}
+        {row.played_at ? stamp(row.played_at, dateFormat) : '—'}
       </span>
       <span className="font-mono text-meta text-faint tabular">
         <Trans>deleted {when}</Trans>

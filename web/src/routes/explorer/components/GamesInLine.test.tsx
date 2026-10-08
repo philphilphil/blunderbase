@@ -11,6 +11,7 @@ import { MemoryRouter } from 'react-router-dom'
 import { describe, expect, it } from 'vitest'
 
 import type { PositionOccurrence } from '@/lib/api/types'
+import { writeDate } from '@/lib/i18n/dateFormat'
 
 import { GamesInLine } from './GamesInLine'
 
@@ -40,8 +41,8 @@ describe('GamesInLine', () => {
     )
 
     const row = screen.getByRole('button')
-    // A game from an earlier year carries its year; `formatGameDate` owns that rule.
-    expect(row).toHaveTextContent('27 Dec 16')
+    // The date in the reader's format, Automatic here; `formatGameDate` owns how it is written.
+    expect(row).toHaveTextContent(writeDate(new Date('2016-12-27T12:00:00Z'), 'auto'))
     expect(row).toHaveTextContent('a-very-long-opponent-handle-that-cannot-fit')
     expect(row).toHaveTextContent('2184')
     expect(row).toHaveTextContent('Nbxd7+')

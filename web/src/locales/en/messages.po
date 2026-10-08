@@ -1181,6 +1181,19 @@ msgstr "↵ open"
 msgid "type two letters to search your games"
 msgstr "type two letters to search your games"
 
+#: src/components/shell/DateFormatPicker.tsx
+msgid "Automatic ({example})"
+msgstr "Automatic ({example})"
+
+#: src/components/shell/DateFormatPicker.tsx
+#: src/components/shell/SettingsMenu.tsx
+msgid "Date format"
+msgstr "Date format"
+
+#: src/components/shell/DateFormatPicker.tsx
+msgid "How dates are written in lists"
+msgstr "How dates are written in lists"
+
 #: src/components/shell/EngineToggle.tsx
 msgid "Engine hidden. Nothing gives the game away."
 msgstr "Engine hidden. Nothing gives the game away."
@@ -7131,66 +7144,6 @@ msgstr "has blunders"
 #: src/routes/games/filters.ts
 msgid "no blunders"
 msgstr "no blunders"
-
-#: src/routes/games/format.ts
-msgctxt "month abbreviation"
-msgid "Jan"
-msgstr "Jan"
-
-#: src/routes/games/format.ts
-msgctxt "month abbreviation"
-msgid "Feb"
-msgstr "Feb"
-
-#: src/routes/games/format.ts
-msgctxt "month abbreviation"
-msgid "Mar"
-msgstr "Mar"
-
-#: src/routes/games/format.ts
-msgctxt "month abbreviation"
-msgid "Apr"
-msgstr "Apr"
-
-#: src/routes/games/format.ts
-msgctxt "month abbreviation"
-msgid "May"
-msgstr "May"
-
-#: src/routes/games/format.ts
-msgctxt "month abbreviation"
-msgid "Jun"
-msgstr "Jun"
-
-#: src/routes/games/format.ts
-msgctxt "month abbreviation"
-msgid "Jul"
-msgstr "Jul"
-
-#: src/routes/games/format.ts
-msgctxt "month abbreviation"
-msgid "Aug"
-msgstr "Aug"
-
-#: src/routes/games/format.ts
-msgctxt "month abbreviation"
-msgid "Sep"
-msgstr "Sep"
-
-#: src/routes/games/format.ts
-msgctxt "month abbreviation"
-msgid "Oct"
-msgstr "Oct"
-
-#: src/routes/games/format.ts
-msgctxt "month abbreviation"
-msgid "Nov"
-msgstr "Nov"
-
-#: src/routes/games/format.ts
-msgctxt "month abbreviation"
-msgid "Dec"
-msgstr "Dec"
 
 #. Short for "correspondence", the speed of a game played over days
 #. Short for "correspondence", the speed of a game played over days

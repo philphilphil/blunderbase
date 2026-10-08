@@ -71,16 +71,6 @@ export function currentLocale(): Locale {
   return isLocale(i18n.locale) ? i18n.locale : DEFAULT_LOCALE
 }
 
-/**
- * The BCP 47 tag for a date that is written out in words — `22 Aug 2026`, `22. Aug. 2026`.
- * Numbers and clock times follow the browser, because a German owner reading English still
- * wants their thousands separator; a month name is a word, and words follow the UI.
- * English is British, which is the day-month-year order every game site prints.
- */
-export function dateLocale(): string {
-  return currentLocale() === 'de' ? 'de-DE' : 'en-GB'
-}
-
 async function loadCatalog(locale: Locale): Promise<Messages> {
   const { messages } = (await import(`../../locales/${locale}/messages.po`)) as {
     messages: Messages

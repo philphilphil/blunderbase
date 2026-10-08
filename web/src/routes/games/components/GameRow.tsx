@@ -44,6 +44,7 @@ import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { ROW, ROW_SELECTED } from '@/components/ui/row'
 import type { GameCard } from '@/lib/api/types'
+import { useDateFormat, type DateFormat } from '@/lib/i18n/dateFormat'
 import { cn } from '@/lib/utils'
 
 import {
@@ -101,6 +102,8 @@ interface CellContext {
   /** "In queue", or the Analyse button, for a game no pass has looked at. */
   queueState: React.ReactNode
   collectionNames: ReadonlyMap<number, string>
+  /** The reader's date format (`useDateFormat`), read by the row so it follows a change. */
+  dateFormat: DateFormat
   onToggle: (id: number, event: React.MouseEvent) => void
   words: { select: string; unknownOpening: string; heldBack: string; sourceLink: string }
 }
@@ -137,14 +140,14 @@ const CELLS: Record<CellId, (ctx: CellContext) => CellParts> = {
     ),
   }),
 
-  date: ({ game, selected, inCollections }) => ({
+  date: ({ game, selected, inCollections, dateFormat }) => ({
     className: cn(
       'font-mono tabular text-body max-md:flex max-md:min-w-0 max-md:items-center max-md:gap-2',
       selected ? 'max-md:text-soft' : 'max-md:text-dim',
     ),
     body: (
       <>
-        {formatGameDate(game.played_at)}
+        {formatGameDate(game.played_at, dateFormat)}
         {/* The phone card's copy of the chips (see the Collections cell for why there are two). */}
         {inCollections ? <CollectionChips ids={game.collections} className="md:hidden" /> : null}
       </>
@@ -424,6 +427,7 @@ export const GameRow = memo(function GameRow({
   collectionNames,
 }: GameRowProps) {
   const { t } = useLingui()
+  const dateFormat = useDateFormat()
   const id = game.id
   const analysis = analysisOf(game)
   // What reads `dim` on a plain row reads `soft` on a selected one (see the doc above).
@@ -470,6 +474,7 @@ export const GameRow = memo(function GameRow({
     ownerSide: game.is_owner_game === false ? null : (game.color ?? null),
     queueState,
     collectionNames,
+    dateFormat,
     onToggle,
     words: {
       select: t`Select game ${id}`,

@@ -8,6 +8,7 @@ import { ButtonGroup, ButtonGroupItem } from '@/components/ui/button-group'
 import { TextLink } from '@/components/ui/text-link'
 import type { GameRunSummary, GameSummary, RunResponse } from '@/lib/api/types'
 import { SOURCE_STYLES } from '@/lib/chess/classification'
+import { useDateFormat } from '@/lib/i18n/dateFormat'
 import { relative } from '@/lib/mcp/status'
 import { cn } from '@/lib/utils'
 
@@ -81,6 +82,7 @@ export function GameHeaderBar({
   className?: string
 }) {
   const { t } = useLingui()
+  const dateFormat = useDateFormat()
   const timeControl = formatTimeControl(game)
   const analysedAt = best?.finished_at ? relative(best.finished_at) : null
   const source = SOURCE_STYLES[game.source]
@@ -163,7 +165,7 @@ export function GameHeaderBar({
         data-testid="game-date"
         className="flex-none font-mono text-label tabular text-soft @max-[34rem]:hidden"
       >
-        {formatGameDate(game.played_at)}
+        {formatGameDate(game.played_at, dateFormat)}
       </span>
       <span className="flex-none text-faint">·</span>
       <span className="flex-none font-mono text-label tabular text-body">

@@ -12,42 +12,18 @@ import type { Classification, GameCard, GameSummary, Outcome, Source } from '@/l
 import { glyphFor, type Glyph, type RunShape } from '@/lib/chess/classification'
 import { MINUS } from '@/lib/chess/evaluation'
 import { formatClock } from '@/lib/chess/timeControl'
+import { writeDate, type DateFormat } from '@/lib/i18n/dateFormat'
 
 /**
- * The twelve abbreviations the date column is built from. `context` is what tells a
- * translator these are months — `May` and `Mar` are words in their own right, and a
- * three-letter string with nothing around it is the one thing a catalog cannot guess.
+ * A game's date in figures, in the reader's date format (`lib/i18n/dateFormat`): `08.10.2026`,
+ * `10/08/2026`, `2026-10-08`. The format is passed in rather than read here so that a list
+ * writing dates takes it from `useDateFormat()` and follows a change in Settings.
  */
-const MONTHS: MessageDescriptor[] = [
-  msg({ message: 'Jan', context: 'month abbreviation' }),
-  msg({ message: 'Feb', context: 'month abbreviation' }),
-  msg({ message: 'Mar', context: 'month abbreviation' }),
-  msg({ message: 'Apr', context: 'month abbreviation' }),
-  msg({ message: 'May', context: 'month abbreviation' }),
-  msg({ message: 'Jun', context: 'month abbreviation' }),
-  msg({ message: 'Jul', context: 'month abbreviation' }),
-  msg({ message: 'Aug', context: 'month abbreviation' }),
-  msg({ message: 'Sep', context: 'month abbreviation' }),
-  msg({ message: 'Oct', context: 'month abbreviation' }),
-  msg({ message: 'Nov', context: 'month abbreviation' }),
-  msg({ message: 'Dec', context: 'month abbreviation' }),
-]
-
-/**
- * `22 Aug` for a game from this year, `7 Dec 16` for an older one — the design's 78px
- * date column, which has no room for a full date but must not lie about the year.
- */
-export function formatGameDate(
-  played: string | null | undefined,
-  now: Date = new Date(),
-): string {
+export function formatGameDate(played: string | null | undefined, format: DateFormat): string {
   if (!played) return '—'
   const date = new Date(played)
   if (Number.isNaN(date.getTime())) return '—'
-  const day = `${date.getDate()} ${i18n._(MONTHS[date.getMonth()])}`
-  return date.getFullYear() === now.getFullYear()
-    ? day
-    : `${day} ${String(date.getFullYear() % 100).padStart(2, '0')}`
+  return writeDate(date, format)
 }
 
 /** The PGN result with typographic glyphs: `1–0`, `0–1`, `½–½`. */

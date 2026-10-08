@@ -1,6 +1,7 @@
 import { Trans, useLingui } from '@lingui/react/macro'
 import {
   Bot,
+  CalendarDays,
   ChevronUp,
   CircleHelp,
   Compass,
@@ -39,6 +40,7 @@ import { ChangePasswordDialog } from '@/routes/auth'
 
 import { usePageChrome } from './PageChrome'
 import { useShortcutsOverlay } from './ShortcutsOverlay'
+import { DateFormatPicker } from './DateFormatPicker'
 import { ThemeToggle } from './ThemeToggle'
 
 /**
@@ -97,8 +99,9 @@ function placeAbove(trigger: HTMLElement | null): CSSProperties {
  * Library › Accounts.
  *
  * The menu holds everything about the installation rather than about the games, in the
- * order it is reached for: the two settings set once and left (Appearance and Language, each
- * the app's one `Segmented`) and the keyboard shortcuts; the ways into the installation
+ * order it is reached for: the settings set once and left (Appearance and Language, each
+ * the app's one `Segmented`, and the date format, a picker since six dates do not fit
+ * across) and the keyboard shortcuts; the ways into the installation
  * (the accounts the library is made of, the MCP setup); help (this page's chapter of the
  * manual, the tour); the session (changing the password, signing out, only where there is
  * one); and last, as small print, the build's version with what changed and the source. The
@@ -167,7 +170,9 @@ export function SettingsMenu({ variant = 'row' }: { variant?: 'row' | 'icon' }) 
   // leaving it open over the page behind the focus.
   const onMenuKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
     if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return
-    const items = Array.from(menu.current?.querySelectorAll<HTMLElement>(MENU_ITEM) ?? [])
+    // A select's arrows are its own: on Windows and in Firefox they step through its options.
+    if (event.target instanceof HTMLSelectElement) return
+    const items =Array.from(menu.current?.querySelectorAll<HTMLElement>(MENU_ITEM) ?? [])
     if (items.length === 0) return
     const at = items.indexOf(document.activeElement as HTMLElement)
     const step = event.key === 'ArrowDown' ? 1 : -1
@@ -248,6 +253,13 @@ export function SettingsMenu({ variant = 'row' }: { variant?: 'row' | 'icon' }) 
                     label: <span lang={option}>{LOCALE_NAMES[option]}</span>,
                   }))}
                 />
+              </div>
+              <div className={FIELD}>
+                <span className="inline-flex flex-1 items-center gap-2 whitespace-nowrap">
+                  <CalendarDays className="size-3.5" aria-hidden />
+                  <Trans>Date format</Trans>
+                </span>
+                <DateFormatPicker />
               </div>
               {/*
                 The row prints its key, so opening the list once teaches the `?` that opens

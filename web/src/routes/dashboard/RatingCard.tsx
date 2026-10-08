@@ -34,6 +34,7 @@ import { SectionHead } from '@/components/shell/Section'
 import { Segmented } from '@/components/ui/segmented'
 import { useProfile } from '@/lib/api/queries'
 import { SPEEDS, type Platform, type RatingSeries } from '@/lib/api/types'
+import { useDateFormat } from '@/lib/i18n/dateFormat'
 import { rem, scaleMargin, scalePx } from '@/lib/ui/scale'
 import { cn } from '@/lib/utils'
 
@@ -198,6 +199,7 @@ function SpeedGraph({
   className?: string
 }) {
   const { i18n } = useLingui()
+  const dateFormat = useDateFormat()
   return (
     <div className={cn('flex min-w-0 flex-col gap-1.5', className)}>
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
@@ -246,7 +248,7 @@ function SpeedGraph({
           />
           <ChartTooltip
             cursor={{ stroke: 'var(--bb-edge)' }}
-            labelFormatter={(label) => fullDate(String(label))}
+            labelFormatter={(label) => fullDate(String(label), dateFormat)}
             content={<ChartTooltipContent />}
           />
           {chart.lines.map((line) => (
@@ -316,6 +318,7 @@ function SpeedsPicker({ allCharts, hidden }: { allCharts: SpeedChart[]; hidden: 
 
 export function RatingCard() {
   const { t } = useLingui()
+  const dateFormat = useDateFormat()
   const profile = useProfile()
   const [windowKey, setWindowKey] = useState<WindowKey>('all')
   const hidden = useHiddenSpeeds()
@@ -329,8 +332,8 @@ export function RatingCard() {
   const anchor = anchorOf(newestPoint(playable))
   const range = windowRange(windowKey, anchor)
   // Named, because it is what the empty state interpolates and the placeholder a
-  // translator sees is the identifier: "the last 90 days", "the 30 days to 7 Dec 2016".
-  const period = windowProse(windowKey, anchor)
+  // translator sees is the identifier: "the last 90 days", "the 30 days to 07.12.2016".
+  const period = windowProse(windowKey, dateFormat, anchor)
 
   // The profile stamps points as `+00:00` and `windowRange` as `Z`, so the cut is made on
   // parsed time rather than on the strings.
@@ -402,7 +405,11 @@ export function RatingCard() {
                 charts.length === 1 && index === 0 ? 'col-span-full' : undefined
               }
               // A quarter reads in days; a year or the whole archive reads in months.
-              tick={windowKey === '30d' || windowKey === '90d' ? shortDate : monthYear}
+              tick={
+                windowKey === '30d' || windowKey === '90d'
+                  ? (value) => shortDate(value, dateFormat)
+                  : monthYear
+              }
             />
           ))}
         </div>

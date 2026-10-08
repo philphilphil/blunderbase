@@ -13,6 +13,8 @@ import { useSyncExternalStore } from 'react'
 
 export interface ViewPreference<V extends string> {
   use: () => V
+  /** The value now, for code outside React; a component reads it with `use` to follow it. */
+  get: () => V
   set: (view: V) => void
   /** Test seam: forget what was read, so the next read hits storage again. */
   reset: () => void
@@ -65,6 +67,7 @@ export function viewPreference<V extends string>(
 
   return {
     use: () => useSyncExternalStore(subscribe, snapshot, () => fallback),
+    get: snapshot,
     set(view) {
       cache = view
       try {

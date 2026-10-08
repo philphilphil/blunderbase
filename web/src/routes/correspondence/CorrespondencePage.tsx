@@ -53,6 +53,7 @@ import type { CorrespondenceGameSummary } from '@/lib/api/types'
 import { useNotation } from '@/lib/chess/notationPrefs'
 import { formatNodes, formatScore } from '@/lib/chess/evaluation'
 import { engineHosts } from '@/lib/engines/hosts'
+import { useDateFormat } from '@/lib/i18n/dateFormat'
 import { cn } from '@/lib/utils'
 
 import { CapacityStrip } from './components/CapacityStrip'
@@ -95,6 +96,7 @@ function Side({ color }: { color: 'white' | 'black' }) {
 
 function Due({ game }: { game: CorrespondenceGameSummary }) {
   const { i18n } = useLingui()
+  const dateFormat = useDateFormat()
   const tone = dueTone(game)
   const phrase = duePhrase(game.days_left)
   if (!phrase) return <span className="text-label text-dim">—</span>
@@ -104,7 +106,7 @@ function Due({ game }: { game: CorrespondenceGameSummary }) {
         {i18n._({ ...phrase.message, values: phrase.values })}
       </span>
       <span className="mt-px font-mono text-meta text-dim-2">
-        {shortDate(game.reply_due, i18n.locale)}
+        {shortDate(game.reply_due, dateFormat)}
       </span>
     </span>
   )
@@ -261,8 +263,9 @@ function OngoingTable({
 
 /** Finished games link into the library: that is where a finished game is read. */
 function FinishedRow({ game }: { game: CorrespondenceGameSummary }) {
-  const { i18n } = useLingui()
-  const date = shortDate(game.last_move_at ?? game.updated_at, i18n.locale)
+  const dateFormat = useDateFormat()
+  // With its year: a finished correspondence game may be a year or more behind.
+  const date = shortDate(game.last_move_at ?? game.updated_at, dateFormat, { year: true })
   return (
     <div className="flex items-center gap-3 border-t border-hairline py-2">
       <Side color={ownerColor(game)} />

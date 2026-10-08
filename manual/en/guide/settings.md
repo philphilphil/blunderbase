@@ -7,6 +7,26 @@ switches between English and German. It is a setting
 of the browser rather than of the account, so a phone in German and a desk in English is an
 ordinary arrangement. The page reloads under you, so save an open note first.
 
+## Choose the date format
+
+The **Date format** row decides how every date in Blunderbase is written: in the games list
+and a game's header, the explorer, Notes, Collections, the search, the dashboard and Stats,
+the import history and correspondence. The list shows today's date in each format, so you
+can see what you would get.
+
+**Automatic**, the default, writes it in figures the way your browser does for its
+language, such as 08.10.2026. Your browser goes by its own language rather than your
+computer's region, so a browser set to American English writes 10/08/2026 even on a German
+computer; pick 08.10.2026, 10/08/2026, 08/10/2026 or 2026-10-08 directly to settle it. The
+last choice writes the month as a word instead, 8 Oct 2026, in the language Blunderbase is
+shown in.
+
+A date carries its whole year, except where the year is plain from around it, such as the
+ticks under a chart of the last 90 days. Times of day follow your browser. A chart over
+years is still labelled by month, Oct 2026, since it names months rather than days, and
+the date fields in filters are your browser's own. Like the language, the format is kept
+in this browser.
+
 ## Switch the theme
 
 Also in the settings menu, the **Appearance** row: **Dark**, **Light** or **System**, which

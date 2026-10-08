@@ -7,6 +7,27 @@ Das Einstellungsmenü öffnet sich über **Einstellungen** unten in der linken L
 gehört zum Browser, nicht zum Konto: das Handy auf Deutsch und der Rechner auf Englisch ist
 also kein Problem. Die Seite lädt dabei neu, speichere eine offene Notiz vorher.
 
+## Datumsformat wählen { #choose-the-date-format }
+
+Die Zeile **Datumsformat** legt fest, wie Blunderbase jedes Datum schreibt: in der
+Partienliste und im Kopf einer Partie, im Explorer, in den Notizen, bei den Sammlungen, in
+der Suche, auf der Übersicht und in der Statistik, im Importverlauf und bei den
+Fernpartien. Die Auswahl zeigt das heutige Datum in jedem Format, damit du siehst, was du
+bekommst.
+
+**Automatisch**, die Voreinstellung, schreibt es in Ziffern, so wie dein Browser es für
+seine Sprache tut, etwa 08.10.2026. Der Browser richtet sich nach seiner eigenen Sprache,
+nicht nach der Region deines Rechners – steht er auf amerikanischem Englisch, schreibt er
+auch auf einem deutschen Rechner 10/08/2026. Dann wählst du 08.10.2026, 10/08/2026,
+08/10/2026 oder 2026-10-08 einfach direkt. Die letzte Wahl schreibt den Monat als Wort,
+8. Okt. 2026, in der Sprache, in der Blunderbase gerade angezeigt wird.
+
+Ein Datum trägt sein volles Jahr, außer wo das Jahr ohnehin klar ist, etwa unter einem
+Diagramm der letzten 90 Tage. Uhrzeiten schreibt dein Browser. Ein Diagramm über Jahre
+ist weiterhin nach Monaten beschriftet, Okt. 2026, weil es Monate meint und keine Tage, und
+die Datumsfelder in den Filtern sind die deines Browsers. Wie die Sprache bleibt das Format
+in diesem Browser.
+
 ## Erscheinungsbild wechseln { #switch-the-theme }
 
 Ebenfalls im Einstellungsmenü, in der Zeile **Erscheinungsbild**: **Dunkel**, **Hell** oder

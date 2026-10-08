@@ -194,8 +194,9 @@ const MV = msg({
  */
 export const COLUMNS: Column[] = [
   { id: 'select', label: null, size: '', bar: 0, phone: CARD.select },
-  // "28 Sep 25".
-  { id: 'date', label: msg`Date`, size: 'md:min-w-[9ch]', bar: 3.5, sort: 'played_at', mono: true, phone: CARD.date },
+  // "08.10.2026": ten glyphs in every date format in figures (`lib/i18n/dateFormat`); the
+  // track grows past the floor for one in words.
+  { id: 'date', label: msg`Date`, size: 'md:min-w-[10ch]', bar: 3.5, sort: 'played_at', mono: true, phone: CARD.date },
   { id: 'white', label: msg`White`, size: 'md:min-w-30', cap: 'md:max-w-40', floorRem: 7.5, bar: 5, sort: 'white', phone: CARD.white },
   { id: 'white_rating', label: ELO, name: msg`White's rating`, size: 'md:min-w-[4ch]', bar: 2, align: 'right', sort: 'white_rating', mono: true, phone: CARD.white_rating },
   { id: 'black', label: msg`Black`, size: 'md:min-w-30', cap: 'md:max-w-40', floorRem: 7.5, bar: 5, sort: 'black', phone: CARD.black },

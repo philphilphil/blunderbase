@@ -18,6 +18,7 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import type { ImportJob, JobStatus } from '@/lib/api/types'
+import { useDateFormat } from '@/lib/i18n/dateFormat'
 import { cn } from '@/lib/utils'
 
 import { pageRange } from '@/routes/games/paging'
@@ -108,6 +109,7 @@ export function SyncHistory({
   onPageChange: (page: number) => void
 }) {
   const { t } = useLingui()
+  const dateFormat = useDateFormat()
   const [open, setOpen] = useState<number | null>(null)
   // The deleted column earns its width only on a library where something was deleted, and
   // the folded-out failure row has to span whatever that leaves.
@@ -215,7 +217,7 @@ export function SyncHistory({
                     <SourceBadge source={job.source} variant="plain" className="text-data text-body" />
                   </TableCell>
                   <TableCell className="font-mono text-data text-soft tabular">
-                    {stamp(job.started_at ?? job.created_at)}
+                    {stamp(job.started_at ?? job.created_at, dateFormat)}
                   </TableCell>
                   <TableCell className="text-right font-mono text-data text-dim tabular">
                     {duration(job)}
