@@ -29,6 +29,7 @@ import { Link } from 'react-router-dom'
 import { Readout } from '@/components/ui/badge'
 import { COLUMN_HEAD, ROW } from '@/components/ui/row'
 import type { NoteResponse } from '@/lib/api/types'
+import { useDateFormat, writeDateTime } from '@/lib/i18n/dateFormat'
 import { relative } from '@/lib/mcp/status'
 import { cn } from '@/lib/utils'
 import { formatGameDate, formatResult, outcomeTone } from '@/routes/games/format'
@@ -42,11 +43,13 @@ import { TagChip } from './TagChip'
  * at 90rem (1440px), where there is room for them without squeezing the note's line to
  * nothing. At `xl` (1280) they left the note one character wide beside the rail: the fixed
  * columns are in the app's 120% rem, so they take a fifth more than the breakpoint assumed.
+ * Played is 6rem: the reader's date format can be words, and `28. Sept. 2026` is fourteen
+ * mono glyphs where a date in figures is ten.
  */
 export const LIST_COLUMNS =
   'md:grid md:items-center md:gap-x-3 ' +
   'md:grid-cols-[4.5rem_minmax(0,1fr)_10rem_minmax(0,11rem)_2.75rem_1.25rem] ' +
-  'min-[90rem]:grid-cols-[4.5rem_minmax(0,1fr)_10rem_minmax(0,11rem)_2.75rem_4.5rem_minmax(0,9rem)_1.25rem]'
+  'min-[90rem]:grid-cols-[4.5rem_minmax(0,1fr)_10rem_minmax(0,11rem)_2.75rem_6rem_minmax(0,9rem)_1.25rem]'
 
 const HEAD = COLUMN_HEAD
 
@@ -110,6 +113,7 @@ export function NoteRow({
   onOpponentClick,
 }: NoteRowProps) {
   const { t, i18n } = useLingui()
+  const dateFormat = useDateFormat()
   const [open, setOpen] = useState(highlighted)
   // And opens when a link names it later, too: ⌘K or a row's ↗ on a note with no game goes
   // to `/notes?note=12` without remounting the rows, so the first render is not the only
@@ -123,7 +127,7 @@ export function NoteRow({
   const scope = scopeOf(note)
   const move = originLabel(note)
   const game = note.game
-  const when = new Date(note.created_at).toLocaleString()
+  const when = writeDateTime(new Date(note.created_at), dateFormat)
   const line = oneLine(note, 400)
 
   return (
@@ -199,7 +203,7 @@ export function NoteRow({
         </span>
 
         <span className="font-mono text-label tabular text-dim max-[90rem]:hidden">
-          {game ? formatGameDate(game.date) : '—'}
+          {game ? formatGameDate(game.date, dateFormat) : '—'}
         </span>
 
         <span className="flex min-w-0 gap-1 overflow-hidden max-[90rem]:hidden">

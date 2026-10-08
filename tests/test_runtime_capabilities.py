@@ -132,7 +132,15 @@ def test_demo_needs_no_password_and_says_it_is_read_only(demo: TestClient) -> No
 
 
 def test_demo_answers_every_read_to_a_stranger(demo: TestClient) -> None:
-    for path in ("/games", "/collections", "/stats/dimensions", "/explorer", "/notes", "/settings"):
+    for path in (
+        "/games",
+        "/collections",
+        "/stats/dimensions",
+        "/explorer",
+        "/notes",
+        "/settings",
+        "/settings/game-columns",
+    ):
         assert demo.get(path).status_code == 200, path
     assert demo.get("/api/games").status_code == 200
     with demo.websocket_connect("/events") as socket:
@@ -144,6 +152,7 @@ def test_demo_answers_every_read_to_a_stranger(demo: TestClient) -> None:
     [
         ("POST", "/notes", {"text": "a stranger's note"}),
         ("PUT", "/settings", {}),
+        ("PUT", "/settings/game-columns", {"order": ["date"], "hidden": []}),
         ("POST", "/games/delete-all", {}),
         ("POST", "/import/lichess", {"username": "somebody"}),
         ("DELETE", "/engines/1", None),

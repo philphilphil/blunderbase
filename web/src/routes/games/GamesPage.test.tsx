@@ -5,7 +5,9 @@ import { MemoryRouter, Route, Routes, useLocation, useNavigate } from 'react-rou
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { Providers } from '@/app/Providers'
-import type { BatchAnalysisResponse, GameCard } from '@/lib/api/types'
+import type { BatchAnalysisResponse, GameCard, GameColumns } from '@/lib/api/types'
+import { GAME_COLUMNS_KEY } from '@/lib/games/demoColumns'
+import { setEngineHidden } from '@/lib/ui/engineVisibility'
 import { ChromeActions, ChromeCrumbs } from '@/test/chrome'
 
 import { resetTrail, useGameTrail, useLibraryAddress } from './gameTrail'
@@ -119,7 +121,13 @@ beforeEach(() => {
   stubFetch()
 })
 
-afterEach(() => vi.unstubAllGlobals())
+afterEach(() => {
+  vi.unstubAllGlobals()
+  // Both outlive a test unless put back: ⇧E is written down, and so is this browser's copy
+  // of the column choice.
+  setEngineHidden(false)
+  localStorage.removeItem(GAME_COLUMNS_KEY)
+})
 
 describe('GamesPage — filtering analysis coverage', () => {
   it('requests only games with no finished analysis', async () => {
@@ -726,5 +734,131 @@ describe('GamesPage — collections', () => {
 
     expect(await screen.findByRole('dialog', { name: 'New collection' })).toBeInTheDocument()
     expect(screen.getByText('With the 2 games you picked.')).toBeInTheDocument()
+  })
+})
+
+describe('GamesPage — the columns, and the sort a hidden one leaves behind', () => {
+  /**
+   * The library, and the owner's column choice — the server's empty order when there is
+   * none, or a 500 for it, when it cannot be read.
+   */
+  function stubColumns(columns: GameColumns | null | 'failing') {
+    vi.mocked(fetch).mockImplementation(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const path = String(input).split('?')[0]!
+      if (path.endsWith('/api/settings/game-columns') && init?.method === 'PUT') {
+        return json(200, JSON.parse(String(init.body)))
+      }
+      if (path.endsWith('/api/settings/game-columns')) {
+        if (columns === 'failing') return json(500, { error: 'internal', detail: path })
+        return json(200, columns ?? { order: [], hidden: [] })
+      }
+      if (path.endsWith('/api/games')) {
+        return json(200, { games: GAMES, total: GAMES.length, limit: 50, offset: 0 })
+      }
+      return json(404, { error: 'not_found', detail: path })
+    })
+  }
+
+  function lastGamesQuery(): URLSearchParams {
+    const calls = vi.mocked(fetch).mock.calls.map(([input]) => String(input))
+    const last = calls.filter((url) => url.split('?')[0]!.endsWith('/api/games')).at(-1)!
+    return new URL(last, 'http://localhost').searchParams
+  }
+
+  function drawWithAddress(at: string) {
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    function Where() {
+      return <output data-testid="where">{useLocation().search}</output>
+    }
+    render(
+      <Providers client={client}>
+        <MemoryRouter initialEntries={[at]}>
+          <GamesPage />
+          <Where />
+        </MemoryRouter>
+      </Providers>,
+    )
+  }
+
+  const heads = () => screen.getAllByRole('columnheader').map((head) => head.textContent)
+
+  it('draws the default columns when there is no choice to read', async () => {
+    stubColumns(null)
+    drawWithAddress('/games')
+    await loaded()
+    expect(heads()).toContain('Opening')
+    expect(heads()).toContain('Worst')
+  })
+
+  it('keeps this browser’s columns, and Columns shut, when the choice cannot be read', async () => {
+    localStorage.setItem(GAME_COLUMNS_KEY, JSON.stringify({ order: ['date', 'white', 'opening'], hidden: ['opening'] }))
+    stubColumns('failing')
+    drawWithAddress('/games')
+    await loaded()
+    const columns = screen.getByRole('button', { name: 'Columns' })
+    await waitFor(() => expect(columns).toHaveAttribute('title', 'Could not read the column choice'))
+    expect(heads()).not.toContain('Opening')
+    expect(columns).toBeDisabled()
+  })
+
+  it('reads the list newest first while the column it is sorted by is hidden, and keeps the address', async () => {
+    stubColumns({ order: ['date', 'white', 'opening'], hidden: ['opening'] })
+    drawWithAddress('/games?order=opening&direction=asc')
+    await loaded()
+
+    await waitFor(() => expect(heads()).not.toContain('Opening'))
+    await waitFor(() => expect(lastGamesQuery().get('order')).toBe('played_at'))
+    expect(lastGamesQuery().get('direction')).toBe('desc')
+    // A new browser has no copy of the choice: the list waits for it rather than being read
+    // by Opening first and again newest first a moment later.
+    expect(vi.mocked(fetch).mock.calls.some(([input]) => String(input).includes('order=opening'))).toBe(false)
+    // The owner's sort stands in the address, ready for when the column is back.
+    expect(screen.getByTestId('where')).toHaveTextContent('?order=opening&direction=asc')
+  })
+
+  it('reads the list by a shown column once the choice is in', async () => {
+    stubColumns(null)
+    drawWithAddress('/games?order=opening&direction=asc')
+    await loaded()
+    expect(lastGamesQuery().get('order')).toBe('opening')
+    expect(lastGamesQuery().get('direction')).toBe('asc')
+  })
+
+  it('reads the list newest first while ⇧E takes the Worst column away', async () => {
+    stubColumns(null)
+    setEngineHidden(true)
+    drawWithAddress('/games?order=worst')
+    await loaded()
+
+    expect(heads()).not.toContain('Worst')
+    expect(lastGamesQuery().get('order')).toBe('played_at')
+    expect(vi.mocked(fetch).mock.calls.some(([input]) => String(input).includes('order=worst'))).toBe(false)
+    expect(screen.getByTestId('where')).toHaveTextContent('?order=worst')
+  })
+
+  it('hides a column from Columns in the filter bar, and leaves the arrows to the menu', async () => {
+    const user = userEvent.setup()
+    stubColumns(null)
+    drawWithAddress('/games')
+    await loaded()
+
+    await user.click(screen.getByRole('button', { name: 'Columns' }))
+    const panel = screen.getByRole('dialog', { name: 'Columns' })
+    await user.click(within(panel).getByRole('checkbox', { name: 'Opening' }))
+    expect(heads()).not.toContain('Opening')
+
+    // Inside the menu ↓ and End are the menu's: the rows do not take the focus from it.
+    const box = within(panel).getByRole('checkbox', { name: 'Opening' })
+    box.focus()
+    await user.keyboard('{ArrowDown}{End}')
+    expect(box).toHaveFocus()
+
+    await waitFor(() =>
+      expect(
+        vi.mocked(fetch).mock.calls.some(
+          ([input, init]) => String(input).includes('/api/settings/game-columns') && init?.method === 'PUT',
+        ),
+      ).toBe(true),
+    )
   })
 })

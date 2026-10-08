@@ -9,6 +9,7 @@ import { ApiError } from '@/lib/api/client'
 import { useFailedRuns, useRetryFailed } from '@/lib/api/queries'
 import type { RunResponse } from '@/lib/api/types'
 import { RUN_STYLES, runKind, runLabel, type RunKind } from '@/lib/chess/classification'
+import { useDateFormat } from '@/lib/i18n/dateFormat'
 import { cn } from '@/lib/utils'
 import { formatCount } from '@/routes/games/format'
 // The same absolute stamp the sync history uses, and for the same reason: a list of
@@ -102,6 +103,7 @@ function RetryError({ error }: { error: Error }) {
 
 export function FailedRuns({ failed }: { failed: number }) {
   const { i18n, t } = useLingui()
+  const dateFormat = useDateFormat()
   // Coverage has already counted them, so a library with no failures asks for no listing.
   const runs = useFailedRuns(undefined, { enabled: failed > 0 })
   const retry = useRetryFailed()
@@ -191,7 +193,7 @@ export function FailedRuns({ failed }: { failed: number }) {
                     {group.message}
                   </span>
                   <span className="flex-none font-mono text-meta tabular text-dim-2">
-                    {stamp(group.runs[0]?.finished_at ?? group.runs[0]?.created_at)}
+                    {stamp(group.runs[0]?.finished_at ?? group.runs[0]?.created_at, dateFormat)}
                   </span>
                 </div>
                 <GameList runs={group.runs} />

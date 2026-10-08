@@ -13,6 +13,7 @@ import { ROW } from '@/components/ui/row'
 import { Skeleton } from '@/components/ui/skeleton'
 import { TextLink } from '@/components/ui/text-link'
 import type { PositionOccurrence } from '@/lib/api/types'
+import { useDateFormat } from '@/lib/i18n/dateFormat'
 import { cn } from '@/lib/utils'
 
 import { formatGameDate, formatResult, outcomeTone } from '@/routes/games/format'
@@ -31,6 +32,7 @@ export function GamesInLine({
   libraryHref: string | null
 }) {
   const navigate = useNavigate()
+  const dateFormat = useDateFormat()
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-2.5 max-md:flex-none">
@@ -70,9 +72,10 @@ export function GamesInLine({
                 'flex h-[1.8125rem] flex-none items-center gap-2.5 whitespace-nowrap rounded-sm px-2.5 text-left',
               )}
             >
-              {/* `27 Dec 16` is nine mono glyphs — the cell has to hold them on one line. */}
-              <span className="w-[4.25rem] flex-none text-soft">
-                {formatGameDate(occurrence.game.played_at)}
+              {/* Ten mono glyphs in figures (`08.10.2026`), up to fourteen in words
+                  (`28. Sept. 2026`): a floor rather than a width, so words are never cut. */}
+              <span className="min-w-[10ch] flex-none text-soft">
+                {formatGameDate(occurrence.game.played_at, dateFormat)}
               </span>
               <span className="min-w-0 flex-1 truncate font-sans text-lead text-body">
                 {occurrence.game.opponent ?? '—'}

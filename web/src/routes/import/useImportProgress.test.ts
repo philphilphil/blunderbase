@@ -137,7 +137,14 @@ describe('history formatting', () => {
 
   it('has an em dash for a sync that never finished', () => {
     expect(duration(job('2026-08-26T00:50:19Z', null))).toBe('—')
-    expect(stamp(null)).toBe('—')
-    expect(stamp('not a date')).toBe('—')
+    expect(stamp(null, 'iso')).toBe('—')
+    expect(stamp('not a date', 'iso')).toBe('—')
+  })
+
+  it('stamps a sync with its date in the reader’s format and the time', () => {
+    // Local noon, so the calendar day is the 26th in every test zone.
+    expect(stamp(new Date(2026, 7, 26, 12, 5).toISOString(), 'dmy-dot')).toMatch(
+      /^26\.08\.2026 12:05/,
+    )
   })
 })

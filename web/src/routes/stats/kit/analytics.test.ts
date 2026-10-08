@@ -7,6 +7,7 @@ import {
   deltaTone,
   formatCount,
   formatDelta,
+  fullDate,
   hourLabel,
   lossCounts,
   num,
@@ -87,7 +88,7 @@ describe('anchorOf', () => {
   it('ends the window now when the newest game is today', () => {
     const today = new Date(NOW.getTime() - 3600_000).toISOString()
     expect(anchorOf(today, NOW).getTime()).toBe(NOW.getTime() - 3600_000)
-    expect(windowProse('7d', anchorOf(today, NOW), NOW)).toBe('the last 7 days')
+    expect(windowProse('7d', 'iso', anchorOf(today, NOW), NOW)).toBe('the last 7 days')
   })
 
   it('falls back to now when nothing has been imported or the stamp is junk', () => {
@@ -103,13 +104,14 @@ describe('anchorOf', () => {
 
 describe('windowProse', () => {
   it('reads as "the last N days" while the anchor is current', () => {
-    expect(windowProse('30d', NOW, NOW)).toBe('the last 30 days')
-    expect(windowProse('all', NOW, NOW)).toBe('all time')
+    expect(windowProse('30d', 'iso', NOW, NOW)).toBe('the last 30 days')
+    expect(windowProse('all', 'iso', NOW, NOW)).toBe('all time')
   })
 
-  it('names the date it ends on once the anchor is in the past', () => {
+  it('names the date it ends on once the anchor is in the past, in the reader’s format', () => {
     const anchor = new Date('2016-12-07T13:17:53.000Z')
-    expect(windowProse('90d', anchor, NOW)).toMatch(/^the 90 days to /)
+    expect(windowProse('90d', 'iso', anchor, NOW)).toBe('the 90 days to 2016-12-07')
+    expect(windowProse('90d', 'dmy-dot', anchor, NOW)).toBe('the 90 days to 07.12.2016')
   })
 })
 
@@ -166,14 +168,17 @@ describe('numbers', () => {
   it('formats counts and dates the way the design writes them', () => {
     expect(formatCount(1284)).toBe((1284).toLocaleString())
     expect(formatCount(null)).toBe('—')
-    expect(shortDate(null)).toBe('—')
-    expect(shortDate('not a date')).toBe('—')
+    expect(shortDate(null, 'iso')).toBe('—')
+    expect(shortDate('not a date', 'iso')).toBe('—')
+    expect(shortDate('2016-12-07T13:17:53Z', 'dmy-dot')).toBe('07.12.')
+    expect(fullDate('2016-12-07T13:17:53Z', 'mdy-slash')).toBe('12/07/2016')
     expect(hourLabel('7')).toBe('07:00')
     expect(hourLabel('total')).toBe('total')
   })
 
   it('names a rating_trend bucket by its month', () => {
-    expect(periodLabel('2016-12')).toMatch(/16/)
+    // The whole year, in the page's language: `Dec 16` read as the 16th of December.
+    expect(periodLabel('2016-12')).toBe('Dec 2016')
     expect(periodLabel('total')).toBe('total')
   })
 })

@@ -129,6 +129,7 @@ msgstr "The analysis pass stops at {budget} nodes."
 #: src/components/analysis/AnalyseDialog.tsx
 #: src/routes/game/components/MobileGameView.tsx
 #: src/routes/game/components/MoveList.tsx
+#: src/routes/games/components/columns.ts
 msgid "Moves"
 msgstr "Moves"
 
@@ -1180,6 +1181,19 @@ msgstr "↵ open"
 msgid "type two letters to search your games"
 msgstr "type two letters to search your games"
 
+#: src/components/shell/DateFormatPicker.tsx
+msgid "Automatic ({example})"
+msgstr "Automatic ({example})"
+
+#: src/components/shell/DateFormatPicker.tsx
+#: src/components/shell/SettingsMenu.tsx
+msgid "Date format"
+msgstr "Date format"
+
+#: src/components/shell/DateFormatPicker.tsx
+msgid "How dates are written in lists"
+msgstr "How dates are written in lists"
+
 #: src/components/shell/EngineToggle.tsx
 msgid "Engine hidden. Nothing gives the game away."
 msgstr "Engine hidden. Nothing gives the game away."
@@ -1591,6 +1605,10 @@ msgstr "{hours}h"
 #: src/lib/analysis/useStreamSession.ts
 msgid "Another analysis board took this position over."
 msgstr "Another analysis board took this position over."
+
+#: src/lib/api/queries.ts
+msgid "Could not save the columns"
+msgstr "Could not save the columns"
 
 #: src/lib/board/linePreview.ts
 msgid "after {at}"
@@ -3447,6 +3465,7 @@ msgid "It becomes a library game: its analysis pass is queued, it counts in the 
 msgstr "It becomes a library game: its analysis pass is queued, it counts in the statistics, and the tree stays attached to it — read-only from here on."
 
 #: src/routes/correspondence/components/GameHeader.tsx
+#: src/routes/games/components/columns.ts
 #: src/routes/games/filters.ts
 #: src/routes/notes/filters.ts
 msgid "Result"
@@ -6764,6 +6783,70 @@ msgstr "Opening (ECO)"
 msgid "B22, or just C6"
 msgstr "B22, or just C6"
 
+#: src/routes/games/components/ColumnsMenu.tsx
+msgid "Picked up {column}."
+msgstr "Picked up {column}."
+
+#: src/routes/games/components/ColumnsMenu.tsx
+msgid "{column} is at place {place} of {count}."
+msgstr "{column} is at place {place} of {count}."
+
+#: src/routes/games/components/ColumnsMenu.tsx
+msgid "{column} dropped where it was."
+msgstr "{column} dropped where it was."
+
+#: src/routes/games/components/ColumnsMenu.tsx
+msgid "{column} dropped at place {place} of {count}."
+msgstr "{column} dropped at place {place} of {count}."
+
+#: src/routes/games/components/ColumnsMenu.tsx
+msgid "Moving {column} cancelled; it is back in its place."
+msgstr "Moving {column} cancelled; it is back in its place."
+
+#: src/routes/games/components/ColumnsMenu.tsx
+msgid "To move a column, press Space or Enter on its grip, then the up and down arrow keys, and Space or Enter again to drop it. Escape cancels."
+msgstr "To move a column, press Space or Enter on its grip, then the up and down arrow keys, and Space or Enter again to drop it. Escape cancels."
+
+#: src/routes/games/components/ColumnsMenu.tsx
+msgid "Could not read the column choice"
+msgstr "Could not read the column choice"
+
+#: src/routes/games/components/ColumnsMenu.tsx
+msgid "Choose and order the columns"
+msgstr "Choose and order the columns"
+
+#: src/routes/games/components/ColumnsMenu.tsx
+msgid "Columns"
+msgstr "Columns"
+
+#: src/routes/games/components/ColumnsMenu.tsx
+msgid "One column has to stay"
+msgstr "One column has to stay"
+
+#: src/routes/games/components/ColumnsMenu.tsx
+msgid "Off while the engine is hidden"
+msgstr "Off while the engine is hidden"
+
+#: src/routes/games/components/ColumnsMenu.tsx
+msgid "Move {label} up"
+msgstr "Move {label} up"
+
+#: src/routes/games/components/ColumnsMenu.tsx
+msgid "Move {label} down"
+msgstr "Move {label} down"
+
+#: src/routes/games/components/ColumnsMenu.tsx
+msgid "Reset to default"
+msgstr "Reset to default"
+
+#: src/routes/games/components/ColumnsMenu.tsx
+msgid "Drag {label} to another place"
+msgstr "Drag {label} to another place"
+
+#: src/routes/games/components/ColumnsMenu.tsx
+msgid "Drag to move"
+msgstr "Drag to move"
+
 #: src/routes/games/components/DeleteGamesDialog.tsx
 msgid "{count, plural, one {Delete 1 game} other {Delete # games}}"
 msgstr "{count, plural, one {Delete 1 game} other {Delete # games}}"
@@ -6988,16 +7071,24 @@ msgstr "Add to a collection"
 msgid "Elo"
 msgstr "Elo"
 
-#. Column header, short for "Result", in a 40px column
+#. Column header, short for "Result" — kept short so the figure column stays narrow
 #: src/routes/games/components/columns.ts
 #: src/routes/notes/components/NoteRow.tsx
 msgid "Res"
 msgstr "Res"
 
-#. Column header, short for "Moves", in a 40px column
+#. Column header, short for "Moves" — kept short so the figure column stays narrow
 #: src/routes/games/components/columns.ts
 msgid "Mv"
 msgstr "Mv"
+
+#: src/routes/games/components/columns.ts
+msgid "White's rating"
+msgstr "White's rating"
+
+#: src/routes/games/components/columns.ts
+msgid "Black's rating"
+msgstr "Black's rating"
 
 #: src/routes/games/components/columns.ts
 msgid "Time"
@@ -7053,66 +7144,6 @@ msgstr "has blunders"
 #: src/routes/games/filters.ts
 msgid "no blunders"
 msgstr "no blunders"
-
-#: src/routes/games/format.ts
-msgctxt "month abbreviation"
-msgid "Jan"
-msgstr "Jan"
-
-#: src/routes/games/format.ts
-msgctxt "month abbreviation"
-msgid "Feb"
-msgstr "Feb"
-
-#: src/routes/games/format.ts
-msgctxt "month abbreviation"
-msgid "Mar"
-msgstr "Mar"
-
-#: src/routes/games/format.ts
-msgctxt "month abbreviation"
-msgid "Apr"
-msgstr "Apr"
-
-#: src/routes/games/format.ts
-msgctxt "month abbreviation"
-msgid "May"
-msgstr "May"
-
-#: src/routes/games/format.ts
-msgctxt "month abbreviation"
-msgid "Jun"
-msgstr "Jun"
-
-#: src/routes/games/format.ts
-msgctxt "month abbreviation"
-msgid "Jul"
-msgstr "Jul"
-
-#: src/routes/games/format.ts
-msgctxt "month abbreviation"
-msgid "Aug"
-msgstr "Aug"
-
-#: src/routes/games/format.ts
-msgctxt "month abbreviation"
-msgid "Sep"
-msgstr "Sep"
-
-#: src/routes/games/format.ts
-msgctxt "month abbreviation"
-msgid "Oct"
-msgstr "Oct"
-
-#: src/routes/games/format.ts
-msgctxt "month abbreviation"
-msgid "Nov"
-msgstr "Nov"
-
-#: src/routes/games/format.ts
-msgctxt "month abbreviation"
-msgid "Dec"
-msgstr "Dec"
 
 #. Short for "correspondence", the speed of a game played over days
 #. Short for "correspondence", the speed of a game played over days

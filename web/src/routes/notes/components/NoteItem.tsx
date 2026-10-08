@@ -38,6 +38,7 @@ import { Button } from '@/components/ui/button'
 import { TextLink } from '@/components/ui/text-link'
 import type { NoteResponse } from '@/lib/api/types'
 import { useNotation } from '@/lib/chess/notationPrefs'
+import { useDateFormat, writeDateTime } from '@/lib/i18n/dateFormat'
 import { relative } from '@/lib/mcp/status'
 import { cn } from '@/lib/utils'
 
@@ -89,6 +90,7 @@ export function NoteItem({
   onTagClick,
 }: NoteItemProps) {
   const { t, i18n } = useLingui()
+  const dateFormat = useDateFormat()
   const [editing, setEditing] = useState(false)
   const [confirming, setConfirming] = useState(false)
   const host = useRef<HTMLElement>(null)
@@ -103,7 +105,7 @@ export function NoteItem({
   const move = originLabel(note)
   const sheet = layout === 'sheet'
   // Named because the identifier is the placeholder a translator sees in "written {when}".
-  const when = new Date(note.created_at).toLocaleString()
+  const when = writeDateTime(new Date(note.created_at), dateFormat)
 
   const parts = {
     heads: (

@@ -45,10 +45,10 @@ import {
   useRequestAnalysisBatch,
 } from '@/lib/api/queries'
 import { useLibraryPlace } from '@/lib/libraryPlace'
-import { useEngineHidden } from '@/lib/ui/engineVisibility'
 import { isTyping } from '@/lib/ui/shortcuts'
 
 import { CollectionDialog } from './components/CollectionDialog'
+import { hasSortColumn, sortHidden } from './components/columns'
 import { DeleteGamesDialog } from './components/DeleteGamesDialog'
 import { DebouncedInput, FilterBar } from './components/FilterBar'
 import { GamesTable } from './components/GamesTable'
@@ -73,6 +73,7 @@ import {
 } from './paging'
 import { DEFAULT_SORT, sortFromParams, writeSortParams, type Sort } from './sorting'
 import { useCollectionNames } from './useCollectionNames'
+import { useGameColumns } from './useGameColumns'
 import { useGameLibrary } from './useGameLibrary'
 
 /**
@@ -107,19 +108,37 @@ export function GamesPage() {
   /**
    * The sort the table is actually read under.
    *
-   * Hiding the engine takes the `Worst` column away (`columns.ts`), and the header that
-   * sorted by it goes with the column — so a library left sorted worst-first would go on
-   * being ordered by a verdict, with nothing on screen saying so and no header left to
-   * change it back. It falls back to the default while the engine is hidden.
+   * A column can leave the table while the list is sorted by it: the owner hides it, hiding
+   * the engine takes `Worst` away (`columns.ts`). The header that sorted by it goes with the
+   * column — so a library left sorted worst-first would go on being ordered by a verdict,
+   * with nothing on screen saying so and no header left to change it back. It falls back to
+   * the default while the column is gone (`sortHidden`), and at every width alike: the
+   * phone follows the desktop's choice rather than the breakpoint, so dragging a window
+   * across `md` never re-sorts the list, and the hidden column's sort chip is gone from the
+   * phone's strip too. If Date itself is hidden, the default order stands with no head
+   * marked.
    *
-   * Derived rather than written back over `sort`: the reader's own choice is still their
-   * choice, and it is standing again the moment the engine is.
+   * Derived rather than written back over `sort`: the address keeps the reader's own sort,
+   * which is still their choice and is standing again the moment the column is.
+   *
+   * On a browser with no copy of the choice (a new machine, a private window) the columns
+   * are not known until the server answers, so neither is this sort. A list sorted by a
+   * column's key waits for that answer rather than being read in the address's order and
+   * then read again, re-sorted under the reader, once the column turns out to be hidden. The
+   * default order, and every visit with a copy here, starts at once.
    */
-  const engineHidden = useEngineHidden()
-  const readSort = engineHidden && sort.key === 'worst' ? DEFAULT_SORT : sort
+  const { columns, resolved } = useGameColumns()
+  const readSort = sortHidden(columns, sort.key) ? DEFAULT_SORT : sort
+  const sortWaits = !resolved && sort.key !== DEFAULT_SORT.key && hasSortColumn(sort.key)
 
   const rowsPerPage = resolvePageSize(pageSize, fitRows)
-  const library = useGameLibrary({ filters, sort: readSort, page, pageSize: rowsPerPage })
+  const library = useGameLibrary({
+    filters,
+    sort: readSort,
+    page,
+    pageSize: rowsPerPage,
+    enabled: !sortWaits,
+  })
   const rows = library.games
   // The row button queues one game through the same call: one id is a batch of one, and
   // one path here is one receipt and one set of spinning rows. Deleting works the same way.

@@ -53,6 +53,7 @@ import type {
 } from '@/lib/api/types'
 import type { RuntimeCapabilities } from '@/lib/api/types'
 import { collectionPath } from '@/lib/collections'
+import { useDateFormat, type DateFormat } from '@/lib/i18n/dateFormat'
 import { useRuntimeCapabilities } from '@/lib/runtime/capabilities'
 import { cn } from '@/lib/utils'
 import { paramsFromFilters } from '@/routes/games/filters'
@@ -319,6 +320,7 @@ function searchItems(
   opponents: OpponentHit[],
   openings: OpeningHit[],
   notes: NoteResponse[],
+  dateFormat: DateFormat,
 ): PaletteItem[] {
   const items: PaletteItem[] = []
 
@@ -328,7 +330,7 @@ function searchItems(
       group: 'Games',
       label: gameLabel(i18n, game),
       hint: gameHint(game),
-      trailing: `${formatResult(game.result)}  ${formatGameDate(game.played_at)}`,
+      trailing: `${formatResult(game.result)}  ${formatGameDate(game.played_at, dateFormat)}`,
       trailingClass: outcomeTone(game.outcome),
       icon: Swords,
       to: `/games/${game.id}`,
@@ -369,7 +371,7 @@ function searchItems(
       group: 'Notes',
       label: oneLine(note),
       hint: note.tags.length ? note.tags.join(' · ') : i18n._(msg`note`),
-      trailing: formatGameDate(note.updated_at),
+      trailing: formatGameDate(note.updated_at, dateFormat),
       icon: NotesIcon,
       to: noteHref(note),
     })
@@ -442,6 +444,7 @@ function Dialog({ onClose }: { onClose: () => void }) {
   const search = useSearch(query, PER_GROUP)
   const capabilities = useRuntimeCapabilities()
   const collections = useCollections().data?.collections
+  const dateFormat = useDateFormat()
   const { t, i18n } = useLingui()
 
   const needle = query.trim().toLowerCase()
@@ -452,9 +455,16 @@ function Dialog({ onClose }: { onClose: () => void }) {
     if (needle.length < MIN_QUERY || !answered) return pages
     return [
       ...pages,
-      ...searchItems(i18n, answered.games, answered.opponents, answered.openings, answered.notes),
+      ...searchItems(
+        i18n,
+        answered.games,
+        answered.opponents,
+        answered.openings,
+        answered.notes,
+        dateFormat,
+      ),
     ]
-  }, [i18n, needle, saved, answered, capabilities, collections, statsSearch])
+  }, [i18n, needle, saved, answered, capabilities, collections, statsSearch, dateFormat])
 
   // A new set of rows starts at the top: the highlight belongs to the list, not to a
   // position that happened to survive a keystroke. Adjusted during the render that

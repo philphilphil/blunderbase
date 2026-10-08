@@ -224,6 +224,28 @@ export interface TourState {
   seen: boolean
 }
 
+/**
+ * `GET`/`PUT /settings/game-columns` — which of the games list's columns are shown, and in
+ * what order (`routes/games/components/columns.ts`).
+ *
+ * Stored with the library rather than in this browser for the tour's reason: it is the
+ * owner's choice about their own list, and a second machine drawing the list differently
+ * would be a second list. `order` is every column, left to right, hidden ones included —
+ * and any id this build does not know, kept in its place so an older tab cannot drop a
+ * newer build's column; `hidden` is the ones not shown. Empty lists are the default. The
+ * demo is the exception and keeps its own copy — see `lib/games/demoColumns.ts`.
+ */
+export interface GameColumns {
+  order: string[]
+  hidden: string[]
+}
+
+/** The body of the `PUT`: the whole arrangement, or `order: null` to put the default back. */
+export interface GameColumnsUpdate {
+  order: string[] | null
+  hidden: string[]
+}
+
 // --- games ----------------------------------------------------------------
 
 export interface GameSummary extends Extra {

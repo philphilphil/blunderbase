@@ -48,6 +48,7 @@ import { ViewToggle, type ViewOption } from '@/components/ui/view-toggle'
 import { useCollectionOverview } from '@/lib/api/queries'
 import type { CollectionDetail } from '@/lib/api/types'
 import { collectionPath, collectionStatsPath, isRuleEmpty } from '@/lib/collections'
+import { useDateFormat } from '@/lib/i18n/dateFormat'
 import { cn } from '@/lib/utils'
 import { CollectionDialog } from '@/routes/games/components/CollectionDialog'
 import { formatCount, formatGameDate, formatPoints } from '@/routes/games/format'
@@ -220,8 +221,9 @@ const DASH = '—'
 
 function useFigures(collection: CollectionDetail): Figures {
   const { t } = useLingui()
+  const dateFormat = useDateFormat()
   const summary = collection.summary
-  const last = summary.last_played_at ? formatGameDate(summary.last_played_at) : null
+  const last = summary.last_played_at ? formatGameDate(summary.last_played_at, dateFormat) : null
   if (summary.games === 0) {
     return {
       score: DASH,

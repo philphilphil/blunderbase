@@ -53,7 +53,8 @@ Filter macht wieder **Partien (gefiltert)** daraus.
 
 ## In der Tabelle suchen { #search-the-table }
 
-Das Feld **Partien filtern: Gegner, ECO, PGN …** am rechten Ende der Filterleiste sucht in
+Das Feld **Partien filtern: Gegner, ECO, PGN …** rechts in der Filterleiste, vor
+**Spalten**, sucht in
 Gegnername, ECO-Code und im Text des PGN. `/` setzt den Cursor von überall auf der Seite
 hinein; **Esc** holt ihn wieder heraus, die Suche bleibt stehen.
 
@@ -68,14 +69,48 @@ einen selbst gespeicherten, erscheint das Kreuz zum Entfernen. Wählst du einen 
 oder über `⌘K`, bleibt die Tabelle so sortiert, wie sie war, und der Eintrag bleibt
 hervorgehoben, egal wie du sortierst oder blätterst.
 
+## Spalten auswählen und anordnen { #choose-and-arrange-the-columns }
+
+**Spalten** am rechten Ende der Filterleiste, hinter dem Suchfeld, öffnet eine Liste der
+Spalten der Tabelle. Ein Haken zeigt eine Spalte, ohne Haken ist sie ausgeblendet. Um eine
+Spalte zu verschieben, ziehst du sie am Griff vorn in ihrer Zeile an die gewünschte
+Stelle, oder du rückst sie mit den Pfeilen am Zeilenende Schritt für Schritt weiter; oben
+in der Liste heißt links in der Tabelle. Mit der Tastatur hebt die Leertaste auf dem Griff
+die Spalte an, die Pfeiltasten nach oben und unten tragen sie, die Leertaste legt sie ab,
+und Escape stellt sie zurück, wo sie war. Jede Änderung wirkt sofort und bleibt erhalten;
+**Auf Standard zurücksetzen**
+holt alle Spalten in ihrer ursprünglichen Reihenfolge zurück. Eine Spalte muss bleiben,
+deshalb ist das Kästchen der letzten Spalte, die noch einen Haken trägt, ausgegraut.
+**Verlust**, **Symbole** und **Sammlungen** zählen dabei nicht mit, denn `⇧E` und das
+Löschen deiner letzten Sammlung nehmen sie ohnehin weg.
+
+Die Spalte, die zuletzt ganz rechts steht, bekommt den übrigen Platz, und der Papierkorb
+der Zeile rückt an ihr Ende. Ist die Liste nach einer Spalte sortiert, die du ausblendest,
+fällt sie stattdessen auf „neueste zuerst“ zurück – auf jeder Bildschirmgröße, bis die
+Spalte wieder da ist; die Adresse behält deine Sortierung. Ohne **Datum** bleibt es bei
+„neueste zuerst“, nur ist dann keine Überschrift markiert.
+
+Auf dem Handy, wo eine Zeile eine Karte ist, fehlt die Schaltfläche. Die Karte behält ihre
+Felder, egal was du gewählt hast; nur über den Karten fehlt der Sortierknopf einer
+ausgeblendeten Spalte.
+
+Die Auswahl liegt bei deiner Bibliothek und ist deshalb auf jedem Gerät dieselbe, auf dem
+du Blunderbase öffnest. Nur in der öffentlichen Demo bleibt sie in deinem Browser.
+**Spalten** bleibt ausgegraut, bis deine Auswahl vom Server angekommen ist, damit keine
+Änderung auf einem bloßen Platzhalter landet. Lässt sie sich nicht lesen, behält die
+Tabelle die Spalten, die dieser Browser zuletzt gezeigt hat, und der Hinweis an der
+Schaltfläche sagt es.
+
 ## Sortieren und blättern { #sort-and-page }
 
 Ein Klick auf eine Spaltenüberschrift sortiert danach, ein zweiter dreht die Richtung um;
 die sortierte Spalte trägt einen Pfeil. Sortiert wird die ganze gefilterte Liste, nicht nur
 die sichtbare Seite. **Zeilen** in der Fußzeile legt fest, wie viele Zeilen eine Seite hat –
 **Fit** sind so viele, wie ins Fenster passen –, und ‹ › daneben blättern um die aktuelle
-Seite herum. Ist das Fenster zu schmal für alle Spalten, lässt sich die Tabelle seitwärts
-schieben; ein Verlauf am rechten Rand zeigt, dass dort noch mehr steht.
+Seite herum. Jede Spalte ist so breit, wie es ihr Inhalt auf der Seite verlangt; Namen,
+Eröffnungen und lange Bedenkzeiten enden ab einer gewissen Breite mit „…“, und wenn du mit
+dem Zeiger darüberfährst, siehst du sie ganz. Ist das Fenster zu schmal für alle Spalten, lässt sich
+die Tabelle seitwärts schieben; ein Verlauf am rechten Rand zeigt, dass dort noch mehr steht.
 
 Die Spalte **Analyse** sagt schlicht **Analysiert**, in Lila, wenn eine von dir angeforderte
 Analyse dabei ist. Bei einer Partie, die noch nichts analysiert hat, steht dort
@@ -87,15 +122,16 @@ eingefärbt.
 ihren Zügen und zu ihren angehefteten Varianten; eine Notiz aus einer anderen Partie, die
 dieselbe Stellung erreicht hat, zählt nicht mit. Nach dieser Spalte sortiert, findest du die
 Partien, die du kommentiert hast.
-Die letzte Spalte, **Sammlungen**, nennt die Sammlungen, in denen eine Partie liegt, durch
-Kommas getrennt; sie erscheint erst, wenn du eine Sammlung angelegt hast.
+**Sammlungen** nennt die Sammlungen, in denen eine Partie liegt, durch Kommas getrennt; die
+Spalte erscheint erst, wenn du eine Sammlung angelegt hast.
 
 ## Die Liste ohne Engine lesen { #read-the-list-without-the-engine }
 
 `⇧E` oder der Schalter **Engine ausblenden** in der Titelleiste nimmt der Tabelle die
-Spalten **Verlust** und **Symbole**. Die Tabelle sagt dann, was du gespielt hast, und nicht,
-wie gut. Eine Liste, die nach **Verlust** sortiert war, fällt solange auf „neueste zuerst“
-zurück. Der Filter **Analyse** wirkt weiter – eine Frage, die du gestellt hast, ist keine
+Spalten **Verlust** und **Symbole**, egal, was unter **Spalten** gewählt ist. Die Tabelle
+sagt dann, was du gespielt hast, und nicht, wie gut; in der Liste unter **Spalten** sind
+beide als ausgeschaltet markiert, solange die Engine ausgeblendet ist. Eine Liste, die nach
+**Verlust** sortiert war, fällt solange auf „neueste zuerst“ zurück. Der Filter **Analyse** wirkt weiter – eine Frage, die du gestellt hast, ist keine
 Antwort, die dir jemand gegeben hat –, und **Analysieren**, das eine Partie einreiht, die
 noch niemand angesehen hat, steht weiterhin in ihrer Zeile. Alles zum Modus steht unter
 [Einstellungen](settings.md#hide-the-engine).
@@ -137,4 +173,5 @@ du verschicken oder als Lesezeichen ablegen kannst. Auch Sortierung und aktuelle
 stehen darin; deshalb landest du nach dem Zurückgehen aus einer Partie – mit Zurück oder
 über den Pfad in ihrer Titelleiste – wieder auf derselben Seite in derselben
 Reihenfolge. Die Zeilen pro Seite gehören nicht dazu, die merkt sich dein
-Browser für dich.
+Browser für dich. Die Spalten ebenso wenig: Sie liegen bei der Bibliothek, nicht im Link
+([Spalten auswählen und anordnen](#choose-and-arrange-the-columns)).

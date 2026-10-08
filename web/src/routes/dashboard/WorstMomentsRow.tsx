@@ -47,11 +47,12 @@ import type { MomentResponse } from '@/lib/api/types'
 import { glyphStyle } from '@/lib/chess/classification'
 import { formatWinLoss } from '@/lib/chess/evaluation'
 import { useNotation } from '@/lib/chess/notationPrefs'
+import { useDateFormat } from '@/lib/i18n/dateFormat'
 import type { Notate } from '@/lib/chess/notation'
 import { cn } from '@/lib/utils'
 
 import { Bar, EmptyBlock, ErrorBlock } from '@/routes/stats/kit/states'
-import { shortDate } from '@/routes/stats/kit/analytics'
+import { fullDate } from '@/routes/stats/kit/analytics'
 
 /** Six: two rows of three on a laptop, one row on a wide screen. */
 const COUNT = 6
@@ -109,6 +110,7 @@ const CARD = 'flex flex-col gap-1.5 rounded-md p-1.5'
 
 function MomentCard({ moment }: { moment: MomentResponse }) {
   const { t, i18n } = useLingui()
+  const dateFormat = useDateFormat()
   // Stable identities, so the board reconfigures only when the moment itself changes.
   const squares = useMemo(() => squaresOf(moment.uci), [moment.uci])
   const arrows = useMemo(() => arrowsOf(moment.best_move_uci), [moment.best_move_uci])
@@ -170,7 +172,8 @@ function MomentCard({ moment }: { moment: MomentResponse }) {
           </div>
         ) : null}
         <div className="truncate text-label text-dim-2">
-          {opponent} · {shortDate(moment.game.played_at)}
+          {/* The whole date: the worst moments can reach back years into an archive. */}
+          {opponent} · {fullDate(moment.game.played_at, dateFormat)}
         </div>
       </div>
     </Link>

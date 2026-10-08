@@ -15,6 +15,7 @@ import type {
   CorrespondenceMark,
   CorrespondenceTreeNode,
 } from '@/lib/api/types'
+import { writeDate, writeDayMonth, type DateFormat } from '@/lib/i18n/dateFormat'
 
 /** The three cuts of the list, in the order the page prints them. */
 export interface CorrespondenceSections {
@@ -131,12 +132,20 @@ export function duePhrase(daysLeft: number | null | undefined): DuePhrase | null
   }
 }
 
-/** A timestamp as a plain date, in the reader's locale. Empty for anything unparseable. */
-export function shortDate(iso: string | null | undefined, locale: string): string {
+/**
+ * A timestamp as a plain date in the reader's date format (`lib/i18n/dateFormat`): the day
+ * and month alone for a reply due within weeks, the whole date with `year` for a game that
+ * may have finished long ago. Empty for anything unparseable.
+ */
+export function shortDate(
+  iso: string | null | undefined,
+  format: DateFormat,
+  { year = false }: { year?: boolean } = {},
+): string {
   if (!iso) return ''
   const at = new Date(iso)
   if (Number.isNaN(at.getTime())) return ''
-  return at.toLocaleDateString(locale, { day: 'numeric', month: 'short' })
+  return year ? writeDate(at, format) : writeDayMonth(at, format)
 }
 
 /** An ISO timestamp as the `yyyy-mm-dd` a native date input takes, in local time. */

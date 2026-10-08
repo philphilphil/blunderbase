@@ -22,6 +22,12 @@ been through the orientation tour. It hangs off this prefix because it is stored
 these are and read by nobody else, and it keeps its own pair of routes because the PUT
 above rewrites every key it names — a flag about the person has no business being cleared
 by a save of a node budget.
+
+`/settings/game-columns` is the same kind of neighbour: which columns the games list shows
+and in what order, kept with the library so every device draws the list alike. A PUT is the
+whole arrangement and answers with what was kept of it; `order: null` puts the default back.
+The public demo refuses the PUT like every write, and its page keeps the choice in the
+browser instead.
 """
 
 from __future__ import annotations
@@ -30,7 +36,14 @@ from fastapi import APIRouter, Request
 from sqlalchemy.orm import Session
 
 from backend.api.deps import SessionDep
-from backend.api.schemas import AppSettings, AppSettingsUpdate, TourState, TourUpdate
+from backend.api.schemas import (
+    AppSettings,
+    AppSettingsUpdate,
+    GameColumns,
+    GameColumnsUpdate,
+    TourState,
+    TourUpdate,
+)
 from backend.services import app_settings as app_settings_service
 
 router = APIRouter(prefix="/settings", tags=["settings"])
@@ -81,6 +94,20 @@ def get_tour(session: SessionDep) -> TourState:
 def put_tour(session: SessionDep, body: TourUpdate) -> TourState:
     """`seen: false` is "Show the tour again" — the row goes rather than holding a 0."""
     return TourState(seen=app_settings_service.set_tour_seen(session, body.seen))
+
+
+@router.get("/game-columns", response_model=GameColumns, summary="The games list's columns")
+def get_game_columns(session: SessionDep) -> GameColumns:
+    """Empty lists mean the owner has not arranged them, and the page shows its default."""
+    return GameColumns(**app_settings_service.get_game_columns(session))
+
+
+@router.put("/game-columns", response_model=GameColumns, summary="Arrange the games list")
+def put_game_columns(session: SessionDep, body: GameColumnsUpdate) -> GameColumns:
+    """Answers with the arrangement in force: badly formed and repeated ids are dropped,
+    hidden ids not in `order` too, and an `order` with nothing left in it is the default."""
+    value = None if body.order is None else {"order": body.order, "hidden": body.hidden}
+    return GameColumns(**app_settings_service.set_game_columns(session, value))
 
 
 def _answer(session: Session, values: dict[str, int | float | None]) -> AppSettings:

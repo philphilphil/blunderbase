@@ -10,6 +10,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { AuthGate } from '@/app/AuthGate'
 import { Providers } from '@/app/Providers'
+import { getDateFormat, resetDateFormat, writeDate } from '@/lib/i18n/dateFormat'
 import { TourProvider } from '@/lib/tour/TourProvider'
 
 import { PageChromeProvider, SetPageChrome } from './PageChrome'
@@ -82,7 +83,11 @@ beforeEach(() => {
   )
 })
 
-afterEach(() => vi.unstubAllGlobals())
+afterEach(() => {
+  vi.unstubAllGlobals()
+  localStorage.removeItem('blunderbase.dateFormat')
+  resetDateFormat()
+})
 
 async function openMenu() {
   await userEvent.click(await screen.findByRole('button', { name: 'Settings' }))
@@ -185,6 +190,33 @@ describe('SettingsMenu', () => {
     const keys = screen.getByRole('menuitem', { name: /keyboard shortcuts/i })
     // The row prints the key that opens the list from anywhere.
     expect(keys.querySelector('kbd')).toHaveTextContent('?')
+  })
+
+  it('picks the date format from today written each way, kept in this browser', async () => {
+    const user = userEvent.setup()
+    draw()
+    await openMenu()
+
+    const picker = screen.getByRole('combobox', { name: 'Date format' })
+    expect(picker).toHaveValue('auto')
+    const today = new Date()
+    const options = Array.from((picker as HTMLSelectElement).options).map((option) => option.text)
+    expect(options).toEqual([
+      `Automatic (${writeDate(today, 'auto')})`,
+      writeDate(today, 'dmy-dot'),
+      writeDate(today, 'mdy-slash'),
+      writeDate(today, 'dmy-slash'),
+      writeDate(today, 'iso'),
+      writeDate(today, 'words'),
+    ])
+
+    await user.selectOptions(picker, 'iso')
+    expect(getDateFormat()).toBe('iso')
+    expect(localStorage.getItem('blunderbase.dateFormat')).toBe('iso')
+    // The menu's arrow walk leaves a select's own arrows alone.
+    picker.focus()
+    await user.keyboard('{ArrowDown}')
+    expect(document.activeElement).toBe(picker)
   })
 
   it('carries the ways into the installation and the two things an owner does to a session', async () => {

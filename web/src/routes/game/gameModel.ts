@@ -39,7 +39,7 @@ import type {
 import { isFlagged } from '@/lib/chess/classification'
 import { winPercent, type Score } from '@/lib/chess/evaluation'
 import { formatClock } from '@/lib/chess/timeControl'
-import { dateLocale } from '@/lib/i18n/locale'
+import { writeDate, type DateFormat } from '@/lib/i18n/dateFormat'
 
 export type Side = 'white' | 'black'
 
@@ -309,16 +309,12 @@ export function formatTimeControl(game: GameSummary): string | null {
   return speed ?? clock
 }
 
-/** `22 Aug 2026` — the breadcrumb and header date format. */
-export function formatGameDate(played: string | null | undefined): string {
+/** The header's date, in the reader's date format like every list's (`lib/i18n/dateFormat`). */
+export function formatGameDate(played: string | null | undefined, format: DateFormat): string {
   if (!played) return t`undated`
   const value = new Date(played)
   if (Number.isNaN(value.getTime())) return t`undated`
-  return value.toLocaleDateString(dateLocale(), {
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-  })
+  return writeDate(value, format)
 }
 
 // --- evaluations ----------------------------------------------------------

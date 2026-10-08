@@ -12,6 +12,7 @@ import { useQuery } from '@tanstack/react-query'
 import * as api from '@/lib/api/endpoints'
 import { queryKeys } from '@/lib/api/keys'
 import type { GameFilters, StatsBucket, StatsResponse } from '@/lib/api/types'
+import { writeDate, writeDayMonth, writeMonth, type DateFormat } from '@/lib/i18n/dateFormat'
 
 // --- windows --------------------------------------------------------------
 
@@ -93,20 +94,20 @@ export function windowRange(window: WindowKey, anchor: Date = new Date()): Perio
   return { since: since.toISOString(), until: anchor.toISOString() }
 }
 
-/** "the last 30 days", or "the 30 days to 7 Dec 2016" when the anchor is in the past. */
+/**
+ * "the last 30 days", or "the 30 days to 07.12.2016" when the anchor is in the past — the
+ * end written in the reader's date format.
+ */
 export function windowProse(
   window: WindowKey,
+  format: DateFormat,
   anchor: Date = new Date(),
   now: Date = new Date(),
 ): string {
   if (window === 'all') return windowProseNow('all')
   // A day of slack, so "yesterday evening" still reads as the last N days.
   if (now.getTime() - anchor.getTime() <= DAY_MS) return windowProseNow(window)
-  const to = anchor.toLocaleDateString(undefined, {
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-  })
+  const to = writeDate(anchor, format)
   const days = WINDOW_DAYS[window]
   return t`the ${days} days to ${to}`
 }
@@ -255,51 +256,41 @@ export function formatCount(value: number | null | undefined): string {
   return Math.round(value).toLocaleString()
 }
 
-/** `2016-12-07T13:17:53Z` -> `7 Dec`. */
-export function shortDate(value: string | null | undefined): string {
+/**
+ * `2016-12-07T13:17:53Z` -> `07.12.` — the day without its year, in the reader's date format,
+ * for a tick or a line whose year is plain from around it.
+ */
+export function shortDate(value: string | null | undefined, format: DateFormat): string {
   if (!value) return '—'
   const stamp = new Date(value)
   if (Number.isNaN(stamp.getTime())) return '—'
-  return stamp.toLocaleDateString(undefined, {
-    day: 'numeric',
-    month: 'short',
-  })
+  return writeDayMonth(stamp, format)
 }
 
 /** `2016-12-07T13:17:53Z` -> `Dec 2016` — the tick for a window long enough that a day
- * without a year says nothing. */
+ * without a year says nothing (`writeMonth`). */
 export function monthYear(value: string | null | undefined): string {
   if (!value) return '—'
   const stamp = new Date(value)
   if (Number.isNaN(stamp.getTime())) return '—'
-  return stamp.toLocaleDateString(undefined, {
-    month: 'short',
-    year: 'numeric',
-  })
+  return writeMonth(stamp)
 }
 
-/** `2016-12-07T13:17:53Z` -> `7 Dec 2016` — the tooltip, where there is room to be exact. */
-export function fullDate(value: string | null | undefined): string {
+/**
+ * `2016-12-07T13:17:53Z` -> `07.12.2016` — the tooltip, where there is room to be exact, in
+ * the reader's date format.
+ */
+export function fullDate(value: string | null | undefined, format: DateFormat): string {
   if (!value) return '—'
   const stamp = new Date(value)
   if (Number.isNaN(stamp.getTime())) return '—'
-  return stamp.toLocaleDateString(undefined, {
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-  })
+  return writeDate(stamp, format)
 }
 
-/** `2016-12` (a `rating_trend` bucket key) -> `Dec 16`. */
+/** `2016-12` (a `rating_trend` bucket key) -> `Dec 2016` (`writeMonth`). */
 export function periodLabel(key: string): string {
   const monthly = /^(\d{4})-(\d{2})$/.exec(key)
-  if (monthly) {
-    const stamp = new Date(Number(monthly[1]), Number(monthly[2]) - 1, 1)
-    return stamp.toLocaleDateString(undefined, {
-      month: 'short',
-      year: '2-digit',
-    })
-  }
+  if (monthly) return writeMonth(new Date(Number(monthly[1]), Number(monthly[2]) - 1, 1))
   return key
 }
 

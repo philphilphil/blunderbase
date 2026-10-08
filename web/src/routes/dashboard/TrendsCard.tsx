@@ -16,6 +16,7 @@ import { Segmented } from '@/components/ui/segmented'
 import { useStats } from '@/lib/api/queries'
 import { useProfile } from '@/lib/api/queries'
 import type { GameFilters, StatsBucket } from '@/lib/api/types'
+import { useDateFormat, writeDate, writeDayMonth } from '@/lib/i18n/dateFormat'
 import { cn } from '@/lib/utils'
 
 import {
@@ -74,6 +75,7 @@ const DAY_MS = 86_400_000
 
 export function TrendsCard({ className }: { className?: string }) {
   const { t, i18n } = useLingui()
+  const dateFormat = useDateFormat()
   const profile = useProfile()
   const lastGame =
     typeof profile.data?.volume?.last_game === 'string' ? profile.data.volume.last_game : null
@@ -132,19 +134,18 @@ export function TrendsCard({ className }: { className?: string }) {
   const days = WINDOW_DAYS[windowKey as Exclude<WindowKey, 'all'>]
 
   // The detail line wants only the end of the window, where `windowProse` gives the whole
-  // of it — "to today" or "to 7 Dec 2016". It used to be that prose with the front cut off
+  // of it — "to today" or "to 07.12.2016". It used to be that prose with the front cut off
   // by a regex, which stopped matching the moment the prose could arrive in another
   // language; the two halves are built here instead.
-  // The year only when it is not this one: "to Sep 5" beside the segment fits the rail,
-  // "to Sep 5, 2026" was cut to "to Sep 5,…" there.
-  const until = anchor.toLocaleDateString(undefined, {
-    day: 'numeric',
-    month: 'short',
-    ...(anchor.getFullYear() === new Date().getFullYear() ? {} : { year: 'numeric' }),
-  })
+  // The year only when it is not this one: "to 05.09." beside the segment fits the rail,
+  // where a whole date with its year was cut short. Both in the reader's date format.
+  const until =
+    anchor.getFullYear() === new Date().getFullYear()
+      ? writeDayMonth(anchor, dateFormat)
+      : writeDate(anchor, dateFormat)
   const ending = endsToday ? t`to today` : t`to ${until}`
   const played = plural(games, { one: '# game', other: '# games' })
-  const period = windowProse(windowKey, anchor)
+  const period = windowProse(windowKey, dateFormat, anchor)
 
   return (
     <section className={cn('flex flex-col gap-2', className)}>

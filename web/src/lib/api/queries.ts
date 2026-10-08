@@ -14,9 +14,13 @@ import {
   type UseMutationOptions,
   type UseQueryOptions,
 } from '@tanstack/react-query'
-import { useEffect, useState } from 'react'
+import { useLingui } from '@lingui/react/macro'
+import { useCallback, useEffect, useState } from 'react'
 
 import { ownWrite } from '@/lib/events/ownWrites'
+import { readLocalColumns, writeLocalColumns } from '@/lib/games/demoColumns'
+import { useRuntimeCapabilities } from '@/lib/runtime/capabilities'
+import { toast } from '@/lib/toast'
 
 import { ApiError, type Download } from './client'
 import * as api from './endpoints'
@@ -48,6 +52,8 @@ import type {
   EngineDeleteResult,
   EngineRolesUpdate,
   EngineUpdate,
+  GameColumns,
+  GameColumnsUpdate,
   GameFilters,
   GamesDeleted,
   GameSummary,
@@ -251,6 +257,137 @@ export function useSetTourSeen(options?: UseMutationOptions<TourState, Error, bo
       options?.onSuccess?.(...args)
     },
   })
+}
+
+/**
+ * Column saves sent and not yet settled, per client. `useSaveGameColumns` keeps it rather
+ * than asking `isMutating`, because how a scoped mutation still waiting its turn is counted
+ * there is not something to lean on — and the whole point of the count is the saves that
+ * are waiting. Per client so that two test clients cannot see each other's saves.
+ */
+const columnSaves = new WeakMap<QueryClient, number>()
+
+function pendingColumnSaves(client: QueryClient): number {
+  return columnSaves.get(client) ?? 0
+}
+
+/**
+ * Bumped when a column save is sent and again when it settles, per client. A read compares
+ * it from when it was asked to when it is answered: a read asked before a save settled may
+ * have been served the row from before that save, even though no save is pending by the
+ * time its answer lands — the pending count alone, looked at on arrival, would take it.
+ */
+const columnSaveRounds = new WeakMap<QueryClient, number>()
+
+function columnSaveRound(client: QueryClient): number {
+  return columnSaveRounds.get(client) ?? 0
+}
+
+function nextColumnSaveRound(client: QueryClient): void {
+  columnSaveRounds.set(client, columnSaveRound(client) + 1)
+}
+
+/**
+ * How the owner arranged the games list's columns (`routes/games/useGameColumns.ts` turns
+ * it into the list's columns).
+ *
+ * Until the server answers, the list is drawn from this browser's copy of the last answer
+ * (`lib/games/demoColumns.ts`), so a reload shows the owner's columns rather than flashing
+ * the default first; every answer rewrites that copy, so a change made on another machine
+ * is where the next visit here starts. On the read-only demo there is no server copy to ask
+ * for — the visitor's choice cannot be written there — so the query is off and the browser's
+ * copy is the answer. `enabled` is set only there, so a caller's (or a test client's)
+ * default stands everywhere else.
+ *
+ * An answer that lands while a save is still on its way, or that was asked for before a save
+ * settled, may be older than what is on screen, so it is not taken — not into the cache and
+ * not into this browser's copy: the save's own answer settles it (`useSaveGameColumns`).
+ * The read is cancellable, so the one a click cancels really stops rather than landing late.
+ */
+export function useGameColumnsPref(options?: Options<GameColumns>) {
+  const client = useQueryClient()
+  const { read_only: demo } = useRuntimeCapabilities()
+  return useQuery({
+    queryKey: queryKeys.gameColumns(),
+    queryFn: async ({ signal }) => {
+      const asked = columnSaveRound(client)
+      const answer = await api.getGameColumns(signal)
+      if (pendingColumnSaves(client) > 0 || columnSaveRound(client) !== asked) {
+        return client.getQueryData<GameColumns>(queryKeys.gameColumns()) ?? answer
+      }
+      writeLocalColumns(answer)
+      return answer
+    },
+    placeholderData: () => readLocalColumns() ?? undefined,
+    ...(demo ? { enabled: false, initialData: () => readLocalColumns() ?? undefined } : {}),
+    ...options,
+  })
+}
+
+/**
+ * Save an arrangement of the games list's columns — the app's first optimistic write.
+ *
+ * A column choice is a click whose answer the owner is already looking at: the list is
+ * redrawn the moment a box is ticked, not a round trip later, and fifteen quick moves in the
+ * column menu must not wait on fifteen. So `save` writes the cache and this browser's copy
+ * itself, at click time — not in `onMutate`, which for a scoped mutation waits its turn —
+ * and only then sends the PUT.
+ *
+ * The PUTs go out one at a time, in click order (`scope`): sent side by side they could land
+ * in any order and leave the server with an older arrangement than the screen. Every PUT
+ * carries the whole arrangement, so there is nothing to roll back to: the newest save to
+ * settle is complete. Its answer is taken only when no newer save is still waiting behind
+ * it — an earlier answer would put back a state the owner has already clicked past. A
+ * failure says so in a toast (the column menu is a popover, with no panel to put a red line
+ * in), and when it was the newest save, the list is asked for again, so the screen and this
+ * browser's copy come back to what the server actually holds.
+ *
+ * On the read-only demo nothing is sent: the browser's copy is the visitor's only one, and
+ * a PUT would only be refused with a "read-only" toast on every click.
+ */
+export function useSaveGameColumns() {
+  const client = useQueryClient()
+  const { read_only: demo } = useRuntimeCapabilities()
+  const { t } = useLingui()
+  const { mutate } = useMutation({
+    mutationKey: queryKeys.gameColumns(),
+    scope: { id: 'gameColumns' },
+    mutationFn: (body: GameColumnsUpdate) => api.saveGameColumns(body),
+    // On the options, not on `mutate`: these run for every save, not only the latest.
+    onSuccess: (answer) => {
+      if (pendingColumnSaves(client) !== 1) return
+      client.setQueryData(queryKeys.gameColumns(), answer)
+      writeLocalColumns(answer)
+    },
+    onError: () => {
+      toast.error(t`Could not save the columns`)
+    },
+    onSettled: (_answer, error) => {
+      const left = Math.max(0, pendingColumnSaves(client) - 1)
+      columnSaves.set(client, left)
+      // Before the read below is asked, so that read counts as asked after this save.
+      nextColumnSaveRound(client)
+      // Asked again only once this save no longer counts, or the read would see it still
+      // pending and keep the failed state on screen instead of the server's.
+      if (error && left === 0) void client.invalidateQueries({ queryKey: queryKeys.gameColumns() })
+    },
+  })
+  const save = useCallback(
+    (body: GameColumnsUpdate) => {
+      const shown: GameColumns =
+        body.order === null ? { order: [], hidden: [] } : { order: body.order, hidden: body.hidden }
+      // A read in flight was asked before this click, and would land over it.
+      void client.cancelQueries({ queryKey: queryKeys.gameColumns() })
+      client.setQueryData(queryKeys.gameColumns(), shown)
+      writeLocalColumns(shown)
+      if (demo) return
+      columnSaves.set(client, pendingColumnSaves(client) + 1)
+      nextColumnSaveRound(client)
+      mutate(body)
+    },
+    [client, demo, mutate],
+  )
+  return { save }
 }
 
 // --- games ----------------------------------------------------------------
