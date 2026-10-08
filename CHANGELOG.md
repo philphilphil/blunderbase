@@ -4,6 +4,14 @@ One line per change, newest first. Written by hand when a release is cut — see
 
 ## Unreleased
 
+## v1.9.3 — 2026-10-08
+
+- Changed the move list to a ledger layout
+- Changed the note box to sit under the move list
+- Added counts to the Book and Notes tabs
+- Added note counts to the games list
+- Removed the Flagged tab from the move list
+
 ## v1.9.2 — 2026-10-04
 
 - Added masters and Lichess games to the game's Book tab
