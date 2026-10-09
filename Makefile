@@ -182,7 +182,10 @@ site:
 # the built web app (docs/contributing.md, "Screenshots"). Playwright is pulled in for the
 # run rather than kept in uv.lock: nothing else wants it, and the version is pinned here so
 # the Chromium it downloads once stays the one it drives. `only=notes` shoots one scene.
+# The web app is built first, every time: the script serves web/dist, and a picture of
+# last week's build is the mistake this target exists to rule out.
 screenshots: $(DEMO_DB)
+	cd web && pnpm build
 	uv run --with playwright==1.63.0 python -m playwright install chromium
 	uv run --with playwright==1.63.0 python scripts/screenshots.py $(if $(only),--only $(only))
 

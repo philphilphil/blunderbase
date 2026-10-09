@@ -115,19 +115,21 @@ theme (`game-dark.png`, `game-light.png`); `scripts/site.sh` copies them into th
 they live in one place. The desktop ones are taken by `make screenshots`:
 
 ```bash
-cd web && pnpm build && cd ..   # the script serves web/dist, so build what you want shown
 make screenshots                # every scene, both themes, into docs/screenshots/
 make screenshots only=notes     # one scene
 ```
 
-It serves `data/demo.db` (built by `make data/demo.db` if missing) from the API process on
+It builds the web app first (`pnpm build`), then serves it and `data/demo.db` (built by
+`make data/demo.db` if missing) from the API process on
 a free port, so a running `make run` is not disturbed, and drives a headless Chromium at
 1920×1080 and a device scale of 2 — 3840×2160, the size the pages declare. The scenes are
-the table at the top of `scripts/screenshots.py`; the game screen and the hidden-engine game
-screen open on the first demo note that sits on a game position, so what the demo writes in
-`backend/services/demo.py` (`NOTE_TEXTS`, `_notes`) is what those pictures show. Rebuild the
-demo (`rm data/demo.db`) after changing it. The explorer opens on the six-ply line the most
-demo games share.
+the table at the top of `scripts/screenshots.py`. The game screen and the hidden-engine game
+screen always open on the same demo game at the same ply (`GAME_MOVES`, `GAME_PLY` in the
+script). The game is found by its first moves, since a rebuilt demo numbers its games
+afresh; a demo that does not have it makes the script stop and say so rather than shoot
+some other game. The explorer opens on the six-ply
+line the most demo games share. The notes page shows what `backend/services/demo.py` writes
+(`NOTE_TEXTS`, `_notes`); rebuild the demo (`rm data/demo.db`) after changing it.
 
 Look at every picture before committing it: the script waits for the network and a
 moment for the board to settle, but it cannot tell a good position from a dull one. The

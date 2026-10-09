@@ -14,9 +14,8 @@ image serves itself — the built web app from `web/dist` inside the API process
 of its own, so it runs beside `make run` instead of replacing it the way `make run-demo`
 does.
 
-The scenes are a table below rather than clicks recorded somewhere else: the game and the
-ply are read out of the demo database (the first game that carries a note on a position),
-so a rebuilt demo still lands on a position with something written about it. The phone
+The scenes are a table below rather than clicks recorded somewhere else, and the game
+screen always opens on the same game and ply (`GAME_MOVES`, `GAME_PLY`). The phone
 shots are not here; they come from the iOS simulator (`make ios-run`, then `make ios-shot`).
 """
 
@@ -53,8 +52,27 @@ ENGINE_HIDDEN_KEY = "blunderbase.engineHidden"
 # Long enough for chessground's move animation and the charts' first transition, which
 # finish after the network has gone quiet.
 SETTLE_MS = 1200
+# The demo's own badge beside the name in the rail (`SideNav.tsx`) is taken out: the
+# pictures show the app, not the demo. The collapse button beside it takes over its
+# `ml-auto`, which the badge carries in read-only mode, so the row is laid out as it is in
+# a normal install.
+HIDE_DEMO_BADGE = (
+    "[data-demo-badge] { display: none !important }"
+    " [data-demo-badge] + button { margin-left: auto }"
+)
 
 
+# The game the game and quiet-game scenes show, and the ply they open on, chosen by eye
+# and fixed so a re-shoot shows the same position as the last one: a 10+5 game of 33 moves
+# with notes written on it, opening on White's eleventh move. It is found by its first
+# moves, not by its id, because a rebuilt demo numbers its games afresh. A demo built from
+# another library may not have it at all, and the script then stops and says so rather
+# than shooting some other game — pick one and change these two.
+GAME_MOVES = (
+    "e2e4 d7d6 g1f3 e7e6 d2d4 f8e7 b1c3 c8d7 f1c4 a7a6 e1g1 b7b5"
+    " c4b3 b5b4 c3e2 a6a5 c2c3 a5a4 b3c2 b4c3 e2c3 a4a3 b2b3 c7c5"
+).split()
+GAME_PLY = 21
 # How deep the explorer scene opens: far enough in to be an opening rather than the start
 # position, shallow enough that the demo's games still branch into a tree worth showing.
 EXPLORER_PLY = 6
@@ -62,12 +80,8 @@ EXPLORER_PLY = 6
 
 @dataclass(frozen=True)
 class Hero:
-    """Where the scenes that need a position open.
-
-    The game and quiet-game scenes share a game and a ply, the one a note sits on. The
-    explorer gets a line of its own: a note can sit deep in an endgame, and the explorer
-    there is a one-game tree under a line of moves that fills the screen.
-    """
+    """Where the scenes that need a position open: the fixed game and ply above, and for
+    the explorer the line of `EXPLORER_PLY` moves the most demo games open with."""
 
     game_id: int
     ply: int
@@ -101,22 +115,20 @@ SCENES: tuple[Scene, ...] = (
 
 
 def pick_hero(path: Path) -> Hero:
-    """The first game in the demo with a note on one of its positions, at that note's ply,
-    and the line of `EXPLORER_PLY` moves the most demo games open with."""
     with sqlite3.connect(f"file:{path}?mode=ro", uri=True) as connection:
-        row = connection.execute(
-            "select n.game_id, n.ply from notes n where n.game_id is not null"
-            " and n.ply is not null order by n.id limit 1"
-        ).fetchone()
-        openings = Counter(
-            tuple(json.loads(moves)[:EXPLORER_PLY])
-            for (moves,) in connection.execute("select moves_uci from games")
+        games = [
+            (game_id, json.loads(moves))
+            for game_id, moves in connection.execute("select id, moves_uci from games")
+        ]
+    found = [game_id for game_id, moves in games if moves[: len(GAME_MOVES)] == GAME_MOVES]
+    if len(found) != 1:
+        raise RuntimeError(
+            f"{len(found)} games in this demo start with GAME_MOVES; the game scenes need"
+            " exactly one — pick a game and set GAME_MOVES and GAME_PLY"
         )
-    if row is None:
-        raise RuntimeError("the demo library has no note on a game position to shoot")
+    openings = Counter(tuple(moves[:EXPLORER_PLY]) for _, moves in games)
     opening = next((line for line, _ in openings.most_common() if len(line) == EXPLORER_PLY), ())
-    game_id, ply = row
-    return Hero(game_id=game_id, ply=ply, opening=opening)
+    return Hero(game_id=found[0], ply=GAME_PLY, opening=opening)
 
 
 def free_port() -> int:
@@ -156,6 +168,7 @@ def shoot(page: Page, url: str, scene: Scene, target: Path) -> None:
     page.goto(url)
     page.wait_for_load_state("networkidle")
     page.wait_for_selector(scene.ready)
+    page.add_style_tag(content=HIDE_DEMO_BADGE)
     page.evaluate("document.fonts.ready")
     page.wait_for_timeout(SETTLE_MS)
     # The pointer rests off the page, so no hover state or tooltip is in the picture.

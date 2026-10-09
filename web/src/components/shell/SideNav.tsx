@@ -1039,6 +1039,9 @@ function BrandRow({ onClose, onToggle }: { onClose?: () => void; onToggle?: () =
           href={SITE_URL}
           target="_blank"
           rel="noreferrer"
+          // The screenshot script hides the badge by this, since the README's and the
+          // site's pictures are of the app rather than of the demo (scripts/screenshots.py).
+          data-demo-badge=""
           title={t`This is the public demo · read-only: look at everything, change nothing. Get your own Blunderbase at blunderbase.org.`}
           className="ml-auto inline-flex flex-none items-center gap-[0.1875rem] rounded-sm bg-chip-info px-1.5 text-label font-medium text-info transition-colors hover:text-ink"
         >
