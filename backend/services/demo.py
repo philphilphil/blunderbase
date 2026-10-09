@@ -69,7 +69,6 @@ CHESSCOM_RATING_OFFSET = -18
 DEMO_NAME = "Alex Knight"
 LICHESS_HANDLE = "alex_knight"
 CHESSCOM_HANDLE = "AlexKnight"
-MAIA_ELOS = (1500, 1800)
 
 OPPONENTS = (
     "Maya Brooks",
@@ -276,7 +275,8 @@ def _seed(
     anchor: date,
 ) -> DemoSummary:
     accounts = _accounts(target)
-    _settings(target)
+    levels = app_settings_service.get_maia_elos(source)
+    _settings(target, levels)
     total = len(candidates)
     span = _span_days(total)
     curves = _rating_curves(span)
@@ -314,7 +314,7 @@ def _seed(
     # Every game has an import pass copied from the source library.
     analyzed = len(imported)
     for game, original_run in zip(imported, source_runs, strict=True):
-        _analysis(target, source, game, original_run)
+        _analysis(target, source, game, original_run, levels)
 
     for job in jobs.values():
         job.status = JobStatus.DONE
@@ -365,11 +365,11 @@ def _runners(source: Session, target: Session) -> int:
     return len(rows)
 
 
-def _settings(session: Session) -> None:
+def _settings(session: Session, levels: list[int]) -> None:
     # The levels the copied policies are filed under, so the panel knows which to show.
     # No role is assigned: there is no engine row to assign, and a runner that dials in
     # takes the empty ones itself (`engines.assign_default_roles`).
-    app_settings_service.set_maia_elos(session, list(MAIA_ELOS))
+    app_settings_service.set_maia_elos(session, levels)
 
 
 def _span_days(total: int) -> int:
@@ -555,6 +555,7 @@ def _analysis(
     source: Session,
     game: Game,
     original_run: AnalysisRun,
+    levels: list[int],
 ) -> None:
     # No engine row: the numbers were computed elsewhere, and a run that named an engine
     # the demo does not have would be a run the Engines page could not account for.
@@ -569,7 +570,7 @@ def _analysis(
         multipv=max(1, original_run.multipv or 1),
         priority=analysis_service.IMPORT_PRIORITY,
         maia=True,
-        maia_elos=list(MAIA_ELOS),
+        maia_elos=list(levels),
         attempts=1,
     )
     target.add(run)
@@ -596,7 +597,7 @@ def _analysis(
             classification=row.classification,
             best_move_uci=row.best_move_uci,
             best_lines=copy.deepcopy(row.best_lines),
-            maia_policy=_policy(row),
+            maia_policy=_policy(row.maia_policy, levels),
         )
         for row in original_rows
         if row.ply < game.ply_count
@@ -609,34 +610,22 @@ def _analysis(
     target.commit()
 
 
-def _policy(row: MoveEval) -> dict[str, list[dict[str, Any]]] | None:
-    moves: list[str] = []
-    for move in (row.move_uci, row.best_move_uci, *_line_heads(row.best_lines)):
-        if move and move not in moves:
-            moves.append(move)
-    moves = moves[:3]
-    if not moves:
+def _policy(
+    policy: dict[str, list[dict[str, Any]]] | None, levels: list[int]
+) -> dict[str, list[dict[str, Any]]] | None:
+    """What Maia said about the position in the source library, at the demo's levels.
+
+    Copied, never made up: Maia's odds are a fact about the position, like the engine's
+    evaluation, so they carry nothing of the owner, and a demo that invented them would show
+    every visitor the same three-move shape on every move. A move the source has no policy
+    for gets none here, and the panel says so, as it would in any library.
+    """
+    if not policy:
         return None
-    policies: dict[str, list[dict[str, Any]]] = {}
-    for level in MAIA_ELOS:
-        weights = [0.52, 0.31, 0.17] if level == MAIA_ELOS[0] else [0.38, 0.43, 0.19]
-        chosen = weights[: len(moves)]
-        total = sum(chosen)
-        policies[str(level)] = [
-            {"uci": move, "p": round(weight / total, 3)}
-            for move, weight in zip(moves, chosen, strict=True)
-        ]
-    return policies
-
-
-def _line_heads(lines: list[dict[str, Any]] | None) -> list[str]:
-    if not lines:
-        return []
-    return [
-        str(line["pv"][0])
-        for line in lines
-        if isinstance(line, dict) and isinstance(line.get("pv"), list) and line["pv"]
-    ]
+    kept = {
+        str(level): copy.deepcopy(policy[str(level)]) for level in levels if str(level) in policy
+    }
+    return kept or None
 
 
 def _notes(session: Session, games: list[Game], anchor: date) -> int:

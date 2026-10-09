@@ -20,6 +20,7 @@ from backend.db.models import (
     Runner,
 )
 from backend.db.session import session_scope
+from backend.services import app_settings as app_settings_service
 from backend.services import engines as engines_service
 from backend.services import runners as runners_service
 from backend.services.demo import DEMO_NAME, DemoDataError, create_demo_database
@@ -113,6 +114,36 @@ def test_demo_database_copies_chess_facts_but_no_personal_data(
     with session_scope(settings) as session:
         assert session.get(Game, source_game_id) is not None
         assert session.scalar(select(func.count(Game.id))) == 6
+
+
+def test_demo_copies_maias_real_odds_at_the_source_levels(
+    settings: Settings, fixtures_dir: Path, tmp_path: Path
+) -> None:
+    _analyzed_source(settings, fixtures_dir / "query_games.pgn")
+    said = {
+        "1500": [{"uci": "e2e4", "san": "e4", "rank": 1, "p": 0.61}],
+        "1900": [{"uci": "d2d4", "san": "d4", "rank": 1, "p": 0.47}],
+        "1100": [{"uci": "g1f3", "san": "Nf3", "rank": 1, "p": 0.33}],
+    }
+    with session_scope(settings) as session:
+        app_settings_service.set_maia_elos(session, [1500, 1900])
+        session.scalars(select(MoveEval)).one().maia_policy = said
+    output = tmp_path / "showcase.db"
+
+    create_demo_database(settings.database_path, output, game_count=1, as_of=date(2026, 8, 29))
+
+    demo_settings = Settings(
+        root=tmp_path, data_dir=tmp_path, BLUNDERBASE_DB_PATH=output, analysis_workers=False
+    )
+    with session_scope(demo_settings) as session:
+        # The source's levels and Maia's own numbers; a level the source does not ask
+        # for is dropped rather than shown under a heading nobody configured.
+        assert app_settings_service.get_maia_elos(session) == [1500, 1900]
+        assert session.scalars(select(AnalysisRun)).one().maia_elos == [1500, 1900]
+        assert session.scalars(select(MoveEval)).one().maia_policy == {
+            "1500": said["1500"],
+            "1900": said["1900"],
+        }
 
 
 def test_demo_database_refuses_to_overwrite_or_alias_the_source(
