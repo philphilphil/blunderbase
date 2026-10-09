@@ -4,8 +4,10 @@ One line per change, newest first. Written by hand when a release is cut — see
 
 ## Unreleased
 
-## v1.9.3 — 2026-10-08
+## v1.10.0 — 2026-10-09
 
+- Added a column picker to the games list
+- Added a date format setting
 - Changed the move list to a ledger layout
 - Changed the note box to sit under the move list
 - Added counts to the Book and Notes tabs
