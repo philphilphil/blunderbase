@@ -123,10 +123,11 @@ make screenshots only=notes     # one scene
 It serves `data/demo.db` (built by `make data/demo.db` if missing) from the API process on
 a free port, so a running `make run` is not disturbed, and drives a headless Chromium at
 1920×1080 and a device scale of 2 — 3840×2160, the size the pages declare. The scenes are
-the table at the top of `scripts/screenshots.py`; the game screen, the hidden-engine game
-screen and the explorer all open on the first demo note that sits on a game position, so
-what the demo writes in `backend/services/demo.py` (`NOTE_TEXTS`, `_notes`) is what those
-pictures show. Rebuild the demo (`rm data/demo.db`) after changing it.
+the table at the top of `scripts/screenshots.py`; the game screen and the hidden-engine game
+screen open on the first demo note that sits on a game position, so what the demo writes in
+`backend/services/demo.py` (`NOTE_TEXTS`, `_notes`) is what those pictures show. Rebuild the
+demo (`rm data/demo.db`) after changing it. The explorer opens on the six-ply line the most
+demo games share.
 
 Look at every picture before committing it: the script waits for the network and a
 moment for the board to settle, but it cannot tell a good position from a dull one. The

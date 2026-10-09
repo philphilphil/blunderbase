@@ -31,6 +31,7 @@ import subprocess
 import sys
 import time
 import urllib.request
+from collections import Counter
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -54,13 +55,23 @@ ENGINE_HIDDEN_KEY = "blunderbase.engineHidden"
 SETTLE_MS = 1200
 
 
+# How deep the explorer scene opens: far enough in to be an opening rather than the start
+# position, shallow enough that the demo's games still branch into a tree worth showing.
+EXPLORER_PLY = 6
+
+
 @dataclass(frozen=True)
 class Hero:
-    """The position the game, quiet-game and explorer scenes share."""
+    """Where the scenes that need a position open.
+
+    The game and quiet-game scenes share a game and a ply, the one a note sits on. The
+    explorer gets a line of its own: a note can sit deep in an endgame, and the explorer
+    there is a one-game tree under a line of moves that fills the screen.
+    """
 
     game_id: int
     ply: int
-    line: tuple[str, ...]
+    opening: tuple[str, ...]
 
 
 @dataclass(frozen=True)
@@ -82,7 +93,7 @@ SCENES: tuple[Scene, ...] = (
         ready=".cg-wrap",
     ),
     Scene("notes", lambda h: "/notes"),
-    Scene("explorer", lambda h: "/explorer?line=" + ",".join(h.line), ready=".cg-wrap"),
+    Scene("explorer", lambda h: "/explorer?line=" + ",".join(h.opening), ready=".cg-wrap"),
     Scene("dashboard", lambda h: "/"),
     Scene("games", lambda h: "/games"),
     Scene("stats", lambda h: "/stats"),
@@ -90,16 +101,22 @@ SCENES: tuple[Scene, ...] = (
 
 
 def pick_hero(path: Path) -> Hero:
-    """The first game in the demo with a note on one of its positions, at that note's ply."""
+    """The first game in the demo with a note on one of its positions, at that note's ply,
+    and the line of `EXPLORER_PLY` moves the most demo games open with."""
     with sqlite3.connect(f"file:{path}?mode=ro", uri=True) as connection:
         row = connection.execute(
-            "select n.game_id, n.ply, g.moves_uci from notes n join games g on g.id = n.game_id"
-            " where n.ply is not null order by n.id limit 1"
+            "select n.game_id, n.ply from notes n where n.game_id is not null"
+            " and n.ply is not null order by n.id limit 1"
         ).fetchone()
+        openings = Counter(
+            tuple(json.loads(moves)[:EXPLORER_PLY])
+            for (moves,) in connection.execute("select moves_uci from games")
+        )
     if row is None:
         raise RuntimeError("the demo library has no note on a game position to shoot")
-    game_id, ply, moves = row
-    return Hero(game_id=game_id, ply=ply, line=tuple(json.loads(moves)[:ply]))
+    opening = next((line for line, _ in openings.most_common() if len(line) == EXPLORER_PLY), ())
+    game_id, ply = row
+    return Hero(game_id=game_id, ply=ply, opening=opening)
 
 
 def free_port() -> int:
