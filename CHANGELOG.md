@@ -4,6 +4,12 @@ One line per change, newest first. Written by hand when a release is cut — see
 
 ## Unreleased
 
+## v1.11.0 — 2026-10-23
+
+- Added Show the engine for several selected games
+- Added a long live search's clock to the title bar
+- Fixed the demo showing invented Maia odds
+
 ## v1.10.0 — 2026-10-09
 
 - Added a column picker to the games list
