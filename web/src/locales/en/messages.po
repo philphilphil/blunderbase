@@ -261,6 +261,7 @@ msgid "Live analysis"
 msgstr "Live analysis"
 
 #: src/components/analysis/InfiniteAnalysisPanel.tsx
+#: src/components/shell/LiveSearchReadout.tsx
 #: src/routes/game/components/MaiaPanel.tsx
 msgid "{nodes} nodes"
 msgstr "{nodes} nodes"
@@ -1209,6 +1210,14 @@ msgstr "Hide engine"
 #: src/components/shell/EngineToggle.tsx
 msgid "Hide engine evaluations, lines and flags (⇧E)"
 msgstr "Hide engine evaluations, lines and flags (⇧E)"
+
+#: src/components/shell/LiveSearchReadout.tsx
+msgid "{engine} has searched this position for {elapsed}, to depth {depth}"
+msgstr "{engine} has searched this position for {elapsed}, to depth {depth}"
+
+#: src/components/shell/LiveSearchReadout.tsx
+msgid "{engine} has searched this position for {elapsed}"
+msgstr "{engine} has searched this position for {elapsed}"
 
 #: src/components/shell/QueueDestinations.tsx
 msgid "nothing will drain this until the machine connects"
@@ -5842,8 +5851,10 @@ msgid "The engine was held back on this game when it was imported, so you could 
 msgstr "The engine was held back on this game when it was imported, so you could read it first. Show its evaluations, badges and lines now."
 
 #. Button in the transport row that reveals the engine on a game imported with it hidden
+#. Selection footer button that reveals the engine on games imported with it hidden
 #: src/routes/game/components/EngineRevealButton.tsx
 #: src/routes/game/components/PracticeBar.tsx
+#: src/routes/games/components/TableFooter.tsx
 msgid "Show the engine"
 msgstr "Show the engine"
 
@@ -6562,6 +6573,15 @@ msgid "{deleted, plural, one {# game} other {# games}} deleted"
 msgstr "{deleted, plural, one {# game} other {# games}} deleted"
 
 #: src/routes/games/GamesPage.tsx
+msgid "Engine shown on {shown, plural, one {# game} other {# games}}"
+msgstr "Engine shown on {shown, plural, one {# game} other {# games}}"
+
+#. placeholder {0}: refusalReason(error, t`the request never landed`)
+#: src/routes/games/GamesPage.tsx
+msgid "Could not show the engine — {0}"
+msgstr "Could not show the engine — {0}"
+
+#: src/routes/games/GamesPage.tsx
 msgid "{removed, plural, one {# game} other {# games}} taken out of {name}"
 msgstr "{removed, plural, one {# game} other {# games}} taken out of {name}"
 
@@ -7024,6 +7044,10 @@ msgstr "Clear selection"
 #: src/routes/games/components/TableFooter.tsx
 msgid "Remove from collection"
 msgstr "Remove from collection"
+
+#: src/routes/games/components/TableFooter.tsx
+msgid "{heldBackCount, plural, one {The engine was held back on # selected game when it was imported. Show its evaluations, badges and lines now.} other {The engine was held back on # selected games when they were imported. Show their evaluations, badges and lines now.}}"
+msgstr "{heldBackCount, plural, one {The engine was held back on # selected game when it was imported. Show its evaluations, badges and lines now.} other {The engine was held back on # selected games when they were imported. Show their evaluations, badges and lines now.}}"
 
 #: src/routes/games/components/TableFooter.tsx
 msgid "Queue analysis"

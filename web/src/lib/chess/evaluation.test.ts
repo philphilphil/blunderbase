@@ -128,6 +128,7 @@ describe('small formatters', () => {
 
   it('formats node budgets the way the design writes them', () => {
     expect(formatNodes(40_000_000)).toBe('40M')
+    expect(formatNodes(2_430_000_000)).toBe('2.4G')
     expect(formatNodes(4500)).toBe('4.5k')
     expect(formatNodes(120)).toBe('120')
     expect(formatNodes(null)).toBe('—')

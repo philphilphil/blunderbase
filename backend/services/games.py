@@ -18,6 +18,7 @@ from sqlalchemy import (
     func,
     or_,
     select,
+    update,
 )
 from sqlalchemy.orm import Session, joinedload
 
@@ -717,6 +718,23 @@ def set_engine_hidden(session: Session, game_id: int, hidden: bool) -> Game | No
     game.engine_hidden = hidden
     session.commit()
     return game
+
+
+def set_engine_hidden_on(session: Session, game_ids: Sequence[int], hidden: bool) -> int:
+    """`set_engine_hidden` over a selection: the games page's footer, for a batch read first.
+
+    Answers with how many games changed. A game already the way it was asked for, or not
+    there at all, takes itself out of the count rather than the rest of the selection with
+    it — the same receipt a delete of a selection gives.
+    """
+    result = session.execute(
+        update(Game)
+        .where(Game.id.in_(game_ids), Game.engine_hidden != hidden)
+        .values(engine_hidden=hidden),
+        execution_options={"synchronize_session": False},
+    )
+    session.commit()
+    return int(result.rowcount or 0)
 
 
 # --- the one mutation of a stored game ------------------------------------

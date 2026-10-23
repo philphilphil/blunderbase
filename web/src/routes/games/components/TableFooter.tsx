@@ -33,11 +33,17 @@
  * the everyday act and deserves a button.
  * Both make the one line wider, so the words the pager implies leave earlier than they did.
  *
+ * "Show the engine" is the game page's button of that name over a selection, for games an
+ * import held the engine back on. It is there only while a selected game is held back —
+ * the same rule as on the game — and stands before Queue analysis, which stays the last of
+ * the everyday commands.
+ *
  * The paging half is the app's pickers and pager: Rows is a `PickerSelect` ("Rows: Fit
  * (13)", a value from a list, ⇅), and ‹ › are the `Pager`'s faces around a flat readout.
  */
+import { plural } from '@lingui/core/macro'
 import { Trans, useLingui } from '@lingui/react/macro'
-import { ChevronDown, FolderMinus, Play, Trash2, X } from 'lucide-react'
+import { ChevronDown, Eye, FolderMinus, Play, Trash2, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 
 import { CollectionChecklist, type ChecklistGame } from '@/components/collections/CollectionChecklist'
@@ -61,6 +67,10 @@ export interface TableFooterProps {
   inCollection?: boolean
   removing?: boolean
   onRemoveFromCollection?: () => void
+  /** How many selected games have the engine held back; "Show the engine" shows above 0. */
+  heldBackCount?: number
+  revealing?: boolean
+  onShowEngine?: () => void
   /** Rows on this page. */
   loadedCount: number
   total: number
@@ -90,6 +100,9 @@ export function TableFooter({
   inCollection = false,
   removing = false,
   onRemoveFromCollection,
+  heldBackCount = 0,
+  revealing = false,
+  onShowEngine,
   loadedCount,
   total,
   queueing,
@@ -145,6 +158,24 @@ export function TableFooter({
               <span aria-hidden className="hidden md:@max-[60rem]:inline">
                 <Trans context="button">Remove</Trans>
               </span>
+            </Button>
+          ) : null}
+          {heldBackCount > 0 && onShowEngine ? (
+            <Button
+              type="button"
+              size="sm"
+              variant="secondary"
+              disabled={revealing}
+              onClick={onShowEngine}
+              title={plural(heldBackCount, {
+                one: 'The engine was held back on # selected game when it was imported. Show its evaluations, badges and lines now.',
+                other: 'The engine was held back on # selected games when they were imported. Show their evaluations, badges and lines now.',
+              })}
+            >
+              <Eye aria-hidden />
+              <Trans comment="Selection footer button that reveals the engine on games imported with it hidden">
+                Show the engine
+              </Trans>
             </Button>
           ) : null}
           <Button type="button" size="sm" disabled={queueing} onClick={onQueue}>

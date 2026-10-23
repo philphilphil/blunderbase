@@ -348,6 +348,22 @@ def test_the_engine_can_be_shown_or_held_back_on_one_game(
     assert api.put("/games/999999/engine", json={"hidden": False}).status_code == 404
 
 
+def test_the_engine_can_be_shown_on_a_selection(api: TestClient, seeded: dict[str, int]) -> None:
+    game_id = seeded["game_id"]
+    api.put(f"/games/{game_id}/engine", json={"hidden": True})
+
+    # A game that is not there leaves the rest of the selection alone and is not counted.
+    response = api.post("/games/engine", json={"game_ids": [game_id, 999999], "hidden": False})
+
+    assert response.status_code == 200
+    assert response.json() == {"games": 1}
+    assert api.get(f"/games/{game_id}").json()["game"]["engine_hidden"] is False
+    # Already showing: nothing changed, so nothing counted.
+    again = api.post("/games/engine", json={"game_ids": [game_id], "hidden": False})
+    assert again.json() == {"games": 0}
+    assert api.post("/games/engine", json={"game_ids": [], "hidden": False}).status_code == 422
+
+
 def test_a_game_that_is_not_there_is_a_typed_404(api: TestClient) -> None:
     response = api.get("/games/9999")
 

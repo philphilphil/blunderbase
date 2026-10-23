@@ -8,6 +8,18 @@
  */
 import { t } from '@lingui/core/macro'
 
+/**
+ * `0:42`, `4:12`, `1:02:03` — time already spent, as a clock reads it. Not an estimate, so
+ * none of `formatDuration`'s rounding: a search that is being watched moves every second.
+ */
+export function formatElapsed(ms: number): string {
+  const total = Math.max(0, Math.floor(ms / 1000))
+  const hours = Math.floor(total / 3600)
+  const minutes = Math.floor((total % 3600) / 60)
+  const seconds = String(total % 60).padStart(2, '0')
+  return hours > 0 ? `${hours}:${String(minutes).padStart(2, '0')}:${seconds}` : `${minutes}:${seconds}`
+}
+
 /** `3h 20m`, `14m`, `under a minute` — the granularity the number deserves and no more. */
 export function formatDuration(seconds: number): string {
   if (!Number.isFinite(seconds) || seconds < 60) return t`under a minute`

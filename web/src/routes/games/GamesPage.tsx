@@ -43,6 +43,7 @@ import {
   useDeleteGames,
   useRemoveFromCollection,
   useRequestAnalysisBatch,
+  useSetGamesEngineHidden,
 } from '@/lib/api/queries'
 import { useLibraryPlace } from '@/lib/libraryPlace'
 import { isTyping } from '@/lib/ui/shortcuts'
@@ -145,6 +146,7 @@ export function GamesPage() {
   const analysis = useRequestAnalysisBatch()
   const deletion = useDeleteGames()
   const removal = useRemoveFromCollection()
+  const reveal = useSetGamesEngineHidden()
 
   // The collection the filter is set to, if it is — what "Remove from collection" takes the
   // selection out of, named in its receipt from the list the chip already reads.
@@ -374,6 +376,25 @@ export function GamesPage() {
     [rows, selectedVisible],
   )
 
+  // The selected games an import held the engine back on — what "Show the engine" is for,
+  // and the only time the footer offers it.
+  const heldBack = useMemo(
+    () => rows.filter((game) => selectedVisible.has(game.id) && game.engine_hidden).map((game) => game.id),
+    [rows, selectedVisible],
+  )
+
+  // The selection stays: having read the games, queueing them or opening one is what's next.
+  const showEngine = useCallback(async () => {
+    if (heldBack.length === 0) return
+    try {
+      const receipt = await reveal.mutateAsync({ gameIds: heldBack, hidden: false })
+      const shown = receipt.games
+      setMessage(t`Engine shown on ${plural(shown, { one: '# game', other: '# games' })}`)
+    } catch (error) {
+      setMessage(t`Could not show the engine — ${refusalReason(error, t`the request never landed`)}`)
+    }
+  }, [reveal, heldBack, t])
+
   // Taking games out of the collection the filter is set to. No confirmation: nothing is
   // deleted, the games are one Add to… away from coming back, and a rule never re-adds them.
   const removeFromCollection = useCallback(async () => {
@@ -490,6 +511,9 @@ export function GamesPage() {
         inCollection={inCollection !== undefined}
         removing={removal.isPending}
         onRemoveFromCollection={() => void removeFromCollection()}
+        heldBackCount={heldBack.length}
+        revealing={reveal.isPending}
+        onShowEngine={() => void showEngine()}
         loadedCount={loaded}
         total={library.total}
         queueing={analysis.isPending}

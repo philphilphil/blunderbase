@@ -124,6 +124,8 @@ export function whiteWinPercent(score: Score, pov: 'white' | 'black' = 'white'):
 /** `123` -> `1.2M`, `4500` -> `4.5k` — engine node budgets, as the design writes them. */
 export function formatNodes(nodes: number | null | undefined): string {
   if (nodes === null || nodes === undefined) return '—'
+  // A live search left to run for minutes passes a billion; `2400M` is a number to count.
+  if (nodes >= 1_000_000_000) return `${round(nodes / 1_000_000_000, 1)}G`
   if (nodes >= 1_000_000) return `${round(nodes / 1_000_000, 1)}M`
   if (nodes >= 1_000) return `${round(nodes / 1_000, 1)}k`
   return String(nodes)

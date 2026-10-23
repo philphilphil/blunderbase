@@ -139,7 +139,8 @@ noch niemand angesehen hat, steht weiterhin in ihrer Zeile. Alles zum Modus steh
 Eine Zeile, die in den Spalten **Verlust** und **Symbole** ein Auge zeigt, während der Rest der Tabelle
 aussieht wie immer, ist eine Partie, die mit ausgeblendeter Engine importiert wurde
 ([Analyse](analysis.md#hide-the-engine-on-new-games)); öffne sie und drück **Engine
-zeigen**, wenn du sie gelesen hast.
+zeigen**, wenn du sie gelesen hast, oder wähl mehrere aus und drück **Engine zeigen** in der
+Fußzeile.
 
 ## Mehrere Partien auf einmal bearbeiten { #act-on-several-games-at-once }
 
@@ -151,7 +152,10 @@ gefüllte Schaltfläche) und, etwas abgesetzt, **Löschen …**. **Hinzufügen z
 eine Sammlung oder nimmt sie heraus, siehe
 [Partien von Hand hinzufügen](collections.md#add-games-by-hand). Ist der Filter **Sammlung**
 gesetzt, nimmt **Aus der Sammlung nehmen** sie aus genau dieser heraus, siehe
-[Partien herausnehmen](collections.md#take-games-out). **Analyse einreihen** gibt
+[Partien herausnehmen](collections.md#take-games-out). Ist unter den ausgewählten eine
+Partie, bei der die Engine beim Import zurückgehalten wurde, steht vor **Analyse einreihen**
+noch **Engine zeigen** und blendet sie bei all diesen Partien auf einmal ein.
+**Analyse einreihen** gibt
 jeder Partie die Importanalyse, mit dem Budget und dem Platz in der Warteschlange, den jede
 importierte Partie bekommt; genauer hinsehen lässt du bei einer einzelnen Partie mit
 **Analysieren …** in der Partie selbst. Was ein Durchlauf kostet, steht unter

@@ -1,4 +1,5 @@
-export { formatDuration } from './duration'
+export { formatDuration, formatElapsed } from './duration'
+export { useLiveSearchReading, type LiveSearchReading } from './liveSearchBeacon'
 export {
   formatNps,
   formatVariation,

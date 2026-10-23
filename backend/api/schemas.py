@@ -350,6 +350,24 @@ class GameEngineUpdate(Input):
     hidden: bool
 
 
+class GamesEngineUpdate(Input):
+    """`POST /games/engine`: the same flag over a selection, with a delete's ceiling."""
+
+    game_ids: list[int] = Field(min_length=1, max_length=MAX_BATCH_GAMES)
+    hidden: bool
+
+    @model_validator(mode="after")
+    def _distinct_games(self) -> GamesEngineUpdate:
+        self.game_ids = list(dict.fromkeys(self.game_ids))
+        return self
+
+
+class GamesEngineChanged(BaseModel):
+    """How many of the named games now read the way the request asked."""
+
+    games: int = 0
+
+
 class GameCard(GameSummary):
     """A summary plus the eval curve and the worst moments, for a dashboard strip."""
 

@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { render, screen } from '@testing-library/react'
+import { cleanup, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -84,6 +84,24 @@ describe('TableFooter — the selection', () => {
     expect(screen.getByRole('button', { name: 'Delete…' }).className).toContain('text-blunder')
     // The count is data, not a link.
     expect(screen.getByText('2 selected').className).not.toContain('accent')
+  })
+
+  it('offers "Show the engine" only while a selected game has it held back', async () => {
+    const user = userEvent.setup()
+    const onShowEngine = vi.fn()
+    setup({ selectedCount: 2, selectedGames: [{ id: 11 }, { id: 12 }], heldBackCount: 0, onShowEngine })
+    expect(screen.queryByRole('button', { name: 'Show the engine' })).not.toBeInTheDocument()
+
+    cleanup()
+    setup({ selectedCount: 2, selectedGames: [{ id: 11 }, { id: 12 }], heldBackCount: 1, onShowEngine })
+    const names = screen
+      .getAllByRole('button')
+      .map((button) => button.textContent?.trim())
+      .filter((name) => name === 'Show the engine' || name === 'Queue analysis')
+    // Before the region's primary, which stays the last of the everyday commands.
+    expect(names).toEqual(['Show the engine', 'Queue analysis'])
+    await user.click(screen.getByRole('button', { name: 'Show the engine' }))
+    expect(onShowEngine).toHaveBeenCalledOnce()
   })
 
   it('pages with the Rows picker and the pager', async () => {

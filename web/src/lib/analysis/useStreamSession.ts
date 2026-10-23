@@ -48,6 +48,7 @@ import { useEventListener, useEvents } from '@/lib/events/EventsProvider'
 import type { StreamEndedEvent, StreamSnapshotEvent } from '@/lib/events/types'
 
 import { readStreamEnginePick, writeStreamEnginePick } from './enginePreference'
+import { publishLiveSearch } from './liveSearchBeacon'
 import { snapshotFrom, type StreamSnapshot } from './streamModel'
 
 export type { StreamSnapshot }
@@ -152,7 +153,26 @@ export function useStreamSession(options: UseStreamSessionOptions): StreamSessio
   const demo = capabilities.read_only
   const remote = useServerStreamSession({ ...options, fen: demo ? null : options.fen })
   const local = useDemoStream({ ...options, fen: demo ? options.fen : null })
-  return demo ? local : remote
+  const chosen = demo ? local : remote
+
+  // The titlebar's readout of a long search (`liveSearchBeacon`), from whichever board
+  // answered — posted here so that every page with a live search gets it without asking.
+  const { phase, snapshot } = chosen
+  useEffect(() => {
+    publishLiveSearch(
+      phase === 'running' && snapshot
+        ? {
+            engine: snapshot.engine,
+            depth: snapshot.depth,
+            nodes: snapshot.nodes,
+            timeMs: snapshot.timeMs,
+          }
+        : null,
+    )
+  }, [phase, snapshot])
+  useEffect(() => () => publishLiveSearch(null), [])
+
+  return chosen
 }
 
 function useServerStreamSession({

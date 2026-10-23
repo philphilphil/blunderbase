@@ -177,6 +177,12 @@ Space plays its move onto the board. Once you leave the game line the pane goes 
 by itself while a search is running, since the stored pass never looked at the position
 you are in.
 
+Once a search has stayed on one position for ten seconds, the title bar shows it too, beside
+the analysis queue: a green dot, how long the engine has been on this position, and how many
+nodes it has looked at. Point at it for the engine and the depth. It goes when you stop the
+search or move, and comes back after ten seconds on the new position. The live board shows
+the same.
+
 ## What a human would play
 
 The Maia panel gives five moves with the odds of each at the level you pick, not the best

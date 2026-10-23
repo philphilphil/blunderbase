@@ -9,6 +9,7 @@ import { cn } from '@/lib/utils'
 
 import { useCommandPalette } from './CommandPalette'
 import { EngineToggle } from './EngineToggle'
+import { LiveSearchReadout } from './LiveSearchReadout'
 import { usePageChrome, type Crumb, type PageBack } from './PageChrome'
 import { QueueIndicator } from './QueueIndicator'
 
@@ -117,7 +118,8 @@ function BackLink({ back }: { back: PageBack }) {
 
 /**
  * The 42px titlebar: the page's title, its own actions right-aligned, and then, past a
- * rule, the analysis queue and the Hide engine switch (the clarity pass, D3-A).
+ * rule, a live search left running (`LiveSearchReadout`), the analysis queue and the Hide
+ * engine switch (the clarity pass, D3-A).
  * Thin, flat and on every screen — it carries a strong bottom rule and the chrome surface
  * rather than a hairline over the canvas. It starts at the rail's edge, and its left padding
  * is the page's gutter (`pl-6`, `PageBody`'s), so the title sits over the column it names.
@@ -175,6 +177,7 @@ export function TopBar({ onOpenNav }: { onOpenNav: () => void }) {
           <div className="h-[1.125rem] w-px flex-none bg-line" />
         </>
       ) : null}
+      <LiveSearchReadout />
       <QueueIndicator />
       <EngineToggle compact={mobile} />
       <Button

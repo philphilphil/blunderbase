@@ -125,7 +125,8 @@ queues a game nothing has looked at, is still there on its row. The whole of the
 A row that shows an eye in the **Worst** and **Flags** columns, with the rest of the table as ever, is a
 game that was imported with its engine held back
 ([Analysis](analysis.md#hide-the-engine-on-new-games)); open it and press **Show the
-engine** when you have read it.
+engine** when you have read it, or select several and press **Show the engine** in the
+footer.
 
 ## Act on several games at once
 
@@ -136,7 +137,9 @@ footer then says how many are selected and offers, in this order, **Clear select
 **Add to** puts them in a collection or takes them out, see
 [Add games by hand](collections.md#add-games-by-hand); with the **Collection** filter set,
 **Remove from collection** takes them out of that one, see
-[Take games out](collections.md#take-games-out). **Queue analysis** gives each game the
+[Take games out](collections.md#take-games-out). When a selected game was imported with its
+engine held back, **Show the engine** stands before **Queue analysis** and shows it on every
+such game in the selection at once. **Queue analysis** gives each game the
 import pass, at the budget and in the place in the queue every imported game gets; a
 deeper look at one game is **Analyse…** on the game itself. What a pass costs is in
 [Analysis](analysis.md#which-pass-does-a-game-get).

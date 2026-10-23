@@ -254,6 +254,10 @@ export const deleteGames = (gameIds: number[]) =>
 export const setGameEngineHidden = (gameId: number, hidden: boolean) =>
   http.put<GameSummary>(`/games/${gameId}/engine`, { body: { hidden } })
 
+/** The same over a selection; answers with how many games changed. */
+export const setGamesEngineHidden = (gameIds: number[], hidden: boolean) =>
+  http.post<{ games: number }>('/games/engine', { body: { game_ids: gameIds, hidden } })
+
 
 /** Every stored game with notes and saved lines layered onto its original PGN. */
 export const exportLibrary = () =>

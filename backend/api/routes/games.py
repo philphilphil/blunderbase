@@ -16,6 +16,8 @@ from backend.api.schemas import (
     GameEngineUpdate,
     GameList,
     GamesDeleted,
+    GamesEngineChanged,
+    GamesEngineUpdate,
     GamesRemoved,
     GameSummary,
     GamesWipe,
@@ -122,6 +124,21 @@ def delete_games(session: SessionDep, body: GameDeleteRequest) -> GamesRemoved:
     comes back is what actually went.
     """
     return GamesRemoved(**asdict(games_service.delete_games(session, body.game_ids)))
+
+
+@router.post(
+    "/engine",
+    response_model=GamesEngineChanged,
+    summary="Show the engine on the named games, or hold it back again",
+)
+def post_games_engine(session: SessionDep, body: GamesEngineUpdate) -> GamesEngineChanged:
+    """`PUT /games/{id}/engine` over a selection: the games page's "Show the engine".
+
+    A POST for the reason `/games/delete` is one — the ids travel in the body. What comes
+    back is how many games changed; one already that way, or not there, is not counted.
+    """
+    changed = games_service.set_engine_hidden_on(session, body.game_ids, body.hidden)
+    return GamesEngineChanged(games=changed)
 
 
 @router.get("/{game_id}", response_model=GameDetail, summary="One game with its analysis")

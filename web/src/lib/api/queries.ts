@@ -444,6 +444,21 @@ export function useSetGameEngineHidden(
   })
 }
 
+/** `useSetGameEngineHidden` over a selection — the games page's footer. */
+export function useSetGamesEngineHidden(
+  options?: UseMutationOptions<{ games: number }, Error, { gameIds: number[]; hidden: boolean }>,
+) {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: ({ gameIds, hidden }) => api.setGamesEngineHidden(gameIds, hidden),
+    ...options,
+    onSuccess: (...args) => {
+      void client.invalidateQueries({ queryKey: queryKeys.games() })
+      options?.onSuccess?.(...args)
+    },
+  })
+}
+
 /** The complete portable game library as a single PGN document. */
 export function useExportLibrary(options?: UseMutationOptions<Download, Error, void>) {
   return useMutation({ mutationFn: () => api.exportLibrary(), ...options })

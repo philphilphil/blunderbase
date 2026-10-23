@@ -195,6 +195,12 @@ Sobald du die Partie verlässt, wechselt das Feld von selbst auf **Live**, solan
 Suche läuft – die gespeicherte Analyse hat die Stellung, in der du jetzt stehst, nie
 gesehen.
 
+Rechnet die Suche zehn Sekunden an derselben Stellung, steht sie auch in der Titelleiste,
+neben der Analyse-Warteschlange: ein grüner Punkt, wie lange die Engine schon an dieser
+Stellung rechnet, und wie viele Knoten sie sich angesehen hat. Zeigst du darauf, nennt sie
+Engine und Tiefe. Hältst du die Suche an oder ziehst weiter, verschwindet die Anzeige und
+kommt nach zehn Sekunden auf der neuen Stellung wieder. Auf dem Live-Brett genauso.
+
 ## Was ein Mensch ziehen würde { #what-a-human-would-play }
 
 Das Maia-Feld zeigt fünf Züge mit ihrer jeweiligen Wahrscheinlichkeit auf der gewählten
