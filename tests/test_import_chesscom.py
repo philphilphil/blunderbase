@@ -450,6 +450,18 @@ def test_a_rate_limited_request_is_tried_again(
     assert job.games_imported == 4
 
 
+def test_a_name_typed_with_capitals_reads_the_lowercase_archives(
+    session: Session, api: FakeApi
+) -> None:
+    """chess.com answers `/pub/player/Trevizer/…` with a 301 to the lowercase path (#47)."""
+    with api.client() as client:
+        job = import_service.run_import(session, "chesscom", username="BlunderBase", client=client)
+
+    assert job.status is JobStatus.DONE
+    assert api.urls[0] == ARCHIVES
+    assert job.games_imported == 4
+
+
 def test_a_username_that_is_not_one_is_refused_before_any_request(
     session: Session, api: FakeApi
 ) -> None:

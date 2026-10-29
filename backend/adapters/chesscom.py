@@ -200,8 +200,13 @@ def run(
 def fetch_archives(
     client: httpx.Client, username: str, *, headers: dict[str, str] | None = None
 ) -> list[str]:
-    """Every monthly archive URL chess.com has for a player, oldest first."""
-    response = _get(client, ARCHIVES_URL.format(username=quote(username)), headers)
+    """Every monthly archive URL chess.com has for a player, oldest first.
+
+    The name goes into the URL lowercased: chess.com names ignore case, but its API answers
+    any capital with a 301 to the lowercase path, and that redirect is not followed.
+    """
+    url = ARCHIVES_URL.format(username=quote(username.lower()))
+    response = _get(client, url, headers)
     if response.status_code == 404:
         raise UnknownPlayerError(f"chess.com has no player {username!r}")
     response.raise_for_status()
