@@ -22,7 +22,7 @@ import {
   type PlayerAnalysisSummary,
 } from '../gameModel'
 import { usePlyLabel } from '../plyNumbering'
-import { PlotBars, PlotMarks, type PlotPoint } from './graphParts'
+import { padForBars, PlotBars, PlotMarks, type PlotPoint } from './graphParts'
 import { FILL_BLACK, FILL_WHITE } from './graphTokens'
 import { MoveTimePlot, TimeTallies } from './MoveTimeGraph'
 import { TAB_ROW } from './paneTabs'
@@ -179,6 +179,13 @@ export function EvalGraph({
   // marks index against, and it costs one pass over a list the length of a game.
   const prefs = useEvalGraphPrefs()
   const bars = prefs.style === 'bars'
+  // A column is centred on its ply, so the first and last would hang half outside the plot
+  // and be clipped; bars get half a ply of room at each end. The curve keeps the bare range
+  // so it still runs edge to edge.
+  const xDomain = useMemo<[number, number]>(
+    () => (bars ? padForBars(domain) : domain),
+    [bars, domain],
+  )
   // Start focused on the owner's mistakes; the checkbox can still reveal both players'
   // markers without changing the two-player tallies on the header line.
   const [onlyMine, setOnlyMine] = useState(true)
@@ -326,7 +333,7 @@ export function EvalGraph({
                 offset={12}
                 wrapperStyle={{ outline: 'none', zIndex: 20 }}
               />
-              <XAxis dataKey="ply" type="number" domain={domain} hide />
+              <XAxis dataKey="ply" type="number" domain={xDomain} hide />
               <YAxis type="number" domain={[0, 100]} hide />
 
               <ReferenceLine y={75} stroke="var(--bb-graph-grid)" strokeWidth={1} />

@@ -20,7 +20,7 @@ import {
   type MoveTimeSummary,
 } from '../gameModel'
 import { usePlyLabel } from '../plyNumbering'
-import { PlotBars, PlotMarks, type PlotPoint } from './graphParts'
+import { padForBars, PlotBars, PlotMarks, type PlotPoint } from './graphParts'
 
 const AXIS = 0
 const CONFIG: ChartConfig = { value: { label: <Trans>Move time</Trans>, color: 'var(--bb-text-2)' } }
@@ -128,7 +128,7 @@ export function MoveTimePlot({
             offset={12}
             wrapperStyle={{ outline: 'none', zIndex: 20 }}
           />
-          <XAxis dataKey="ply" type="number" domain={domain} hide />
+          <XAxis dataKey="ply" type="number" domain={padForBars(domain)} hide />
           <YAxis type="number" domain={[-reach, reach]} hide />
 
           {increment > 0 && tick < reach ? (

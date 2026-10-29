@@ -37,6 +37,17 @@ export interface PlotPoint {
 }
 
 /**
+ * The x axis's domain for a plot drawn in columns: the plies' own range with half a ply
+ * either side. A column is centred on its ply, so on the bare range the first and last
+ * would hang half off the plot and be clipped. With the padding a ply's slot is exactly
+ * `plotWidth / plies`, which is the step `PlotBars` sizes its columns from — it is still
+ * handed the bare range.
+ */
+export function padForBars([first, last]: [number, number]): [number, number] {
+  return [first - 0.5, last + 0.5]
+}
+
+/**
  * One column per ply, standing on `axis` and reaching up in White's tone or down in
  * Black's — up being a value above the axis.
  *
