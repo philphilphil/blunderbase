@@ -27,11 +27,19 @@ connection dot: green while the app is live, orange while it connects, red while
 offline.
 
 The bar across the top belongs to the page. It shows the page's title, with the places
-above it as links (`Library › Import`), then the page's own buttons on the right, then the
+above it as links (`Library › Import`), then the page's own buttons on the right, then a
+clock icon for your latest game, then the
 analysis queue (`Idle 0/0`, or a spinner and a meter while it works, with **Pause** and
 **Clear** beside it while there is something to pause or clear), and last the **Hide
-engine** switch ([Hide the engine](settings.md#hide-the-engine)). On a
-phone the rail is behind the ☰ and slides in with the same contents. A page opened from
+engine** switch ([Hide the engine](settings.md#hide-the-engine)).
+
+The latest game is the one you played last, wherever you are, so after a game you are one
+click from its review. It goes by when the game was played, not when it was imported, so
+importing old games does not take it over. Hold the pointer over it to see the opponent and
+how long ago it was played. A blue dot on it means this browser has not opened that game
+yet.
+
+On a phone the rail is behind the ☰ and slides in with the same contents. A page opened from
 a list, such as a game, shows `‹ Games` instead of the ☰ to take you back. The page's
 buttons move to a row under the bar.
 

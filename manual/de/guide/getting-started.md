@@ -29,11 +29,19 @@ daneben der Verbindungspunkt: grün, solange die App live ist, orange beim Verbi
 ohne Verbindung.
 
 Die Leiste oben gehört der Seite. Sie zeigt den Titel der Seite, davor die übergeordneten
-Orte als Links (`Bibliothek › Importieren`). Rechts folgen die Knöpfe der Seite, dann die
+Orte als Links (`Bibliothek › Importieren`). Rechts folgen die Knöpfe der Seite, dann
+ein Uhrsymbol für deine neueste Partie, dann die
 Analyse-Warteschlange (`Leerlauf 0/0`, oder ein Kreisel und ein Balken, solange sie
 arbeitet, mit **Pause** und **Leeren** daneben, solange es etwas anzuhalten oder zu leeren
 gibt) und zuletzt der Schalter **Engine ausblenden**
 ([Die Engine ausblenden](settings.md#hide-the-engine)).
+
+Die neueste Partie ist die, die du zuletzt gespielt hast – von jeder Seite aus bist du nach
+einer Partie also einen Klick von ihrer Analyse entfernt. Es zählt, wann gespielt wurde,
+nicht wann importiert: Holst du alte Partien nach, bleibt der Knopf bei der letzten. Zeigst
+du mit der Maus darauf, siehst du Gegner und wie lange die Partie her ist. Ein blauer Punkt
+daran heißt, dass dieser Browser die Partie noch nicht geöffnet hat.
+
 Auf dem Handy liegt die linke Leiste hinter dem ☰ und schiebt sich mit demselben Inhalt
 herein. Eine Seite, die du aus einer Liste geöffnet hast, etwa eine Partie, zeigt statt
 des ☰ ein `‹ Partien`, das dich zurückbringt. Die Knöpfe der Seite stehen dort in einer

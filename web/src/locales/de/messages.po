@@ -1211,6 +1211,18 @@ msgstr "Engine ausblenden"
 msgid "Hide engine evaluations, lines and flags (⇧E)"
 msgstr "Bewertungen, Varianten und Markierungen der Engine ausblenden (⇧E)"
 
+#: src/components/shell/LatestGame.tsx
+msgid "unknown opponent"
+msgstr "unbekannten Gegner"
+
+#: src/components/shell/LatestGame.tsx
+msgid "Open your latest game, not opened yet: vs {opponent}, {age}"
+msgstr "Deine neueste Partie öffnen, noch nicht angesehen: gegen {opponent}, {age}"
+
+#: src/components/shell/LatestGame.tsx
+msgid "Open your latest game: vs {opponent}, {age}"
+msgstr "Deine neueste Partie öffnen: gegen {opponent}, {age}"
+
 #: src/components/shell/LiveSearchReadout.tsx
 msgid "{engine} has searched this position for {elapsed}, to depth {depth}"
 msgstr "{engine} rechnet seit {elapsed} an dieser Stellung, bis Tiefe {depth}"

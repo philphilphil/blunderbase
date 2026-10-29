@@ -9,6 +9,7 @@ import { cn } from '@/lib/utils'
 
 import { useCommandPalette } from './CommandPalette'
 import { EngineToggle } from './EngineToggle'
+import { LatestGame } from './LatestGame'
 import { LiveSearchReadout } from './LiveSearchReadout'
 import { usePageChrome, type Crumb, type PageBack } from './PageChrome'
 import { QueueIndicator } from './QueueIndicator'
@@ -118,8 +119,8 @@ function BackLink({ back }: { back: PageBack }) {
 
 /**
  * The 42px titlebar: the page's title, its own actions right-aligned, and then, past a
- * rule, a live search left running (`LiveSearchReadout`), the analysis queue and the Hide
- * engine switch (the clarity pass, D3-A).
+ * rule, a live search left running (`LiveSearchReadout`), the latest game as an icon
+ * (`LatestGame`), the analysis queue and the Hide engine switch (the clarity pass, D3-A).
  * Thin, flat and on every screen — it carries a strong bottom rule and the chrome surface
  * rather than a hairline over the canvas. It starts at the rail's edge, and its left padding
  * is the page's gutter (`pl-6`, `PageBody`'s), so the title sits over the column it names.
@@ -138,8 +139,8 @@ function BackLink({ back }: { back: PageBack }) {
  *
  * On a phone the bar spans the window (the rail is a drawer) and holds, in order: the ☰, or
  * on a detail page the back link that replaces it (`SetPageChrome`'s `back`); the title
- * alone, never under 6rem; the queue's figure (and Pause/Clear while they apply); the
- * engine switch without its word; and search as an icon,
+ * alone, never under 6rem; the latest game's icon; the queue's figure (and Pause/Clear while
+ * they apply); the engine switch without its word; and search as an icon,
  * since the rail's search field is behind the ☰. The page's actions stand in a row of their
  * own under the bar (`AppShell`'s `PhoneActions`).
  *
@@ -178,6 +179,7 @@ export function TopBar({ onOpenNav }: { onOpenNav: () => void }) {
         </>
       ) : null}
       <LiveSearchReadout />
+      <LatestGame />
       <QueueIndicator />
       <EngineToggle compact={mobile} />
       <Button

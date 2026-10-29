@@ -27,6 +27,8 @@ vi.mock('@/lib/api/queries', () => ({
   useChangePassword,
   useQueueStatus,
   useCollections,
+  // The titlebar's latest game; `LatestGame.test.tsx` is where it is exercised.
+  useGames: () => ({ data: undefined }),
 }))
 
 // The Settings menu is the rail's, not the palette's, and it wants the tour provider
