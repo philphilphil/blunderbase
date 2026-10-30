@@ -4,6 +4,12 @@ One line per change, newest first. Written by hand when a release is cut — see
 
 ## Unreleased
 
+## v1.12.0 — 2026-10-30
+
+- Added the latest game to the title bar
+- Fixed linking a chess.com name typed with capitals
+- Fixed the game graphs clipping their first and last bars
+
 ## v1.11.0 — 2026-10-23
 
 - Added Show the engine for several selected games
